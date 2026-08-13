@@ -11,6 +11,15 @@ export interface ConfigDefinition {
   readonly ruleKey: string;
   readonly version: number;
   readonly status: string;
+  readonly ruleType: string;
+  readonly contextKey?: string | null;
+  readonly resourceKey?: string | null;
+  readonly serviceKey?: string | null;
+  readonly semanticOwner?: string | null;
+  readonly steward?: string | null;
+  readonly sourceReleaseId?: string | null;
+  readonly sourceChangeSetId?: string | null;
+  readonly definition?: unknown;
   readonly condition?: unknown;
   readonly parameters?: {
     readonly nullSemantics?: string;
@@ -18,6 +27,7 @@ export interface ConfigDefinition {
     readonly hostContractVersion?: string;
   };
   readonly governance?: { readonly lifecycleBoundary?: string };
+  readonly validationResult?: unknown;
 }
 
 interface ConfigDefinitionCapabilities {
@@ -87,6 +97,7 @@ export class ProjectionCatalogService {
           availableActions,
           reviewStatus: decision.reviewStatus,
           configDefinitionId: definition?.id,
+          configDefinition: definition,
           configStatus: definition?.status,
           expression: formatDecisionExpression(definition?.condition),
           condition: definition?.condition ?? null,
@@ -109,6 +120,40 @@ export class ProjectionCatalogService {
       { withCredentials: true }
     ).pipe(map(response => response.events));
   }
+
+  createDraftVersion(
+    definition: ConfigDefinition, condition: unknown, config: PolicyStudioRuntimeConfig
+  ): Observable<ConfigDefinition> {
+    if (config.mode !== 'remote' || !config.configApiBaseUrl) {
+      throw new Error('DRAFT_REMOTE_CONFIG_REQUIRED');
+    }
+    return this.http.post<ConfigDefinition>(
+      `${config.configApiBaseUrl}/api/praxis/config/domain-rules/definitions`,
+      newDraftVersionRequest(definition, condition),
+      { withCredentials: true }
+    );
+  }
+}
+
+export function newDraftVersionRequest(definition: ConfigDefinition, condition: unknown): Record<string, unknown> {
+  return {
+    ruleKey: definition.ruleKey,
+    version: definition.version + 1,
+    ruleType: definition.ruleType,
+    status: 'draft',
+    contextKey: definition.contextKey ?? null,
+    resourceKey: definition.resourceKey ?? null,
+    serviceKey: definition.serviceKey ?? null,
+    semanticOwner: definition.semanticOwner ?? null,
+    steward: definition.steward ?? null,
+    sourceReleaseId: definition.sourceReleaseId ?? null,
+    sourceChangeSetId: definition.sourceChangeSetId ?? null,
+    definition: definition.definition ?? {},
+    parameters: definition.parameters ?? {},
+    condition,
+    governance: definition.governance ?? {},
+    validationResult: null
+  };
 }
 
 export function latestDefinition(

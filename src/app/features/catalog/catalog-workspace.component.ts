@@ -32,6 +32,8 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly permissionLimited = signal(false);
   readonly authenticating = signal(false);
   readonly authenticationFailed = signal(false);
+  readonly savingDraft = signal(false);
+  readonly draftSaveError = signal(false);
   readonly timeline = signal<readonly DecisionTimelineEvent[]>([]);
   readonly authoringOpen = signal(false);
   readonly draftCondition = signal<unknown | null>(null);
@@ -129,6 +131,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.authoringOpen.set(false);
     this.draftCondition.set(decision.condition);
     this.editorState.set(null);
+    this.draftSaveError.set(false);
     this.timeline.set([]);
     const state = this.runtime.state();
     if (state.kind === 'ready' && decision.configDefinitionId) {
@@ -144,6 +147,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     if (!decision?.editable || !decision.condition) return;
     this.draftCondition.set(decision.condition);
     this.editorState.set(null);
+    this.draftSaveError.set(false);
     this.authoringOpen.set(true);
   }
 
@@ -155,5 +159,26 @@ export class CatalogWorkspaceComponent implements OnInit {
   resetDraft(): void {
     this.draftCondition.set(this.selected()?.condition ?? null);
     this.editorState.set(null);
+    this.draftSaveError.set(false);
+  }
+
+  saveDraftVersion(): void {
+    const current = this.selected();
+    const state = this.runtime.state();
+    if (state.kind !== 'ready' || !current?.configDefinition || !this.draftChanged() ||
+        !current.availableActions?.includes('CREATE_NEW_VERSION') || this.savingDraft()) return;
+    this.savingDraft.set(true);
+    this.draftSaveError.set(false);
+    this.catalog.createDraftVersion(current.configDefinition, this.draftCondition(), state.config).subscribe({
+      next: () => {
+        this.savingDraft.set(false);
+        this.authoringOpen.set(false);
+        this.loadCatalog();
+      },
+      error: () => {
+        this.savingDraft.set(false);
+        this.draftSaveError.set(true);
+      }
+    });
   }
 }

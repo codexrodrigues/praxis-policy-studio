@@ -57,14 +57,17 @@ const copy = {
     openDraft: 'Abrir draft local',
     conditionRequired: 'Carregue a condição do Config',
     localDraft: 'Draft local e descartável',
-    localDraftBoundary: 'Esta área não salva, publica, ativa nem altera a autoridade da regra.',
+    localDraftBoundary: 'Salvar cria uma nova versão draft; não publica, ativa nem altera a autoridade da regra.',
     close: 'Fechar',
     validationIssues: 'itens de validação',
     unsavedLocalChanges: 'Há alterações apenas nesta sessão.',
     unchangedDraft: 'A condição permanece igual à origem carregada.',
     resetDraft: 'Restaurar condição',
     loadedCondition: 'Condição carregada do Config',
-    localCondition: 'Draft local'
+    localCondition: 'Draft local',
+    saveDraft: 'Salvar nova versão draft',
+    savingDraft: 'Salvando…',
+    draftSaveError: 'Não foi possível criar a nova versão. Recarregue o catálogo e tente novamente.'
   },
   'en-US': {
     skip: 'Skip to main content',
@@ -121,14 +124,17 @@ const copy = {
     openDraft: 'Open local draft',
     conditionRequired: 'Load the condition from Config',
     localDraft: 'Local disposable draft',
-    localDraftBoundary: 'This area does not save, publish, activate, or change rule authority.',
+    localDraftBoundary: 'Saving creates a new draft version; it does not publish, activate, or change rule authority.',
     close: 'Close',
     validationIssues: 'validation items',
     unsavedLocalChanges: 'Changes exist only in this session.',
     unchangedDraft: 'The condition remains equal to its loaded source.',
     resetDraft: 'Reset condition',
     loadedCondition: 'Condition loaded from Config',
-    localCondition: 'Local draft'
+    localCondition: 'Local draft',
+    saveDraft: 'Save new draft version',
+    savingDraft: 'Saving…',
+    draftSaveError: 'The new version could not be created. Reload the catalog and try again.'
   }
 } as const;
 

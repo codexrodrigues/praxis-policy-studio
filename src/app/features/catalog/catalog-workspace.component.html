@@ -196,7 +196,13 @@
             <strong>{{ editorState()?.validationErrors?.length ?? 0 }} {{ i18n.text('validationIssues') }}</strong>
             <small>{{ draftChanged() ? i18n.text('unsavedLocalChanges') : i18n.text('unchangedDraft') }}</small>
           </div>
-          <button type="button" class="quiet-button" (click)="resetDraft()">{{ i18n.text('resetDraft') }}</button>
+          <div class="draft-actions">
+            @if (draftSaveError()) { <span role="alert">{{ i18n.text('draftSaveError') }}</span> }
+            <button type="button" class="quiet-button" (click)="resetDraft()">{{ i18n.text('resetDraft') }}</button>
+            <button type="button" [disabled]="!draftChanged() || savingDraft()" (click)="saveDraftVersion()">
+              {{ i18n.text(savingDraft() ? 'savingDraft' : 'saveDraft') }}
+            </button>
+          </div>
         </footer>
       </section>
     }

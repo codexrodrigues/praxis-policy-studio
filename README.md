@@ -61,9 +61,10 @@ autoridade operacional, enquanto o Config aparece apenas como draft técnico.
 Esta superfície não oferece edição, publicação ou ativação.
 
 A decisão focal editável abre o Visual Builder oficial em um chunk lazy. O
-workspace altera somente memória local, mostra validações e permite restaurar a
-condição carregada. Ele deliberadamente não possui comando HTTP de gravação,
-publicação, materialização, snapshot ou ativação.
+workspace mostra validações, permite restaurar a condição carregada e, quando o
+servidor autoriza `CREATE_NEW_VERSION`, cria uma nova definição `draft` com a
+condição editada. A versão anterior permanece imutável; o Studio não publica,
+materializa, cria snapshot, ativa nem altera a autoridade runtime.
 
 ## Gates
 

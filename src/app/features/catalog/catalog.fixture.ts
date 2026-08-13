@@ -1,4 +1,5 @@
 export type DecisionState = 'technical-draft' | 'verified';
+import type { ConfigDefinition } from '../../core/projection-catalog.service';
 
 export interface DecisionSummary {
   readonly order: number;
@@ -17,6 +18,7 @@ export interface DecisionSummary {
   readonly availableActions?: readonly string[];
   readonly reviewStatus?: string;
   readonly configDefinitionId?: string;
+  readonly configDefinition?: ConfigDefinition;
   readonly configStatus?: string;
   readonly expression: string | null;
   readonly condition: unknown | null;
