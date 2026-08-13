@@ -6,9 +6,10 @@ import { validateDomainProjection } from './domain-projection';
 import { DecisionSummary, DecisionTimelineEvent } from '../features/catalog/catalog.fixture';
 import { collectFactPaths, formatDecisionExpression } from './decision-inspection';
 
-interface ConfigDefinition {
+export interface ConfigDefinition {
   readonly id: string;
   readonly ruleKey: string;
+  readonly version: number;
   readonly status: string;
   readonly condition?: unknown;
   readonly parameters?: {
@@ -17,6 +18,15 @@ interface ConfigDefinition {
     readonly hostContractVersion?: string;
   };
   readonly governance?: { readonly lifecycleBoundary?: string };
+}
+
+interface ConfigDefinitionCapabilities {
+  readonly definitions: readonly {
+    readonly definitionId: string;
+    readonly ruleKey: string;
+    readonly version: number;
+    readonly availableActions: readonly string[];
+  }[];
 }
 
 interface ConfigTimeline {
@@ -33,9 +43,17 @@ export class ProjectionCatalogService {
           withCredentials: true
         })
       : of([] as readonly ConfigDefinition[]);
-    return forkJoin({ projection: this.http.get<unknown>(path).pipe(map(validateDomainProjection)), definitions }).pipe(
-      map(({ projection, definitions }) => projection.decisionRefs.map(decision => {
-        const definition = definitions.find(item => item.ruleKey === decision.decisionKey);
+    const capabilities = config.mode === 'remote'
+      ? this.http.get<ConfigDefinitionCapabilities>(
+          `${config.configApiBaseUrl}/api/praxis/config/domain-rules/definitions/capabilities`,
+          { withCredentials: true })
+      : of({ definitions: [] } as ConfigDefinitionCapabilities);
+    return forkJoin({ projection: this.http.get<unknown>(path).pipe(map(validateDomainProjection)), definitions, capabilities }).pipe(
+      map(({ projection, definitions, capabilities }) => projection.decisionRefs.map(decision => {
+        const definition = latestDefinition(definitions, decision.decisionKey);
+        const availableActions = definition
+          ? capabilities.definitions.find(item => item.definitionId === definition.id)?.availableActions ?? []
+          : [];
         const conditionFactPaths = collectFactPaths(definition?.condition);
         if (conditionFactPaths.some(factPath => !decision.factPaths.includes(factPath))) {
           throw new Error(`CONFIG_FACT_OUTSIDE_GOVERNED_PROJECTION ${decision.decisionKey}`);
@@ -65,7 +83,8 @@ export class ProjectionCatalogService {
           authority: `${projection.authorityEvidence.currentAuthority} · ${projection.authorityEvidence.legacyAuthority}`,
           source: decision.semanticSourceRef,
           evidenceCount: projection.sourceArtifacts.length,
-          editable: decision.editable,
+          editable: decision.editable && availableActions.includes('CREATE_NEW_VERSION'),
+          availableActions,
           reviewStatus: decision.reviewStatus,
           configDefinitionId: definition?.id,
           configStatus: definition?.status,
@@ -90,4 +109,13 @@ export class ProjectionCatalogService {
       { withCredentials: true }
     ).pipe(map(response => response.events));
   }
+}
+
+export function latestDefinition(
+  definitions: readonly ConfigDefinition[], ruleKey: string
+): ConfigDefinition | undefined {
+  return definitions
+    .filter(item => item.ruleKey === ruleKey)
+    .reduce<ConfigDefinition | undefined>((latest, item) =>
+      !latest || item.version > latest.version ? item : latest, undefined);
 }

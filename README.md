@@ -48,6 +48,11 @@ status técnico do Config em homologação de negócio. A projeção governada s
 sendo a fonte das 14 identidades e da ordem; o Config apenas acrescenta o estado
 persistido que tenha a mesma chave canônica.
 
+A editabilidade também não é inferida pelo browser. O Studio exige
+`CREATE_NEW_VERSION` em `GET /domain-rules/definitions/capabilities` para a
+versão mais recente da definição; sem essa ação server-owned, o workspace permanece
+estritamente read-only.
+
 No modo remoto, a inspeção de cada decisão mostra a condição em leitura
 simbólica, os facts referenciados, a semântica de `null`, as operações cobertas,
 a posição na precedência e as evidências de origem. A comparação entre baseline

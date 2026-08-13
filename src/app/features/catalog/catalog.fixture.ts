@@ -14,6 +14,7 @@ export interface DecisionSummary {
   readonly source: string;
   readonly evidenceCount: number;
   readonly editable?: boolean;
+  readonly availableActions?: readonly string[];
   readonly reviewStatus?: string;
   readonly configDefinitionId?: string;
   readonly configStatus?: string;
