@@ -1,0 +1,8 @@
+/.angular/
+/dist/
+/node_modules/
+/coverage/
+/.dev-server.*
+/.idea/
+/.vscode/*
+!/.vscode/extensions.json

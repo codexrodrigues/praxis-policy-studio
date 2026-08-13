@@ -1,0 +1,31 @@
+<a class="skip-link" href="#main-content">{{ i18n.text('skip') }}</a>
+<header class="product-bar">
+  <a class="brand" href="/catalog" aria-label="Praxis Policy Studio — catálogo">
+    <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+    <strong>{{ i18n.text('product') }}</strong>
+  </a>
+  <nav aria-label="Navegação principal">
+    <a href="/catalog" aria-current="page"><span class="glyph" aria-hidden="true">⌘</span>{{ i18n.text('catalog') }}</a>
+  </nav>
+  <div class="context">
+    <span><span class="glyph" aria-hidden="true">◇</span>{{ i18n.text('fixture') }}</span>
+    <span><span class="glyph" aria-hidden="true">●</span>{{ i18n.text('readonly') }}</span>
+  </div>
+</header>
+
+<main id="main-content" tabindex="-1">
+  @switch (runtime.state().kind) {
+    @case ('loading') {
+      <section class="setup-state" aria-live="polite"><span class="loader"></span><p>{{ i18n.text('loading') }}</p></section>
+    }
+    @case ('error') {
+      <section class="setup-state error" role="alert">
+        <span class="error-glyph" aria-hidden="true">!</span>
+        <h1>{{ i18n.text('setupError') }}</h1>
+        <code>{{ $any(runtime.state()).code }}</code>
+        <button type="button" (click)="runtime.load()">{{ i18n.text('retry') }}</button>
+      </section>
+    }
+    @default { <router-outlet /> }
+  }
+</main>

@@ -1,0 +1,28 @@
+:root {
+  color-scheme: light;
+  --pax-color-primary: #076487;
+  --pax-color-on-primary: #ffffff;
+  --pax-color-primary-container: #c6e8f5;
+  --pax-color-on-primary-container: #073949;
+  --pax-color-tertiary: #187457;
+  --pax-color-tertiary-container: #c4ead8;
+  --pax-color-on-tertiary-container: #123f31;
+  --pax-color-surface: #f9fbfc;
+  --pax-color-surface-container-lowest: #ffffff;
+  --pax-color-surface-container-low: #f1f5f6;
+  --pax-color-surface-container: #e4eaed;
+  --pax-color-on-surface: #15242a;
+  --pax-color-on-surface-variant: #52636a;
+  --pax-color-outline: #697a82;
+  --pax-color-outline-variant: #c5d0d5;
+  --pax-color-error: #ba1a1a;
+  font-family: Inter, Aptos, "Segoe UI", sans-serif;
+  background: var(--pax-color-surface);
+  color: var(--pax-color-on-surface);
+}
+* { box-sizing: border-box; }
+html { min-width: 20rem; background: var(--pax-color-surface); }
+body { min-height: 100vh; margin: 0; }
+button, input { font: inherit; }
+::selection { background: var(--pax-color-primary-container); color: var(--pax-color-on-primary-container); }
+

@@ -1,0 +1,80 @@
+<section class="workspace" aria-labelledby="catalog-title">
+  <aside class="catalog-pane" aria-label="Catálogo de decisões">
+    <header class="pane-heading">
+      <div>
+        <p class="eyebrow">workforce.frequency-and-absence</p>
+        <h1 id="catalog-title">{{ i18n.text('catalog') }}</h1>
+      </div>
+      <span class="count">{{ decisions().length }} {{ i18n.text('decisions') }}</span>
+    </header>
+
+    <label class="search">
+      <span class="search-glyph" aria-hidden="true">⌕</span>
+      <span class="visually-hidden">{{ i18n.text('search') }}</span>
+      <input [value]="query()" (input)="updateQuery($any($event.target).value)" [placeholder]="i18n.text('searchHint')">
+      @if (query()) {
+        <button type="button" (click)="updateQuery('')" aria-label="Limpar busca">×</button>
+      }
+    </label>
+
+    <div class="decision-list" role="listbox" aria-label="Decisões disponíveis">
+      @for (decision of decisions(); track decision.key) {
+        <button
+          type="button"
+          role="option"
+          class="decision-row"
+          [class.selected]="selected().key === decision.key"
+          [attr.aria-selected]="selected().key === decision.key"
+          (click)="select(decision)">
+          <span class="decision-code">{{ decision.code }}</span>
+          <span class="decision-copy">
+            <strong>{{ decision.name }}</strong>
+            <small>{{ decision.ruleSet }}</small>
+          </span>
+          <span class="state-dot" [class.verified]="decision.state === 'verified'" aria-hidden="true"></span>
+        </button>
+      } @empty {
+        <p class="empty">{{ i18n.text('noResults') }}</p>
+      }
+    </div>
+  </aside>
+
+  <article class="decision-pane" aria-labelledby="decision-title">
+    <header class="decision-header">
+      <div>
+        <p class="eyebrow">{{ i18n.text('selected') }} · {{ selected().code }}</p>
+        <h2 id="decision-title">{{ selected().name }}</h2>
+        <p class="canonical-key">{{ selected().key }}</p>
+      </div>
+      <span class="status" [class.verified]="selected().state === 'verified'">
+        {{ selected().state === 'verified' ? 'Evidência técnica verificada' : 'Draft técnico' }}
+      </span>
+    </header>
+
+    <div class="decision-trail" aria-label="Trilha da decisão">
+      <div class="trail-step active"><span>1</span><strong>{{ i18n.text('meaning') }}</strong><small>Contrato legível</small></div>
+      <div class="trail-line"></div>
+      <div class="trail-step"><span>2</span><strong>{{ i18n.text('evidence') }}</strong><small>{{ selected().evidenceCount }} referências</small></div>
+      <div class="trail-line"></div>
+      <div class="trail-step"><span>3</span><strong>{{ i18n.text('execution') }}</strong><small>Host consumidor</small></div>
+    </div>
+
+    <div class="detail-grid">
+      <section class="meaning-block">
+        <p class="section-label">{{ i18n.text('meaning') }}</p>
+        <p class="meaning">{{ selected().meaning }}</p>
+      </section>
+      <dl class="facts">
+        <div><dt>Domínio</dt><dd>{{ selected().domain }}</dd></div>
+        <div><dt>RuleSet</dt><dd>{{ selected().ruleSet }}</dd></div>
+        <div><dt>{{ i18n.text('authority') }}</dt><dd>{{ selected().authority }}</dd></div>
+        <div><dt>{{ i18n.text('source') }}</dt><dd>{{ selected().source }}</dd></div>
+      </dl>
+    </div>
+
+    <footer class="fixture-boundary">
+      <span class="boundary-glyph" aria-hidden="true">◇</span>
+      <span>{{ i18n.text('fixtureNotice') }}</span>
+    </footer>
+  </article>
+</section>
