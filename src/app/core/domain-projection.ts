@@ -4,6 +4,7 @@ export interface DomainProjection {
   readonly projectionVersion: number;
   readonly sourceArtifacts: readonly { readonly path: string; readonly kind: string; readonly sha256: string }[];
   readonly ruleSetRef: {
+    readonly domainKey: string;
     readonly boundedContextKey: string;
     readonly ruleSetKey: string;
     readonly hostContractVersion?: string;
@@ -18,8 +19,8 @@ export interface DomainProjection {
   };
   readonly evidenceBoundaries: readonly { readonly boundary: string; readonly operations: readonly string[]; readonly status: string }[];
   readonly authorityEvidence: {
-    readonly currentAuthority: 'KEEP_DB_BACKED';
-    readonly legacyAuthority: 'LEGACY_AUTHORITATIVE';
+    readonly currentAuthority: string;
+    readonly baselineAuthority: string;
     readonly productionAuthorityChanged: false;
   };
 }
@@ -27,7 +28,7 @@ export interface DomainProjection {
 export interface ProjectionDecisionRef {
   readonly order: number;
   readonly decisionKey: string;
-  readonly reasonCode: string;
+  readonly reasonCode: string | null;
   readonly presentationLabel: string;
   readonly semanticStatus: string;
   readonly reviewStatus: string;
@@ -35,11 +36,22 @@ export interface ProjectionDecisionRef {
   readonly targetPlanRef: string;
   readonly editable: boolean;
   readonly factPaths: readonly string[];
+  readonly stage?: string;
+  readonly cardinality?: string;
+  readonly overridePolicy?: string;
+  readonly bindingRefs?: readonly {
+    readonly bindingKey: string;
+    readonly source: string;
+    readonly executorType: string;
+    readonly order: number;
+  }[];
 }
+
+export type ProjectionFactValueType = 'boolean' | 'string' | 'number' | 'date' | 'string-array' | 'date-array';
 
 export interface ProjectionFactSchema {
   readonly path: string;
-  readonly valueType: 'number' | 'date';
+  readonly valueType: ProjectionFactValueType;
   readonly nullable: boolean;
   readonly presentationLabel: string;
   readonly description: string;
@@ -51,23 +63,32 @@ export interface ProjectionFactSchema {
 export function validateDomainProjection(value: unknown): DomainProjection {
   if (!value || typeof value !== 'object') throw new Error('PROJECTION_DOCUMENT_REQUIRED');
   const projection = value as Partial<DomainProjection>;
-  if (!projection.projectionId || !projection.ruleSetRef?.ruleSetKey) throw new Error('PROJECTION_IDENTITY_REQUIRED');
+  if (!projection.projectionId || !projection.ruleSetRef?.domainKey || !projection.ruleSetRef.ruleSetKey) {
+    throw new Error('PROJECTION_IDENTITY_REQUIRED');
+  }
   if (!projection.decisionRefs?.length) throw new Error('PROJECTION_DECISIONS_REQUIRED');
   if (!projection.factSchemas?.length) throw new Error('PROJECTION_FACT_SCHEMAS_REQUIRED');
+  if (!projection.sourceArtifacts?.length || projection.sourceArtifacts.some(item => !/^[A-Fa-f0-9]{64}$/.test(item.sha256))) {
+    throw new Error('PROJECTION_SOURCE_DIGEST_INVALID');
+  }
   const decisions = projection.decisionRefs;
   if (new Set(decisions.map(item => item.decisionKey)).size !== decisions.length) throw new Error('PROJECTION_DECISION_DUPLICATE');
   if (decisions.some((item, index) => item.order !== index + 1)) throw new Error('PROJECTION_ORDER_INVALID');
+  if (decisions.some(item => !['TECHNICAL_DRAFT_READY', 'REFERENCE_IMPLEMENTED'].includes(item.semanticStatus))) {
+    throw new Error('PROJECTION_SEMANTIC_STATUS_UNSUPPORTED');
+  }
   const factPaths = projection.factSchemas.map(item => item.path);
   if (new Set(factPaths).size !== factPaths.length) throw new Error('PROJECTION_FACT_SCHEMA_DUPLICATE');
   if (projection.factSchemas.some(item => !item.presentationLabel || !item.description || !item.providerRef ||
-      !item.evidenceRefs?.length || !['number', 'date'].includes(item.valueType) || typeof item.nullable !== 'boolean')) {
+      !item.evidenceRefs?.length || !['boolean', 'string', 'number', 'date', 'string-array', 'date-array'].includes(item.valueType) ||
+      typeof item.nullable !== 'boolean')) {
     throw new Error('PROJECTION_FACT_SCHEMA_INVALID');
   }
-  if (decisions.some(item => !item.factPaths?.length || item.factPaths.some(factPath => !factPaths.includes(factPath)))) {
+  if (decisions.some(item => !Array.isArray(item.factPaths) || item.factPaths.some(factPath => !factPaths.includes(factPath)))) {
     throw new Error('PROJECTION_FACT_SCHEMA_COVERAGE_INVALID');
   }
-  if (projection.authorityEvidence?.currentAuthority !== 'KEEP_DB_BACKED' ||
-      projection.authorityEvidence.legacyAuthority !== 'LEGACY_AUTHORITATIVE' ||
+  if (!projection.authorityEvidence?.currentAuthority?.trim() ||
+      !projection.authorityEvidence.baselineAuthority?.trim() ||
       projection.authorityEvidence.productionAuthorityChanged !== false) {
     throw new Error('PROJECTION_AUTHORITY_INVALID');
   }

@@ -16,7 +16,7 @@ nav a { width: fit-content; min-height: 2.5rem; padding: 0 .75rem; border-radius
 .setup-state button { border: 0; border-radius: .45rem; padding: .7rem 1rem; background: var(--pax-color-primary, #076487); color: var(--pax-color-on-primary, #fff); font: inherit; font-weight: 700; cursor: pointer; }
 .loader { width: 2rem; height: 2rem; border: 3px solid var(--pax-color-outline-variant, #c5d0d5); border-top-color: var(--pax-color-primary, #076487); border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .loader { animation-duration: 2s; } }
+@media (prefers-reduced-motion: reduce) { .loader { animation: none; border-top-color: var(--pax-color-outline-variant, #c5d0d5); border-inline-start-color: var(--pax-color-primary, #076487); } }
 @media (max-width: 760px) {
   .product-bar { grid-template-columns: 1fr auto; min-height: 4rem; gap: .5rem; }
   nav { display: none; }

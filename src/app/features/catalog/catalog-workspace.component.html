@@ -2,7 +2,7 @@
   <aside class="catalog-pane" aria-label="Catálogo de decisões">
     <header class="pane-heading">
       <div>
-        <p class="eyebrow">workforce.frequency-and-absence</p>
+        <p class="eyebrow">{{ selected()?.domain ?? i18n.text('product') }}</p>
         <h1 id="catalog-title">{{ i18n.text('catalog') }}</h1>
       </div>
       <span class="count">{{ decisions().length }} {{ i18n.text('decisions') }}</span>
@@ -13,11 +13,11 @@
       <span class="visually-hidden">{{ i18n.text('search') }}</span>
       <input [value]="query()" (input)="updateQuery($any($event.target).value)" [placeholder]="i18n.text('searchHint')">
       @if (query()) {
-        <button type="button" (click)="updateQuery('')" aria-label="Limpar busca">×</button>
+        <button type="button" (click)="updateQuery('')" [attr.aria-label]="i18n.text('clearSearch')">×</button>
       }
     </label>
 
-    <div class="decision-list" role="listbox" aria-label="Decisões disponíveis">
+    <div class="decision-list" [attr.aria-label]="i18n.text('availableDecisions')">
       @if (loading()) {
         <p class="empty" aria-live="polite">{{ i18n.text('loading') }}</p>
       } @else if (authenticationRequired()) {
@@ -34,24 +34,28 @@
         <p class="empty state-message" role="alert">{{ i18n.text('permissionLimited') }}</p>
       } @else if (loadError()) {
         <p class="empty state-message" role="alert">{{ i18n.text('remoteError') }}</p>
-      }
-      @for (decision of decisions(); track decision.key) {
-        <button
-          type="button"
-          role="option"
-          class="decision-row"
-          [class.selected]="selected()?.key === decision.key"
-          [attr.aria-selected]="selected()?.key === decision.key"
-          (click)="select(decision)">
-          <span class="decision-code">{{ decision.code }}</span>
-          <span class="decision-copy">
-            <strong>{{ decision.name }}</strong>
-            <small>{{ decision.ruleSet }}</small>
-          </span>
-          <span class="state-dot" [class.verified]="decision.state === 'verified'" aria-hidden="true"></span>
+        <button type="button" class="quiet-button state-retry" (click)="loadCatalog()">
+          {{ i18n.text('retryCatalog') }}
         </button>
-      } @empty {
-        <p class="empty">{{ i18n.text('noResults') }}</p>
+      } @else {
+        @for (decision of decisions(); track decision.key) {
+          <button
+            type="button"
+            class="decision-row"
+            [class.selected]="selected()?.key === decision.key"
+            [attr.aria-current]="selected()?.key === decision.key ? 'true' : null"
+            (click)="select(decision)">
+            <span class="decision-code">{{ decision.code }}</span>
+            <span class="decision-copy">
+              <strong>{{ decision.name }}</strong>
+              <small>{{ decision.ruleSet }}</small>
+              <span class="visually-hidden">{{ i18n.text(decision.state === 'verified' ? 'verifiedState' : 'draftState') }}</span>
+            </span>
+            <span class="state-dot" [class.verified]="decision.state === 'verified'" aria-hidden="true"></span>
+          </button>
+        } @empty {
+          <p class="empty">{{ i18n.text('noResults') }}</p>
+        }
       }
     </div>
   </aside>
@@ -65,7 +69,7 @@
         <p class="canonical-key">{{ current.key }}</p>
       </div>
       <span class="status" [class.verified]="current.state === 'verified'">
-        {{ current.state === 'verified' ? 'Evidência técnica verificada' : 'Draft técnico' }}
+        {{ i18n.text(current.state === 'verified' ? 'verifiedState' : 'draftState') }}
       </span>
     </header>
 
@@ -97,7 +101,7 @@
       <header class="inspection-heading">
         <div>
           <p class="section-label" id="inspection-title">{{ i18n.text('inspection') }}</p>
-          <p class="inspection-summary">{{ i18n.text('sequentialOrder') }} {{ current.order }}/{{ current.totalDecisions }}</p>
+          <p class="inspection-summary">{{ i18n.text('governedOrder') }} {{ current.order }}/{{ current.totalDecisions }}</p>
         </div>
         <span class="sequence" [attr.aria-label]="i18n.text('precedence') + ' ' + current.order + '/' + current.totalDecisions">
           <strong>{{ current.order }}</strong><small>/{{ current.totalDecisions }}</small>
@@ -137,8 +141,8 @@
       <div class="version-compare" aria-label="Comparação de autoridade e draft">
         <section>
           <span class="version-kicker">{{ i18n.text('baseline') }}</span>
-          <strong>{{ i18n.text('legacyBaseline') }}</strong>
-          <small>KEEP_DB_BACKED · LEGACY_AUTHORITATIVE</small>
+          <strong>{{ i18n.text('referenceBaseline') }}</strong>
+          <small>{{ current.baselineAuthority }}</small>
         </section>
         <span class="compare-arrow" aria-hidden="true">→</span>
         <section [class.unavailable]="!current.configStatus">
@@ -148,15 +152,42 @@
         </section>
       </div>
 
+      @if (current.workspaceId) {
+        <section class="semantic-diff" aria-labelledby="semantic-diff-title">
+          <header>
+            <div>
+              <p class="section-label" id="semantic-diff-title">{{ i18n.text('semanticDiff') }}</p>
+              <p>{{ i18n.text('semanticDiffBoundary') }}</p>
+            </div>
+            <strong>{{ semanticDiff().length }}</strong>
+          </header>
+          @for (change of semanticDiff(); track change.path + change.kind) {
+            <article>
+              <span>{{ change.kind }}</span>
+              <code>{{ change.path }}</code>
+              <small>{{ displayDiffValue(change.baseline) }} → {{ displayDiffValue(change.candidate) }}</small>
+            </article>
+          } @empty {
+            <p class="empty">{{ i18n.text('noSemanticChanges') }}</p>
+          }
+        </section>
+      }
+
       @if (current.editable) {
         <div class="authoring-entry">
           <div>
             <strong>{{ i18n.text('draftWorkspace') }}</strong>
             <small>{{ i18n.text('draftWorkspaceHint') }}</small>
           </div>
-          <button type="button" [disabled]="!current.condition" (click)="openAuthoring()">
-            {{ i18n.text(current.condition ? 'openDraft' : 'conditionRequired') }}
-          </button>
+          @if (current.workspaceId) {
+            <button type="button" [disabled]="!current.condition || authoringBusy()" (click)="openAuthoring()">
+              {{ i18n.text(current.condition ? 'openDraft' : 'conditionRequired') }}
+            </button>
+          } @else {
+            <button type="button" [disabled]="!current.configDefinitionId || authoringBusy()" (click)="createWorkspace()">
+              {{ i18n.text('createWorkspace') }}
+            </button>
+          }
         </div>
       }
     </section>
@@ -196,15 +227,192 @@
             <strong>{{ editorState()?.validationErrors?.length ?? 0 }} {{ i18n.text('validationIssues') }}</strong>
             <small>{{ draftChanged() ? i18n.text('unsavedLocalChanges') : i18n.text('unchangedDraft') }}</small>
           </div>
-          <div class="draft-actions">
-            @if (draftSaveError()) { <span role="alert">{{ i18n.text('draftSaveError') }}</span> }
+          <div class="authoring-actions">
             <button type="button" class="quiet-button" (click)="resetDraft()">{{ i18n.text('resetDraft') }}</button>
-            <button type="button" [disabled]="!draftChanged() || savingDraft()" (click)="saveDraftVersion()">
-              {{ i18n.text(savingDraft() ? 'savingDraft' : 'saveDraft') }}
+            <button type="button" [disabled]="authoringBusy() || !draftChanged() || !!editorState()?.validationErrors?.length" (click)="saveGovernedDraft()">
+              {{ i18n.text('saveDraft') }}
             </button>
           </div>
         </footer>
       </section>
+    }
+
+    @if (current.workspaceId) {
+      <section class="scenario-workspace" aria-labelledby="scenario-title">
+        <header>
+          <div>
+            <p class="section-label" id="scenario-title">{{ i18n.text('testScenarios') }}</p>
+            <p>{{ i18n.text('scenarioBoundary') }}</p>
+          </div>
+          <strong>{{ scenarios().length }}</strong>
+        </header>
+        <form #scenarioForm class="scenario-form" (submit)="$event.preventDefault(); createScenario(scenarioKey.value, scenarioName.value, scenarioFacts.value, expectedDecision.value, scenarioForm)">
+          <label><span>{{ i18n.text('scenarioKey') }}</span><input #scenarioKey required></label>
+          <label><span>{{ i18n.text('scenarioName') }}</span><input #scenarioName required></label>
+          <label class="scenario-facts"><span>Facts JSON</span><textarea #scenarioFacts rows="4" required>{}</textarea></label>
+          <label><span>{{ i18n.text('expectedDecision') }}</span>
+            <select #expectedDecision>
+              <option>ALLOW</option><option>DENY</option><option>NOT_APPLICABLE</option>
+              <option>INCONCLUSIVE</option><option>TECHNICAL_ERROR</option>
+            </select>
+          </label>
+          <button type="submit" [disabled]="authoringBusy()">{{ i18n.text('addScenario') }}</button>
+        </form>
+        <div class="scenario-list">
+          @for (scenario of scenarios(); track scenario.id) {
+            <article><strong>{{ scenario.name }}</strong><code>{{ scenario.scenarioKey }}</code><span>{{ scenario.expectedDecision }} · {{ scenario.status }}</span></article>
+          } @empty { <p class="empty">{{ i18n.text('noScenarios') }}</p> }
+        </div>
+        <div class="governed-actions">
+          <button type="button" [disabled]="authoringBusy() || !scenarios().length || draftChanged()" (click)="runGovernedSandbox()">
+            {{ i18n.text('runSandbox') }}
+          </button>
+          <button type="button" [disabled]="authoringBusy() || current.workspaceStatus !== 'OPEN' || draftChanged()" (click)="submitGovernedWorkspace()">
+            {{ i18n.text('submitReview') }}
+          </button>
+        </div>
+        @if (sandboxRun(); as run) {
+          <div class="sandbox-results" aria-live="polite">
+            @for (result of run.results; track result.scenarioId) {
+              <article [class.passed]="result.candidateMatchesExpected">
+                <strong>{{ result.scenarioKey }}</strong>
+                <span>{{ result.candidateDecision }} / {{ result.expectedDecision }}</span>
+                <small>{{ result.comparison }} · active {{ result.activeDecision }}</small>
+              </article>
+            }
+          </div>
+        }
+        @if (authoringFeedback()) {
+          <p [class.state-message]="authoringError()" [attr.role]="authoringError() ? 'alert' : 'status'">{{ authoringFeedback() }}</p>
+        }
+      </section>
+
+
+      <section class="review-workspace" aria-labelledby="review-title">
+        <header>
+          <div>
+            <p class="section-label" id="review-title">{{ i18n.text('independentReview') }}</p>
+            <p>{{ i18n.text('reviewBoundary') }}</p>
+          </div>
+          <strong>{{ reviews().length }}</strong>
+        </header>
+        <div class="review-list">
+          @for (review of reviews(); track review.id) {
+            <article>
+              <strong>{{ review.decision }}</strong>
+              <span>{{ review.reviewerRef }} · rev {{ review.workspaceRevision }}</span>
+              <p>{{ review.rationale }}</p>
+              <time [attr.datetime]="review.reviewedAt">{{ review.reviewedAt }}</time>
+            </article>
+          } @empty {
+            <p class="empty">{{ i18n.text('noReviews') }}</p>
+          }
+        </div>
+        @if (current.workspaceStatus === 'SUBMITTED') {
+          <form #reviewForm class="review-form" (submit)="$event.preventDefault()">
+            <label>
+              <span>{{ i18n.text('reviewRationale') }}</span>
+              <textarea #reviewRationale rows="3" required></textarea>
+            </label>
+            <div class="governed-actions">
+              <button type="button" class="quiet-button" [disabled]="authoringBusy() || !reviewRationale.value.trim()" (click)="reviewGovernedWorkspace('REJECT', reviewRationale.value, reviewForm)">
+                {{ i18n.text('rejectWorkspace') }}
+              </button>
+              <button type="button" [disabled]="authoringBusy() || !reviewRationale.value.trim()" (click)="reviewGovernedWorkspace('APPROVE', reviewRationale.value, reviewForm)">
+                {{ i18n.text('approveWorkspace') }}
+              </button>
+            </div>
+          </form>
+        }
+        @if (current.workspaceStatus === 'APPROVED') {
+          <div class="governed-actions">
+            <button type="button" [disabled]="authoringBusy()" (click)="promoteGovernedWorkspace()">
+              {{ i18n.text('promoteWorkspace') }}
+            </button>
+          </div>
+        }
+        <small class="authority-note">{{ i18n.text('serverAuthorizesActions') }}</small>
+      </section>
+
+      @if (current.promotedDefinitionId) {
+        <section class="publication-workspace" aria-labelledby="publication-title">
+          <header>
+            <div>
+              <p class="section-label" id="publication-title">{{ i18n.text('publicationReadiness') }}</p>
+              <p>{{ i18n.text('publicationBoundary') }}</p>
+            </div>
+            <code>{{ current.promotedDefinitionId }}</code>
+          </header>
+          <button type="button" [disabled]="authoringBusy()" (click)="inspectPublicationReadiness()">
+            {{ i18n.text('inspectReadiness') }}
+          </button>
+          @if (publicationReadiness(); as readiness) {
+            <dl class="facts lifecycle-grid">
+              <div><dt>{{ i18n.text('readiness') }}</dt><dd>{{ readiness.readiness ?? '—' }}</dd></div>
+              <div><dt>{{ i18n.text('structuralResult') }}</dt><dd>{{ readiness.result ?? '—' }}</dd></div>
+              <div><dt>{{ i18n.text('existingCoverage') }}</dt><dd>{{ readiness.existingCoverage.length }}</dd></div>
+              <div><dt>{{ i18n.text('requiredApprovals') }}</dt><dd>{{ readiness.requiredApprovals.length }}</dd></div>
+              <div><dt>{{ i18n.text('predictedTargets') }}</dt><dd>{{ readiness.predictedMaterializations.length }}</dd></div>
+              <div><dt>{{ i18n.text('warnings') }}</dt><dd>{{ readiness.warnings.length }}</dd></div>
+            </dl>
+            @if (readiness.recommendedAction) { <p>{{ readiness.recommendedAction }}</p> }
+            <div class="readiness-details">
+              @for (target of readiness.predictedMaterializations; track $index) { <code>{{ displayDiffValue(target) }}</code> }
+              @for (warning of readiness.warnings; track $index) { <code class="warning">{{ displayDiffValue(warning) }}</code> }
+            </div>
+            <button type="button" [disabled]="authoringBusy() || readiness.readiness !== 'ready_to_publish'" (click)="publishGovernedDefinition()">
+              {{ i18n.text('publishDefinition') }}
+            </button>
+          }
+          @if (publicationResult(); as publication) {
+            <p role="status">{{ publication.status }} · {{ publication.readiness }} · {{ publication.materializationCount }} {{ i18n.text('materializations') }}</p>
+          }
+          <small class="authority-note">{{ i18n.text('publicationSeparation') }}</small>
+        </section>
+      }
+    }
+
+    @if (runtime.mode() === 'remote') {
+      <pax-snapshot-cockpit
+        [ruleSetKey]="current.ruleSetKey"
+        [head]="snapshotHead()"
+        [versions]="snapshotVersions()"
+        [loading]="snapshotsLoading()"
+        [loadError]="snapshotsError()"
+        [busy]="snapshotBusy()"
+        [feedback]="snapshotFeedback()"
+        [feedbackError]="snapshotFeedbackError()"
+        [executionSummary]="executionSummary()"
+        [executionSummaryLoading]="executionSummaryLoading()"
+        [executionSummaryError]="executionSummaryError()"
+        [hostStatusSummary]="hostStatusSummary()"
+        [hostStatusLoading]="hostStatusLoading()"
+        [hostStatusError]="hostStatusError()"
+        [rolloutPolicyCatalog]="rolloutPolicyCatalog()"
+        [rolloutPolicyTimeline]="rolloutPolicyTimeline()"
+        [rolloutPoliciesLoading]="rolloutPoliciesLoading()"
+        [rolloutPoliciesError]="rolloutPoliciesError()"
+        [rolloutPolicyBusy]="rolloutPolicyBusy()"
+        [rolloutPolicyFeedback]="rolloutPolicyFeedback()"
+        [rolloutPolicyFeedbackError]="rolloutPolicyFeedbackError()"
+        [rolloutCatalog]="rolloutCatalog()"
+        [rolloutLoading]="rolloutLoading()"
+        [rolloutError]="rolloutError()"
+        [rolloutBusy]="rolloutBusy()"
+        [rolloutFeedback]="rolloutFeedback()"
+        [rolloutFeedbackError]="rolloutFeedbackError()"
+        (retry)="loadSnapshots()"
+        (retryExecutionSummary)="loadExecutionSummary()"
+        (retryHostStatus)="loadHostStatusSummary()"
+        (retryRolloutPolicies)="loadRolloutPolicies()"
+        (createRolloutPolicy)="createRolloutPolicy($event)"
+        (approveRolloutPolicy)="approveRolloutPolicy($event)"
+        (activateRolloutPolicy)="activateRolloutPolicy($event)"
+        (retryRollouts)="loadRollouts()"
+        (createRollout)="createRollout($event)"
+        (cancelRollout)="cancelRollout($event)"
+        (activateRollout)="activateRollout($event)"
+        (operate)="operateSnapshot($event)" />
     }
 
     <section class="evidence-ledger" aria-labelledby="evidence-title">
@@ -219,17 +427,44 @@
       </ol>
     </section>
 
+    @if (current.workspaceId) {
+      <section class="timeline" aria-labelledby="lifecycle-title">
+        <p class="section-label" id="lifecycle-title">{{ i18n.text('governedLifecycle') }}</p>
+        @if (lifecycleLoading()) {
+          <p class="empty" aria-live="polite">{{ i18n.text('loading') }}</p>
+        } @else if (lifecycleError()) {
+          <p class="empty state-message" role="alert">{{ i18n.text('lifecycleError') }}</p>
+          <button type="button" class="quiet-button" (click)="loadLifecycle()">{{ i18n.text('retryLifecycle') }}</button>
+        } @else if (lifecycle(); as governed) {
+          <dl class="facts lifecycle-grid">
+            <div><dt>{{ i18n.text('workspaceStatus') }}</dt><dd>{{ governed.workspaceStatus }}</dd></div>
+            <div><dt>{{ i18n.text('revision') }}</dt><dd>{{ governed.workspaceRevision }}</dd></div>
+            <div><dt>{{ i18n.text('testRuns') }}</dt><dd>{{ governed.testRunCount }}</dd></div>
+            <div><dt>{{ i18n.text('reviews') }}</dt><dd>{{ governed.reviewCount }}</dd></div>
+            <div><dt>{{ i18n.text('materializations') }}</dt><dd>{{ governed.materializationCount }}</dd></div>
+          </dl>
+        }
+      </section>
+    }
+
     @if (current.configDefinitionId) {
       <section class="timeline" aria-labelledby="timeline-title">
         <p class="section-label" id="timeline-title">{{ i18n.text('timeline') }}</p>
-        @for (event of timeline(); track event.occurredAt + event.eventType) {
-          <article class="timeline-event">
-            <time [attr.datetime]="event.occurredAt">{{ event.occurredAt }}</time>
-            <strong>{{ event.summary }}</strong>
-            <small>{{ event.eventType }} @if (event.status) { · {{ event.status }} }</small>
-          </article>
-        } @empty {
-          <p class="empty timeline-empty">{{ i18n.text('noTimeline') }}</p>
+        @if (timelineLoading()) {
+          <p class="empty timeline-empty" aria-live="polite">{{ i18n.text('loading') }}</p>
+        } @else if (timelineError()) {
+          <p class="empty timeline-empty state-message" role="alert">{{ i18n.text('timelineError') }}</p>
+          <button type="button" class="quiet-button" (click)="loadTimeline()">{{ i18n.text('retryTimeline') }}</button>
+        } @else {
+          @for (event of timeline(); track event.occurredAt + event.eventType) {
+            <article class="timeline-event">
+              <time [attr.datetime]="event.occurredAt">{{ event.occurredAt }}</time>
+              <strong>{{ event.summary }}</strong>
+              <small>{{ event.eventType }} @if (event.status) { · {{ event.status }} } @if (event.actor) { · {{ event.actor }} }</small>
+            </article>
+          } @empty {
+            <p class="empty timeline-empty">{{ i18n.text('noTimeline') }}</p>
+          }
         }
       </section>
     }
@@ -242,10 +477,12 @@
   } @else {
     <section class="decision-pane empty-detail" aria-live="polite">
       @if (loadError()) {
-        <h2>Projeção indisponível</h2>
+        <h2>{{ i18n.text('projectionUnavailable') }}</h2>
         <code>{{ loadError() }}</code>
-      } @else {
+      } @else if (loading()) {
         <p>{{ i18n.text('loading') }}</p>
+      } @else {
+        <p>{{ i18n.text('noResults') }}</p>
       }
     </section>
   }

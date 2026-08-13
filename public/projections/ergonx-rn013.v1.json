@@ -510,7 +510,7 @@
   ],
   "authorityEvidence": {
     "currentAuthority": "KEEP_DB_BACKED",
-    "legacyAuthority": "LEGACY_AUTHORITATIVE",
+    "baselineAuthority": "LEGACY_AUTHORITATIVE",
     "developmentEvidence": "JAVA_AUTHORITATIVE_DEVELOPMENT_HISTORICAL_AND_REVERSIBLE",
     "productionAuthorityChanged": false
   }

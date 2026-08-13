@@ -1,0 +1,280 @@
+<section class="snapshot-cockpit" aria-labelledby="snapshot-cockpit-title">
+  <header>
+    <div>
+      <p class="section-label" id="snapshot-cockpit-title">{{ i18n.text('snapshotCockpit') }}</p>
+      <p>{{ i18n.text('snapshotBoundary') }}</p>
+    </div>
+    <code>{{ ruleSetKey() }}</code>
+  </header>
+  @if (loading()) {
+    <p class="empty" aria-live="polite">{{ i18n.text('loading') }}</p>
+  } @else if (loadError()) {
+    <p class="empty state-message" role="alert">{{ i18n.text('snapshotLoadError') }}</p>
+    <button type="button" class="quiet-button" (click)="retry.emit()">{{ i18n.text('retrySnapshots') }}</button>
+  } @else {
+    @if (head(); as currentHead) {
+      <dl class="facts snapshot-head">
+        <div><dt>{{ i18n.text('activeSnapshot') }}</dt><dd><code>{{ currentHead.activeSnapshotKey }}</code></dd></div>
+        <div><dt>{{ i18n.text('executionReadiness') }}</dt><dd>{{ currentHead.executionReady ? i18n.text('ready') : i18n.text('notReady') }}</dd></div>
+        <div><dt>{{ i18n.text('ruleSetVersion') }}</dt><dd>{{ currentHead.ruleSetVersion }}</dd></div>
+        <div><dt>{{ i18n.text('publicationRevision') }}</dt><dd>{{ currentHead.publicationRevision }}</dd></div>
+        <div><dt>{{ i18n.text('activationRevision') }}</dt><dd>{{ currentHead.activationRevision }}</dd></div>
+        <div><dt>{{ i18n.text('governanceState') }}</dt><dd>{{ currentHead.governanceState }}</dd></div>
+        <div class="snapshot-etag"><dt>{{ i18n.text('headEtag') }}</dt><dd><code>{{ currentHead.headEtag }}</code></dd></div>
+      </dl>
+      <small class="authority-note">{{ i18n.text('etagBoundary') }}</small>
+      <section class="rollout-policy" aria-labelledby="staged-rollout-title">
+        <header>
+          <div>
+            <p class="section-label" id="staged-rollout-title">{{ i18n.text('stagedRollout') }}</p>
+            <p>{{ i18n.text('stagedRolloutBoundary') }}</p>
+          </div>
+        </header>
+        @if (rolloutLoading()) {
+          <p class="empty" aria-live="polite">{{ i18n.text('loadingRollouts') }}</p>
+        } @else if (rolloutError()) {
+          <p class="empty state-message" role="alert">{{ i18n.text('rolloutLoadError') }}</p>
+          <button type="button" class="quiet-button" (click)="retryRollouts.emit()">{{ i18n.text('retryRollouts') }}</button>
+        } @else if (rolloutCatalog(); as catalog) {
+          @if (catalog.rollouts.length) {
+            @for (item of catalog.rollouts; track item.rollout.rolloutId) {
+              <article class="staged-rollout">
+                <div>
+                  <strong>{{ item.rollout.candidateSnapshotKey }}</strong>
+                  <small>{{ item.readiness.status }} · {{ item.rollout.enforcementMode }}</small>
+                </div>
+                <dl class="facts rollout-policy-head">
+                  <div><dt>{{ i18n.text('readyProbes') }}</dt><dd>{{ item.readiness.readyProbes }} / {{ item.readiness.totalProbes }}</dd></div>
+                  <div><dt>{{ i18n.text('incompatibleProbes') }}</dt><dd>{{ item.readiness.incompatibleProbes }}</dd></div>
+                  <div><dt>{{ i18n.text('staleProbes') }}</dt><dd>{{ item.readiness.staleProbes }}</dd></div>
+                  <div><dt>{{ i18n.text('expectedHeadCurrent') }}</dt><dd>{{ item.expectedHeadCurrent ? i18n.text('yes') : i18n.text('no') }}</dd></div>
+                </dl>
+                <div class="rollout-actions">
+                  @if (item.availableActions.includes('ACTIVATE_CANDIDATE')) {
+                    <button type="button" class="quiet-button" [disabled]="rolloutBusy()" (click)="activateRollout.emit(item)">{{ i18n.text('promoteCandidate') }}</button>
+                  }
+                  @if (item.availableActions.includes('CANCEL')) {
+                    <button type="button" class="quiet-button" [disabled]="rolloutBusy()" (click)="cancelRollout.emit(item)">{{ i18n.text('cancelRollout') }}</button>
+                  }
+                </div>
+              </article>
+            }
+          } @else {
+            <p class="empty">{{ i18n.text('noOpenRollout') }}</p>
+            <div class="rollout-actions">
+              @for (version of versions(); track version.snapshotKey) {
+                @if (canCreateRollout(version)) {
+                  <button type="button" class="quiet-button" [disabled]="rolloutBusy()" (click)="createRollout.emit(version.snapshotKey)">
+                    {{ i18n.text('startRollout') }} · {{ version.snapshotKey }}
+                  </button>
+                }
+              }
+            </div>
+          }
+        }
+        @if (rolloutFeedback()) {
+          <p [class.state-message]="rolloutFeedbackError()" [attr.role]="rolloutFeedbackError() ? 'alert' : 'status'">{{ rolloutFeedback() }}</p>
+        }
+        <small class="authority-note">{{ i18n.text('rolloutActionsServerOwned') }}</small>
+      </section>
+      <section class="rollout-policy" aria-labelledby="rollout-policy-title">
+        <header>
+          <div>
+            <p class="section-label" id="rollout-policy-title">{{ i18n.text('rolloutSafetyPolicy') }}</p>
+            <p>{{ i18n.text('rolloutPolicyBoundary') }}</p>
+          </div>
+          @if (rolloutPolicyCatalog(); as policies) {
+            <code>{{ i18n.text('revision') }} {{ policies.activationRevision }} · {{ policies.headEtag }}</code>
+          }
+        </header>
+        @if (rolloutPoliciesLoading()) {
+          <p class="empty" aria-live="polite">{{ i18n.text('loadingRolloutPolicies') }}</p>
+        } @else if (rolloutPoliciesError() === 'authentication') {
+          <p class="empty state-message" role="alert">{{ i18n.text('rolloutPolicyAuthenticationRequired') }}</p>
+        } @else if (rolloutPoliciesError() === 'forbidden') {
+          <p class="empty state-message" role="status">{{ i18n.text('rolloutPolicyPermissionLimited') }}</p>
+        } @else if (rolloutPoliciesError() === 'failed') {
+          <p class="empty state-message" role="alert">{{ i18n.text('rolloutPolicyLoadError') }}</p>
+          <button type="button" class="quiet-button" (click)="retryRolloutPolicies.emit()">{{ i18n.text('retryRolloutPolicies') }}</button>
+        } @else {
+          @if (rolloutPolicyCatalog(); as policies) {
+            @if (policies.activePolicy; as activePolicy) {
+              <dl class="facts rollout-policy-head">
+                <div><dt>{{ i18n.text('activeRolloutPolicy') }}</dt><dd><strong>{{ activePolicy.policyKey }}</strong> · v{{ activePolicy.policyVersion }}</dd></div>
+                <div><dt>{{ i18n.text('enforcementMode') }}</dt><dd>{{ activePolicy.enforcementMode }}</dd></div>
+                <div><dt>{{ i18n.text('minimumFreshProbes') }}</dt><dd>{{ activePolicy.minimumFreshProbes }}</dd></div>
+                <div><dt>{{ i18n.text('minimumReadyRatio') }}</dt><dd>{{ activePolicy.minimumReadyRatio }}</dd></div>
+                <div><dt>{{ i18n.text('blockOnIncompatible') }}</dt><dd>{{ activePolicy.blockOnIncompatible ? i18n.text('yes') : i18n.text('no') }}</dd></div>
+                <div><dt>{{ i18n.text('staleAfterSeconds') }}</dt><dd>{{ activePolicy.staleAfterSeconds }}s</dd></div>
+              </dl>
+            } @else {
+              <p class="empty">{{ i18n.text('noActiveRolloutPolicy') }}</p>
+            }
+            <div class="rollout-policy-versions">
+              @for (policy of policies.versions; track policy.policyId) {
+                <article [class.active]="policy.status === 'ACTIVE'">
+                  <div>
+                    <strong>{{ policy.policyKey }} · v{{ policy.policyVersion }}</strong>
+                    <small>{{ policy.status }} · {{ policy.enforcementMode }}</small>
+                  </div>
+                  <small>{{ policy.minimumFreshProbes }} {{ i18n.text('freshProbesShort') }} · {{ policy.minimumReadyRatio }} {{ i18n.text('readyRatioShort') }}</small>
+                  @if (policy.status === 'DRAFT') {
+                    <button type="button" class="quiet-button" [disabled]="rolloutPolicyBusy()" (click)="approveRolloutPolicy.emit(policy)">{{ policyActionLabel(policy) }}</button>
+                  } @else if (policy.status === 'APPROVED' || policy.status === 'SUPERSEDED') {
+                    <button type="button" class="quiet-button" [disabled]="rolloutPolicyBusy() || !policies.headEtag" (click)="activateRolloutPolicy.emit(policy)">{{ policyActionLabel(policy) }}</button>
+                  } @else {
+                    <span class="snapshot-action-state">{{ policyActionLabel(policy) }}</span>
+                  }
+                </article>
+              }
+            </div>
+          } @else if (rolloutPoliciesError() === 'missing') {
+            <p class="empty">{{ i18n.text('noRolloutPolicy') }}</p>
+          }
+
+          <button type="button" class="quiet-button" [attr.aria-expanded]="policyAuthoringOpen()" (click)="policyAuthoringOpen.set(!policyAuthoringOpen())">
+            {{ i18n.text(policyAuthoringOpen() ? 'closeRolloutPolicyAuthoring' : 'createRolloutPolicy') }}
+          </button>
+          @if (policyAuthoringOpen()) {
+            <form class="rollout-policy-form" (submit)="$event.preventDefault(); submitPolicy(policyKey.value, enforcementMode.value, minimumFreshProbes.value, minimumReadyRatio.value, blockOnIncompatible.checked, staleAfterSeconds.value, maximumRolloutAgeSeconds.value)">
+              <label>{{ i18n.text('policyKey') }}<input #policyKey required pattern="[a-z0-9][a-z0-9._-]{0,127}" autocomplete="off" placeholder="host-quorum" /></label>
+              <label>{{ i18n.text('enforcementMode') }}
+                <select #enforcementMode><option value="OBSERVE_ONLY">OBSERVE_ONLY</option><option value="REQUIRED">REQUIRED</option></select>
+              </label>
+              <label>{{ i18n.text('minimumFreshProbes') }}<input #minimumFreshProbes required type="number" min="0" step="1" value="1" /></label>
+              <label>{{ i18n.text('minimumReadyRatio') }}<input #minimumReadyRatio required type="number" min="0" max="1" step="0.01" value="1" /></label>
+              <label>{{ i18n.text('staleAfterSeconds') }}<input #staleAfterSeconds required type="number" min="1" step="1" value="120" /></label>
+              <label>{{ i18n.text('maximumRolloutAgeSeconds') }}<input #maximumRolloutAgeSeconds type="number" min="1" step="1" value="900" /></label>
+              <label class="policy-checkbox"><input #blockOnIncompatible type="checkbox" checked />{{ i18n.text('blockOnIncompatible') }}</label>
+              <button type="submit" class="quiet-button" [disabled]="rolloutPolicyBusy()">{{ i18n.text('createPolicyDraft') }}</button>
+            </form>
+            @if (policyInputError()) { <p class="state-message" role="alert">{{ i18n.text('invalidRolloutPolicy') }}</p> }
+          }
+          @if (rolloutPolicyTimeline().length) {
+            <details class="rollout-policy-timeline">
+              <summary>{{ i18n.text('rolloutPolicyTimeline') }} · {{ rolloutPolicyTimeline().length }}</summary>
+              <ol>
+                @for (event of rolloutPolicyTimeline(); track event.eventId) {
+                  <li><strong>{{ event.eventType }}</strong><span>{{ event.actorRef }}</span><time [attr.datetime]="event.createdAt">{{ event.createdAt }}</time></li>
+                }
+              </ol>
+            </details>
+          }
+          <small class="authority-note">{{ i18n.text('rolloutPolicyServerAuthority') }}</small>
+        }
+        @if (rolloutPolicyFeedback()) {
+          <p [class.state-message]="rolloutPolicyFeedbackError()" [attr.role]="rolloutPolicyFeedbackError() ? 'alert' : 'status'">{{ rolloutPolicyFeedback() }}</p>
+        }
+      </section>
+      <section class="execution-observations" aria-labelledby="host-status-title">
+        <header>
+          <div>
+            <p class="section-label" id="host-status-title">{{ i18n.text('hostAlignment') }}</p>
+            <p>{{ i18n.text('hostAlignmentBoundary') }}</p>
+          </div>
+          <code>{{ currentHead.activeSnapshotKey }}</code>
+        </header>
+        @if (hostStatusLoading()) {
+          <p class="empty" aria-live="polite">{{ i18n.text('loadingHostStatus') }}</p>
+        } @else if (hostStatusError() === 'authentication') {
+          <p class="empty state-message" role="alert">{{ i18n.text('hostStatusAuthenticationRequired') }}</p>
+        } @else if (hostStatusError() === 'forbidden') {
+          <p class="empty state-message" role="status">{{ i18n.text('hostStatusPermissionLimited') }}</p>
+        } @else if (hostStatusError() === 'failed') {
+          <p class="empty state-message" role="alert">{{ i18n.text('hostStatusError') }}</p>
+          <button type="button" class="quiet-button" (click)="retryHostStatus.emit()">{{ i18n.text('retryHostStatus') }}</button>
+        } @else if (hostStatusSummary(); as status) {
+          @if (status.totalHosts === 0) {
+            <p class="empty">{{ i18n.text('noHostStatus') }}</p>
+          } @else {
+            <dl class="execution-totals host-status-totals">
+              <div><dt>{{ i18n.text('alignedHosts') }}</dt><dd>{{ status.alignedHosts }}</dd></div>
+              <div><dt>{{ i18n.text('snapshotDriftedHosts') }}</dt><dd>{{ status.snapshotDriftedHosts }}</dd></div>
+              <div><dt>{{ i18n.text('incompatibleHosts') }}</dt><dd>{{ status.incompatibleHosts }}</dd></div>
+              <div><dt>{{ i18n.text('unavailableHosts') }}</dt><dd>{{ status.unavailableHosts }}</dd></div>
+              <div><dt>{{ i18n.text('staleHosts') }}</dt><dd>{{ status.staleHosts }}</dd></div>
+            </dl>
+            @if (status.incompatibleHosts > 0) {
+              <dl class="facts snapshot-head runtime-coordinates">
+                <div><dt>{{ i18n.text('requiredHostContract') }}</dt><dd><code>{{ status.expectedHostContractVersion }}</code></dd></div>
+                <div><dt>{{ i18n.text('requiredEngineContract') }}</dt><dd><code>{{ status.expectedEngineContractVersion }}</code></dd></div>
+                <div><dt>{{ i18n.text('requiredJsonLogicDialect') }}</dt><dd><code>{{ status.expectedJsonLogicDialectVersion }}</code></dd></div>
+              </dl>
+            }
+            <small class="authority-note">{{ i18n.text('lastHostObservation') }} {{ status.lastObservedAtUtc ?? '—' }}</small>
+          }
+        } @else {
+          <p class="empty">{{ i18n.text('noHostStatus') }}</p>
+        }
+      </section>
+      <section class="execution-observations" aria-labelledby="execution-observations-title">
+        <header>
+          <div>
+            <p class="section-label" id="execution-observations-title">{{ i18n.text('executionObservations') }}</p>
+            <p>{{ i18n.text('executionObservationsBoundary') }}</p>
+          </div>
+          <code>{{ currentHead.activeSnapshotKey }}</code>
+        </header>
+        @if (executionSummaryLoading()) {
+          <p class="empty" aria-live="polite">{{ i18n.text('loadingExecutionSummary') }}</p>
+        } @else if (executionSummaryError() === 'authentication') {
+          <p class="empty state-message" role="alert">{{ i18n.text('executionSummaryAuthenticationRequired') }}</p>
+        } @else if (executionSummaryError() === 'forbidden') {
+          <p class="empty state-message" role="status">{{ i18n.text('executionSummaryPermissionLimited') }}</p>
+        } @else if (executionSummaryError() === 'failed') {
+          <p class="empty state-message" role="alert">{{ i18n.text('executionSummaryError') }}</p>
+          <button type="button" class="quiet-button" (click)="retryExecutionSummary.emit()">{{ i18n.text('retryExecutionSummary') }}</button>
+        } @else if (executionSummary(); as summary) {
+          <dl class="execution-totals">
+            <div><dt>{{ i18n.text('observedExecutions') }}</dt><dd>{{ summary.totalObservations }}</dd></div>
+            <div><dt>{{ i18n.text('observedHosts') }}</dt><dd>{{ summary.distinctHosts }}</dd></div>
+            <div><dt>{{ i18n.text('firstObservation') }}</dt><dd>{{ summary.firstObservedAtUtc ?? '—' }}</dd></div>
+            <div><dt>{{ i18n.text('lastObservation') }}</dt><dd>{{ summary.lastObservedAtUtc ?? '—' }}</dd></div>
+          </dl>
+          <div class="outcome-strip" [attr.aria-label]="i18n.text('outcomeDistribution')">
+            @for (outcome of outcomes; track outcome) {
+              <div [attr.data-outcome]="outcome"><span>{{ outcome }}</span><strong>{{ summary.outcomeCounts[outcome] }}</strong></div>
+            }
+          </div>
+        } @else {
+          <p class="empty">{{ i18n.text('noExecutionObservations') }}</p>
+        }
+      </section>
+    } @else {
+      <p class="empty snapshot-empty">{{ i18n.text('noSnapshotHead') }}</p>
+    }
+
+    <div class="snapshot-version-list">
+      @for (version of versions(); track version.snapshotKey) {
+        <article [class.active]="version.active">
+          <div class="snapshot-version-identity">
+            <strong>{{ version.snapshotKey }}</strong>
+            <small>{{ version.publishedBy }} · <time [attr.datetime]="version.publishedAtUtc">{{ version.publishedAtUtc }}</time></small>
+          </div>
+          <dl>
+            <div><dt>{{ i18n.text('ruleSetVersion') }}</dt><dd>{{ version.ruleSetVersion }}</dd></div>
+            <div><dt>{{ i18n.text('publicationRevision') }}</dt><dd>{{ version.publicationRevision }}</dd></div>
+            <div><dt>{{ i18n.text('governanceState') }}</dt><dd>{{ version.governanceState }}</dd></div>
+            <div><dt>{{ i18n.text('contentHash') }}</dt><dd><code>{{ version.snapshotContentHash }}</code></dd></div>
+          </dl>
+          @if (version.availableAction === 'ACTIVATE' || version.availableAction === 'ROLLBACK') {
+            <button type="button" [disabled]="busy() || !head()?.headEtag" (click)="operate.emit(version)">
+              {{ actionLabel(version) }}
+            </button>
+          } @else {
+            <span class="snapshot-action-state">{{ actionLabel(version) }}</span>
+          }
+        </article>
+      } @empty {
+        <p class="empty snapshot-empty">{{ i18n.text('noSnapshotVersions') }}</p>
+      }
+    </div>
+    @if (feedback()) {
+      <p [class.state-message]="feedbackError()" [attr.role]="feedbackError() ? 'alert' : 'status'">{{ feedback() }}</p>
+    }
+  }
+  <div class="snapshot-prerequisites">
+    <small>{{ i18n.text('snapshotCompositionBoundary') }}</small>
+    <small>{{ i18n.text('hostTelemetryBoundary') }}</small>
+  </div>
+</section>

@@ -1,5 +1,4 @@
 export type DecisionState = 'technical-draft' | 'verified';
-import type { ConfigDefinition } from '../../core/projection-catalog.service';
 
 export interface DecisionSummary {
   readonly order: number;
@@ -9,17 +8,24 @@ export interface DecisionSummary {
   readonly name: string;
   readonly domain: string;
   readonly ruleSet: string;
+  readonly ruleSetKey: string;
   readonly state: DecisionState;
   readonly meaning: string;
   readonly authority: string;
+  readonly baselineAuthority: string;
   readonly source: string;
   readonly evidenceCount: number;
   readonly editable?: boolean;
-  readonly availableActions?: readonly string[];
   readonly reviewStatus?: string;
   readonly configDefinitionId?: string;
-  readonly configDefinition?: ConfigDefinition;
   readonly configStatus?: string;
+  readonly workspaceId?: string;
+  readonly workspaceStatus?: string;
+  readonly workspaceEtag?: string;
+  readonly workspaceRevision?: number;
+  readonly promotedDefinitionId?: string | null;
+  readonly workspaceCondition?: unknown | null;
+  readonly workspaceParameters?: Readonly<Record<string, unknown>>;
   readonly expression: string | null;
   readonly condition: unknown | null;
   readonly factPaths: readonly string[];
@@ -33,7 +39,7 @@ export interface DecisionSummary {
 
 export interface DecisionFact {
   readonly path: string;
-  readonly valueType: 'number' | 'date';
+  readonly valueType: 'boolean' | 'string' | 'number' | 'date' | 'string-array' | 'date-array';
   readonly nullable: boolean;
   readonly label: string;
   readonly description: string;
@@ -52,4 +58,52 @@ export interface DecisionTimelineEvent {
   readonly summary: string;
   readonly status: string | null;
   readonly actor: string | null;
+}
+
+export interface DecisionLifecycleSummary {
+  readonly workspaceStatus: string;
+  readonly workspaceRevision: number;
+  readonly testRunCount: number;
+  readonly reviewCount: number;
+  readonly materializationCount: number;
+  readonly promotedDefinitionId: string | null;
+}
+
+export interface PolicySandboxScenarioResult {
+  readonly scenarioId: string;
+  readonly scenarioKey: string;
+  readonly expectedDecision: string;
+  readonly candidateDecision: string;
+  readonly activeDecision: string;
+  readonly comparison: string;
+  readonly candidateMatchesExpected: boolean;
+  readonly activeMatchesExpected: boolean;
+  readonly candidateReasonCodes: readonly string[];
+  readonly activeReasonCodes: readonly string[];
+}
+
+export interface PolicySandboxRun {
+  readonly runId: string;
+  readonly workspaceId: string;
+  readonly workspaceRevision: number;
+  readonly evaluatedAtUtc: string;
+  readonly activeSnapshotKey: string | null;
+  readonly results: readonly PolicySandboxScenarioResult[];
+}
+
+export interface PublicationReadiness {
+  readonly result: string | null;
+  readonly readiness: string | null;
+  readonly existingCoverage: readonly unknown[];
+  readonly predictedMaterializations: readonly unknown[];
+  readonly requiredApprovals: readonly unknown[];
+  readonly warnings: readonly unknown[];
+  readonly recommendedAction: string | null;
+}
+
+export interface DecisionPublicationResult {
+  readonly status: string | null;
+  readonly readiness: string | null;
+  readonly materializationCount: number;
+  readonly outcomes: readonly unknown[];
 }

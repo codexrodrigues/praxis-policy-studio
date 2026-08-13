@@ -1,52 +1,472 @@
 {
   "kind": "POLICY_STUDIO_PROJECTION_V1",
-  "projectionId": "quickstart.benefits.extraordinary-eligibility",
+  "projectionId": "quickstart.workforce-benefits.extraordinary-grant-eligibility",
   "projectionVersion": 1,
-  "sourceArtifacts": [{
-    "path": "fixtures/quickstart/extraordinary-benefit.v1",
-    "kind": "CONTRACTUAL_FIXTURE",
-    "sha256": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-  }],
+  "sourceArtifacts": [
+    {
+      "path": "src/main/java/com/example/praxis/apiquickstart/rulelab/ExtraordinaryGrantRuleSetFactory.java",
+      "kind": "RULESET_DEFINITION",
+      "sha256": "5EB0A86B32E86E4471EA770BE9FD1C620C8BAA3A2B31287058FE68520E049964"
+    },
+    {
+      "path": "src/test/resources/rule-lab/rule-lab-golden-suite.json",
+      "kind": "GOLDEN_SCENARIO_SUITE",
+      "sha256": "053F9FE6106677ED57F8FD7D1A3DC007AA728B65F2EDDFBFA48E728C8FF34D44"
+    },
+    {
+      "path": "src/test/resources/rule-lab/rule-lab-ql08-stress-matrix.json",
+      "kind": "STRESS_SCENARIO_MATRIX",
+      "sha256": "A4267708154E4B96D21D085D45D0DE331BED0C4C7BB5FF8F82A331C9B736739B"
+    }
+  ],
   "ruleSetRef": {
-    "domainKey": "benefits",
-    "boundedContextKey": "benefits.eligibility",
-    "ruleSetKey": "benefits.extraordinary-eligibility",
-    "hostContractVersion": "fixture-v1",
-    "operationKeys": ["evaluate"]
+    "domainKey": "workforce-benefits",
+    "boundedContextKey": "extraordinary-assistance",
+    "ruleSetKey": "extraordinary-grant-eligibility",
+    "hostContractVersion": "quickstart/1.0",
+    "operationKeys": [
+      "evaluate-extraordinary-grant"
+    ]
   },
-  "decisionRefs": [{
-    "order": 1,
-    "decisionKey": "benefits.extraordinary.requested-amount.limit",
-    "reasonCode": "BENEFIT-AMOUNT-LIMIT",
-    "presentationLabel": "Requested amount must remain within the configured limit.",
-    "semanticStatus": "TECHNICAL_DRAFT_READY",
-    "reviewStatus": "BUSINESS_REVIEW_PENDING",
-    "semanticSourceRef": "fixtures/quickstart/extraordinary-benefit.v1#amount-limit",
-    "targetPlanRef": "fixtures/quickstart/extraordinary-benefit.v1#target",
-    "editable": false,
-    "factPaths": ["benefitRequest.requestedAmount"]
-  }],
-  "factSchemas": [{
-    "path": "benefitRequest.requestedAmount",
-    "valueType": "number",
-    "nullable": false,
-    "presentationLabel": "Requested amount",
-    "description": "Amount requested for the extraordinary benefit eligibility fixture.",
-    "locale": "en-US",
-    "providerRef": "ExtraordinaryBenefitRequest.requestedAmount",
-    "evidenceRefs": ["fixtures/quickstart/extraordinary-benefit.v1"]
-  }],
-  "configDefinitionRefs": { "status": "CONTRACTUAL_FIXTURE", "definitionIds": ["quickstart-extraordinary-benefit-amount-limit"] },
-  "resourceLinks": [],
+  "decisionRefs": [
+    {
+      "order": 1,
+      "decisionKey": "request.authorization-integrity",
+      "reasonCode": "REQUEST_NOT_AUTHORIZED",
+      "presentationLabel": "A solicitação deve partir de um ator autorizado.",
+      "semanticStatus": "REFERENCE_IMPLEMENTED",
+      "reviewStatus": "REFERENCE_CASE",
+      "semanticSourceRef": "ExtraordinaryGrantRuleSetFactory#request.authorization-integrity",
+      "targetPlanRef": "rule-lab-golden-suite.json#QLG-02",
+      "editable": true,
+      "stage": "PROTECTED_GUARD",
+      "cardinality": "SINGLE",
+      "overridePolicy": "FORBIDDEN",
+      "factPaths": [
+        "actor.permissions"
+      ],
+      "bindingRefs": [
+        {
+          "bindingKey": "request.authorization-integrity",
+          "source": "SECURITY",
+          "executorType": "JSON_LOGIC",
+          "order": 10
+        }
+      ]
+    },
+    {
+      "order": 2,
+      "decisionKey": "worker.legal-eligibility",
+      "reasonCode": "WORKER_NOT_ELIGIBLE",
+      "presentationLabel": "O trabalhador deve estar legalmente elegível.",
+      "semanticStatus": "REFERENCE_IMPLEMENTED",
+      "reviewStatus": "REFERENCE_CASE",
+      "semanticSourceRef": "ExtraordinaryGrantRuleSetFactory#worker.legal-eligibility",
+      "targetPlanRef": "rule-lab-golden-suite.json#QLG-01",
+      "editable": true,
+      "stage": "PROTECTED_GUARD",
+      "cardinality": "SINGLE",
+      "overridePolicy": "FORBIDDEN",
+      "factPaths": [
+        "worker.status"
+      ],
+      "bindingRefs": [
+        {
+          "bindingKey": "worker.legal-eligibility",
+          "source": "PRODUCT",
+          "executorType": "JSON_LOGIC",
+          "order": 20
+        }
+      ]
+    },
+    {
+      "order": 3,
+      "decisionKey": "grant.duplicate-conflict",
+      "reasonCode": "DUPLICATE_GRANT",
+      "presentationLabel": "Não pode existir auxílio extraordinário duplicado.",
+      "semanticStatus": "REFERENCE_IMPLEMENTED",
+      "reviewStatus": "REFERENCE_CASE",
+      "semanticSourceRef": "ExtraordinaryGrantRuleSetFactory#grant.duplicate-conflict",
+      "targetPlanRef": "rule-lab-golden-suite.json#QLG-01",
+      "editable": true,
+      "stage": "DOMAIN_DECISION",
+      "cardinality": "SINGLE",
+      "overridePolicy": "FORBIDDEN",
+      "factPaths": [
+        "grant.hasDuplicate"
+      ],
+      "bindingRefs": [
+        {
+          "bindingKey": "grant.duplicate-conflict",
+          "source": "PRODUCT",
+          "executorType": "JSON_LOGIC",
+          "order": 30
+        }
+      ]
+    },
+    {
+      "order": 4,
+      "decisionKey": "program.applicability",
+      "reasonCode": "PROGRAM_NOT_APPLICABLE",
+      "presentationLabel": "O programa deve estar aplicável na data da solicitação.",
+      "semanticStatus": "REFERENCE_IMPLEMENTED",
+      "reviewStatus": "REFERENCE_CASE",
+      "semanticSourceRef": "ExtraordinaryGrantRuleSetFactory#program.applicability",
+      "targetPlanRef": "rule-lab-golden-suite.json#QLG-01",
+      "editable": true,
+      "stage": "DOMAIN_DECISION",
+      "cardinality": "SINGLE",
+      "overridePolicy": "FORBIDDEN",
+      "factPaths": [
+        "program.active"
+      ],
+      "bindingRefs": [
+        {
+          "bindingKey": "program.applicability",
+          "source": "PRODUCT",
+          "executorType": "JSON_LOGIC",
+          "order": 40
+        }
+      ]
+    },
+    {
+      "order": 5,
+      "decisionKey": "customer.additional-eligibility",
+      "reasonCode": "PRODUCT_BASELINE_REJECTED",
+      "presentationLabel": "A política do cliente pode apenas restringir a elegibilidade base.",
+      "semanticStatus": "REFERENCE_IMPLEMENTED",
+      "reviewStatus": "REFERENCE_CASE",
+      "semanticSourceRef": "ExtraordinaryGrantRuleSetFactory#customer.additional-eligibility",
+      "targetPlanRef": "rule-lab-golden-suite.json#QLG-03",
+      "editable": false,
+      "stage": "DOMAIN_DECISION",
+      "cardinality": "MULTIPLE",
+      "overridePolicy": "RESTRICT_ONLY",
+      "factPaths": [
+        "customer.additionalEligible"
+      ],
+      "bindingRefs": [
+        {
+          "bindingKey": "customer.product-baseline",
+          "source": "PRODUCT",
+          "executorType": "JSON_LOGIC",
+          "order": 50
+        },
+        {
+          "bindingKey": "customer.additional-eligibility",
+          "source": "CUSTOMER",
+          "executorType": "JAVA",
+          "order": 60
+        }
+      ]
+    },
+    {
+      "order": 6,
+      "decisionKey": "payment.calendar-policy",
+      "reasonCode": "PAYMENT_DATE_NOT_ALLOWED",
+      "presentationLabel": "A data de pagamento deve pertencer ao calendário permitido.",
+      "semanticStatus": "REFERENCE_IMPLEMENTED",
+      "reviewStatus": "REFERENCE_CASE",
+      "semanticSourceRef": "ExtraordinaryGrantRuleSetFactory#payment.calendar-policy",
+      "targetPlanRef": "rule-lab-golden-suite.json#QLG-04",
+      "editable": true,
+      "stage": "DOMAIN_DECISION",
+      "cardinality": "SINGLE",
+      "overridePolicy": "REPLACEABLE",
+      "factPaths": [
+        "payment.allowedDates",
+        "payment.requestedDate"
+      ],
+      "bindingRefs": [
+        {
+          "bindingKey": "payment.calendar-policy",
+          "source": "PRODUCT",
+          "executorType": "JSON_LOGIC",
+          "order": 70
+        }
+      ]
+    },
+    {
+      "order": 7,
+      "decisionKey": "grant.amount-parameters",
+      "reasonCode": "REQUESTED_AMOUNT_EXCEEDS_PROGRAM_LIMIT",
+      "presentationLabel": "O valor solicitado deve respeitar o limite do programa.",
+      "semanticStatus": "REFERENCE_IMPLEMENTED",
+      "reviewStatus": "REFERENCE_CASE",
+      "semanticSourceRef": "ExtraordinaryGrantRuleSetFactory#grant.amount-parameters",
+      "targetPlanRef": "rule-lab-golden-suite.json#QLG-05",
+      "editable": true,
+      "stage": "DOMAIN_DECISION",
+      "cardinality": "SINGLE",
+      "overridePolicy": "PARAMETERIZABLE",
+      "factPaths": [
+        "program.maxAmount",
+        "request.requestedAmount"
+      ],
+      "bindingRefs": [
+        {
+          "bindingKey": "grant.amount-parameters",
+          "source": "PRODUCT",
+          "executorType": "JSON_LOGIC",
+          "order": 80
+        }
+      ]
+    },
+    {
+      "order": 8,
+      "decisionKey": "budget.availability",
+      "reasonCode": "BUDGET_INSUFFICIENT",
+      "presentationLabel": "O orçamento disponível deve cobrir o valor solicitado.",
+      "semanticStatus": "REFERENCE_IMPLEMENTED",
+      "reviewStatus": "REFERENCE_CASE",
+      "semanticSourceRef": "ExtraordinaryGrantRuleSetFactory#budget.availability",
+      "targetPlanRef": "rule-lab-golden-suite.json#QLG-07",
+      "editable": true,
+      "stage": "POST_DECISION",
+      "cardinality": "SINGLE",
+      "overridePolicy": "RESTRICT_ONLY",
+      "factPaths": [
+        "budget.availableAmount",
+        "request.requestedAmount"
+      ],
+      "bindingRefs": [
+        {
+          "bindingKey": "budget.availability",
+          "source": "PRODUCT",
+          "executorType": "JSON_LOGIC",
+          "order": 100
+        }
+      ]
+    },
+    {
+      "order": 9,
+      "decisionKey": "grant.amount-transformation",
+      "reasonCode": null,
+      "presentationLabel": "O valor aprovado é transformado por cálculo tipado e determinístico.",
+      "semanticStatus": "REFERENCE_IMPLEMENTED",
+      "reviewStatus": "REFERENCE_CASE",
+      "semanticSourceRef": "ExtraordinaryGrantRuleSetFactory#grant.amount-transformation",
+      "targetPlanRef": "rule-lab-golden-suite.json#QLG-06",
+      "editable": false,
+      "stage": "TRANSFORMATION_INTENT",
+      "cardinality": "SINGLE",
+      "overridePolicy": "FORBIDDEN",
+      "factPaths": [
+        "request.requestedAmount"
+      ],
+      "bindingRefs": [
+        {
+          "bindingKey": "grant.amount-transformation",
+          "source": "PRODUCT",
+          "executorType": "JAVA",
+          "order": 110
+        }
+      ]
+    },
+    {
+      "order": 10,
+      "decisionKey": "grant.effect-plan",
+      "reasonCode": null,
+      "presentationLabel": "Os efeitos são planejados separadamente da avaliação pura.",
+      "semanticStatus": "REFERENCE_IMPLEMENTED",
+      "reviewStatus": "REFERENCE_CASE",
+      "semanticSourceRef": "ExtraordinaryGrantRuleSetFactory#grant.effect-plan",
+      "targetPlanRef": "rule-lab-golden-suite.json#QLG-14",
+      "editable": false,
+      "stage": "EFFECT_INTENT",
+      "cardinality": "SINGLE",
+      "overridePolicy": "FORBIDDEN",
+      "factPaths": [],
+      "bindingRefs": [
+        {
+          "bindingKey": "grant.effect-plan",
+          "source": "PRODUCT",
+          "executorType": "JAVA",
+          "order": 120
+        }
+      ]
+    }
+  ],
+  "factSchemas": [
+    {
+      "path": "actor.permissions",
+      "valueType": "string-array",
+      "nullable": false,
+      "presentationLabel": "Permissões do ator",
+      "description": "Permissões efetivas usadas pelo guard protegido.",
+      "locale": "pt-BR",
+      "providerRef": "ExtraordinaryBenefitEvaluationService.actor.permissions",
+      "evidenceRefs": [
+        "ExtraordinaryGrantRuleSetFactory.java"
+      ]
+    },
+    {
+      "path": "worker.status",
+      "valueType": "string",
+      "nullable": false,
+      "presentationLabel": "Situação do trabalhador",
+      "description": "Situação funcional usada na elegibilidade legal.",
+      "locale": "pt-BR",
+      "providerRef": "JdbcExtraordinaryBenefitFactProvider.worker.status",
+      "evidenceRefs": [
+        "ExtraordinaryGrantRuleSetFactory.java"
+      ]
+    },
+    {
+      "path": "grant.hasDuplicate",
+      "valueType": "boolean",
+      "nullable": false,
+      "presentationLabel": "Auxílio duplicado",
+      "description": "Indica conflito com auxílio já existente.",
+      "locale": "pt-BR",
+      "providerRef": "JdbcExtraordinaryBenefitFactProvider.grant.hasDuplicate",
+      "evidenceRefs": [
+        "ExtraordinaryGrantRuleSetFactory.java"
+      ]
+    },
+    {
+      "path": "program.active",
+      "valueType": "boolean",
+      "nullable": false,
+      "presentationLabel": "Programa ativo",
+      "description": "Indica se o programa é aplicável.",
+      "locale": "pt-BR",
+      "providerRef": "JdbcExtraordinaryBenefitFactProvider.program.active",
+      "evidenceRefs": [
+        "ExtraordinaryGrantRuleSetFactory.java"
+      ]
+    },
+    {
+      "path": "customer.additionalEligible",
+      "valueType": "boolean",
+      "nullable": true,
+      "presentationLabel": "Elegibilidade adicional",
+      "description": "Restrição adicional opcional da política do cliente.",
+      "locale": "pt-BR",
+      "providerRef": "JdbcExtraordinaryBenefitFactProvider.customer.additionalEligible",
+      "evidenceRefs": [
+        "ExtraordinaryGrantRuleSetFactory.java"
+      ]
+    },
+    {
+      "path": "payment.requestedDate",
+      "valueType": "date",
+      "nullable": false,
+      "presentationLabel": "Data solicitada",
+      "description": "Data pretendida para pagamento.",
+      "locale": "pt-BR",
+      "providerRef": "ExtraordinaryBenefitEvaluationService.payment.requestedDate",
+      "evidenceRefs": [
+        "ExtraordinaryGrantRuleSetFactory.java"
+      ]
+    },
+    {
+      "path": "payment.allowedDates",
+      "valueType": "date-array",
+      "nullable": false,
+      "presentationLabel": "Datas permitidas",
+      "description": "Calendário permitido para pagamento.",
+      "locale": "pt-BR",
+      "providerRef": "JdbcExtraordinaryBenefitFactProvider.payment.allowedDates",
+      "evidenceRefs": [
+        "ExtraordinaryGrantRuleSetFactory.java"
+      ]
+    },
+    {
+      "path": "request.requestedAmount",
+      "valueType": "number",
+      "nullable": false,
+      "presentationLabel": "Valor solicitado",
+      "description": "Valor monetário solicitado pelo trabalhador.",
+      "locale": "pt-BR",
+      "providerRef": "ExtraordinaryBenefitEvaluationService.request.requestedAmount",
+      "evidenceRefs": [
+        "ExtraordinaryGrantRuleSetFactory.java"
+      ]
+    },
+    {
+      "path": "program.maxAmount",
+      "valueType": "number",
+      "nullable": false,
+      "presentationLabel": "Limite do programa",
+      "description": "Valor máximo permitido pelo programa.",
+      "locale": "pt-BR",
+      "providerRef": "JdbcExtraordinaryBenefitFactProvider.program.maxAmount",
+      "evidenceRefs": [
+        "ExtraordinaryGrantRuleSetFactory.java"
+      ]
+    },
+    {
+      "path": "budget.availableAmount",
+      "valueType": "number",
+      "nullable": false,
+      "presentationLabel": "Orçamento disponível",
+      "description": "Saldo disponível para concessão do auxílio.",
+      "locale": "pt-BR",
+      "providerRef": "JdbcExtraordinaryBenefitFactProvider.budget.availableAmount",
+      "evidenceRefs": [
+        "ExtraordinaryGrantRuleSetFactory.java"
+      ]
+    }
+  ],
+  "configDefinitionRefs": {
+    "status": "NOT_RESOLVED_FROM_CONTROL_PLANE",
+    "definitionIds": [],
+    "blocker": "A projeção não inventa identificadores do Config; o Studio deve resolvê-los no control plane governado."
+  },
   "presentationLabels": {
-    "domain": { "pt-BR": "Benefícios", "en-US": "Benefits" },
-    "ruleSet": { "pt-BR": "Elegibilidade extraordinária", "en-US": "Extraordinary eligibility" }
+    "domain": {
+      "pt-BR": "Benefícios da força de trabalho",
+      "en-US": "Workforce benefits"
+    },
+    "ruleSet": {
+      "pt-BR": "Elegibilidade de auxílio extraordinário",
+      "en-US": "Extraordinary grant eligibility"
+    }
   },
-  "evidenceBoundaries": [{ "boundary": "CONTRACT_SHAPE", "operations": ["evaluate"], "status": "HERMETIC_FIXTURE" }],
+  "evidenceBoundaries": [
+    {
+      "boundary": "REFERENCE_RULESET_COMPOSITION",
+      "operations": [
+        "evaluate-extraordinary-grant"
+      ],
+      "status": "PROVED_LOCAL"
+    },
+    {
+      "boundary": "FIVE_OUTCOME_GOLDEN_SUITE",
+      "operations": [
+        "evaluate-extraordinary-grant"
+      ],
+      "status": "PROVED_LOCAL"
+    },
+    {
+      "boundary": "SHADOW_AND_HOT_RELOAD",
+      "operations": [
+        "evaluate-extraordinary-grant"
+      ],
+      "status": "PROVED_LOCAL"
+    },
+    {
+      "boundary": "POLICY_STUDIO_AUTHORING_ROUNDTRIP",
+      "operations": [],
+      "status": "NOT_YET_PROVED"
+    }
+  ],
   "authorityEvidence": {
-    "currentAuthority": "KEEP_DB_BACKED",
-    "legacyAuthority": "LEGACY_AUTHORITATIVE",
-    "developmentEvidence": "NONE",
+    "currentAuthority": "QUICKSTART_GOVERNED_SNAPSHOT",
+    "baselineAuthority": "SYNTHETIC_REFERENCE_BASELINE",
+    "developmentEvidence": "LOCAL_OPERATIONAL_PROOF",
     "productionAuthorityChanged": false
+  },
+  "testEvidence": {
+    "suitePath": "src/test/resources/rule-lab/rule-lab-golden-suite.json",
+    "caseCount": 15,
+    "outcomes": [
+      "ALLOW",
+      "DENY",
+      "NOT_APPLICABLE",
+      "INCONCLUSIVE",
+      "TECHNICAL_ERROR"
+    ]
   }
 }
