@@ -1,11 +1,12 @@
 {
   "name": "praxis-policy-studio",
-  "version": "0.1.0-beta.1",
+  "version": "0.1.0-beta.2",
   "private": true,
   "scripts": {
-    "start": "ng serve --host 0.0.0.0 --port 4302",
+    "start": "ng serve --host 0.0.0.0 --port 4302 --proxy-config proxy.conf.json",
     "build": "ng build",
     "check:projections": "node tools/check-projections.mjs",
+    "check:local-runtime": "node tools/check-local-runtime.mjs",
     "generate:ergonx-projection": "node tools/generate-ergonx-projection.mjs",
     "lint": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.spec.json --noEmit",
     "test": "vitest run --environment jsdom"
