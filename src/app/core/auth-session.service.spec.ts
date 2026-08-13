@@ -39,4 +39,20 @@ describe('AuthSessionService', () => {
       mode: 'fixture', configApiBaseUrl: null, locale: 'pt-BR'
     })).toThrowError('AUTH_REMOTE_CONFIG_REQUIRED');
   });
+
+  it('distinguishes a missing session from an authenticated principal', () => {
+    const config = { mode: 'remote' as const, configApiBaseUrl: 'http://127.0.0.1:8088', locale: 'pt-BR' as const };
+    let active = false;
+    service.hasSession(config).subscribe(value => active = value);
+    const activeRequest = http.expectOne('http://127.0.0.1:8088/auth/session');
+    expect(activeRequest.request.withCredentials).toBe(true);
+    activeRequest.flush(null);
+    expect(active).toBe(true);
+
+    let missing = true;
+    service.hasSession(config).subscribe(value => missing = value);
+    http.expectOne('http://127.0.0.1:8088/auth/session')
+      .flush(null, { status: 401, statusText: 'Unauthorized' });
+    expect(missing).toBe(false);
+  });
 });

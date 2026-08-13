@@ -36,7 +36,8 @@ Abra `http://localhost:4302/catalog`.
 
 `public/app-config.json` é carregado no início. A configuração versionada desta
 POC usa o modo `remote` e o endpoint local oficial
-`http://127.0.0.1:8088`. Ela não contém credenciais. O modo `remote` falha
+`http://localhost:8088`. Manter Studio e Quickstart no mesmo hostname é
+necessário para a sessão local baseada em cookie `SameSite`. Ela não contém credenciais. O modo `remote` falha
 fechado quando `configApiBaseUrl` não é informado, consulta definições e timeline por
 `/api/praxis/config/domain-rules/**` e usa a sessão autenticada do host. O
 browser não envia nem infere tenant, ambiente, authority ou capability; esse

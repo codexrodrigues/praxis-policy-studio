@@ -3,6 +3,7 @@
 /node_modules/
 /coverage/
 /.dev-server.*
+/.policy-studio-dev.log
 /.idea/
 /.vscode/*
 !/.vscode/extensions.json

@@ -175,7 +175,7 @@
         @defer (when authoringOpen()) {
         <pax-local-draft-workspace
           [config]="authoringConfig"
-          [condition]="draftCondition()"
+          [condition]="editorCondition()"
           (conditionChanged)="updateDraft($event)"
           (stateChanged)="updateEditorState($event)" />
         } @placeholder {

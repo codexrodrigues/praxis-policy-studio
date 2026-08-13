@@ -8,8 +8,9 @@ import { RuntimeConfigService } from '../../core/runtime-config.service';
 import { HttpErrorResponse } from '@angular/common/http';
 import type { RuleBuilderConfig, RuleBuilderState } from '@praxisui/visual-builder';
 import { LocalDraftWorkspaceComponent } from '../authoring/local-draft-workspace.component';
-import { canonicalDecisionExpression, formatDecisionExpression } from '../../core/decision-inspection';
+import { canonicalDecisionExpression, composeDecisionCondition, editableDecisionCondition, formatDecisionExpression } from '../../core/decision-inspection';
 import { AuthSessionService } from '../../core/auth-session.service';
+import { PolicyStudioRuntimeConfig } from '../../core/runtime-config';
 
 @Component({
   selector: 'pax-catalog-workspace',
@@ -37,6 +38,7 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly editorState = signal<RuleBuilderState | null>(null);
   readonly originalExpression = computed(() => formatDecisionExpression(this.selected()?.condition));
   readonly draftExpression = computed(() => formatDecisionExpression(this.draftCondition()));
+  readonly editorCondition = computed(() => editableDecisionCondition(this.draftCondition()));
   readonly draftChanged = computed(() => canonicalDecisionExpression(this.selected()?.condition) !==
     canonicalDecisionExpression(this.draftCondition()));
   readonly editorConfig = computed<RuleBuilderConfig | null>(() => {
@@ -85,10 +87,20 @@ export class CatalogWorkspaceComponent implements OnInit {
       },
       error: (error: unknown) => {
         this.loading.set(false);
-        this.authenticationRequired.set(error instanceof HttpErrorResponse && error.status === 401);
-        this.permissionLimited.set(error instanceof HttpErrorResponse && error.status === 403);
         this.loadError.set(error instanceof Error ? error.message : 'PROJECTION_LOAD_FAILED');
+        if (error instanceof HttpErrorResponse && error.status === 401) {
+          this.authenticationRequired.set(true);
+        } else if (error instanceof HttpErrorResponse && error.status === 403) {
+          this.resolveForbiddenResponse(state.config);
+        }
       }
+    });
+  }
+
+  private resolveForbiddenResponse(config: PolicyStudioRuntimeConfig): void {
+    this.auth.hasSession(config).subscribe({
+      next: active => active ? this.permissionLimited.set(true) : this.authenticationRequired.set(true),
+      error: () => this.loadError.set('SESSION_STATUS_UNAVAILABLE')
     });
   }
 
@@ -136,7 +148,9 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   closeAuthoring(): void { this.authoringOpen.set(false); }
-  updateDraft(condition: unknown): void { this.draftCondition.set(condition); }
+  updateDraft(condition: unknown): void {
+    this.draftCondition.set(composeDecisionCondition(this.selected()?.condition, condition));
+  }
   updateEditorState(state: RuleBuilderState): void { this.editorState.set(state); }
   resetDraft(): void {
     this.draftCondition.set(this.selected()?.condition ?? null);
