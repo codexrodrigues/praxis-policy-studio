@@ -83,6 +83,68 @@
       </dl>
     </div>
 
+    <section class="inspection" aria-labelledby="inspection-title">
+      <header class="inspection-heading">
+        <div>
+          <p class="section-label" id="inspection-title">{{ i18n.text('inspection') }}</p>
+          <p class="inspection-summary">{{ i18n.text('sequentialOrder') }} {{ current.order }}/{{ current.totalDecisions }}</p>
+        </div>
+        <span class="sequence" [attr.aria-label]="i18n.text('precedence') + ' ' + current.order + '/' + current.totalDecisions">
+          <strong>{{ current.order }}</strong><small>/{{ current.totalDecisions }}</small>
+        </span>
+      </header>
+
+      <div class="inspection-grid">
+        <section class="condition-panel">
+          <p class="inspection-label">{{ i18n.text('condition') }}</p>
+          @if (current.expression) {
+            <code class="expression">{{ current.expression }}</code>
+          } @else {
+            <p class="inspection-empty">{{ i18n.text('noCondition') }}</p>
+          }
+          <dl class="contract-facts">
+            <div><dt>{{ i18n.text('nullBehavior') }}</dt><dd>{{ current.nullSemantics ?? '—' }}</dd></div>
+            <div><dt>{{ i18n.text('operations') }}</dt><dd>{{ current.operationKeys.join(' · ') }}</dd></div>
+            <div><dt>{{ i18n.text('hostContract') }}</dt><dd>{{ current.hostContractVersion ?? '—' }}</dd></div>
+          </dl>
+        </section>
+
+        <section class="facts-panel">
+          <p class="inspection-label">{{ i18n.text('facts') }}</p>
+          <ul class="fact-list">
+            @for (fact of current.factPaths; track fact) { <li><code>{{ fact }}</code></li> }
+            @empty { <li class="inspection-empty">—</li> }
+          </ul>
+        </section>
+      </div>
+
+      <div class="version-compare" aria-label="Comparação de autoridade e draft">
+        <section>
+          <span class="version-kicker">{{ i18n.text('baseline') }}</span>
+          <strong>{{ i18n.text('legacyBaseline') }}</strong>
+          <small>KEEP_DB_BACKED · LEGACY_AUTHORITATIVE</small>
+        </section>
+        <span class="compare-arrow" aria-hidden="true">→</span>
+        <section [class.unavailable]="!current.configStatus">
+          <span class="version-kicker">{{ i18n.text('draft') }}</span>
+          <strong>{{ current.configStatus ?? i18n.text('noDraft') }}</strong>
+          <small>{{ current.draftLifecycle ?? 'DRAFT_ONLY' }} · {{ current.reviewStatus }}</small>
+        </section>
+      </div>
+    </section>
+
+    <section class="evidence-ledger" aria-labelledby="evidence-title">
+      <div>
+        <p class="section-label" id="evidence-title">{{ i18n.text('evidence') }}</p>
+        <p>{{ i18n.text('technicalEvidence') }}</p>
+      </div>
+      <ol>
+        @for (item of current.evidence; track item.sha256) {
+          <li><span>{{ item.kind }}</span><code>{{ item.path }}</code><small>SHA-256 {{ item.sha256.slice(0, 12) }}…</small></li>
+        }
+      </ol>
+    </section>
+
     @if (current.configDefinitionId) {
       <section class="timeline" aria-labelledby="timeline-title">
         <p class="section-label" id="timeline-title">{{ i18n.text('timeline') }}</p>

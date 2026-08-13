@@ -29,7 +29,21 @@ const copy = {
     permissionLimited: 'Você não possui permissão para consultar este catálogo.',
     remoteError: 'Não foi possível consultar o catálogo governado.',
     timeline: 'Linha do tempo segura',
-    noTimeline: 'Nenhum evento governado foi publicado para esta decisão.'
+    noTimeline: 'Nenhum evento governado foi publicado para esta decisão.',
+    inspection: 'Inspeção da decisão',
+    precedence: 'Precedência',
+    condition: 'Condição governada',
+    facts: 'Facts utilizados',
+    nullBehavior: 'Comportamento de nulo',
+    operations: 'Operações',
+    hostContract: 'Contrato do host',
+    baseline: 'Baseline operacional',
+    draft: 'Draft no Config',
+    legacyBaseline: 'Oracle legado permanece autoritativo',
+    noDraft: 'Nenhum draft governado corresponde a esta decisão.',
+    sequentialOrder: 'Primeira negação na ordem',
+    technicalEvidence: 'Evidência técnica rastreável',
+    noCondition: 'A condição governada ainda não foi carregada do Config.'
   },
   'en-US': {
     skip: 'Skip to main content',
@@ -58,7 +72,21 @@ const copy = {
     permissionLimited: 'You do not have permission to read this catalog.',
     remoteError: 'The governed catalog could not be loaded.',
     timeline: 'Safe timeline',
-    noTimeline: 'No governed event has been published for this decision.'
+    noTimeline: 'No governed event has been published for this decision.',
+    inspection: 'Decision inspection',
+    precedence: 'Precedence',
+    condition: 'Governed condition',
+    facts: 'Facts used',
+    nullBehavior: 'Null behavior',
+    operations: 'Operations',
+    hostContract: 'Host contract',
+    baseline: 'Operational baseline',
+    draft: 'Config draft',
+    legacyBaseline: 'Legacy Oracle remains authoritative',
+    noDraft: 'No governed draft matches this decision.',
+    sequentialOrder: 'First denial in order',
+    technicalEvidence: 'Traceable technical evidence',
+    noCondition: 'The governed condition has not been loaded from Config yet.'
   }
 } as const;
 

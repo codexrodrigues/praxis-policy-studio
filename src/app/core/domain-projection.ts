@@ -6,6 +6,7 @@ export interface DomainProjection {
   readonly ruleSetRef: {
     readonly boundedContextKey: string;
     readonly ruleSetKey: string;
+    readonly hostContractVersion?: string;
     readonly operationKeys: readonly string[];
   };
   readonly decisionRefs: readonly ProjectionDecisionRef[];
@@ -49,4 +50,3 @@ export function validateDomainProjection(value: unknown): DomainProjection {
   }
   return projection as DomainProjection;
 }
-

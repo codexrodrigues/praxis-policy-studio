@@ -41,6 +41,13 @@ status técnico do Config em homologação de negócio. A projeção governada s
 sendo a fonte das 14 identidades e da ordem; o Config apenas acrescenta o estado
 persistido que tenha a mesma chave canônica.
 
+No modo remoto, a inspeção de cada decisão mostra a condição em leitura
+simbólica, os facts referenciados, a semântica de `null`, as operações cobertas,
+a posição na precedência e as evidências de origem. A comparação entre baseline
+e draft é deliberadamente assimétrica: o Oracle legado continua indicado como
+autoridade operacional, enquanto o Config aparece apenas como draft técnico.
+Esta superfície não oferece edição, publicação ou ativação.
+
 ## Gates
 
 ```powershell
