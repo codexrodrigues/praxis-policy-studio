@@ -1,6 +1,8 @@
 export type DecisionState = 'technical-draft' | 'verified';
 
 export interface DecisionSummary {
+  readonly order: number;
+  readonly totalDecisions: number;
   readonly key: string;
   readonly code: string;
   readonly name: string;
@@ -15,6 +17,19 @@ export interface DecisionSummary {
   readonly reviewStatus?: string;
   readonly configDefinitionId?: string;
   readonly configStatus?: string;
+  readonly expression: string | null;
+  readonly factPaths: readonly string[];
+  readonly nullSemantics: string | null;
+  readonly operationKeys: readonly string[];
+  readonly hostContractVersion: string | null;
+  readonly evidence: readonly DecisionEvidence[];
+  readonly draftLifecycle: string | null;
+}
+
+export interface DecisionEvidence {
+  readonly path: string;
+  readonly kind: string;
+  readonly sha256: string;
 }
 
 export interface DecisionTimelineEvent {
