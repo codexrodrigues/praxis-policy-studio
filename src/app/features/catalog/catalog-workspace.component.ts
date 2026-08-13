@@ -103,6 +103,7 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly rolloutBusy = signal(false);
   readonly rolloutFeedback = signal<string | null>(null);
   readonly rolloutFeedbackError = signal(false);
+  private selectionRevision = 0;
   private snapshotLoadRevision = 0;
   readonly draftCondition = signal<unknown | null>(null);
   readonly editorState = signal<RuleBuilderState | null>(null);
@@ -203,6 +204,7 @@ export class CatalogWorkspaceComponent implements OnInit {
   select(decision: DecisionSummary): void {
     if (decision.key === this.selected()?.key) return;
     if (decision.key !== this.selected()?.key && !this.confirmDraftDiscard()) return;
+    const selectionRevision = ++this.selectionRevision;
     this.selected.set(decision);
     this.authoringOpen.set(false);
     this.draftCondition.set(decision.condition);
@@ -210,15 +212,15 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.timeline.set([]);
     this.snapshotFeedback.set(null);
     this.snapshotFeedbackError.set(false);
-    this.loadTimeline();
-    this.loadLifecycle();
-    this.loadScenarios();
-    this.loadReviews();
+    this.loadTimeline(selectionRevision);
+    this.loadLifecycle(selectionRevision);
+    this.loadScenarios(selectionRevision);
+    this.loadReviews(selectionRevision);
     this.loadSnapshots();
     this.revealSelectedDecision();
   }
 
-  loadTimeline(): void {
+  loadTimeline(selectionRevision = this.selectionRevision): void {
     const state = this.runtime.state();
     const definitionId = this.selected()?.configDefinitionId;
     this.timeline.set([]);
@@ -230,17 +232,19 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.timelineLoading.set(true);
     this.catalog.timeline(definitionId, state.config).subscribe({
       next: events => {
+        if (!this.isCurrentDefinition(selectionRevision, definitionId)) return;
         this.timeline.set(events);
         this.timelineLoading.set(false);
       },
       error: () => {
+        if (!this.isCurrentDefinition(selectionRevision, definitionId)) return;
         this.timelineLoading.set(false);
         this.timelineError.set(true);
       }
     });
   }
 
-  loadLifecycle(): void {
+  loadLifecycle(selectionRevision = this.selectionRevision): void {
     const state = this.runtime.state();
     const decision = this.selected();
     this.lifecycle.set(null);
@@ -252,10 +256,12 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.lifecycleLoading.set(true);
     this.catalog.lifecycle(decision.workspaceId, state.config).subscribe({
       next: lifecycle => {
+        if (!this.isCurrentWorkspace(selectionRevision, decision.workspaceId!)) return;
         this.lifecycle.set(lifecycle);
         this.lifecycleLoading.set(false);
       },
       error: () => {
+        if (!this.isCurrentWorkspace(selectionRevision, decision.workspaceId!)) return;
         this.lifecycleLoading.set(false);
         this.lifecycleError.set(true);
       }
@@ -472,25 +478,37 @@ export class CatalogWorkspaceComponent implements OnInit {
     });
   }
 
-  loadScenarios(): void {
+  loadScenarios(selectionRevision = this.selectionRevision): void {
     const state = this.runtime.state();
     const workspaceId = this.selected()?.workspaceId;
     this.scenarios.set([]);
     if (state.kind !== 'ready' || !workspaceId) return;
     this.catalog.scenarios(workspaceId, state.config).subscribe({
-      next: scenarios => this.scenarios.set(scenarios),
-      error: () => this.authoringError.set(true)
+      next: scenarios => {
+        if (!this.isCurrentWorkspace(selectionRevision, workspaceId)) return;
+        this.scenarios.set(scenarios);
+      },
+      error: () => {
+        if (!this.isCurrentWorkspace(selectionRevision, workspaceId)) return;
+        this.authoringError.set(true);
+      }
     });
   }
 
-  loadReviews(): void {
+  loadReviews(selectionRevision = this.selectionRevision): void {
     const state = this.runtime.state();
     const workspaceId = this.selected()?.workspaceId;
     this.reviews.set([]);
     if (state.kind !== 'ready' || !workspaceId) return;
     this.catalog.reviews(workspaceId, state.config).subscribe({
-      next: reviews => this.reviews.set(reviews),
-      error: () => this.authoringError.set(true)
+      next: reviews => {
+        if (!this.isCurrentWorkspace(selectionRevision, workspaceId)) return;
+        this.reviews.set(reviews);
+      },
+      error: () => {
+        if (!this.isCurrentWorkspace(selectionRevision, workspaceId)) return;
+        this.authoringError.set(true);
+      }
     });
   }
 
@@ -810,6 +828,14 @@ export class CatalogWorkspaceComponent implements OnInit {
       this.host.nativeElement.querySelector<HTMLElement>('.decision-row.selected')
         ?.scrollIntoView({ block: 'center', inline: 'nearest' });
     }));
+  }
+
+  private isCurrentDefinition(revision: number, definitionId: string): boolean {
+    return revision === this.selectionRevision && this.selected()?.configDefinitionId === definitionId;
+  }
+
+  private isCurrentWorkspace(revision: number, workspaceId: string): boolean {
+    return revision === this.selectionRevision && this.selected()?.workspaceId === workspaceId;
   }
 
   private resetDraftState(): void {

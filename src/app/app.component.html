@@ -9,7 +9,7 @@
   </nav>
   <div class="context">
     <span><span class="glyph" aria-hidden="true">◇</span>{{ i18n.text(runtime.mode() === 'remote' ? 'governedConfig' : 'fixture') }}</span>
-    <span><span class="glyph" aria-hidden="true">●</span>{{ i18n.text('readonly') }}</span>
+    <span><span class="glyph" aria-hidden="true">●</span>{{ i18n.text(runtime.mode() === 'remote' ? 'governedOperations' : 'readonly') }}</span>
   </div>
 </header>
 
