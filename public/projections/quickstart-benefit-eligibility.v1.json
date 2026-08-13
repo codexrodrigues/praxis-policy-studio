@@ -23,7 +23,18 @@
     "reviewStatus": "BUSINESS_REVIEW_PENDING",
     "semanticSourceRef": "fixtures/quickstart/extraordinary-benefit.v1#amount-limit",
     "targetPlanRef": "fixtures/quickstart/extraordinary-benefit.v1#target",
-    "editable": false
+    "editable": false,
+    "factPaths": ["benefitRequest.requestedAmount"]
+  }],
+  "factSchemas": [{
+    "path": "benefitRequest.requestedAmount",
+    "valueType": "number",
+    "nullable": false,
+    "presentationLabel": "Requested amount",
+    "description": "Amount requested for the extraordinary benefit eligibility fixture.",
+    "locale": "en-US",
+    "providerRef": "ExtraordinaryBenefitRequest.requestedAmount",
+    "evidenceRefs": ["fixtures/quickstart/extraordinary-benefit.v1"]
   }],
   "configDefinitionRefs": { "status": "CONTRACTUAL_FIXTURE", "definitionIds": ["quickstart-extraordinary-benefit-amount-limit"] },
   "resourceLinks": [],
@@ -39,4 +50,3 @@
     "productionAuthorityChanged": false
   }
 }
-

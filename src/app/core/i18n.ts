@@ -43,7 +43,18 @@ const copy = {
     noDraft: 'Nenhum draft governado corresponde a esta decisão.',
     sequentialOrder: 'Primeira negação na ordem',
     technicalEvidence: 'Evidência técnica rastreável',
-    noCondition: 'A condição governada ainda não foi carregada do Config.'
+    noCondition: 'A condição governada ainda não foi carregada do Config.',
+    draftWorkspace: 'Workspace de alteração',
+    draftWorkspaceHint: 'Edite e valide localmente antes de qualquer fluxo governado.',
+    openDraft: 'Abrir draft local',
+    conditionRequired: 'Carregue a condição do Config',
+    localDraft: 'Draft local e descartável',
+    localDraftBoundary: 'Esta área não salva, publica, ativa nem altera a autoridade da regra.',
+    close: 'Fechar',
+    validationIssues: 'itens de validação',
+    unsavedLocalChanges: 'Há alterações apenas nesta sessão.',
+    unchangedDraft: 'A condição permanece igual à origem carregada.',
+    resetDraft: 'Restaurar condição'
   },
   'en-US': {
     skip: 'Skip to main content',
@@ -86,7 +97,18 @@ const copy = {
     noDraft: 'No governed draft matches this decision.',
     sequentialOrder: 'First denial in order',
     technicalEvidence: 'Traceable technical evidence',
-    noCondition: 'The governed condition has not been loaded from Config yet.'
+    noCondition: 'The governed condition has not been loaded from Config yet.',
+    draftWorkspace: 'Change workspace',
+    draftWorkspaceHint: 'Edit and validate locally before any governed workflow.',
+    openDraft: 'Open local draft',
+    conditionRequired: 'Load the condition from Config',
+    localDraft: 'Local disposable draft',
+    localDraftBoundary: 'This area does not save, publish, activate, or change rule authority.',
+    close: 'Close',
+    validationIssues: 'validation items',
+    unsavedLocalChanges: 'Changes exist only in this session.',
+    unchangedDraft: 'The condition remains equal to its loaded source.',
+    resetDraft: 'Reset condition'
   }
 } as const;
 

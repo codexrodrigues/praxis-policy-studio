@@ -8,6 +8,7 @@ export function validateProjection(projection) {
   if (!projection?.ruleSetRef?.ruleSetKey) errors.push('RULESET_REQUIRED');
   if (!Array.isArray(projection?.decisionRefs) || projection.decisionRefs.length === 0) errors.push('DECISIONS_REQUIRED');
   if (!Array.isArray(projection?.sourceArtifacts) || projection.sourceArtifacts.length === 0) errors.push('SOURCES_REQUIRED');
+  if (!Array.isArray(projection?.factSchemas) || projection.factSchemas.length === 0) errors.push('FACT_SCHEMAS_REQUIRED');
 
   const decisions = Array.isArray(projection?.decisionRefs) ? projection.decisionRefs : [];
   const keys = decisions.map(item => item.decisionKey);
@@ -18,6 +19,19 @@ export function validateProjection(projection) {
   if (decisions.some(item => !item.reasonCode || !item.presentationLabel || !item.semanticSourceRef)) {
     errors.push('DECISION_REFERENCE_INCOMPLETE');
   }
+  const factSchemas = Array.isArray(projection?.factSchemas) ? projection.factSchemas : [];
+  const factPaths = factSchemas.map(item => item.path);
+  if (new Set(factPaths).size !== factPaths.length) errors.push('FACT_SCHEMA_PATH_DUPLICATE');
+  if (factSchemas.some(item => !item.path || !['number', 'date'].includes(item.valueType) ||
+      typeof item.nullable !== 'boolean' || !item.presentationLabel || !item.description ||
+      !item.providerRef || !Array.isArray(item.evidenceRefs) || item.evidenceRefs.length === 0)) {
+    errors.push('FACT_SCHEMA_INCOMPLETE');
+  }
+  const requiredFactPaths = new Set(decisions.flatMap(item => Array.isArray(item.factPaths) ? item.factPaths : []));
+  if (decisions.some(item => !Array.isArray(item.factPaths) || item.factPaths.length === 0) ||
+      [...requiredFactPaths].some(factPath => !factPaths.includes(factPath))) {
+    errors.push('FACT_SCHEMA_COVERAGE_INCOMPLETE');
+  }
   if (projection?.authorityEvidence?.currentAuthority !== 'KEEP_DB_BACKED' ||
       projection?.authorityEvidence?.legacyAuthority !== 'LEGACY_AUTHORITATIVE') {
     errors.push('AUTHORITY_BOUNDARY_INVALID');
@@ -27,4 +41,3 @@ export function validateProjection(projection) {
   }
   return errors;
 }
-

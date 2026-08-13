@@ -10,7 +10,12 @@ const valid = {
   decisionRefs: [{
     order: 1, decisionKey: 'fixture.decision', reasonCode: 'FIXTURE-1', presentationLabel: 'Fixture decision',
     semanticStatus: 'TECHNICAL_DRAFT_READY', reviewStatus: 'BUSINESS_REVIEW_PENDING',
-    semanticSourceRef: 'fixture#decision', targetPlanRef: 'fixture#target', editable: false
+    semanticSourceRef: 'fixture#decision', targetPlanRef: 'fixture#target', editable: false, factPaths: ['fixture.amount']
+  }],
+  factSchemas: [{
+    path: 'fixture.amount', valueType: 'number', nullable: true, presentationLabel: 'Amount',
+    description: 'Amount evaluated by the fixture decision.', locale: 'pt-BR', providerRef: 'Fixture.amount',
+    evidenceRefs: ['fixture.fact-provider-evidence.json']
   }],
   configDefinitionRefs: { status: 'CONTRACTUAL_FIXTURE', definitionIds: ['fixture'] },
   presentationLabels: { domain: { 'en-US': 'Fixture' }, ruleSet: { 'en-US': 'Rules' } },
@@ -33,5 +38,10 @@ describe('validateDomainProjection', () => {
   it('rejects duplicate decision identities', () => {
     expect(() => validateDomainProjection({ ...valid, decisionRefs: [valid.decisionRefs[0], valid.decisionRefs[0]] }))
       .toThrowError('PROJECTION_DECISION_DUPLICATE');
+  });
+
+  it('rejects a decision whose facts have no governed schema', () => {
+    expect(() => validateDomainProjection({ ...valid, factSchemas: [] }))
+      .toThrowError('PROJECTION_FACT_SCHEMAS_REQUIRED');
   });
 });

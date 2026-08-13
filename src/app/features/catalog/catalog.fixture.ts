@@ -18,12 +18,23 @@ export interface DecisionSummary {
   readonly configDefinitionId?: string;
   readonly configStatus?: string;
   readonly expression: string | null;
+  readonly condition: unknown | null;
   readonly factPaths: readonly string[];
+  readonly facts: readonly DecisionFact[];
   readonly nullSemantics: string | null;
   readonly operationKeys: readonly string[];
   readonly hostContractVersion: string | null;
   readonly evidence: readonly DecisionEvidence[];
   readonly draftLifecycle: string | null;
+}
+
+export interface DecisionFact {
+  readonly path: string;
+  readonly valueType: 'number' | 'date';
+  readonly nullable: boolean;
+  readonly label: string;
+  readonly description: string;
+  readonly providerRef: string;
 }
 
 export interface DecisionEvidence {

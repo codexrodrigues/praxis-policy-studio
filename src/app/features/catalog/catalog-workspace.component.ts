@@ -6,10 +6,12 @@ import { DecisionSummary } from './catalog.fixture';
 import { DecisionTimelineEvent } from './catalog.fixture';
 import { RuntimeConfigService } from '../../core/runtime-config.service';
 import { HttpErrorResponse } from '@angular/common/http';
+import type { RuleBuilderConfig, RuleBuilderState } from '@praxisui/visual-builder';
+import { LocalDraftWorkspaceComponent } from '../authoring/local-draft-workspace.component';
 
 @Component({
   selector: 'pax-catalog-workspace',
-  imports: [FormsModule],
+  imports: [FormsModule, LocalDraftWorkspaceComponent],
   templateUrl: './catalog-workspace.component.html',
   styleUrl: './catalog-workspace.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -24,6 +26,25 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly loading = signal(true);
   readonly permissionLimited = signal(false);
   readonly timeline = signal<readonly DecisionTimelineEvent[]>([]);
+  readonly authoringOpen = signal(false);
+  readonly draftCondition = signal<unknown | null>(null);
+  readonly editorState = signal<RuleBuilderState | null>(null);
+  readonly editorConfig = computed<RuleBuilderConfig | null>(() => {
+    const decision = this.selected();
+    if (!decision) return null;
+    return {
+      fieldSchemas: Object.fromEntries(decision.facts.map(fact => [fact.path, {
+        name: fact.path,
+        label: fact.label,
+        type: fact.valueType,
+        description: fact.description,
+        required: !fact.nullable,
+        origin: 'field'
+      }])),
+      ui: { showAdvanced: false, enableDragDrop: true, showInlineErrors: true },
+      validation: { realTime: true, strictness: 'strict' }
+    };
+  });
   readonly decisions = computed(() => {
     const query = this.query().trim().toLocaleLowerCase();
     return query
@@ -54,6 +75,9 @@ export class CatalogWorkspaceComponent implements OnInit {
   updateQuery(value: string): void { this.query.set(value); }
   select(decision: DecisionSummary): void {
     this.selected.set(decision);
+    this.authoringOpen.set(false);
+    this.draftCondition.set(decision.condition);
+    this.editorState.set(null);
     this.timeline.set([]);
     const state = this.runtime.state();
     if (state.kind === 'ready' && decision.configDefinitionId) {
@@ -62,5 +86,21 @@ export class CatalogWorkspaceComponent implements OnInit {
         error: () => this.timeline.set([])
       });
     }
+  }
+
+  openAuthoring(): void {
+    const decision = this.selected();
+    if (!decision?.editable || !decision.condition) return;
+    this.draftCondition.set(decision.condition);
+    this.editorState.set(null);
+    this.authoringOpen.set(true);
+  }
+
+  closeAuthoring(): void { this.authoringOpen.set(false); }
+  updateDraft(condition: unknown): void { this.draftCondition.set(condition); }
+  updateEditorState(state: RuleBuilderState): void { this.editorState.set(state); }
+  resetDraft(): void {
+    this.draftCondition.set(this.selected()?.condition ?? null);
+    this.editorState.set(null);
   }
 }

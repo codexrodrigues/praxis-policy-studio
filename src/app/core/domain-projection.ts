@@ -10,6 +10,7 @@ export interface DomainProjection {
     readonly operationKeys: readonly string[];
   };
   readonly decisionRefs: readonly ProjectionDecisionRef[];
+  readonly factSchemas: readonly ProjectionFactSchema[];
   readonly configDefinitionRefs: { readonly status: string; readonly definitionIds: readonly string[] };
   readonly presentationLabels: {
     readonly domain: Record<string, string>;
@@ -33,6 +34,18 @@ export interface ProjectionDecisionRef {
   readonly semanticSourceRef: string;
   readonly targetPlanRef: string;
   readonly editable: boolean;
+  readonly factPaths: readonly string[];
+}
+
+export interface ProjectionFactSchema {
+  readonly path: string;
+  readonly valueType: 'number' | 'date';
+  readonly nullable: boolean;
+  readonly presentationLabel: string;
+  readonly description: string;
+  readonly locale: 'pt-BR' | 'en-US';
+  readonly providerRef: string;
+  readonly evidenceRefs: readonly string[];
 }
 
 export function validateDomainProjection(value: unknown): DomainProjection {
@@ -40,9 +53,19 @@ export function validateDomainProjection(value: unknown): DomainProjection {
   const projection = value as Partial<DomainProjection>;
   if (!projection.projectionId || !projection.ruleSetRef?.ruleSetKey) throw new Error('PROJECTION_IDENTITY_REQUIRED');
   if (!projection.decisionRefs?.length) throw new Error('PROJECTION_DECISIONS_REQUIRED');
+  if (!projection.factSchemas?.length) throw new Error('PROJECTION_FACT_SCHEMAS_REQUIRED');
   const decisions = projection.decisionRefs;
   if (new Set(decisions.map(item => item.decisionKey)).size !== decisions.length) throw new Error('PROJECTION_DECISION_DUPLICATE');
   if (decisions.some((item, index) => item.order !== index + 1)) throw new Error('PROJECTION_ORDER_INVALID');
+  const factPaths = projection.factSchemas.map(item => item.path);
+  if (new Set(factPaths).size !== factPaths.length) throw new Error('PROJECTION_FACT_SCHEMA_DUPLICATE');
+  if (projection.factSchemas.some(item => !item.presentationLabel || !item.description || !item.providerRef ||
+      !item.evidenceRefs?.length || !['number', 'date'].includes(item.valueType) || typeof item.nullable !== 'boolean')) {
+    throw new Error('PROJECTION_FACT_SCHEMA_INVALID');
+  }
+  if (decisions.some(item => !item.factPaths?.length || item.factPaths.some(factPath => !factPaths.includes(factPath)))) {
+    throw new Error('PROJECTION_FACT_SCHEMA_COVERAGE_INVALID');
+  }
   if (projection.authorityEvidence?.currentAuthority !== 'KEEP_DB_BACKED' ||
       projection.authorityEvidence.legacyAuthority !== 'LEGACY_AUTHORITATIVE' ||
       projection.authorityEvidence.productionAuthorityChanged !== false) {

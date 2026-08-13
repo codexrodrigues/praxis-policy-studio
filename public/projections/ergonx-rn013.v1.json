@@ -2,12 +2,12 @@
   "kind": "ERGONX_POLICY_STUDIO_PROJECTION_V1",
   "projectionId": "ergonx.workforce.frequency-and-absence.rn-013",
   "projectionVersion": 1,
-  "generatedFromRevision": "1efe3cfad5b87f44982bb05124c888019824025c",
+  "generatedFromRevision": "51c74355eec81ee450ac6f0aff00b0746fa8df60",
   "sourceArtifacts": [
     {
       "path": "tools/migration-factory/rn013-full-block-config-payload.psm1",
       "kind": "CONFIG_MATERIALIZER",
-      "sha256": "E2AD6F9006227B5CE340859A63E7A405B78DBD35F0787A4E7BEECC8B2C6F1DA5"
+      "sha256": "8073E06416A6EDD62A24C72643D48F1941A480F42CEEB166B87EE391CC37B4F4"
     },
     {
       "path": "ms-administracao-pessoal/src/main/java/com/example/praxis/msadministracaopessoal/administracaopessoal/rule/RegraFrequenciaMainPreHostContract.java",
@@ -28,6 +28,91 @@
       "path": "docs/migracao/ERGadm00036/rule-migration/rule-traceability-matrix.md",
       "kind": "TRACEABILITY",
       "sha256": "717D62F5A77809718201CD6A6F18CABE6ECBC787F3A4B52C0898E57072A1B009"
+    },
+    {
+      "path": "ms-administracao-pessoal/src/main/java/com/example/praxis/msadministracaopessoal/administracaopessoal/dto/RegraFrequenciaCommandDTO.java",
+      "kind": "FACT_SCHEMA_SOURCE",
+      "sha256": "95F159312779F7C4CB406CEB7C3DD1EC1C45687C31CB2D8B048083A1FE5FC96A"
+    },
+    {
+      "path": "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.extension-interval-nonnegative.fact-provider-evidence.json",
+      "kind": "FACT_PROVIDER_EVIDENCE",
+      "sha256": "9B5324D48EB21AC4F8C5B7E95EA6DCD09A3793935BD0AEB102093842BE0808BB"
+    },
+    {
+      "path": "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.maximum-consecutive-month-days.fact-provider-evidence.json",
+      "kind": "FACT_PROVIDER_EVIDENCE",
+      "sha256": "E71693C4575B2A30173ED6DC98A5A808A707347B5863C60F5C00A92746909238"
+    },
+    {
+      "path": "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.maximum-consecutive-month-nonnegative.fact-provider-evidence.json",
+      "kind": "FACT_PROVIDER_EVIDENCE",
+      "sha256": "AA0D55610CA4BFF2E3AA984193B96CA264701C75F19E12B9C377D35DFF2D671C"
+    },
+    {
+      "path": "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.maximum-consecutive-year-days.fact-provider-evidence.json",
+      "kind": "FACT_PROVIDER_EVIDENCE",
+      "sha256": "68F4BB2F3896DA049FA043CF1B38D3469969E2BA102E512E6AE11B4E3EF5BA42"
+    },
+    {
+      "path": "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.maximum-consecutive-year-nonnegative.fact-provider-evidence.json",
+      "kind": "FACT_PROVIDER_EVIDENCE",
+      "sha256": "2CFC1F880F4804A5C270A600EF082EBEB7CDDFDF828B9D729C0BAC8C2408A2FA"
+    },
+    {
+      "path": "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.maximum-interpolated-month-days.fact-provider-evidence.json",
+      "kind": "FACT_PROVIDER_EVIDENCE",
+      "sha256": "543F46730FB09F4AC74937DD1EAAB94DFE675D24B8D58C108313471CCB4E1668"
+    },
+    {
+      "path": "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.maximum-interpolated-month-nonnegative.fact-provider-evidence.json",
+      "kind": "FACT_PROVIDER_EVIDENCE",
+      "sha256": "696C3C104A3531CAAE4AD58EFCF700181F6798762AEBE983CB6D7F300A5ED034"
+    },
+    {
+      "path": "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.maximum-interpolated-year-days.fact-provider-evidence.json",
+      "kind": "FACT_PROVIDER_EVIDENCE",
+      "sha256": "0ABE4E6E01F4CF2F46817AC80FE00FE21C7DAA9928DB26B8501FB51515EC3A85"
+    },
+    {
+      "path": "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.maximum-interpolated-year-nonnegative.fact-provider-evidence.json",
+      "kind": "FACT_PROVIDER_EVIDENCE",
+      "sha256": "E4E2860CB6DC61E2988C3FE8A26E770ECB000A36AED003F1FD644C63BCFE3673"
+    },
+    {
+      "path": "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.maximum-quantity-nonnegative.fact-provider-evidence.json",
+      "kind": "FACT_PROVIDER_EVIDENCE",
+      "sha256": "88343A6228703CA7BC1B32657E9F55678B08E2514125C9AC5C644DF382381B29"
+    },
+    {
+      "path": "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.minimum-interval-nonnegative.fact-provider-evidence.json",
+      "kind": "FACT_PROVIDER_EVIDENCE",
+      "sha256": "1E767CA39EDBC4F6B245459984717D47BE2C872526542BB76343E0C2FF55610A"
+    },
+    {
+      "path": "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.minimum-quantity-nonnegative.fact-provider-evidence.json",
+      "kind": "FACT_PROVIDER_EVIDENCE",
+      "sha256": "F88269883D8678A56C0B743614CDF2959AF0FC17A3E01366F4C2DCC718BAE2C0"
+    },
+    {
+      "path": "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.quantity-range-maximum.fact-provider-evidence.json",
+      "kind": "FACT_PROVIDER_EVIDENCE",
+      "sha256": "84B68E17D1BCE9EA4509B88D635A0CBDABF00EC3C43F7E9650758D507D9EEBAA"
+    },
+    {
+      "path": "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.quantity-range-minimum.fact-provider-evidence.json",
+      "kind": "FACT_PROVIDER_EVIDENCE",
+      "sha256": "33B6AE7BF2C5B1D880CC7F53F30637A60E364D2E2BA12E4D376A280BAF16BCE7"
+    },
+    {
+      "path": "docs/migracao/rule-migration/factory-contracts/review/rn-013a/rn-013a.end-date.fact-provider-evidence.json",
+      "kind": "FACT_PROVIDER_EVIDENCE",
+      "sha256": "4CA6492E71CB8E44DE261F0D9579C02ADE4C59C566B7F8E0253044B8CB661437"
+    },
+    {
+      "path": "docs/migracao/rule-migration/factory-contracts/review/rn-013a/rn-013a.start-date.fact-provider-evidence.json",
+      "kind": "FACT_PROVIDER_EVIDENCE",
+      "sha256": "F217AE58F9FFFC138D2EAB0EBD5BCE17813DB4A8C285334658631B79CAF65C4E"
     }
   ],
   "ruleSetRef": {
@@ -50,7 +135,10 @@
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
       "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[0]",
       "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
-      "editable": false
+      "editable": false,
+      "factPaths": [
+        "regraFrequenciaCommand.quantidadeMaximaDias"
+      ]
     },
     {
       "order": 2,
@@ -61,7 +149,10 @@
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
       "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[1]",
       "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
-      "editable": false
+      "editable": false,
+      "factPaths": [
+        "regraFrequenciaCommand.quantidadeMinimaDias"
+      ]
     },
     {
       "order": 3,
@@ -72,7 +163,11 @@
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
       "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[2]",
       "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
-      "editable": true
+      "editable": true,
+      "factPaths": [
+        "regraFrequenciaCommand.quantidadeMaximaDias",
+        "regraFrequenciaCommand.quantidadeMinimaDias"
+      ]
     },
     {
       "order": 4,
@@ -83,7 +178,10 @@
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
       "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[3]",
       "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
-      "editable": false
+      "editable": false,
+      "factPaths": [
+        "regraFrequenciaCommand.quantidadeMaximaConsecutivaMesDias"
+      ]
     },
     {
       "order": 5,
@@ -94,7 +192,10 @@
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
       "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[4]",
       "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
-      "editable": false
+      "editable": false,
+      "factPaths": [
+        "regraFrequenciaCommand.quantidadeMaximaConsecutivaAnoDias"
+      ]
     },
     {
       "order": 6,
@@ -105,7 +206,10 @@
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
       "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[5]",
       "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
-      "editable": false
+      "editable": false,
+      "factPaths": [
+        "regraFrequenciaCommand.quantidadeMaximaIntercaladaMesDias"
+      ]
     },
     {
       "order": 7,
@@ -116,7 +220,10 @@
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
       "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[6]",
       "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
-      "editable": false
+      "editable": false,
+      "factPaths": [
+        "regraFrequenciaCommand.quantidadeMaximaIntercaladaAnoDias"
+      ]
     },
     {
       "order": 8,
@@ -127,7 +234,10 @@
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
       "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[7]",
       "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
-      "editable": false
+      "editable": false,
+      "factPaths": [
+        "regraFrequenciaCommand.intervaloProrrogacaoDias"
+      ]
     },
     {
       "order": 9,
@@ -138,7 +248,10 @@
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
       "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[8]",
       "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
-      "editable": false
+      "editable": false,
+      "factPaths": [
+        "regraFrequenciaCommand.intervaloMinimoDias"
+      ]
     },
     {
       "order": 10,
@@ -149,7 +262,10 @@
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
       "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[9]",
       "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
-      "editable": false
+      "editable": false,
+      "factPaths": [
+        "regraFrequenciaCommand.quantidadeMaximaConsecutivaMesDias"
+      ]
     },
     {
       "order": 11,
@@ -160,7 +276,10 @@
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
       "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[10]",
       "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
-      "editable": false
+      "editable": false,
+      "factPaths": [
+        "regraFrequenciaCommand.quantidadeMaximaIntercaladaMesDias"
+      ]
     },
     {
       "order": 12,
@@ -171,7 +290,10 @@
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
       "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[11]",
       "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
-      "editable": false
+      "editable": false,
+      "factPaths": [
+        "regraFrequenciaCommand.quantidadeMaximaConsecutivaAnoDias"
+      ]
     },
     {
       "order": 13,
@@ -182,7 +304,10 @@
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
       "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[12]",
       "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
-      "editable": false
+      "editable": false,
+      "factPaths": [
+        "regraFrequenciaCommand.quantidadeMaximaIntercaladaAnoDias"
+      ]
     },
     {
       "order": 14,
@@ -193,7 +318,139 @@
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
       "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[13]",
       "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
-      "editable": false
+      "editable": false,
+      "factPaths": [
+        "regraFrequenciaCommand.dataInicio",
+        "regraFrequenciaCommand.dataFim"
+      ]
+    }
+  ],
+  "factSchemas": [
+    {
+      "path": "regraFrequenciaCommand.dataFim",
+      "valueType": "date",
+      "nullable": true,
+      "presentationLabel": "Fim",
+      "description": "Data final de vigencia da regra, quando houver termino definido.",
+      "locale": "pt-BR",
+      "providerRef": "RegraFrequenciaCommandDTO.dataFim",
+      "evidenceRefs": [
+        "docs/migracao/rule-migration/factory-contracts/review/rn-013a/rn-013a.end-date.fact-provider-evidence.json"
+      ]
+    },
+    {
+      "path": "regraFrequenciaCommand.dataInicio",
+      "valueType": "date",
+      "nullable": false,
+      "presentationLabel": "Inicio",
+      "description": "Data inicial de vigencia da regra de frequencia.",
+      "locale": "pt-BR",
+      "providerRef": "RegraFrequenciaCommandDTO.dataInicio",
+      "evidenceRefs": [
+        "docs/migracao/rule-migration/factory-contracts/review/rn-013a/rn-013a.start-date.fact-provider-evidence.json"
+      ]
+    },
+    {
+      "path": "regraFrequenciaCommand.intervaloMinimoDias",
+      "valueType": "number",
+      "nullable": true,
+      "presentationLabel": "Intervalo minimo",
+      "description": "Intervalo minimo em dias entre ocorrencias considerado pela regra.",
+      "locale": "pt-BR",
+      "providerRef": "RegraFrequenciaCommandDTO.intervaloMinimoDias",
+      "evidenceRefs": [
+        "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.minimum-interval-nonnegative.fact-provider-evidence.json"
+      ]
+    },
+    {
+      "path": "regraFrequenciaCommand.intervaloProrrogacaoDias",
+      "valueType": "number",
+      "nullable": true,
+      "presentationLabel": "Intervalo prorrogacao",
+      "description": "Intervalo de prorrogacao em dias associado a regra.",
+      "locale": "pt-BR",
+      "providerRef": "RegraFrequenciaCommandDTO.intervaloProrrogacaoDias",
+      "evidenceRefs": [
+        "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.extension-interval-nonnegative.fact-provider-evidence.json"
+      ]
+    },
+    {
+      "path": "regraFrequenciaCommand.quantidadeMaximaConsecutivaAnoDias",
+      "valueType": "number",
+      "nullable": true,
+      "presentationLabel": "Max. consec. ano",
+      "description": "Quantidade maxima de dias consecutivos no ano.",
+      "locale": "pt-BR",
+      "providerRef": "RegraFrequenciaCommandDTO.quantidadeMaximaConsecutivaAnoDias",
+      "evidenceRefs": [
+        "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.maximum-consecutive-year-days.fact-provider-evidence.json",
+        "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.maximum-consecutive-year-nonnegative.fact-provider-evidence.json"
+      ]
+    },
+    {
+      "path": "regraFrequenciaCommand.quantidadeMaximaConsecutivaMesDias",
+      "valueType": "number",
+      "nullable": true,
+      "presentationLabel": "Max. consec. mes",
+      "description": "Quantidade maxima de dias consecutivos no mes.",
+      "locale": "pt-BR",
+      "providerRef": "RegraFrequenciaCommandDTO.quantidadeMaximaConsecutivaMesDias",
+      "evidenceRefs": [
+        "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.maximum-consecutive-month-days.fact-provider-evidence.json",
+        "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.maximum-consecutive-month-nonnegative.fact-provider-evidence.json"
+      ]
+    },
+    {
+      "path": "regraFrequenciaCommand.quantidadeMaximaDias",
+      "valueType": "number",
+      "nullable": true,
+      "presentationLabel": "Qtd. maxima",
+      "description": "Quantidade maxima de dias permitida pela regra.",
+      "locale": "pt-BR",
+      "providerRef": "RegraFrequenciaCommandDTO.quantidadeMaximaDias",
+      "evidenceRefs": [
+        "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.maximum-quantity-nonnegative.fact-provider-evidence.json",
+        "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.quantity-range-maximum.fact-provider-evidence.json"
+      ]
+    },
+    {
+      "path": "regraFrequenciaCommand.quantidadeMaximaIntercaladaAnoDias",
+      "valueType": "number",
+      "nullable": true,
+      "presentationLabel": "Max. intercalado ano",
+      "description": "Quantidade maxima de dias intercalados no ano.",
+      "locale": "pt-BR",
+      "providerRef": "RegraFrequenciaCommandDTO.quantidadeMaximaIntercaladaAnoDias",
+      "evidenceRefs": [
+        "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.maximum-interpolated-year-days.fact-provider-evidence.json",
+        "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.maximum-interpolated-year-nonnegative.fact-provider-evidence.json"
+      ]
+    },
+    {
+      "path": "regraFrequenciaCommand.quantidadeMaximaIntercaladaMesDias",
+      "valueType": "number",
+      "nullable": true,
+      "presentationLabel": "Max. intercalado mes",
+      "description": "Quantidade maxima de dias intercalados no mes.",
+      "locale": "pt-BR",
+      "providerRef": "RegraFrequenciaCommandDTO.quantidadeMaximaIntercaladaMesDias",
+      "evidenceRefs": [
+        "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.maximum-interpolated-month-days.fact-provider-evidence.json",
+        "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.maximum-interpolated-month-nonnegative.fact-provider-evidence.json"
+      ]
+    },
+    {
+      "path": "regraFrequenciaCommand.quantidadeMinimaDias",
+      "valueType": "number",
+      "nullable": true,
+      "presentationLabel": "Qtd. minima",
+      "description": "Quantidade minima de dias exigida pela regra.",
+      "locale": "pt-BR",
+      "providerRef": "RegraFrequenciaCommandDTO.quantidadeMinimaDias",
+      "evidenceRefs": [
+        "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.minimum-quantity-nonnegative.fact-provider-evidence.json",
+        "docs/migracao/rule-migration/factory-contracts/review/rn-013/rn-013.quantity-range-minimum.fact-provider-evidence.json"
+      ]
     }
   ],
   "configDefinitionRefs": {

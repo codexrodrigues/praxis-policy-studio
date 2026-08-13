@@ -99,3 +99,39 @@ h2 { max-width: 48rem; font-size: clamp(1.6rem, 3vw, 2.45rem); line-height: 1.08
   .compare-arrow { transform: rotate(90deg); justify-self: start; }
   .evidence-ledger li { grid-template-columns: 1fr; gap: .3rem; }
 }
+.authoring-entry,
+.draft-workspace > header,
+.draft-workspace > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.authoring-entry {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px solid var(--pax-border, #d9e0e7);
+  border-radius: 0.75rem;
+}
+
+.authoring-entry small,
+.draft-workspace small { display: block; margin-top: 0.25rem; }
+
+.draft-workspace {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid var(--pax-border, #d9e0e7);
+  border-radius: 1rem;
+  background: var(--pax-surface, #fff);
+}
+
+.draft-workspace > header { margin-bottom: 1rem; }
+.draft-workspace > footer { margin-top: 1rem; }
+
+.quiet-button {
+  border: 1px solid currentColor;
+  background: transparent;
+  border-radius: 0.5rem;
+  padding: 0.55rem 0.85rem;
+}

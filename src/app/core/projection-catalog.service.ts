@@ -36,6 +36,22 @@ export class ProjectionCatalogService {
     return forkJoin({ projection: this.http.get<unknown>(path).pipe(map(validateDomainProjection)), definitions }).pipe(
       map(({ projection, definitions }) => projection.decisionRefs.map(decision => {
         const definition = definitions.find(item => item.ruleKey === decision.decisionKey);
+        const conditionFactPaths = collectFactPaths(definition?.condition);
+        if (conditionFactPaths.some(factPath => !decision.factPaths.includes(factPath))) {
+          throw new Error(`CONFIG_FACT_OUTSIDE_GOVERNED_PROJECTION ${decision.decisionKey}`);
+        }
+        const facts = decision.factPaths.map(factPath => {
+          const schema = projection.factSchemas.find(item => item.path === factPath);
+          if (!schema) throw new Error(`PROJECTION_FACT_SCHEMA_MISSING ${factPath}`);
+          return {
+            path: schema.path,
+            valueType: schema.valueType,
+            nullable: schema.nullable,
+            label: schema.presentationLabel,
+            description: schema.description,
+            providerRef: schema.providerRef
+          };
+        });
         return {
           order: decision.order,
           totalDecisions: projection.decisionRefs.length,
@@ -54,7 +70,9 @@ export class ProjectionCatalogService {
           configDefinitionId: definition?.id,
           configStatus: definition?.status,
           expression: formatDecisionExpression(definition?.condition),
-          factPaths: collectFactPaths(definition?.condition),
+          condition: definition?.condition ?? null,
+          factPaths: conditionFactPaths.length ? conditionFactPaths : decision.factPaths,
+          facts,
           nullSemantics: definition?.parameters?.nullSemantics ?? null,
           operationKeys: definition?.parameters?.operationKeys ?? projection.ruleSetRef.operationKeys,
           hostContractVersion: definition?.parameters?.hostContractVersion ?? projection.ruleSetRef.hostContractVersion ?? null,

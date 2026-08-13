@@ -112,7 +112,13 @@
         <section class="facts-panel">
           <p class="inspection-label">{{ i18n.text('facts') }}</p>
           <ul class="fact-list">
-            @for (fact of current.factPaths; track fact) { <li><code>{{ fact }}</code></li> }
+            @for (fact of current.facts; track fact.path) {
+              <li>
+                <strong>{{ fact.label }}</strong>
+                <code>{{ fact.path }}</code>
+                <small>{{ fact.description }} · {{ fact.valueType }} · {{ fact.nullable ? 'nullable' : 'obrigatório' }}</small>
+              </li>
+            }
             @empty { <li class="inspection-empty">—</li> }
           </ul>
         </section>
@@ -131,7 +137,49 @@
           <small>{{ current.draftLifecycle ?? 'DRAFT_ONLY' }} · {{ current.reviewStatus }}</small>
         </section>
       </div>
+
+      @if (current.editable) {
+        <div class="authoring-entry">
+          <div>
+            <strong>{{ i18n.text('draftWorkspace') }}</strong>
+            <small>{{ i18n.text('draftWorkspaceHint') }}</small>
+          </div>
+          <button type="button" [disabled]="!current.condition" (click)="openAuthoring()">
+            {{ i18n.text(current.condition ? 'openDraft' : 'conditionRequired') }}
+          </button>
+        </div>
+      }
     </section>
+
+
+    @if (authoringOpen() && editorConfig(); as authoringConfig) {
+      <section class="draft-workspace" aria-labelledby="draft-workspace-title">
+        <header>
+          <div>
+            <p class="section-label">{{ i18n.text('localDraft') }}</p>
+            <h3 id="draft-workspace-title">{{ current.name }}</h3>
+            <p>{{ i18n.text('localDraftBoundary') }}</p>
+          </div>
+          <button type="button" class="quiet-button" (click)="closeAuthoring()">{{ i18n.text('close') }}</button>
+        </header>
+        @defer (when authoringOpen()) {
+        <pax-local-draft-workspace
+          [config]="authoringConfig"
+          [condition]="draftCondition()"
+          (conditionChanged)="updateDraft($event)"
+          (stateChanged)="updateEditorState($event)" />
+        } @placeholder {
+          <p>{{ i18n.text('loading') }}</p>
+        }
+        <footer>
+          <div>
+            <strong>{{ editorState()?.validationErrors?.length ?? 0 }} {{ i18n.text('validationIssues') }}</strong>
+            <small>{{ editorState()?.isDirty ? i18n.text('unsavedLocalChanges') : i18n.text('unchangedDraft') }}</small>
+          </div>
+          <button type="button" class="quiet-button" (click)="resetDraft()">{{ i18n.text('resetDraft') }}</button>
+        </footer>
+      </section>
+    }
 
     <section class="evidence-ledger" aria-labelledby="evidence-title">
       <div>
