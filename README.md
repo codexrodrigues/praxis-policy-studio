@@ -1,86 +1,138 @@
 # Praxis Policy Studio
 
-Workstation independente da plataforma Praxis para compreender, criar, testar e operar decisões governadas. O ErgonX é o primeiro consumidor; contratos e semântica do produto permanecem neutros em relação ao domínio.
+O Praxis Policy Studio é a estação de trabalho da plataforma Praxis para
+compreender, comparar e evoluir decisões de negócio governadas. Ele transforma
+regras que normalmente ficam dispersas entre código, banco, documentação e
+configuração em uma experiência rastreável para pessoas técnicas e de negócio.
 
-## Estado atual
+O ErgonX é o primeiro consumidor e fornece o primeiro pacote de domínio real,
+mas não é uma dependência arquitetural do produto. O core do Studio deve
+continuar reutilizável por qualquer solução que publique os contratos Praxis de
+decisão, Config e projeção de domínio.
 
-`PS-001` implementa o shell, `PS-003` adiciona projeções read-only validadas e
-o primeiro slice de `PS-002/PS-004` conecta essas referências ao catálogo e à
-timeline segura do Config quando o modo remoto é habilitado. Não há publicação,
-ativação, persistência ou mudança de autoridade.
+## Comece por aqui
 
-O catálogo carrega 14 referências RN-013 geradas a partir do materializador
-Config e do contrato Java, mais uma fixture contratual neutra do Quickstart.
-O manifesto não contém expressões executáveis nem credenciais. Ele projeta os
-schemas dos facts a partir de `FACT_PROVIDER_EVIDENCE` verificado e das
-anotações deliberadas do DTO Java; condição e lifecycle continuam vindo do
-Config autenticado.
+| Se você quer... | Leia |
+| --- | --- |
+| entender por que o produto existe e quais problemas deve resolver | [Visão do produto e casos de uso](docs/product-vision-and-use-cases.md) |
+| entender owners, contratos, fluxos e limites de segurança | [Arquitetura e guia de continuidade](docs/architecture-and-continuation-guide.md) |
+| preparar a máquina e contribuir sem acesso ao Ergon | [Guia de contribuição](CONTRIBUTING.md) |
+| conhecer a decisão arquitetural de fundação | [ADR 0001 — fronteira do produto](docs/adr/0001-product-boundary.md) |
+| conferir a primeira prova de integração protegida | [Prova de leitura do Config](docs/config-read-live-proof-2026-08-13.md) |
 
-## Requisitos
+## O que já funciona
 
-- Node.js 20.19+ ou 22.12+
-- npm 10+
+- shell Angular independente, responsivo e bilíngue (`pt-BR` e `en-US`);
+- catálogo e busca das 14 decisões do RuleSet RN-013;
+- projeções de domínio validadas por identidade, ordem, facts, evidências e
+  fronteira de autoridade;
+- leitura autenticada das definições, capabilities e timeline no Praxis Config;
+- estados explícitos de login necessário, acesso limitado, erro e somente leitura;
+- inspeção de condição, facts, semântica de `null`, precedência, operações,
+  origem e evidências;
+- edição focal pelo Visual Builder oficial;
+- comparação entre a definição carregada e o draft;
+- criação de uma nova versão imutável em estado `draft`, somente quando o
+  servidor retorna a capability `CREATE_NEW_VERSION`.
 
-## Executar
+Criar um draft **não** publica, materializa, cria snapshot, ativa a regra, altera
+o Oracle nem transfere autoridade de execução. A baseline RN-013 continua
+`KEEP_DB_BACKED / LEGACY_AUTHORITATIVE`.
+
+## O que ainda não funciona
+
+- seleção dinâmica de vários pacotes de domínio na interface;
+- edição genérica de todas as decisões e tipos de regra;
+- validação semântica humana ou homologação de negócio;
+- simulação contra facts do host consumidor;
+- revisão e aprovação de mudanças;
+- publicação, materialização, ativação, rollback e comparação de snapshots;
+- operação corporativa completa, incluindo políticas de segregação, retenção,
+  auditoria e observabilidade.
+
+Esses itens são roadmap, não capacidades implícitas. O Studio nunca deve simular
+no browser uma autorização ou um estado que pertença ao servidor.
+
+## Executar sem Ergon
+
+Requisitos:
+
+- Node.js 20.19+ ou 22.12+;
+- npm 10+.
+
+Instale e valide:
 
 ```powershell
 npm ci
-npm start
-```
-
-No modo remoto, uma sessão ausente exibe o login explícito do ambiente de desenvolvimento. O formulário chama o endpoint canônico `/auth/login`, recebe apenas o cookie `HttpOnly` do host e descarta os campos após a tentativa; o Policy Studio não persiste senha ou token.
-
-Abra `http://localhost:4302/catalog`.
-
-## Configuração
-
-`public/app-config.json` é carregado no início. A configuração versionada desta
-POC usa o modo `remote` e o endpoint local oficial
-`http://localhost:8088`. Manter Studio e Quickstart no mesmo hostname é
-necessário para a sessão local baseada em cookie `SameSite`. Ela não contém credenciais. O modo `remote` falha
-fechado quando `configApiBaseUrl` não é informado, consulta definições e timeline por
-`/api/praxis/config/domain-rules/**` e usa a sessão autenticada do host. O
-browser não envia nem infere tenant, ambiente, authority ou capability; esse
-escopo é resolvido pelo servidor. Nenhum token ou segredo deve ser versionado.
-
-O catálogo distingue indisponibilidade de falta de permissão e não transforma
-status técnico do Config em homologação de negócio. A projeção governada segue
-sendo a fonte das 14 identidades e da ordem; o Config apenas acrescenta o estado
-persistido que tenha a mesma chave canônica.
-
-A editabilidade também não é inferida pelo browser. O Studio exige
-`CREATE_NEW_VERSION` em `GET /domain-rules/definitions/capabilities` para a
-versão mais recente da definição; sem essa ação server-owned, o workspace permanece
-estritamente read-only.
-
-No modo remoto, a inspeção de cada decisão mostra a condição em leitura
-simbólica, os facts referenciados, a semântica de `null`, as operações cobertas,
-a posição na precedência e as evidências de origem. A comparação entre baseline
-e draft é deliberadamente assimétrica: o Oracle legado continua indicado como
-autoridade operacional, enquanto o Config aparece apenas como draft técnico.
-Esta superfície não oferece edição, publicação ou ativação.
-
-A decisão focal editável abre o Visual Builder oficial em um chunk lazy. O
-workspace mostra validações, permite restaurar a condição carregada e, quando o
-servidor autoriza `CREATE_NEW_VERSION`, cria uma nova definição `draft` com a
-condição editada. A versão anterior permanece imutável; o Studio não publica,
-materializa, cria snapshot, ativa nem altera a autoridade runtime.
-
-## Gates
-
-```powershell
+npm run lint
 npm test
 npm run check:projections
 npm run build
 ```
 
-Para atualizar a projeção RN-013 a partir de um checkout governado da migração:
+Para navegar sem Quickstart, Oracle, VPN ou credenciais do Ergon, altere
+temporariamente `public/app-config.json` para:
+
+```json
+{
+  "mode": "fixture",
+  "configApiBaseUrl": null,
+  "locale": "pt-BR"
+}
+```
+
+Depois execute:
+
+```powershell
+npm start
+```
+
+Abra `http://localhost:4302/catalog`. O catálogo usa a projeção RN-013
+versionada no próprio repositório e não acessa o banco legado. Antes de criar um
+commit, restaure `public/app-config.json`, pois a configuração versionada da POC
+permanece no modo remoto oficial.
+
+## Executar integrado ao Config
+
+A configuração versionada aponta para `http://localhost:8088`. Nesse modo o
+Studio usa a sessão `HttpOnly` do host de referência e chama as superfícies
+protegidas de `/api/praxis/config/domain-rules/**`. O browser não envia nem
+infere tenant, ambiente, authority ou capability; o servidor resolve o escopo.
+
+Uma sessão ausente exibe o login explícito de desenvolvimento. O formulário
+chama `/auth/login`, recebe apenas o cookie do host e descarta usuário e senha
+após a tentativa. Nenhuma credencial deve ser versionada.
+
+## Projeções de domínio
+
+Uma projeção é um read model verificável para apresentação. Ela referencia
+identidades, ordem, facts, fontes e limites de evidência já governados; não copia
+expressões executáveis nem se torna uma nova fonte de verdade.
+
+As projeções versionadas atuais são:
+
+- `ergonx-rn013.v1.json`: primeiro pacote real, exibido pelo catálogo atual;
+- `quickstart-benefit-eligibility.v1.json`: fixture neutra que prova o contrato
+  de projeção e prepara o segundo consumidor; ainda não é selecionável na UI.
+
+Para conferir ambas:
+
+```powershell
+npm run check:projections
+```
+
+Para regenerar a projeção RN-013 a partir de um checkout governado da migração:
 
 ```powershell
 npm run generate:ergonx-projection -- D:\caminho\para\Techne-ErgonX-migracao
 npm run check:projections
 ```
 
-O gerador falha se materializador e host não tiverem exatamente as mesmas 14
-identidades na mesma ordem. IDs das definições Config permanecem explicitamente
-`NOT_RESOLVED_IN_VERSIONED_EVIDENCE`; o Studio não os infere.
+Essa regeneração é opcional para trabalhar no core do Studio. Ela só é necessária
+quando as fontes governadas do domínio ErgonX mudarem.
+
+## Princípio central
+
+O Studio explica e propõe mudanças; o Config governa versões e lifecycle; o
+Rules Engine compila e avalia; o host fornece facts, autorização, transação e
+efeitos. Nenhuma evolução pode misturar esses papéis por conveniência local.
