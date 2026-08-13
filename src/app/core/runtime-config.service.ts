@@ -14,6 +14,10 @@ export class RuntimeConfigService {
   private readonly stateSignal = signal<SetupState>({ kind: 'loading' });
   readonly state = this.stateSignal.asReadonly();
   readonly ready = computed(() => this.stateSignal().kind === 'ready');
+  readonly mode = computed(() => {
+    const state = this.stateSignal();
+    return state.kind === 'ready' ? state.config.mode : null;
+  });
 
   async load(): Promise<void> {
     this.stateSignal.set({ kind: 'loading' });
@@ -28,4 +32,3 @@ export class RuntimeConfigService {
     }
   }
 }
-
