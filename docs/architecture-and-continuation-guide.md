@@ -157,12 +157,12 @@ snapshot ou activate.
 | fixture neutra | valida contrato do segundo consumidor | `quickstart-benefit-eligibility.v1.json` |
 | leitura Config | implementada | service, testes e prova live documentada |
 | sessão de desenvolvimento | implementada | `auth-session.service.ts` |
-| capabilities | implementadas | ação `CREATE_NEW_VERSION` server-owned |
+| capabilities | parciais | definitions, snapshots e staged rollout possuem ações server-owned; workspace review/promotion e rollout-policy ainda inferem lifecycle |
 | inspeção | implementada | catálogo e `decision-inspection.ts` |
 | editor | implementado para o slice focal | `local-draft-workspace.component.ts` |
-| persistência | criação de versão draft | `newDraftVersionRequest` e testes |
-| simulação | não implementada | roadmap |
-| publicação/ativação/rollback | não implementados | roadmap |
+| persistência | workspace concorrente com ETag | `ProjectionCatalogService` e testes de integração |
+| simulação | candidate × active implementada | cenários/Test Runs do Config e sandbox do host; evidência legada registrada é gap |
+| publicação/ativação/rollback | parcialmente implementados | readiness/materializações, snapshot e staged rollout; actions de workspace/policy precisam ser server-owned |
 | autoridade Java/produção | não alterada pelo Studio | projeção e docs de evidência |
 
 O termo “implementado” acima significa código e prova no escopo indicado. Não
@@ -296,7 +296,8 @@ prova visual como evidência de execução no host.
 - o catálogo atual está ligado ao arquivo RN-013, embora o core deva ser genérico;
 - a fixture Quickstart é validada pelo checker, mas ainda não aparece na UI;
 - apenas um slice focal está editável;
-- simulação e execução runtime ainda não são capacidades do Studio;
+- comparação candidate × active existe; candidate × evidência legada registrada ainda não possui contrato canônico;
+- review/promotion de workspace e rollout-policy ainda inferem comandos do lifecycle no browser;
 - documentação de evidência histórica pode ficar stale e deve registrar commits;
 - uma projeção válida pode continuar semanticamente não homologada;
 - capabilities incompletas devem reduzir ações, nunca ser compensadas no cliente;

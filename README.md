@@ -38,6 +38,8 @@ Abra `http://localhost:4302/catalog`.
 
 Para integrar o primeiro consumidor, consulte o
 [handoff do Ergon para o corte beta.2](docs/ergon-handoff-beta2.md).
+O handoff referencia o corpus portátil executável mantido pelo Quickstart, que
+exercita riscos de migração sem transformar evidência sintética em prova Oracle.
 
 ## Configuração
 
@@ -49,8 +51,10 @@ público e a sessão cookie não dependem de transporte cross-origin. Ela não
 contém credenciais. O modo `remote` falha fechado quando `configApiBaseUrl` não
 é string, consulta definições e timeline por
 `/api/praxis/config/domain-rules/**` e usa a sessão autenticada do host. O
-browser não envia nem infere tenant, ambiente, authority ou capability. Isso é
-uma restrição do cliente, não uma garantia de isolamento. Definitions, timelines
+browser não envia tenant, ambiente ou authority. Isso é uma restrição do cliente,
+não uma garantia de isolamento. Ações de snapshot e staged rollout vêm do
+servidor; review/promotion de workspace e lifecycle de rollout-policy ainda
+carecem de um catálogo server-owned de ações e blockers. Definitions, timelines
 e materializations exigem `ROLE_RULE_DEFINITION_READER`; o Config resolve
 principal, tenant e ambiente no servidor. Nenhum token ou segredo deve ser versionado.
 
@@ -79,10 +83,11 @@ segunda verdade. Cenários e Test Runs formam o gate de submissão.
 
 Workspaces `SUBMITTED` expõem o formulário de review, mas o Config resolve o
 principal e exige `ROLE_RULE_DEFINITION_APPROVER`, inclusive author ≠ reviewer.
-Após aprovação, promoção exige a capability server-side correspondente e cria
-uma nova definição governada; ela não publica materializações nem ativa snapshot.
-A UI usa o status apenas para apresentar a próxima ação possível. `403`, conflito
-de ETag e gates de lifecycle continuam sendo decididos pelo servidor.
+Após aprovação, a promoção cria uma nova definição governada; ela não publica
+materializações nem ativa snapshot. Neste corte, a UI ainda usa o status para
+apresentar review/promotion e depende da revalidação do servidor em `403`, ETag e
+gates de lifecycle. Isso não é o estado final: o Config deve publicar ações e
+blockers por principal, e o Studio deve remover a inferência local.
 
 Para a definição promovida, o Studio materializa o readiness já publicado pelo
 Config: cobertura existente, aprovações requeridas, targets previstos, warnings,
@@ -100,9 +105,11 @@ No mesmo cockpit, a política de segurança do rollout é uma entidade governada
 separada do snapshot: versões imutáveis percorrem `DRAFT → APPROVED → ACTIVE`,
 com autor diferente do aprovador e um head/ETag anti-ABA próprio. O Studio usa
 exclusivamente o `DomainRuleService` público para criar draft, consultar catálogo
-e timeline, aprovar e ativar. A tela deriva comandos apenas do lifecycle; papéis,
-segregação, ausência de rollouts abertos e concorrência continuam validados pelo
-Config. O editor não simula readiness de rollout no browser. Essa operação será
+e timeline, aprovar e ativar. A tela ainda deriva esses comandos do lifecycle;
+papéis, segregação, ausência de rollouts abertos e concorrência continuam
+validados pelo Config. Antes de produção, o catálogo deve publicar as ações
+server-owned da política, como já ocorre em snapshots e staged rollout. O editor
+não simula readiness de rollout no browser. Essa operação será
 materializada quando o control plane publicar discovery governado de rollouts
 abertos e suas ações disponíveis para a persona humana.
 

@@ -42,6 +42,7 @@
           <button
             type="button"
             class="decision-row"
+            [disabled]="authoringBusy() || snapshotBusy() || rolloutPolicyBusy() || rolloutBusy()"
             [class.selected]="selected()?.key === decision.key"
             [attr.aria-current]="selected()?.key === decision.key ? 'true' : null"
             (click)="select(decision)">
@@ -61,7 +62,7 @@
   </aside>
 
   @if (selected(); as current) {
-  <article class="decision-pane" aria-labelledby="decision-title">
+  <article class="decision-pane" aria-labelledby="decision-title" [attr.aria-busy]="authoringBusy() || snapshotBusy() || rolloutPolicyBusy() || rolloutBusy()">
     <header class="decision-header">
       <div>
         <p class="eyebrow">{{ i18n.text('selected') }} · {{ current.code }}</p>
