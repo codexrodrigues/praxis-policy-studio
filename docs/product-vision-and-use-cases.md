@@ -266,4 +266,3 @@ Uma fase não deve usar como gate itens que pertencem a fases posteriores.
 | Publicação | transição autorizada, ETag, timeline e artefato materializado |
 | Ativação | snapshot imutável, head atômico, last-known-good, observação e rollback |
 | Produção | segurança, SLO, auditoria, retenção, redaction e operação aprovados |
-

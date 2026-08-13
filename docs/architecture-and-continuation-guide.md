@@ -319,4 +319,3 @@ Antes de entregar trabalho a outro agente, registre:
 Nunca inclua credenciais no handoff. Se a tarefa depender de acesso privado,
 ofereça primeiro uma fixture ou prova hermética equivalente e identifique
 separadamente o gate de integração.
-

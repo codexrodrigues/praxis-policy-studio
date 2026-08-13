@@ -136,4 +136,3 @@ Limites: não publicar, não ativar, não alterar autoridade, quando aplicável.
 
 O agente deve conseguir iniciar em `fixture` e separar claramente o que depende
 de integração remota. Nunca presuma que ele tenha acesso ao Ergon.
-
