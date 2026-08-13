@@ -34,9 +34,15 @@ bloqueio atual é de conteúdo: o Config de desenvolvimento ainda não contém a
 não pode apresentar status nem timeline dessas decisões sem criar uma fonte
 paralela ou inventar correspondências.
 
-## Próximo gate
+## Baseline posterior confirmada
 
-Materializar as 14 definições RN-013 como drafts governados no ambiente de
-desenvolvimento, preservando exatamente as identidades da projeção, sem publicar
-ou promover autoridade. Depois, repetir a leitura autenticada e exigir 14 de 14
-correspondências antes de habilitar qualquer fluxo de edição.
+O gate seguinte foi concluído pela fábrica e revalidado de forma idempotente:
+`created=0`, `reused=14`, `matched=14` e timelines `14/14`. Permanecem
+`publications=0`, `materializations=0`, `snapshots=0` e `oracleTouched=false`.
+
+O Studio agora usa o modo remoto como configuração padrão da POC e oferece para
+a decisão focal um workspace lazy de edição exclusivamente local, com schemas
+de facts governados, validação, comparação antes/draft e restauração. O perfil
+do navegador usado na inspeção atual não tinha sessão do Quickstart e provou o
+estado `permission-limited`; a inspeção visual autenticada do novo editor ainda
+é um gate pendente. Não foi criado bypass de autenticação.

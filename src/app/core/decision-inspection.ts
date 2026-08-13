@@ -37,6 +37,16 @@ export function formatDecisionExpression(value: unknown): string | null {
   return null;
 }
 
+export function canonicalDecisionExpression(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalDecisionExpression).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value as JsonObject)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalDecisionExpression(item)}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
 function visit(value: unknown, consumer: (candidate: unknown) => void): void {
   consumer(value);
   if (Array.isArray(value)) value.forEach(item => visit(item, consumer));

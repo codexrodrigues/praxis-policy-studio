@@ -11,7 +11,10 @@ ativação, persistência ou mudança de autoridade.
 
 O catálogo carrega 14 referências RN-013 geradas a partir do materializador
 Config e do contrato Java, mais uma fixture contratual neutra do Quickstart.
-O manifesto não contém expressões, facts reais, credenciais ou lifecycle.
+O manifesto não contém expressões executáveis nem credenciais. Ele projeta os
+schemas dos facts a partir de `FACT_PROVIDER_EVIDENCE` verificado e das
+anotações deliberadas do DTO Java; condição e lifecycle continuam vindo do
+Config autenticado.
 
 ## Requisitos
 
@@ -29,9 +32,10 @@ Abra `http://localhost:4302/catalog`.
 
 ## Configuração
 
-`public/app-config.json` é carregado no início. O modo `fixture` não exige
-endpoint. O modo `remote` falha fechado quando `configApiBaseUrl` não é
-informado, consulta definições e timeline por
+`public/app-config.json` é carregado no início. A configuração versionada desta
+POC usa o modo `remote` e o endpoint local oficial
+`http://127.0.0.1:8088`. Ela não contém credenciais. O modo `remote` falha
+fechado quando `configApiBaseUrl` não é informado, consulta definições e timeline por
 `/api/praxis/config/domain-rules/**` e usa a sessão autenticada do host. O
 browser não envia nem infere tenant, ambiente, authority ou capability; esse
 escopo é resolvido pelo servidor. Nenhum token ou segredo deve ser versionado.
@@ -47,6 +51,11 @@ a posição na precedência e as evidências de origem. A comparação entre bas
 e draft é deliberadamente assimétrica: o Oracle legado continua indicado como
 autoridade operacional, enquanto o Config aparece apenas como draft técnico.
 Esta superfície não oferece edição, publicação ou ativação.
+
+A decisão focal editável abre o Visual Builder oficial em um chunk lazy. O
+workspace altera somente memória local, mostra validações e permite restaurar a
+condição carregada. Ele deliberadamente não possui comando HTTP de gravação,
+publicação, materialização, snapshot ou ativação.
 
 ## Gates
 

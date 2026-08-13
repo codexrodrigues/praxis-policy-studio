@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collectFactPaths, formatDecisionExpression } from './decision-inspection';
+import { canonicalDecisionExpression, collectFactPaths, formatDecisionExpression } from './decision-inspection';
 
 const condition = {
   or: [
@@ -20,5 +20,12 @@ describe('decision inspection projection', () => {
       'regraFrequenciaCommand.quantidadeMaximaDias',
       'regraFrequenciaCommand.quantidadeMinimaDias'
     ]);
+  });
+
+  it('compares expressions independently of object key insertion order', () => {
+    expect(canonicalDecisionExpression({ or: [{ var: 'amount' }], meta: { b: 2, a: 1 } }))
+      .toBe(canonicalDecisionExpression({ meta: { a: 1, b: 2 }, or: [{ var: 'amount' }] }));
+    expect(canonicalDecisionExpression({ '>': [{ var: 'amount' }, 0] }))
+      .not.toBe(canonicalDecisionExpression({ '>=': [{ var: 'amount' }, 0] }));
   });
 });

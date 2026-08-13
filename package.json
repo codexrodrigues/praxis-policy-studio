@@ -3,7 +3,7 @@
   "version": "0.1.0-beta.1",
   "private": true,
   "scripts": {
-    "start": "ng serve --port 4302",
+    "start": "ng serve --host 0.0.0.0 --port 4302",
     "build": "ng build",
     "check:projections": "node tools/check-projections.mjs",
     "generate:ergonx-projection": "node tools/generate-ergonx-projection.mjs",

@@ -54,7 +54,9 @@ const copy = {
     validationIssues: 'itens de validação',
     unsavedLocalChanges: 'Há alterações apenas nesta sessão.',
     unchangedDraft: 'A condição permanece igual à origem carregada.',
-    resetDraft: 'Restaurar condição'
+    resetDraft: 'Restaurar condição',
+    loadedCondition: 'Condição carregada do Config',
+    localCondition: 'Draft local'
   },
   'en-US': {
     skip: 'Skip to main content',
@@ -108,7 +110,9 @@ const copy = {
     validationIssues: 'validation items',
     unsavedLocalChanges: 'Changes exist only in this session.',
     unchangedDraft: 'The condition remains equal to its loaded source.',
-    resetDraft: 'Reset condition'
+    resetDraft: 'Reset condition',
+    loadedCondition: 'Condition loaded from Config',
+    localCondition: 'Local draft'
   }
 } as const;
 

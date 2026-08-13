@@ -26,3 +26,9 @@ body { min-height: 100vh; margin: 0; }
 button, input { font: inherit; }
 ::selection { background: var(--pax-color-primary-container); color: var(--pax-color-on-primary-container); }
 
+.draft-compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; margin-top: 1rem; }
+.draft-compare section { min-width: 0; padding: .85rem; border: 1px solid var(--pax-color-outline-variant); border-radius: .65rem; }
+.draft-compare section.changed { border-color: var(--pax-color-primary); }
+.draft-compare span { display: block; margin-bottom: .45rem; font-weight: 650; }
+.draft-compare code { display: block; overflow-wrap: anywhere; white-space: normal; }
+@media (max-width: 760px) { .draft-compare { grid-template-columns: 1fr; } }

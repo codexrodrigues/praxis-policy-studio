@@ -171,10 +171,20 @@
         } @placeholder {
           <p>{{ i18n.text('loading') }}</p>
         }
+        <div class="draft-compare" aria-label="Comparação entre condição carregada e draft local">
+          <section>
+            <span>{{ i18n.text('loadedCondition') }}</span>
+            <code>{{ originalExpression() ?? '—' }}</code>
+          </section>
+          <section [class.changed]="draftChanged()">
+            <span>{{ i18n.text('localCondition') }}</span>
+            <code>{{ draftExpression() ?? '—' }}</code>
+          </section>
+        </div>
         <footer>
           <div>
             <strong>{{ editorState()?.validationErrors?.length ?? 0 }} {{ i18n.text('validationIssues') }}</strong>
-            <small>{{ editorState()?.isDirty ? i18n.text('unsavedLocalChanges') : i18n.text('unchangedDraft') }}</small>
+            <small>{{ draftChanged() ? i18n.text('unsavedLocalChanges') : i18n.text('unchangedDraft') }}</small>
           </div>
           <button type="button" class="quiet-button" (click)="resetDraft()">{{ i18n.text('resetDraft') }}</button>
         </footer>

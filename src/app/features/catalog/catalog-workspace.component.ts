@@ -8,6 +8,7 @@ import { RuntimeConfigService } from '../../core/runtime-config.service';
 import { HttpErrorResponse } from '@angular/common/http';
 import type { RuleBuilderConfig, RuleBuilderState } from '@praxisui/visual-builder';
 import { LocalDraftWorkspaceComponent } from '../authoring/local-draft-workspace.component';
+import { canonicalDecisionExpression, formatDecisionExpression } from '../../core/decision-inspection';
 
 @Component({
   selector: 'pax-catalog-workspace',
@@ -29,6 +30,10 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly authoringOpen = signal(false);
   readonly draftCondition = signal<unknown | null>(null);
   readonly editorState = signal<RuleBuilderState | null>(null);
+  readonly originalExpression = computed(() => formatDecisionExpression(this.selected()?.condition));
+  readonly draftExpression = computed(() => formatDecisionExpression(this.draftCondition()));
+  readonly draftChanged = computed(() => canonicalDecisionExpression(this.selected()?.condition) !==
+    canonicalDecisionExpression(this.draftCondition()));
   readonly editorConfig = computed<RuleBuilderConfig | null>(() => {
     const decision = this.selected();
     if (!decision) return null;
