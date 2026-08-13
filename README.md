@@ -38,6 +38,8 @@ Abra `http://localhost:4302/catalog`.
 
 Para integrar o primeiro consumidor, consulte o
 [handoff do Ergon para o corte beta.2](docs/ergon-handoff-beta2.md).
+O handoff referencia o corpus portátil executável mantido pelo Quickstart, que
+exercita riscos de migração sem transformar evidência sintética em prova Oracle.
 
 ## Configuração
 

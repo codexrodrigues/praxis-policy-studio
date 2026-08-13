@@ -39,10 +39,24 @@ transformar PL/SQL, Java ou telas legadas em fonte canônica do Studio. Condiç�
 versão e lifecycle vêm do Config; avaliação vem do Rules Engine/host; facts,
 efeitos e autoridade transacional permanecem no host Ergon.
 
+O Quickstart mantém o primeiro corpus portátil executável em
+`src/test/resources/policy-studio/ergon-portable-parity-corpus.v1.json`, com a
+especificação em `docs/POLICY-STUDIO-ERGON-PORTABLE-PARITY-CORPUS.md`. A
+autoridade desse corpus é explicitamente `SYNTHETIC_BASELINE`: ele permite
+desenvolvimento local, mas não afirma paridade com Oracle. No Ergon, cada caso
+deve ser ligado ao handoff aprovado da Parte 1 e comparado com a rota legada.
+
 O primeiro corpus de paridade deve cobrir `null`, limites de data e quantidade,
 overlap/gap, first denial, create/update e comparação candidate × oracle legado.
 A ativação só pode ocorrer depois de paridade registrada, gates de revisão e
 snapshot governado.
+
+O corte inicial já executa 14 casos neutros com create/update como contextos,
+limites inclusivos, imediatamente acima/abaixo, `null` explícito, fact ausente,
+`NOT_APPLICABLE` e sobreposição de falhas com precedência determinística. O
+agente Ergon deve acrescentar a evidência específica de trigger/package/HADES,
+erro legado, side effects e ausência de mutação em shadow; qualquer evidência
+ausente mantém o resultado `INCONCLUSIVE`.
 
 ## Limite conhecido deste corte
 
