@@ -13,4 +13,14 @@ export interface DecisionSummary {
   readonly evidenceCount: number;
   readonly editable?: boolean;
   readonly reviewStatus?: string;
+  readonly configDefinitionId?: string;
+  readonly configStatus?: string;
+}
+
+export interface DecisionTimelineEvent {
+  readonly eventType: string;
+  readonly occurredAt: string;
+  readonly summary: string;
+  readonly status: string | null;
+  readonly actor: string | null;
 }

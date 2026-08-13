@@ -4,9 +4,10 @@ Workstation independente da plataforma Praxis para compreender, criar, testar e 
 
 ## Estado atual
 
-`PS-001` implementa o shell e `PS-003` adiciona projeções read-only validadas.
-Não há publicação, ativação, persistência, mudança de autoridade ou conexão
-com ambientes do ErgonX.
+`PS-001` implementa o shell, `PS-003` adiciona projeções read-only validadas e
+o primeiro slice de `PS-002/PS-004` conecta essas referências ao catálogo e à
+timeline segura do Config quando o modo remoto é habilitado. Não há publicação,
+ativação, persistência ou mudança de autoridade.
 
 O catálogo carrega 14 referências RN-013 geradas a partir do materializador
 Config e do contrato Java, mais uma fixture contratual neutra do Quickstart.
@@ -28,7 +29,17 @@ Abra `http://localhost:4302/catalog`.
 
 ## Configuração
 
-`public/app-config.json` é carregado no início. O modo `fixture` não exige endpoint. O modo `remote` falha fechado quando `configApiBaseUrl` não é informado. Nenhum tenant, token ou segredo deve ser versionado.
+`public/app-config.json` é carregado no início. O modo `fixture` não exige
+endpoint. O modo `remote` falha fechado quando `configApiBaseUrl` não é
+informado, consulta definições e timeline por
+`/api/praxis/config/domain-rules/**` e usa a sessão autenticada do host. O
+browser não envia nem infere tenant, ambiente, authority ou capability; esse
+escopo é resolvido pelo servidor. Nenhum token ou segredo deve ser versionado.
+
+O catálogo distingue indisponibilidade de falta de permissão e não transforma
+status técnico do Config em homologação de negócio. A projeção governada segue
+sendo a fonte das 14 identidades e da ordem; o Config apenas acrescenta o estado
+persistido que tenha a mesma chave canônica.
 
 ## Gates
 

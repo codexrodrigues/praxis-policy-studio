@@ -23,7 +23,11 @@ const copy = {
     authority: 'Autoridade atual',
     source: 'Fonte governada',
     noResults: 'Nenhuma decisão corresponde à busca.',
-    fixtureNotice: 'Dados locais de demonstração. Nenhuma regra ou autoridade é alterada.'
+    fixtureNotice: 'Dados locais de demonstração. Nenhuma regra ou autoridade é alterada.',
+    permissionLimited: 'Você não possui permissão para consultar este catálogo.',
+    remoteError: 'Não foi possível consultar o catálogo governado.',
+    timeline: 'Linha do tempo segura',
+    noTimeline: 'Nenhum evento governado foi publicado para esta decisão.'
   },
   'en-US': {
     skip: 'Skip to main content',
@@ -46,7 +50,11 @@ const copy = {
     authority: 'Current authority',
     source: 'Governed source',
     noResults: 'No decision matches this search.',
-    fixtureNotice: 'Local demonstration data. No rule or authority is changed.'
+    fixtureNotice: 'Local demonstration data. No rule or authority is changed.',
+    permissionLimited: 'You do not have permission to read this catalog.',
+    remoteError: 'The governed catalog could not be loaded.',
+    timeline: 'Safe timeline',
+    noTimeline: 'No governed event has been published for this decision.'
   }
 } as const;
 
@@ -57,4 +65,3 @@ export class PolicyStudioI18n {
   readonly locale = signal<SupportedLocale>('pt-BR');
   text(key: CopyKey): string { return copy[this.locale()][key]; }
 }
-

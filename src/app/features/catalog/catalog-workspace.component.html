@@ -18,6 +18,13 @@
     </label>
 
     <div class="decision-list" role="listbox" aria-label="Decisões disponíveis">
+      @if (loading()) {
+        <p class="empty" aria-live="polite">{{ i18n.text('loading') }}</p>
+      } @else if (permissionLimited()) {
+        <p class="empty state-message" role="alert">{{ i18n.text('permissionLimited') }}</p>
+      } @else if (loadError()) {
+        <p class="empty state-message" role="alert">{{ i18n.text('remoteError') }}</p>
+      }
       @for (decision of decisions(); track decision.key) {
         <button
           type="button"
@@ -70,8 +77,26 @@
         <div><dt>RuleSet</dt><dd>{{ current.ruleSet }}</dd></div>
         <div><dt>{{ i18n.text('authority') }}</dt><dd>{{ current.authority }}</dd></div>
         <div><dt>{{ i18n.text('source') }}</dt><dd>{{ current.source }}</dd></div>
+        @if (current.configStatus) {
+          <div><dt>Config</dt><dd>{{ current.configStatus }}</dd></div>
+        }
       </dl>
     </div>
+
+    @if (current.configDefinitionId) {
+      <section class="timeline" aria-labelledby="timeline-title">
+        <p class="section-label" id="timeline-title">{{ i18n.text('timeline') }}</p>
+        @for (event of timeline(); track event.occurredAt + event.eventType) {
+          <article class="timeline-event">
+            <time [attr.datetime]="event.occurredAt">{{ event.occurredAt }}</time>
+            <strong>{{ event.summary }}</strong>
+            <small>{{ event.eventType }} @if (event.status) { · {{ event.status }} }</small>
+          </article>
+        } @empty {
+          <p class="empty timeline-empty">{{ i18n.text('noTimeline') }}</p>
+        }
+      </section>
+    }
 
     <footer class="fixture-boundary">
       <span class="boundary-glyph" aria-hidden="true">◇</span>
