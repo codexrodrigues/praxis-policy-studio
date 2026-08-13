@@ -25,7 +25,8 @@ describe('AuthSessionService', () => {
 
   it('creates the canonical remote cookie session', () => {
     service.login('admin', 'temporary-secret', {
-      mode: 'remote', configApiBaseUrl: 'http://127.0.0.1:8088', locale: 'pt-BR'
+      mode: 'remote', configApiBaseUrl: 'http://127.0.0.1:8088', locale: 'pt-BR',
+      projectionPath: '/projections/quickstart-benefit-eligibility.v1.json', initialDecisionKey: null
     }).subscribe();
     const request = http.expectOne('http://127.0.0.1:8088/auth/login');
     expect(request.request.method).toBe('POST');
@@ -36,12 +37,16 @@ describe('AuthSessionService', () => {
 
   it('rejects login from the hermetic fixture', () => {
     expect(() => service.login('admin', 'temporary-secret', {
-      mode: 'fixture', configApiBaseUrl: null, locale: 'pt-BR'
+      mode: 'fixture', configApiBaseUrl: null, locale: 'pt-BR',
+      projectionPath: '/projections/quickstart-benefit-eligibility.v1.json', initialDecisionKey: null
     })).toThrowError('AUTH_REMOTE_CONFIG_REQUIRED');
   });
 
   it('distinguishes a missing session from an authenticated principal', () => {
-    const config = { mode: 'remote' as const, configApiBaseUrl: 'http://127.0.0.1:8088', locale: 'pt-BR' as const };
+    const config = {
+      mode: 'remote' as const, configApiBaseUrl: 'http://127.0.0.1:8088', locale: 'pt-BR' as const,
+      projectionPath: '/projections/quickstart-benefit-eligibility.v1.json', initialDecisionKey: null
+    };
     let active = false;
     service.hasSession(config).subscribe(value => active = value);
     const activeRequest = http.expectOne('http://127.0.0.1:8088/auth/session');

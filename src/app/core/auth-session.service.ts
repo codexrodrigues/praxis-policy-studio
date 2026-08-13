@@ -8,12 +8,12 @@ export class AuthSessionService {
   private readonly http = inject(HttpClient);
 
   login(username: string, password: string, config: PolicyStudioRuntimeConfig): Observable<void> {
-    if (config.mode !== 'remote' || !config.configApiBaseUrl) throw new Error('AUTH_REMOTE_CONFIG_REQUIRED');
+    if (config.mode !== 'remote' || config.configApiBaseUrl === null) throw new Error('AUTH_REMOTE_CONFIG_REQUIRED');
     return this.http.post<void>(`${config.configApiBaseUrl}/auth/login`, { username, password }, { withCredentials: true });
   }
 
   hasSession(config: PolicyStudioRuntimeConfig): Observable<boolean> {
-    if (config.mode !== 'remote' || !config.configApiBaseUrl) throw new Error('AUTH_REMOTE_CONFIG_REQUIRED');
+    if (config.mode !== 'remote' || config.configApiBaseUrl === null) throw new Error('AUTH_REMOTE_CONFIG_REQUIRED');
     return this.http.get<void>(`${config.configApiBaseUrl}/auth/session`, { withCredentials: true }).pipe(
       map(() => true),
       catchError((error: unknown) => error instanceof HttpErrorResponse && error.status === 401

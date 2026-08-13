@@ -11,7 +11,7 @@ Praxis Rules Engine, mas não redefine nenhum desses owners.
 
 O core do produto permanece neutro em relação ao ErgonX. Conteúdo de domínio é
 recebido por projeções read-only baseadas em referências e digests. O ErgonX é
-o primeiro consumidor e o Quickstart será o segundo consumidor de prova.
+o primeiro consumidor e o Rule Lab do Quickstart é o caso neutro de prova local.
 
 ## Limites do incremento atual
 

@@ -107,7 +107,7 @@ const projection = {
     { boundary: 'BUSINESS_HOMOLOGATION', operations: [], status: 'DEFERRED' }
   ],
   authorityEvidence: {
-    currentAuthority: 'KEEP_DB_BACKED', legacyAuthority: 'LEGACY_AUTHORITATIVE',
+    currentAuthority: 'KEEP_DB_BACKED', baselineAuthority: 'LEGACY_AUTHORITATIVE',
     developmentEvidence: 'JAVA_AUTHORITATIVE_DEVELOPMENT_HISTORICAL_AND_REVERSIBLE', productionAuthorityChanged: false
   }
 };

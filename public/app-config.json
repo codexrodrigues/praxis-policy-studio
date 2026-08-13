@@ -1,5 +1,7 @@
 {
   "mode": "remote",
-  "configApiBaseUrl": "http://localhost:8088",
-  "locale": "pt-BR"
+  "configApiBaseUrl": "",
+  "locale": "pt-BR",
+  "projectionPath": "/projections/quickstart-benefit-eligibility.v1.json",
+  "initialDecisionKey": "grant.amount-parameters"
 }
