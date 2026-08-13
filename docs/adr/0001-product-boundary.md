@@ -19,6 +19,10 @@ o primeiro consumidor e o Quickstart será o segundo consumidor de prova.
 hermética. Não há conexão remota, authoring, persistência, publicação,
 ativação, execução ou mudança de autoridade.
 
+`PS-003` materializa apenas o read model interno por referências, digests e
+limites de evidência. O manifesto gerado não se torna fonte semântica e falha
+fechado em cardinalidade, ordem ou autoridade divergentes.
+
 ## Próximas dependências
 
 - `PS-003`: projeção interna mínima, sem nova fonte semântica;
@@ -31,4 +35,3 @@ ativação, execução ou mudança de autoridade.
 - nenhum tenant, segredo ou endpoint corporativo fixado no código;
 - configuração remota inválida falha fechado;
 - ações futuras serão exibidas apenas por capabilities server-owned.
-

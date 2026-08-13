@@ -44,6 +44,7 @@ h2 { max-width: 48rem; font-size: clamp(1.6rem, 3vw, 2.45rem); line-height: 1.08
 .fixture-boundary { display: flex; gap: .65rem; align-items: center; margin-top: clamp(2.5rem, 7vw, 6rem); padding-top: 1rem; border-top: 1px solid var(--pax-color-outline-variant, #b9c6cb); color: var(--pax-color-on-surface-variant, #52636a); font-size: .82rem; }
 .boundary-glyph { font-size: 1rem; }
 .empty { padding: 2rem .75rem; color: var(--pax-color-on-surface-variant, #52636a); }
+.empty-detail { display: grid; align-content: center; justify-items: start; gap: 1rem; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 @media (max-width: 1180px) {
   .detail-grid { grid-template-columns: 1fr; gap: 2rem; }

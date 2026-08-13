@@ -4,7 +4,13 @@ Workstation independente da plataforma Praxis para compreender, criar, testar e 
 
 ## Estado atual
 
-`PS-001` implementa somente o shell e uma fixture hermética read-only. Não há publicação, ativação, persistência, mudança de autoridade ou conexão com ambientes do ErgonX.
+`PS-001` implementa o shell e `PS-003` adiciona projeções read-only validadas.
+Não há publicação, ativação, persistência, mudança de autoridade ou conexão
+com ambientes do ErgonX.
+
+O catálogo carrega 14 referências RN-013 geradas a partir do materializador
+Config e do contrato Java, mais uma fixture contratual neutra do Quickstart.
+O manifesto não contém expressões, facts reais, credenciais ou lifecycle.
 
 ## Requisitos
 
@@ -28,6 +34,17 @@ Abra `http://localhost:4302/catalog`.
 
 ```powershell
 npm test
+npm run check:projections
 npm run build
 ```
 
+Para atualizar a projeção RN-013 a partir de um checkout governado da migração:
+
+```powershell
+npm run generate:ergonx-projection -- D:\caminho\para\Techne-ErgonX-migracao
+npm run check:projections
+```
+
+O gerador falha se materializador e host não tiverem exatamente as mesmas 14
+identidades na mesma ordem. IDs das definições Config permanecem explicitamente
+`NOT_RESOLVED_IN_VERSIONED_EVIDENCE`; o Studio não os infere.

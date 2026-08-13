@@ -23,8 +23,8 @@
           type="button"
           role="option"
           class="decision-row"
-          [class.selected]="selected().key === decision.key"
-          [attr.aria-selected]="selected().key === decision.key"
+          [class.selected]="selected()?.key === decision.key"
+          [attr.aria-selected]="selected()?.key === decision.key"
           (click)="select(decision)">
           <span class="decision-code">{{ decision.code }}</span>
           <span class="decision-copy">
@@ -39,22 +39,23 @@
     </div>
   </aside>
 
+  @if (selected(); as current) {
   <article class="decision-pane" aria-labelledby="decision-title">
     <header class="decision-header">
       <div>
-        <p class="eyebrow">{{ i18n.text('selected') }} · {{ selected().code }}</p>
-        <h2 id="decision-title">{{ selected().name }}</h2>
-        <p class="canonical-key">{{ selected().key }}</p>
+        <p class="eyebrow">{{ i18n.text('selected') }} · {{ current.code }}</p>
+        <h2 id="decision-title">{{ current.name }}</h2>
+        <p class="canonical-key">{{ current.key }}</p>
       </div>
-      <span class="status" [class.verified]="selected().state === 'verified'">
-        {{ selected().state === 'verified' ? 'Evidência técnica verificada' : 'Draft técnico' }}
+      <span class="status" [class.verified]="current.state === 'verified'">
+        {{ current.state === 'verified' ? 'Evidência técnica verificada' : 'Draft técnico' }}
       </span>
     </header>
 
     <div class="decision-trail" aria-label="Trilha da decisão">
       <div class="trail-step active"><span>1</span><strong>{{ i18n.text('meaning') }}</strong><small>Contrato legível</small></div>
       <div class="trail-line"></div>
-      <div class="trail-step"><span>2</span><strong>{{ i18n.text('evidence') }}</strong><small>{{ selected().evidenceCount }} referências</small></div>
+      <div class="trail-step"><span>2</span><strong>{{ i18n.text('evidence') }}</strong><small>{{ current.evidenceCount }} referências</small></div>
       <div class="trail-line"></div>
       <div class="trail-step"><span>3</span><strong>{{ i18n.text('execution') }}</strong><small>Host consumidor</small></div>
     </div>
@@ -62,13 +63,13 @@
     <div class="detail-grid">
       <section class="meaning-block">
         <p class="section-label">{{ i18n.text('meaning') }}</p>
-        <p class="meaning">{{ selected().meaning }}</p>
+        <p class="meaning">{{ current.meaning }}</p>
       </section>
       <dl class="facts">
-        <div><dt>Domínio</dt><dd>{{ selected().domain }}</dd></div>
-        <div><dt>RuleSet</dt><dd>{{ selected().ruleSet }}</dd></div>
-        <div><dt>{{ i18n.text('authority') }}</dt><dd>{{ selected().authority }}</dd></div>
-        <div><dt>{{ i18n.text('source') }}</dt><dd>{{ selected().source }}</dd></div>
+        <div><dt>Domínio</dt><dd>{{ current.domain }}</dd></div>
+        <div><dt>RuleSet</dt><dd>{{ current.ruleSet }}</dd></div>
+        <div><dt>{{ i18n.text('authority') }}</dt><dd>{{ current.authority }}</dd></div>
+        <div><dt>{{ i18n.text('source') }}</dt><dd>{{ current.source }}</dd></div>
       </dl>
     </div>
 
@@ -77,4 +78,14 @@
       <span>{{ i18n.text('fixtureNotice') }}</span>
     </footer>
   </article>
+  } @else {
+    <section class="decision-pane empty-detail" aria-live="polite">
+      @if (loadError()) {
+        <h2>Projeção indisponível</h2>
+        <code>{{ loadError() }}</code>
+      } @else {
+        <p>{{ i18n.text('loading') }}</p>
+      }
+    </section>
+  }
 </section>

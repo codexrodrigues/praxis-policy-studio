@@ -1,0 +1,42 @@
+{
+  "kind": "POLICY_STUDIO_PROJECTION_V1",
+  "projectionId": "quickstart.benefits.extraordinary-eligibility",
+  "projectionVersion": 1,
+  "sourceArtifacts": [{
+    "path": "fixtures/quickstart/extraordinary-benefit.v1",
+    "kind": "CONTRACTUAL_FIXTURE",
+    "sha256": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+  }],
+  "ruleSetRef": {
+    "domainKey": "benefits",
+    "boundedContextKey": "benefits.eligibility",
+    "ruleSetKey": "benefits.extraordinary-eligibility",
+    "hostContractVersion": "fixture-v1",
+    "operationKeys": ["evaluate"]
+  },
+  "decisionRefs": [{
+    "order": 1,
+    "decisionKey": "benefits.extraordinary.requested-amount.limit",
+    "reasonCode": "BENEFIT-AMOUNT-LIMIT",
+    "presentationLabel": "Requested amount must remain within the configured limit.",
+    "semanticStatus": "TECHNICAL_DRAFT_READY",
+    "reviewStatus": "BUSINESS_REVIEW_PENDING",
+    "semanticSourceRef": "fixtures/quickstart/extraordinary-benefit.v1#amount-limit",
+    "targetPlanRef": "fixtures/quickstart/extraordinary-benefit.v1#target",
+    "editable": false
+  }],
+  "configDefinitionRefs": { "status": "CONTRACTUAL_FIXTURE", "definitionIds": ["quickstart-extraordinary-benefit-amount-limit"] },
+  "resourceLinks": [],
+  "presentationLabels": {
+    "domain": { "pt-BR": "Benefícios", "en-US": "Benefits" },
+    "ruleSet": { "pt-BR": "Elegibilidade extraordinária", "en-US": "Extraordinary eligibility" }
+  },
+  "evidenceBoundaries": [{ "boundary": "CONTRACT_SHAPE", "operations": ["evaluate"], "status": "HERMETIC_FIXTURE" }],
+  "authorityEvidence": {
+    "currentAuthority": "KEEP_DB_BACKED",
+    "legacyAuthority": "LEGACY_AUTHORITATIVE",
+    "developmentEvidence": "NONE",
+    "productionAuthorityChanged": false
+  }
+}
+

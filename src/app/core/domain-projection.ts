@@ -1,0 +1,52 @@
+export interface DomainProjection {
+  readonly kind: string;
+  readonly projectionId: string;
+  readonly projectionVersion: number;
+  readonly sourceArtifacts: readonly { readonly path: string; readonly kind: string; readonly sha256: string }[];
+  readonly ruleSetRef: {
+    readonly boundedContextKey: string;
+    readonly ruleSetKey: string;
+    readonly operationKeys: readonly string[];
+  };
+  readonly decisionRefs: readonly ProjectionDecisionRef[];
+  readonly configDefinitionRefs: { readonly status: string; readonly definitionIds: readonly string[] };
+  readonly presentationLabels: {
+    readonly domain: Record<string, string>;
+    readonly ruleSet: Record<string, string>;
+  };
+  readonly evidenceBoundaries: readonly { readonly boundary: string; readonly operations: readonly string[]; readonly status: string }[];
+  readonly authorityEvidence: {
+    readonly currentAuthority: 'KEEP_DB_BACKED';
+    readonly legacyAuthority: 'LEGACY_AUTHORITATIVE';
+    readonly productionAuthorityChanged: false;
+  };
+}
+
+export interface ProjectionDecisionRef {
+  readonly order: number;
+  readonly decisionKey: string;
+  readonly reasonCode: string;
+  readonly presentationLabel: string;
+  readonly semanticStatus: string;
+  readonly reviewStatus: string;
+  readonly semanticSourceRef: string;
+  readonly targetPlanRef: string;
+  readonly editable: boolean;
+}
+
+export function validateDomainProjection(value: unknown): DomainProjection {
+  if (!value || typeof value !== 'object') throw new Error('PROJECTION_DOCUMENT_REQUIRED');
+  const projection = value as Partial<DomainProjection>;
+  if (!projection.projectionId || !projection.ruleSetRef?.ruleSetKey) throw new Error('PROJECTION_IDENTITY_REQUIRED');
+  if (!projection.decisionRefs?.length) throw new Error('PROJECTION_DECISIONS_REQUIRED');
+  const decisions = projection.decisionRefs;
+  if (new Set(decisions.map(item => item.decisionKey)).size !== decisions.length) throw new Error('PROJECTION_DECISION_DUPLICATE');
+  if (decisions.some((item, index) => item.order !== index + 1)) throw new Error('PROJECTION_ORDER_INVALID');
+  if (projection.authorityEvidence?.currentAuthority !== 'KEEP_DB_BACKED' ||
+      projection.authorityEvidence.legacyAuthority !== 'LEGACY_AUTHORITATIVE' ||
+      projection.authorityEvidence.productionAuthorityChanged !== false) {
+    throw new Error('PROJECTION_AUTHORITY_INVALID');
+  }
+  return projection as DomainProjection;
+}
+

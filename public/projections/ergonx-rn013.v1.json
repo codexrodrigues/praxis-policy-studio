@@ -1,0 +1,260 @@
+{
+  "kind": "ERGONX_POLICY_STUDIO_PROJECTION_V1",
+  "projectionId": "ergonx.workforce.frequency-and-absence.rn-013",
+  "projectionVersion": 1,
+  "generatedFromRevision": "1efe3cfad5b87f44982bb05124c888019824025c",
+  "sourceArtifacts": [
+    {
+      "path": "tools/migration-factory/rn013-full-block-config-payload.psm1",
+      "kind": "CONFIG_MATERIALIZER",
+      "sha256": "E2AD6F9006227B5CE340859A63E7A405B78DBD35F0787A4E7BEECC8B2C6F1DA5"
+    },
+    {
+      "path": "ms-administracao-pessoal/src/main/java/com/example/praxis/msadministracaopessoal/administracaopessoal/rule/RegraFrequenciaMainPreHostContract.java",
+      "kind": "HOST_CONTRACT",
+      "sha256": "8F6F178A8792FBBE84929E43E4EB0A204214B6EBF86E35B3BA35787CDAC1200E"
+    },
+    {
+      "path": "docs/migracao/ERGadm00036/rule-migration/rn013-full-block-dynamic-executor-selection.md",
+      "kind": "EXECUTOR_SELECTION",
+      "sha256": "6539F00F2CDE04172D6804BB76DDF39D38BB0282F12217B76369230B941BACAD"
+    },
+    {
+      "path": "docs/migracao/ERGadm00036/rule-migration/rn013-full-block-functional-live-proof-2026-08-11.json",
+      "kind": "FUNCTIONAL_EVIDENCE",
+      "sha256": "E900BCE56FE9529ACED5DA1944588C953C7CAB23E2AB4BBA2083E806E1E02C5D"
+    },
+    {
+      "path": "docs/migracao/ERGadm00036/rule-migration/rule-traceability-matrix.md",
+      "kind": "TRACEABILITY",
+      "sha256": "717D62F5A77809718201CD6A6F18CABE6ECBC787F3A4B52C0898E57072A1B009"
+    }
+  ],
+  "ruleSetRef": {
+    "domainKey": "workforce",
+    "boundedContextKey": "workforce.frequency-and-absence",
+    "ruleSetKey": "workforce.frequency-and-absence.frequency-rules",
+    "hostContractVersion": "rn013-host-v2",
+    "operationKeys": [
+      "create",
+      "update"
+    ]
+  },
+  "decisionRefs": [
+    {
+      "order": 1,
+      "decisionKey": "regra-frequencia.quantidade-maxima.nao-negativa",
+      "reasonCode": "ERG-08380",
+      "presentationLabel": "A quantidade maxima de dias, quando informada, nao pode ser negativa.",
+      "semanticStatus": "TECHNICAL_DRAFT_READY",
+      "reviewStatus": "BUSINESS_REVIEW_PENDING",
+      "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[0]",
+      "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
+      "editable": false
+    },
+    {
+      "order": 2,
+      "decisionKey": "regra-frequencia.quantidade-minima.nao-negativa",
+      "reasonCode": "ERG-08381",
+      "presentationLabel": "A quantidade minima de dias, quando informada, nao pode ser negativa.",
+      "semanticStatus": "TECHNICAL_DRAFT_READY",
+      "reviewStatus": "BUSINESS_REVIEW_PENDING",
+      "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[1]",
+      "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
+      "editable": false
+    },
+    {
+      "order": 3,
+      "decisionKey": "regra-frequencia.quantidade-maxima.coerente-com-minima",
+      "reasonCode": "ERG-08382",
+      "presentationLabel": "A quantidade maxima de dias nao pode ser menor que a quantidade minima.",
+      "semanticStatus": "TECHNICAL_DRAFT_READY",
+      "reviewStatus": "BUSINESS_REVIEW_PENDING",
+      "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[2]",
+      "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
+      "editable": true
+    },
+    {
+      "order": 4,
+      "decisionKey": "regra-frequencia.maximo-consecutivo-mes.nao-negativo",
+      "reasonCode": "ERG-08383",
+      "presentationLabel": "O maximo de dias consecutivos no mes, quando informado, nao pode ser negativo.",
+      "semanticStatus": "TECHNICAL_DRAFT_READY",
+      "reviewStatus": "BUSINESS_REVIEW_PENDING",
+      "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[3]",
+      "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
+      "editable": false
+    },
+    {
+      "order": 5,
+      "decisionKey": "regra-frequencia.maximo-consecutivo-ano.nao-negativo",
+      "reasonCode": "ERG-08384",
+      "presentationLabel": "O maximo de dias consecutivos no ano, quando informado, nao pode ser negativo.",
+      "semanticStatus": "TECHNICAL_DRAFT_READY",
+      "reviewStatus": "BUSINESS_REVIEW_PENDING",
+      "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[4]",
+      "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
+      "editable": false
+    },
+    {
+      "order": 6,
+      "decisionKey": "regra-frequencia.maximo-interpolado-mes.nao-negativo",
+      "reasonCode": "ERG-08385",
+      "presentationLabel": "O maximo de dias intercalados no mes, quando informado, nao pode ser negativo.",
+      "semanticStatus": "TECHNICAL_DRAFT_READY",
+      "reviewStatus": "BUSINESS_REVIEW_PENDING",
+      "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[5]",
+      "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
+      "editable": false
+    },
+    {
+      "order": 7,
+      "decisionKey": "regra-frequencia.maximo-interpolado-ano.nao-negativo",
+      "reasonCode": "ERG-08386",
+      "presentationLabel": "O maximo de dias intercalados no ano, quando informado, nao pode ser negativo.",
+      "semanticStatus": "TECHNICAL_DRAFT_READY",
+      "reviewStatus": "BUSINESS_REVIEW_PENDING",
+      "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[6]",
+      "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
+      "editable": false
+    },
+    {
+      "order": 8,
+      "decisionKey": "regra-frequencia.intervalo-prorrogacao.nao-negativo",
+      "reasonCode": "ERG-08387",
+      "presentationLabel": "O intervalo de prorrogacao em dias, quando informado, nao pode ser negativo.",
+      "semanticStatus": "TECHNICAL_DRAFT_READY",
+      "reviewStatus": "BUSINESS_REVIEW_PENDING",
+      "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[7]",
+      "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
+      "editable": false
+    },
+    {
+      "order": 9,
+      "decisionKey": "regra-frequencia.intervalo-minimo.nao-negativo",
+      "reasonCode": "ERG-08388",
+      "presentationLabel": "O intervalo minimo em dias, quando informado, nao pode ser negativo.",
+      "semanticStatus": "TECHNICAL_DRAFT_READY",
+      "reviewStatus": "BUSINESS_REVIEW_PENDING",
+      "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[8]",
+      "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
+      "editable": false
+    },
+    {
+      "order": 10,
+      "decisionKey": "regra-frequencia.maximo-consecutivo-mes.limite-calendario",
+      "reasonCode": "ERG-08389",
+      "presentationLabel": "O maximo de dias consecutivos no mes nao pode ultrapassar 31.",
+      "semanticStatus": "TECHNICAL_DRAFT_READY",
+      "reviewStatus": "BUSINESS_REVIEW_PENDING",
+      "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[9]",
+      "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
+      "editable": false
+    },
+    {
+      "order": 11,
+      "decisionKey": "regra-frequencia.maximo-interpolado-mes.limite-calendario",
+      "reasonCode": "ERG-08390",
+      "presentationLabel": "O maximo de dias intercalados no mes nao pode ultrapassar 31.",
+      "semanticStatus": "TECHNICAL_DRAFT_READY",
+      "reviewStatus": "BUSINESS_REVIEW_PENDING",
+      "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[10]",
+      "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
+      "editable": false
+    },
+    {
+      "order": 12,
+      "decisionKey": "regra-frequencia.maximo-consecutivo-ano.limite-calendario",
+      "reasonCode": "ERG-08391",
+      "presentationLabel": "O maximo de dias consecutivos no ano nao pode ultrapassar 366.",
+      "semanticStatus": "TECHNICAL_DRAFT_READY",
+      "reviewStatus": "BUSINESS_REVIEW_PENDING",
+      "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[11]",
+      "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
+      "editable": false
+    },
+    {
+      "order": 13,
+      "decisionKey": "regra-frequencia.maximo-interpolado-ano.limite-calendario",
+      "reasonCode": "ERG-08392",
+      "presentationLabel": "O maximo de dias intercalados no ano nao pode ultrapassar 366.",
+      "semanticStatus": "TECHNICAL_DRAFT_READY",
+      "reviewStatus": "BUSINESS_REVIEW_PENDING",
+      "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[12]",
+      "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
+      "editable": false
+    },
+    {
+      "order": 14,
+      "decisionKey": "regra-frequencia.periodo.ordem-valida",
+      "reasonCode": "ERG-00019",
+      "presentationLabel": "A data final da vigencia, quando informada, nao pode ser anterior a data inicial.",
+      "semanticStatus": "TECHNICAL_DRAFT_READY",
+      "reviewStatus": "BUSINESS_REVIEW_PENDING",
+      "semanticSourceRef": "tools/migration-factory/rn013-full-block-config-payload.psm1#DecisionCatalog[13]",
+      "targetPlanRef": "docs/migracao/rule-migration/factory-contracts/review/rn-013",
+      "editable": false
+    }
+  ],
+  "configDefinitionRefs": {
+    "status": "NOT_RESOLVED_IN_VERSIONED_EVIDENCE",
+    "definitionIds": [],
+    "blocker": "Fourteen Config definition identifiers must be obtained from a governed Config projection; the Studio must not infer them."
+  },
+  "resourceLinks": [
+    {
+      "relation": "authoring-impact",
+      "resourceKey": "administracao-pessoal.regras-frequencia"
+    },
+    {
+      "relation": "consumer-screen",
+      "logicalScreenKey": "ERGadm00036",
+      "resolution": "HOST_OWNED"
+    }
+  ],
+  "presentationLabels": {
+    "domain": {
+      "pt-BR": "Frequência e afastamentos",
+      "en-US": "Frequency and absence"
+    },
+    "ruleSet": {
+      "pt-BR": "Validações de frequência",
+      "en-US": "Frequency validations"
+    }
+  },
+  "evidenceBoundaries": [
+    {
+      "boundary": "DB_BACKED_PARITY",
+      "operations": [
+        "create",
+        "update"
+      ],
+      "status": "PROVED_DEVELOPMENT"
+    },
+    {
+      "boundary": "DYNAMIC_POLICY_CHANGE",
+      "operations": [
+        "create"
+      ],
+      "status": "PROVED_DEVELOPMENT"
+    },
+    {
+      "boundary": "VISUAL_LIFECYCLE",
+      "operations": [
+        "create"
+      ],
+      "status": "PROVED_SEPARATE_SURFACE"
+    },
+    {
+      "boundary": "BUSINESS_HOMOLOGATION",
+      "operations": [],
+      "status": "DEFERRED"
+    }
+  ],
+  "authorityEvidence": {
+    "currentAuthority": "KEEP_DB_BACKED",
+    "legacyAuthority": "LEGACY_AUTHORITATIVE",
+    "developmentEvidence": "JAVA_AUTHORITATIVE_DEVELOPMENT_HISTORICAL_AND_REVERSIBLE",
+    "productionAuthorityChanged": false
+  }
+}
