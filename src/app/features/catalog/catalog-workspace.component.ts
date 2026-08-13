@@ -9,6 +9,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import type { RuleBuilderConfig, RuleBuilderState } from '@praxisui/visual-builder';
 import { LocalDraftWorkspaceComponent } from '../authoring/local-draft-workspace.component';
 import { canonicalDecisionExpression, formatDecisionExpression } from '../../core/decision-inspection';
+import { AuthSessionService } from '../../core/auth-session.service';
 
 @Component({
   selector: 'pax-catalog-workspace',
@@ -19,13 +20,17 @@ import { canonicalDecisionExpression, formatDecisionExpression } from '../../cor
 })
 export class CatalogWorkspaceComponent implements OnInit {
   private readonly catalog = inject(ProjectionCatalogService);
+  private readonly auth = inject(AuthSessionService);
   readonly runtime = inject(RuntimeConfigService);
   readonly query = signal('');
   readonly allDecisions = signal<readonly DecisionSummary[]>([]);
   readonly selected = signal<DecisionSummary | null>(null);
   readonly loadError = signal<string | null>(null);
   readonly loading = signal(true);
+  readonly authenticationRequired = signal(false);
   readonly permissionLimited = signal(false);
+  readonly authenticating = signal(false);
+  readonly authenticationFailed = signal(false);
   readonly timeline = signal<readonly DecisionTimelineEvent[]>([]);
   readonly authoringOpen = signal(false);
   readonly draftCondition = signal<unknown | null>(null);
@@ -60,10 +65,19 @@ export class CatalogWorkspaceComponent implements OnInit {
   constructor(readonly i18n: PolicyStudioI18n) {}
 
   ngOnInit(): void {
+    this.loadCatalog();
+  }
+
+  loadCatalog(): void {
     const state = this.runtime.state();
     if (state.kind !== 'ready') return;
+    this.loading.set(true);
+    this.loadError.set(null);
+    this.authenticationRequired.set(false);
+    this.permissionLimited.set(false);
     this.catalog.load('/projections/ergonx-rn013.v1.json', this.i18n.locale(), state.config).subscribe({
       next: decisions => {
+        this.authenticationFailed.set(false);
         this.allDecisions.set(decisions);
         const initial = decisions.find(item => item.code === 'ERG-08382') ?? decisions[0] ?? null;
         if (initial) this.select(initial);
@@ -71,8 +85,28 @@ export class CatalogWorkspaceComponent implements OnInit {
       },
       error: (error: unknown) => {
         this.loading.set(false);
-        this.permissionLimited.set(error instanceof HttpErrorResponse && (error.status === 401 || error.status === 403));
+        this.authenticationRequired.set(error instanceof HttpErrorResponse && error.status === 401);
+        this.permissionLimited.set(error instanceof HttpErrorResponse && error.status === 403);
         this.loadError.set(error instanceof Error ? error.message : 'PROJECTION_LOAD_FAILED');
+      }
+    });
+  }
+
+  login(username: string, password: string, form: HTMLFormElement): void {
+    const state = this.runtime.state();
+    if (state.kind !== 'ready' || this.authenticating()) return;
+    this.authenticating.set(true);
+    this.authenticationFailed.set(false);
+    this.auth.login(username, password, state.config).subscribe({
+      next: () => {
+        form.reset();
+        this.authenticating.set(false);
+        this.loadCatalog();
+      },
+      error: () => {
+        form.reset();
+        this.authenticating.set(false);
+        this.authenticationFailed.set(true);
       }
     });
   }

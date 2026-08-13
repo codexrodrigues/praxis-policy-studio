@@ -20,6 +20,16 @@
     <div class="decision-list" role="listbox" aria-label="Decisões disponíveis">
       @if (loading()) {
         <p class="empty" aria-live="polite">{{ i18n.text('loading') }}</p>
+      } @else if (authenticationRequired()) {
+        <p class="empty state-message" role="alert">{{ i18n.text('authenticationRequired') }}</p>
+        <form #loginForm class="development-login" (submit)="$event.preventDefault(); login(username.value, password.value, loginForm)">
+          <strong>{{ i18n.text('developmentLogin') }}</strong>
+          <label><span>{{ i18n.text('username') }}</span><input #username name="username" value="admin" autocomplete="username" required></label>
+          <label><span>{{ i18n.text('password') }}</span><input #password name="password" type="password" autocomplete="current-password" required></label>
+          @if (authenticationFailed()) { <p role="alert">{{ i18n.text('authenticationFailed') }}</p> }
+          <button type="submit" [disabled]="authenticating()">{{ i18n.text(authenticating() ? 'authenticating' : 'login') }}</button>
+          <small>{{ i18n.text('credentialBoundary') }}</small>
+        </form>
       } @else if (permissionLimited()) {
         <p class="empty state-message" role="alert">{{ i18n.text('permissionLimited') }}</p>
       } @else if (loadError()) {

@@ -20,6 +20,15 @@
   background: var(--pax-color-surface);
   color: var(--pax-color-on-surface);
 }
+
+.development-login { display: grid; gap: .8rem; margin: 0 .75rem 1rem; padding: 1rem; border: 1px solid var(--pax-color-outline-variant, #b9c6cb); border-radius: .75rem; background: var(--pax-color-surface, #fff); }
+.development-login label { display: grid; gap: .3rem; color: var(--pax-color-on-surface-variant, #52636a); font-size: .75rem; font-weight: 700; }
+.development-login input { width: 100%; box-sizing: border-box; border: 1px solid var(--pax-color-outline, #697a82); border-radius: .45rem; padding: .65rem; font: inherit; }
+.development-login input:focus-visible { outline: 3px solid color-mix(in srgb, var(--pax-color-primary, #076487) 30%, transparent); border-color: var(--pax-color-primary, #076487); }
+.development-login button { border: 0; border-radius: .45rem; padding: .7rem; background: var(--pax-color-primary, #076487); color: var(--pax-color-on-primary, #fff); font-weight: 750; cursor: pointer; }
+.development-login button:disabled { opacity: .65; cursor: progress; }
+.development-login p { color: var(--pax-color-error, #ba1a1a); font-size: .78rem; }
+.development-login small { color: var(--pax-color-on-surface-variant, #52636a); line-height: 1.4; }
 * { box-sizing: border-box; }
 html { min-width: 20rem; background: var(--pax-color-surface); }
 body { min-height: 100vh; margin: 0; }
