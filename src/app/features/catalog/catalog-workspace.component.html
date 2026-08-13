@@ -100,7 +100,7 @@
 
     <footer class="fixture-boundary">
       <span class="boundary-glyph" aria-hidden="true">◇</span>
-      <span>{{ i18n.text('fixtureNotice') }}</span>
+      <span>{{ i18n.text(runtime.mode() === 'remote' ? 'governedNotice' : 'fixtureNotice') }}</span>
     </footer>
   </article>
   } @else {

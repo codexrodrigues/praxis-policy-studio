@@ -8,7 +8,7 @@
     <a href="/catalog" aria-current="page"><span class="glyph" aria-hidden="true">⌘</span>{{ i18n.text('catalog') }}</a>
   </nav>
   <div class="context">
-    <span><span class="glyph" aria-hidden="true">◇</span>{{ i18n.text('fixture') }}</span>
+    <span><span class="glyph" aria-hidden="true">◇</span>{{ i18n.text(runtime.mode() === 'remote' ? 'governedConfig' : 'fixture') }}</span>
     <span><span class="glyph" aria-hidden="true">●</span>{{ i18n.text('readonly') }}</span>
   </div>
 </header>

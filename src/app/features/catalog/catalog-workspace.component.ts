@@ -16,7 +16,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 })
 export class CatalogWorkspaceComponent implements OnInit {
   private readonly catalog = inject(ProjectionCatalogService);
-  private readonly runtime = inject(RuntimeConfigService);
+  readonly runtime = inject(RuntimeConfigService);
   readonly query = signal('');
   readonly allDecisions = signal<readonly DecisionSummary[]>([]);
   readonly selected = signal<DecisionSummary | null>(null);
