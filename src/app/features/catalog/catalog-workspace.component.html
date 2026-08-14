@@ -453,6 +453,58 @@
             <div><dt>{{ i18n.text('reviews') }}</dt><dd>{{ governed.reviewCount }}</dd></div>
             <div><dt>{{ i18n.text('materializations') }}</dt><dd>{{ governed.materializationCount }}</dd></div>
           </dl>
+          @if (governed.latestTestRun?.baselineEvidence; as baseline) {
+            <section aria-labelledby="test-evidence-title">
+              <p class="section-label" id="test-evidence-title">{{ i18n.text('testEvidenceAuthority') }}</p>
+              <dl class="facts lifecycle-grid">
+                <div>
+                  <dt>{{ i18n.text('baselineType') }}</dt>
+                  <dd>
+                    @switch (baseline.authorityType) {
+                      @case ('LEGACY_ORACLE') { {{ i18n.text('legacyOracle') }} }
+                      @case ('ACTIVE_SNAPSHOT') { {{ i18n.text('activeSnapshotBaseline') }} }
+                      @default { {{ i18n.text('syntheticExpected') }} }
+                    }
+                  </dd>
+                </div>
+                <div>
+                  <dt>{{ i18n.text('evidenceEligibility') }}</dt>
+                  <dd>
+                    @switch (baseline.eligibility) {
+                      @case ('ELIGIBLE') { {{ i18n.text('eligibleEvidence') }} }
+                      @case ('INELIGIBLE') { {{ i18n.text('ineligibleEvidence') }} }
+                      @default { {{ i18n.text('pendingEvidence') }} }
+                    }
+                  </dd>
+                </div>
+                <div><dt>{{ i18n.text('evidenceObservedAt') }}</dt><dd><time [attr.datetime]="baseline.observedAtUtc">{{ baseline.observedAtUtc }}</time></dd></div>
+                <div><dt>{{ i18n.text('provenScenarios') }}</dt><dd>{{ governed.latestTestRun?.results?.length ?? 0 }}</dd></div>
+                <div><dt>{{ i18n.text('evidenceArtifact') }}</dt><dd><code>{{ baseline.artifactRef }}</code></dd></div>
+                <div><dt>{{ i18n.text('evidenceFingerprint') }}</dt><dd><code>{{ baseline.artifactDigest.slice(0, 12) }}…</code></dd></div>
+              </dl>
+            </section>
+          }
+          @if (operationalTestEvidence().length) {
+            <section aria-labelledby="operational-evidence-title">
+              <p class="section-label" id="operational-evidence-title">{{ i18n.text('operationalEvidence') }}</p>
+              <div>
+                @for (item of operationalTestEvidence(); track item.scenarioKey) {
+                  <article class="timeline-event">
+                    <strong>{{ item.scenarioKey }}</strong>
+                    <dl class="facts lifecycle-grid">
+                      <div><dt>{{ i18n.text('operation') }}</dt><dd>{{ item.evidence.operationMode }}</dd></div>
+                      <div>
+                        <dt>{{ i18n.text('mutation') }}</dt>
+                        <dd>{{ i18n.text(item.evidence.mutationObserved ? 'mutationObserved' : 'noMutationVerified') }}</dd>
+                      </div>
+                      <div><dt>{{ i18n.text('cleanup') }}</dt><dd>{{ i18n.text(item.evidence.cleanupVerified ? 'verified' : 'notVerified') }}</dd></div>
+                      <div><dt>{{ i18n.text('baselineCalls') }}</dt><dd>{{ item.evidence.baselineCallCount }}</dd></div>
+                    </dl>
+                  </article>
+                }
+              </div>
+            </section>
+          }
         }
       </section>
     }

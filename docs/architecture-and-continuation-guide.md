@@ -161,7 +161,7 @@ snapshot ou activate.
 | inspeção | implementada | catálogo e `decision-inspection.ts` |
 | editor | implementado para o slice focal | `local-draft-workspace.component.ts` |
 | persistência | workspace concorrente com ETag | `ProjectionCatalogService` e testes de integração |
-| simulação | candidate × active implementada | cenários/Test Runs do Config e sandbox do host; evidência legada registrada é gap |
+| simulação | candidate × active implementada; provenance operacional suportada | cenários/Test Runs do Config, sandbox do host e contrato V57 para baseline sintético, snapshot ativo ou oracle legado sanitizado; o adapter host-owned ainda precisa produzir a prova |
 | publicação/ativação/rollback | parcialmente implementados | readiness/materializações, snapshot e staged rollout; actions de publicação, criação de rollout e rollout-policy precisam ser server-owned |
 | autoridade Java/produção | não alterada pelo Studio | projeção e docs de evidência |
 

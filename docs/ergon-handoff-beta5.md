@@ -1,4 +1,4 @@
-# Handoff Ergon — Policy Studio 0.1.0-beta.4
+# Handoff Ergon — Policy Studio 0.1.0-beta.5
 
 Este corte permite ao agente da migração validar a integração do Ergon sem Oracle
 local. O caso neutro do Quickstart reproduz o fluxo de decisões ordenadas,
@@ -7,11 +7,11 @@ pela RN-013, mantendo o núcleo do Studio independente do produto Ergon.
 
 ## Baseline compatível
 
-- Policy Studio `0.1.0-beta.4`, porta oficial `4302`;
+- Policy Studio `0.1.0-beta.5`, porta oficial `4302`;
 - Quickstart com dez slots de catálogo e sete definições governadas no caso Policy,
   porta oficial `8088`;
-- `@praxisui/*` `9.0.5-rc.16`, incluindo o client público de capabilities;
-- `praxis-config-starter` `9.0.5-rc.108`, schema Flyway `V56`;
+- `@praxisui/*` `9.0.5-rc.18`, incluindo o client público de capabilities e provenance de Test Run;
+- `praxis-config-starter` `0.1.0-rc.109`, schema Flyway `V57`;
 - banco Config Neon compartilhado como control plane canônico;
 - banco operacional Neon separado para evidências runtime.
 
@@ -77,8 +77,10 @@ limites inclusivos, imediatamente acima/abaixo, `null` explícito, fact ausente,
 `NOT_APPLICABLE` e sobreposição de falhas com precedência determinística. O
 modo de operação ainda não é enviado ao engine/host e, portanto, não prova
 diferença de persistência, readback, DML, ETag ou cleanup entre CREATE e UPDATE. O
-agente Ergon deve acrescentar a evidência específica de trigger/package/HADES,
-erro legado, side effects e ausência de mutação em shadow; qualquer evidência
+agente Ergon deve adaptar a evidência específica de trigger/package/HADES, erro
+legado, side effects e ausência de mutação em shadow para o Test Run V57. O Config
+aceita somente referência/digest sanitizados, before/after, mutação ou não mutação,
+cleanup, ledger de efeito e contagem de chamadas ao baseline; qualquer evidência
 ausente mantém o resultado `INCONCLUSIVE`.
 
 As três lanes de comparação são distintas e não podem ser renomeadas uma como a
@@ -88,11 +90,12 @@ outra:
 2. candidato × evidência legada registrada;
 3. candidato × resultado esperado do cenário neutro.
 
-O sandbox do Studio materializa a primeira e a terceira. A segunda é uma
-`lacuna-real-de-contrato`: o Config ainda precisa ser desenhado como owner da
-proveniência, request/response redigidos, status HTTP, before/after, efeitos e
-prova de não mutação. Até esse contrato existir, o Studio não deve fabricar uma
-segunda API ou chamar o snapshot ativo de “Oracle legado”.
+O sandbox do Studio materializa a primeira e a terceira. O Config V57 já é o
+owner canônico da proveniência sanitizada para a segunda, incluindo autoridade,
+artefato/digest, before/after, mutação ou não mutação, cleanup, ledger de efeitos
+e contagem de chamadas. A lacuna remanescente é operacional: o adapter host-owned
+do Ergon ainda precisa produzir e persistir essa prova; o Studio não deve fabricar
+uma segunda API nem chamar o snapshot ativo de “Oracle legado”.
 
 ## Limite conhecido deste corte
 
@@ -102,7 +105,7 @@ Ela deve ser aplicada somente pela identidade proprietária de migração. Até 
 acontecer, catálogo, authoring, cenários e lifecycle podem ser testados; a prova
 durável de telemetria runtime permanece bloqueada.
 
-## Integridade e governança da beta.4
+## Integridade e governança da beta.5
 
 - respostas assíncronas são invalidadas por recurso e por recarga, inclusive
   quando duas requisições atingem o mesmo workspace;

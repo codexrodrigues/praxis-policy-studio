@@ -9,8 +9,11 @@ o slice executável de `PS-002/PS-004` conecta essas referências ao catálogo,
 timeline e lifecycle do Config quando o modo remoto é habilitado. O Studio cria
 um change workspace governado, persiste drafts com ETag, mantém cenários de
 outcome, executa candidate × active no sandbox do host, registra Test Runs
-imutáveis, submete para revisão independente e projeta review/promotion. Não há
-composição de snapshot no browser: o Studio publica definições/materializações
+imutáveis, submete para revisão independente e projeta review/promotion. O
+lifecycle também apresenta a autoridade e a elegibilidade do baseline e, quando
+o host fornece a prova V57, resume CREATE/UPDATE, mutação ou não mutação, cleanup e
+chamadas ao baseline sem expor facts, payloads ou linhas de banco.
+Não há composição de snapshot no browser: o Studio publica definições/materializações
 e opera versões de snapshot somente pelas ações e pelo ETag fornecidos pelo Config.
 
 O catálogo versiona 14 referências RN-013 e um caso neutro real do Quickstart.
@@ -37,7 +40,7 @@ No modo remoto, uma sessão ausente exibe o login explícito do ambiente de dese
 Abra `http://localhost:4302/catalog`.
 
 Para integrar o primeiro consumidor, consulte o
-[handoff do Ergon para o corte beta.4](docs/ergon-handoff-beta4.md).
+[handoff do Ergon para o corte beta.5](docs/ergon-handoff-beta5.md).
 O handoff referencia o corpus portátil executável mantido pelo Quickstart, que
 exercita riscos de migração sem transformar evidência sintética em prova Oracle.
 

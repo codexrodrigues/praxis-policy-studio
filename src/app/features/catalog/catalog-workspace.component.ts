@@ -70,6 +70,10 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly lifecycle = signal<DecisionLifecycleSummary | null>(null);
   readonly lifecycleLoading = signal(false);
   readonly lifecycleError = signal(false);
+  readonly operationalTestEvidence = computed(() => this.lifecycle()?.latestTestRun?.results
+    .flatMap(result => result.operationalEvidence
+      ? [{ scenarioKey: result.scenarioKey, evidence: result.operationalEvidence }]
+      : []) ?? []);
   readonly authoringOpen = signal(false);
   readonly authoringBusy = signal(false);
   readonly authoringError = signal(false);

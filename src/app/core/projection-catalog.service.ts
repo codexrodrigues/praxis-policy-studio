@@ -248,7 +248,8 @@ export class ProjectionCatalogService {
       testRunCount: inspection.testRuns.length,
       reviewCount: inspection.reviews.length,
       materializationCount: inspection.materializations.length,
-      promotedDefinitionId: inspection.workspace.promotedDefinitionId ?? null
+      promotedDefinitionId: inspection.workspace.promotedDefinitionId ?? null,
+      latestTestRun: inspection.testRuns[0] ?? null
     })));
   }
 

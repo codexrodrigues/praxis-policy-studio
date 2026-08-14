@@ -41,10 +41,11 @@ ela não se torna fonte semântica, endpoint ou contrato público.
 | Lifecycle, approvals, snapshots, ETag, activate e rollback | `ja-suportado-so-ux` | Config; integrar, não recriar |
 | “Simulação” atual do Config | `ja-suportado-mal-nomeado-ou-mal-materializado` | readiness estrutural, não avaliação com facts |
 | Vocabulário e proveniência de facts | `suportado-parcialmente` | Metadata/host; a projeção é uma ponte de evidência |
-| Draft persistido e concorrente | `lacuna-real-de-contrato` | candidato: Config, com base hash/ETag |
-| Scenario, Suite e Run governados | `lacuna-real-de-contrato` | candidato: Config; desenho após o caso vertical |
-| Sandbox candidate versus active | `lacuna-real-de-contrato` | Config orquestra; Rules Engine/host avaliam |
-| Decision execution log redigido | `lacuna-real-de-contrato` | host/runtime publica observação segura |
+| Draft persistido e concorrente | `ja-suportado-so-ux` | Config mantém change workspace, base hash/ETag e ações server-owned |
+| Scenario e Test Run governados | `ja-suportado-so-ux` | Config persiste; sandbox host-owned avalia sem efeitos |
+| Sandbox candidate versus active | `ja-suportado-mal-nomeado-ou-mal-materializado` | já executa as duas lanes; não deve ser confundido com readiness estrutural nem oracle legado |
+| Proveniência de baseline e prova CREATE/UPDATE | `suportado-parcialmente` | Config V57 persiste contrato sanitizado; adapters host-owned ainda precisam produzir a evidência operacional |
+| Decision execution log redigido | `suportado-parcialmente` | observações e resumos existem; faltam completar prova corporativa, retenção, redaction e isolamento sob carga |
 
 ## Remoção da ponte
 

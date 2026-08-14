@@ -1,3 +1,5 @@
+import type { DomainRuleTestRun } from '@praxisui/core';
+
 export type DecisionState = 'technical-draft' | 'verified';
 
 export interface DecisionSummary {
@@ -67,6 +69,7 @@ export interface DecisionLifecycleSummary {
   readonly reviewCount: number;
   readonly materializationCount: number;
   readonly promotedDefinitionId: string | null;
+  readonly latestTestRun: DomainRuleTestRun | null;
 }
 
 export interface PolicySandboxScenarioResult {
