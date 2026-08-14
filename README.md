@@ -52,9 +52,9 @@ contém credenciais. O modo `remote` falha fechado quando `configApiBaseUrl` nã
 é string, consulta definições e timeline por
 `/api/praxis/config/domain-rules/**` e usa a sessão autenticada do host. O
 browser não envia tenant, ambiente ou authority. Isso é uma restrição do cliente,
-não uma garantia de isolamento. Ações de snapshot e staged rollout vêm do
-servidor; review/promotion de workspace e lifecycle de rollout-policy ainda
-carecem de um catálogo server-owned de ações e blockers. Definitions, timelines
+não uma garantia de isolamento. Ações de workspace, snapshot e staged rollout
+vêm do servidor; publicação de Definition, criação de rollout e lifecycle de
+rollout-policy ainda carecem de catálogos server-owned próprios. Definitions, timelines
 e materializations exigem `ROLE_RULE_DEFINITION_READER`; o Config resolve
 principal, tenant e ambiente no servidor. Nenhum token ou segredo deve ser versionado.
 
@@ -81,13 +81,20 @@ só se tornam governadas por comando explícito de save e ETag. O Studio mostra 
 diff semântico derivado entre definição-base e candidato, sem persistir uma
 segunda verdade. Cenários e Test Runs formam o gate de submissão.
 
-Workspaces `SUBMITTED` expõem o formulário de review, mas o Config resolve o
-principal e exige `ROLE_RULE_DEFINITION_APPROVER`, inclusive author ≠ reviewer.
-Após aprovação, a promoção cria uma nova definição governada; ela não publica
-materializações nem ativa snapshot. Neste corte, a UI ainda usa o status para
-apresentar review/promotion e depende da revalidação do servidor em `403`, ETag e
-gates de lifecycle. Isso não é o estado final: o Config deve publicar ações e
-blockers por principal, e o Studio deve remover a inferência local.
+Workspaces expõem save, scenarios, Test Run, submit, review e promoção somente
+quando `GET /workspaces/{id}/capabilities` publica a ação correspondente. Os
+blockers estáveis do Config são mostrados junto da área governada. O Config
+resolve o principal e exige `ROLE_RULE_DEFINITION_APPROVER` no review, inclusive
+author ≠ reviewer. Após aprovação, a promoção cria uma nova definição governada;
+ela não publica materializações nem ativa snapshot. A UI não infere review,
+promoção ou submissão pelo status; o servidor continua revalidando papel,
+segregação, blockers e ETag no comando.
+
+Cada leitura assíncrona do catálogo, timeline, lifecycle, cenários, reviews,
+capabilities, snapshots, rollouts, hosts e execução possui geração própria. Uma
+resposta anterior para a mesma decisão ou uma decisão já abandonada não pode
+substituir evidência mais nova. Perda de sessão/permissão invalida a seleção e
+remove o detalhe governado, em vez de manter estado stale sem rótulo.
 
 Para a definição promovida, o Studio materializa o readiness já publicado pelo
 Config: cobertura existente, aprovações requeridas, targets previstos, warnings,

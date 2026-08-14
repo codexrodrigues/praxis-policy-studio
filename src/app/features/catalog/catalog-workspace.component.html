@@ -230,7 +230,7 @@
           </div>
           <div class="authoring-actions">
             <button type="button" class="quiet-button" (click)="resetDraft()">{{ i18n.text('resetDraft') }}</button>
-            <button type="button" [disabled]="authoringBusy() || !draftChanged() || !!editorState()?.validationErrors?.length" (click)="saveGovernedDraft()">
+            <button type="button" [disabled]="authoringBusy() || !hasWorkspaceAction('UPDATE_DRAFT') || !draftChanged() || !!editorState()?.validationErrors?.length" (click)="saveGovernedDraft()">
               {{ i18n.text('saveDraft') }}
             </button>
           </div>
@@ -257,7 +257,7 @@
               <option>INCONCLUSIVE</option><option>TECHNICAL_ERROR</option>
             </select>
           </label>
-          <button type="submit" [disabled]="authoringBusy()">{{ i18n.text('addScenario') }}</button>
+          <button type="submit" [disabled]="authoringBusy() || !hasWorkspaceAction('MANAGE_SCENARIOS')">{{ i18n.text('addScenario') }}</button>
         </form>
         <div class="scenario-list">
           @for (scenario of scenarios(); track scenario.id) {
@@ -265,10 +265,10 @@
           } @empty { <p class="empty">{{ i18n.text('noScenarios') }}</p> }
         </div>
         <div class="governed-actions">
-          <button type="button" [disabled]="authoringBusy() || !scenarios().length || draftChanged()" (click)="runGovernedSandbox()">
+          <button type="button" [disabled]="authoringBusy() || !hasWorkspaceAction('RECORD_TEST_RUN') || !scenarios().length || draftChanged()" (click)="runGovernedSandbox()">
             {{ i18n.text('runSandbox') }}
           </button>
-          <button type="button" [disabled]="authoringBusy() || current.workspaceStatus !== 'OPEN' || draftChanged()" (click)="submitGovernedWorkspace()">
+          <button type="button" [disabled]="authoringBusy() || !hasWorkspaceAction('SUBMIT') || draftChanged()" (click)="submitGovernedWorkspace()">
             {{ i18n.text('submitReview') }}
           </button>
         </div>
@@ -309,7 +309,7 @@
             <p class="empty">{{ i18n.text('noReviews') }}</p>
           }
         </div>
-        @if (current.workspaceStatus === 'SUBMITTED') {
+        @if (hasWorkspaceAction('REVIEW')) {
           <form #reviewForm class="review-form" (submit)="$event.preventDefault()">
             <label>
               <span>{{ i18n.text('reviewRationale') }}</span>
@@ -325,12 +325,21 @@
             </div>
           </form>
         }
-        @if (current.workspaceStatus === 'APPROVED') {
+        @if (hasWorkspaceAction('PROMOTE')) {
           <div class="governed-actions">
             <button type="button" [disabled]="authoringBusy()" (click)="promoteGovernedWorkspace()">
               {{ i18n.text('promoteWorkspace') }}
             </button>
           </div>
+        }
+        @if (workspaceCapabilitiesLoading()) {
+          <p class="empty" role="status">{{ i18n.text('loading') }}</p>
+        } @else if (workspaceCapabilitiesError()) {
+          <p class="state-message" role="alert">{{ i18n.text('governedCommandFailed') }}</p>
+        } @else if (workspaceCapabilities(); as capabilities) {
+          @for (blocker of capabilities.blockers; track blocker.code + blocker.action) {
+            <p class="authority-note"><strong>{{ blocker.action }}</strong> · {{ blocker.message }}</p>
+          }
         }
         <small class="authority-note">{{ i18n.text('serverAuthorizesActions') }}</small>
       </section>

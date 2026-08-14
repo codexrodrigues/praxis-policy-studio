@@ -238,7 +238,7 @@ const copy = {
     definitionPublished: 'Definição publicada; materializações elegíveis foram processadas.',
     publicationBlocked: 'O Config bloqueou a publicação e preservou a autoridade atual.',
     publicationSeparation: 'Publicar a definição não compõe, publica nem ativa um snapshot de runtime.',
-    serverAuthorizesActions: 'A exibição segue o lifecycle; o servidor continua sendo a autoridade final de identidade, papel e concorrência.',
+    serverAuthorizesActions: 'Ações e bloqueios deste workspace são publicados pelo Config para o principal autenticado; o servidor revalida identidade, papel e concorrência.',
     governedCommandForbidden: 'Seu principal não possui o papel exigido para esta ação. Nenhum estado foi alterado.',
     governedCommandConflict: 'A ação conflita com a revisão atual, o ETag ou um gate de lifecycle. Recarregue as evidências antes de tentar novamente.',
     governedCommandFailed: 'O comando governado foi recusado. O estado local foi preservado.'
@@ -479,7 +479,7 @@ const copy = {
     definitionPublished: 'Definition published; eligible materializations were processed.',
     publicationBlocked: 'Config blocked publication and preserved current authority.',
     publicationSeparation: 'Publishing the definition does not compose, publish, or activate a runtime snapshot.',
-    serverAuthorizesActions: 'Visibility follows lifecycle; the server remains the final authority for identity, role, and concurrency.',
+    serverAuthorizesActions: 'Workspace actions and blockers are published by Config for the authenticated principal; the server revalidates identity, role, and concurrency.',
     governedCommandForbidden: 'Your principal does not have the role required for this action. No state was changed.',
     governedCommandConflict: 'The action conflicts with the current revision, ETag, or a lifecycle gate. Reload evidence before trying again.',
     governedCommandFailed: 'The governed command was rejected. Local state was preserved.'

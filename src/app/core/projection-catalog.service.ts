@@ -31,7 +31,8 @@ import {
   type DomainRuleSnapshotHeadStatus,
   type DomainRuleSnapshotVersion,
   type DomainRuleTestScenario,
-  type DomainRuleTestScenarioRequest
+  type DomainRuleTestScenarioRequest,
+  type DomainRuleWorkspaceCapabilities
 } from '@praxisui/core';
 
 @Injectable({ providedIn: 'root' })
@@ -137,6 +138,13 @@ export class ProjectionCatalogService {
 
   scenarios(workspaceId: string, config: PolicyStudioRuntimeConfig): Observable<DomainRuleTestScenario[]> {
     return this.domainRules.listTestScenarios(workspaceId, this.requestOptions(config));
+  }
+
+  workspaceCapabilities(
+    workspaceId: string,
+    config: PolicyStudioRuntimeConfig
+  ): Observable<DomainRuleWorkspaceCapabilities> {
+    return this.domainRules.getChangeWorkspaceCapabilities(workspaceId, this.requestOptions(config));
   }
 
   createScenario(
