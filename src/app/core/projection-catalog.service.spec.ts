@@ -112,6 +112,27 @@ describe('ProjectionCatalogService', () => {
     }));
   });
 
+  it('loads workspace actions and blockers from the public Core client', () => {
+    const config = {
+      mode: 'remote' as const, configApiBaseUrl: '', locale: 'en-US' as const,
+      projectionPath: '/projections/reference.json', initialDecisionKey: null
+    };
+    service.workspaceCapabilities('workspace 1', config).subscribe(capabilities => {
+      expect(capabilities.availableActions).toEqual(['VIEW', 'SUBMIT']);
+      expect(capabilities.blockers[0]?.code).toBe('TEST_RUN_NOT_PASSING');
+    });
+
+    const request = http.expectOne(
+      '/api/praxis/config/domain-rules/workspaces/workspace%201/capabilities'
+    );
+    expect(request.request.method).toBe('GET');
+    request.flush({
+      workspaceId: 'workspace 1', ruleKey: 'grant.amount-parameters', status: 'OPEN', revision: 2,
+      etag: 'etag-2', availableActions: ['VIEW', 'SUBMIT'],
+      blockers: [{ code: 'TEST_RUN_NOT_PASSING', action: 'SUBMIT', message: 'Passing evidence required.' }]
+    });
+  });
+
   it('loads the safe snapshot catalog, tolerates an absent head, and preserves strong head concurrency', () => {
     const config = {
       mode: 'remote' as const, configApiBaseUrl: '', locale: 'en-US' as const,

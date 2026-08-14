@@ -157,12 +157,12 @@ snapshot ou activate.
 | fixture neutra | valida contrato do segundo consumidor | `quickstart-benefit-eligibility.v1.json` |
 | leitura Config | implementada | service, testes e prova live documentada |
 | sessão de desenvolvimento | implementada | `auth-session.service.ts` |
-| capabilities | parciais | definitions, snapshots e staged rollout possuem ações server-owned; workspace review/promotion e rollout-policy ainda inferem lifecycle |
+| capabilities | parciais | workspace, snapshots e staged rollout possuem ações server-owned; publicação, criação de rollout e rollout-policy ainda requerem catálogos próprios |
 | inspeção | implementada | catálogo e `decision-inspection.ts` |
 | editor | implementado para o slice focal | `local-draft-workspace.component.ts` |
 | persistência | workspace concorrente com ETag | `ProjectionCatalogService` e testes de integração |
 | simulação | candidate × active implementada | cenários/Test Runs do Config e sandbox do host; evidência legada registrada é gap |
-| publicação/ativação/rollback | parcialmente implementados | readiness/materializações, snapshot e staged rollout; actions de workspace/policy precisam ser server-owned |
+| publicação/ativação/rollback | parcialmente implementados | readiness/materializações, snapshot e staged rollout; actions de publicação, criação de rollout e rollout-policy precisam ser server-owned |
 | autoridade Java/produção | não alterada pelo Studio | projeção e docs de evidência |
 
 O termo “implementado” acima significa código e prova no escopo indicado. Não
