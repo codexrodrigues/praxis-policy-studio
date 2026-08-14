@@ -2,7 +2,7 @@ import '@angular/compiler';
 import { ElementRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { BrowserTestingModule, platformBrowserTesting } from '@angular/platform-browser/testing';
-import { Subject } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthSessionService } from '../../core/auth-session.service';
 import { PolicyStudioI18n } from '../../core/i18n';
@@ -26,7 +26,8 @@ function decision(key: string): DecisionSummary {
     order: 1, totalDecisions: 2, key, code: key, name: key, domain: 'test',
     ruleSet: 'Test', ruleSetKey: 'test-rules', state: 'verified', meaning: key,
     authority: 'CONFIG', baselineAuthority: 'SYNTHETIC_BASELINE', source: 'test',
-    evidenceCount: 0, configDefinitionId: `definition-${key}`, workspaceId: `workspace-${key}`,
+    evidenceCount: 0, authoringSupported: true, availableDefinitionActions: [],
+    configDefinitionId: `definition-${key}`, workspaceId: `workspace-${key}`,
     workspaceEtag: `etag-${key}`,
     expression: null, condition: { '===': [1, 1] }, factPaths: [], facts: [],
     nullSemantics: null, operationKeys: [], hostContractVersion: null, evidence: [],
@@ -40,6 +41,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
   const scenarios = { A: [] as Subject<any>[], B: [] as Subject<any>[] };
   const reviews = { A: [] as Subject<any>[], B: [] as Subject<any>[] };
   const capabilities = { A: [] as Subject<any>[], B: [] as Subject<any>[] };
+  const createWorkspace = vi.fn();
   let component: CatalogWorkspaceComponent;
 
   const stream = (streams: Record<'A' | 'B', Subject<any>[]>, id: string) => {
@@ -54,6 +56,11 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
       streams.A.length = 0;
       streams.B.length = 0;
     }
+    createWorkspace.mockReset();
+    createWorkspace.mockReturnValue(of({
+      id: 'workspace-A', ruleKey: 'A', status: 'OPEN', etag: 'etag-new', revision: 1,
+      parameters: {}
+    }));
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       callback(0);
       return 0;
@@ -68,7 +75,8 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
         lifecycle: (id: string) => stream(lifecycles, id),
         scenarios: (id: string) => stream(scenarios, id),
         reviews: (id: string) => stream(reviews, id),
-        workspaceCapabilities: (id: string) => stream(capabilities, id)
+        workspaceCapabilities: (id: string) => stream(capabilities, id),
+        createWorkspace
       } }
     ] });
     component = TestBed.runInInjectionContext(() => new CatalogWorkspaceComponent(TestBed.inject(PolicyStudioI18n)));
@@ -108,6 +116,23 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(component.sandboxRun()).toBeNull();
     expect(component.publicationReadiness()).toBeNull();
     expect(component.publicationResult()).toBeNull();
+  });
+
+  it('creates a workspace only when Config publishes CREATE_NEW_VERSION for the exact definition', () => {
+    component.select({
+      ...decision('A'), workspaceId: undefined, workspaceEtag: undefined,
+      availableDefinitionActions: []
+    });
+    component.createWorkspace();
+    expect(createWorkspace).not.toHaveBeenCalled();
+
+    component.select({
+      ...decision('A'), workspaceId: undefined, workspaceEtag: undefined,
+      availableDefinitionActions: ['CREATE_NEW_VERSION']
+    }, true);
+    component.createWorkspace();
+    expect(createWorkspace).toHaveBeenCalledOnce();
+    expect(createWorkspace).toHaveBeenCalledWith('definition-A', 'A', config);
   });
 
   it('ignores older success and error responses when the same resource is reloaded', () => {
