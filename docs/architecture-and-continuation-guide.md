@@ -87,17 +87,28 @@ o significado de negócio.
 
 ### 3.3 Config read/write
 
-O adapter atual usa, sob sessão autenticada:
+O adapter atual usa o `DomainRuleService` público, sob sessão autenticada, para:
 
-- `GET /api/praxis/config/domain-rules/definitions`;
-- `GET /api/praxis/config/domain-rules/definitions/capabilities`;
-- `GET /api/praxis/config/domain-rules/definitions/{id}/timeline`;
-- `POST /api/praxis/config/domain-rules/definitions` para criar nova versão draft.
+- listar e detalhar definitions e timeline;
+- listar, criar e alterar change workspaces com ETag;
+- consumir capabilities, blockers, cenários, Test Runs, reviews e promoção do
+  workspace;
+- consultar readiness e solicitar publicação/materialização;
+- consultar snapshots, head, resumos de execução/hosts, rollout-policy e staged
+  rollout, executando os comandos já expostos pelo client.
 
-A definição mais recente é escolhida pela maior versão da mesma `ruleKey`. A
-edição só é habilitada quando o servidor devolve `CREATE_NEW_VERSION` para o ID
-exato. O POST preserva o contrato da versão anterior, incrementa `version`, muda
-`status` para `draft` e substitui somente a condição editada.
+A definição mais recente é escolhida pela maior versão da mesma `ruleKey` e a
+condição é obtida por leitura de detalhe. O Studio **ainda não consome**
+`GET /definitions/capabilities`: a abertura/criação inicial de workspace depende
+do marcador estático `editable` da projeção. Esse marcador prova suporte do editor,
+não autorização. O Config já conhece `CREATE_NEW_VERSION`, mas o client público e
+o Studio precisam materializá-lo antes de tratar essa ação como governada.
+
+Depois que o workspace existe, save, cenários, Test Run, submit, review e promoção
+usam `availableActions` e ETag server-owned. Publicação ainda é apresentada a partir
+do readiness; create rollout e comandos de rollout-policy ainda são derivados do
+lifecycle. Essas lacunas exigem actions próprias no Config, não condicionais novas
+no browser.
 
 ### 3.4 Sessão
 
@@ -117,7 +128,7 @@ sequenceDiagram
     participant P as Projeção versionada
     U->>S: abre /catalog
     S->>P: carrega e valida projeção
-    S->>C: lê definições e capabilities
+    S->>C: lê definitions, detalhes e workspaces
     C-->>S: dados no escopo server-owned
     S->>S: cruza pela decisionKey canônica
     S-->>U: catálogo, inspeção e ações permitidas
@@ -126,7 +137,7 @@ sequenceDiagram
 Se uma condição remota usar um fact fora da projeção governada, o carregamento
 falha com diagnóstico em vez de exibir uma regra parcialmente confiável.
 
-### 4.2 Nova versão draft
+### 4.2 Change workspace e lifecycle explícito
 
 ```mermaid
 sequenceDiagram
@@ -137,32 +148,38 @@ sequenceDiagram
     S-->>U: baseline e validações
     U->>S: altera condição
     S->>S: recompõe guardas preservadas e calcula diff
-    U->>S: salva draft
-    S->>C: POST nova versão
-    C-->>S: definição draft imutável
-    S->>C: recarrega catálogo e timeline
-    S-->>U: mostra nova versão
+    U->>S: salva candidate
+    S->>C: PUT workspace com ETag
+    C-->>S: nova revisão do workspace
+    U->>S: executa cenários e submete
+    S->>C: Test Run e SUBMIT autorizados
+    C-->>S: blockers, reviews e availableActions
+    S-->>U: mostra lifecycle e próximos comandos
 ```
 
-O fluxo termina no draft. Não existe chamada implícita de publish, materialize,
-snapshot ou activate.
+Nenhuma etapa é implícita. O Studio já materializa review, promoção, readiness,
+publicação, snapshots e staged rollout em ações separadas. O browser não compõe o
+snapshot nem executa a regra. Actions incompletas devem ocultar o comando até o
+Config publicar a capability correta.
 
 ## 5. Estado atual verificável
 
 | Capacidade | Estado | Evidência local |
 | --- | --- | --- |
-| shell, rota e i18n | implementada | `src/app`, testes e build |
+| shell e rota | implementados | `src/app`, testes e build |
+| i18n | parcial | catálogo usa resources, mas ainda existem literais pt/en no chrome |
 | contrato de projeção | implementado | `domain-projection.ts` e checker Node |
 | pacote RN-013 | 14 decisões versionadas | `public/projections/ergonx-rn013.v1.json` |
 | fixture neutra | valida contrato do segundo consumidor | `quickstart-benefit-eligibility.v1.json` |
-| leitura Config | implementada | service, testes e prova live documentada |
+| leitura Config | implementada no slice | service, detalhe, testes e prova live documentada |
 | sessão de desenvolvimento | implementada | `auth-session.service.ts` |
 | capabilities | parciais | workspace, snapshots e staged rollout possuem ações server-owned; publicação, criação de rollout e rollout-policy ainda requerem catálogos próprios |
-| inspeção | implementada | catálogo e `decision-inspection.ts` |
-| editor | implementado para o slice focal | `local-draft-workspace.component.ts` |
+| inspeção | parcial | catálogo e `decision-inspection.ts`; falta causalidade runtime |
+| editor | implementado para condição focal | Visual Builder; parâmetros/outcomes/RuleSet completo ausentes |
 | persistência | workspace concorrente com ETag | `ProjectionCatalogService` e testes de integração |
-| simulação | candidate × active implementada; provenance operacional suportada | cenários/Test Runs do Config, sandbox do host e contrato V57 para baseline sintético, snapshot ativo ou oracle legado sanitizado; o adapter host-owned ainda precisa produzir a prova |
+| simulação | candidate × active implementada; provenance operacional parcial | cenários/Test Runs do Config e sandbox do host; V57 ainda não possui baseline independente por cenário, idempotência ou gate por estágio |
 | publicação/ativação/rollback | parcialmente implementados | readiness/materializações, snapshot e staged rollout; actions de publicação, criação de rollout e rollout-policy precisam ser server-owned |
+| assistente de decisões | planejado sobre runtime existente | Config/`@praxisui/ai` fornecem a base horizontal; faltam tools e projeção de evidência de domínio |
 | autoridade Java/produção | não alterada pelo Studio | projeção e docs de evidência |
 
 O termo “implementado” acima significa código e prova no escopo indicado. Não
@@ -181,21 +198,23 @@ testes. Não requer backend, Ergon ou Oracle.
 4. execute `npm run lint`, `npm test` e `npm run check:projections`;
 5. inicie com `npm start` e abra a porta `4302`.
 
-Limite atual: a rota de catálogo carrega diretamente a projeção RN-013
-versionada. Isso permite desenvolvimento sem o legado, mas a descoberta e
-seleção genérica de pacotes ainda precisa ser implementada.
+Limite atual: a rota carrega uma única projeção definida por `projectionPath`.
+O arquivo versionado padrão é o caso Quickstart; RN-013 também está versionado,
+mas não há discovery/registry governado nem seleção multi-pacote na UI.
 
 ### Caminho B — integração com o host de referência
 
-Use este caminho para autenticação, leitura, capabilities, timeline e criação de
-draft.
+Use este caminho para autenticação, leitura, workspace, cenários, lifecycle,
+readiness, publicação e cockpit operacional dentro das ações disponíveis.
 
 1. inicie um Quickstart compatível na porta oficial `8088`;
 2. mantenha Studio e host no mesmo hostname para o cookie local `SameSite`;
 3. use `mode: remote` e `configApiBaseUrl: http://localhost:8088`;
 4. autentique com uma conta de desenvolvimento fornecida fora do repositório;
 5. confirme que leitura anônima é negada e leitura autorizada funciona;
-6. salve somente draft e confirme que a versão anterior não mudou.
+6. prove ETag, capability negativa e as transições que a persona realmente possui;
+7. não trate Test Run V57 como gate de produção enquanto evidence requirements,
+   baseline por cenário e idempotência não estiverem implementados.
 
 ### Caminho C — atualizar o pacote ErgonX
 
@@ -250,54 +269,21 @@ prova visual como evidência de execução no host.
 
 ## 9. Roadmap recomendado
 
-### Etapa 1 — generalizar leitura multi-pacote
-
-- criar um índice/registry governado de projeções;
-- remover o path RN-013 fixo do componente;
-- permitir selecionar domínio e RuleSet;
-- provar ErgonX e Quickstart sem branches por produto.
-
-### Etapa 2 — completar authoring de draft
-
-- suportar mais formas do contrato JSON Logic;
-- melhorar diff semântico e diagnósticos;
-- preservar round-trip de toda estrutura não editada;
-- expandir editabilidade apenas por capabilities reais.
-
-### Etapa 3 — validação e simulação
-
-- integrar compilação/validação compatível com o Rules Engine;
-- executar fixtures tipadas sem host privado;
-- adicionar adapter opcional para simulação no host;
-- guardar somente evidências redigidas e correlacionadas.
-
-### Etapa 4 — revisão e publicação
-
-- modelar pacote de revisão, blockers e pareceres;
-- consumir transições de lifecycle do Config;
-- exigir ETag e evitar lost update;
-- separar propor, aprovar e publicar conforme capability/política.
-
-### Etapa 5 — operação
-
-- visualizar materialização, snapshots e head ativo;
-- provar rotação de ETag, last-known-good e rollback;
-- oferecer observabilidade e explicação de execução;
-- concluir requisitos corporativos antes de produção.
-
-### Etapa 6 — portfólio
-
-- acompanhar cobertura por produto, domínio e RuleSet;
-- medir lead time, blockers, paridade e dívida;
-- ligar decisões a consumidores, versões e evidências sem duplicar semântica.
+O roadmap, percentuais, bloqueadores corporativos, gate de evidência e critérios de
+release são mantidos em [Estado e roadmap](current-status-and-roadmap.md). A
+fronteira da IA está em [ADR 0002 — Policy Assistant](adr/0002-policy-assistant-boundary.md).
 
 ## 10. Dívidas e riscos conhecidos
 
-- o catálogo atual está ligado ao arquivo RN-013, embora o core deva ser genérico;
-- a fixture Quickstart é validada pelo checker, mas ainda não aparece na UI;
+- o catálogo carrega um único `projectionPath`; não existe discovery multi-pacote;
 - apenas um slice focal está editável;
-- comparação candidate × active existe; candidate × evidência legada registrada ainda não possui contrato canônico;
-- review/promotion de workspace e rollout-policy ainda inferem comandos do lifecycle no browser;
+- comparison candidate × active existe; baseline legado independente por resultado
+  e idempotência do Test Run ainda são lacunas canônicas;
+- workspace usa actions server-owned, mas Definition create, publicação, create
+  rollout e rollout-policy ainda não possuem consumo completo de capabilities;
+- a role leitora diverge entre host e controller Config em corporate mode;
+- a V57 persiste evidência consultiva, mas não governa o gate por estágio;
+- o Quickstart `main` contém a lane atual depois do tag `v2.0.0-rc.27`; falta novo corte;
 - documentação de evidência histórica pode ficar stale e deve registrar commits;
 - uma projeção válida pode continuar semanticamente não homologada;
 - capabilities incompletas devem reduzir ações, nunca ser compensadas no cliente;
