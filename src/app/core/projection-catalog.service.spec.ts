@@ -94,6 +94,7 @@ describe('ProjectionCatalogService', () => {
 
     expect(decisions).toHaveLength(1);
     expect(decisions[0]?.configDefinitionId).toBe('v2');
+    expect(decisions[0]?.configVersion).toBe(2);
     expect(decisions[0]?.configStatus).toBe('approved');
     expect(decisions[0]?.ruleSetKey).toBe('extraordinary-grant-eligibility');
     expect(decisions[0]?.workspaceId).toBe('workspace-1');

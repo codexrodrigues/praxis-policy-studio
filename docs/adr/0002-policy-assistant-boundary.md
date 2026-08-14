@@ -63,27 +63,32 @@ não contorna autorização, evidência, confirmação, concorrência ou SoD.
 
 ## Primeiro incremento: explicação read-only
 
-O Config deve publicar uma projeção sanitizada de evidência para uma decisão:
+O Config publica uma projeção sanitizada de evidência para uma decisão:
 
 - identidade, versão, status e fingerprint;
-- condição validada e operadores em forma explicável;
-- facts, tipos, nullable, origem e semântica de missing/null;
-- precedência, dependencies, reason codes e materializações;
-- provenance, timeline segura, Test Runs e reviews;
-- snapshot/authority atual e limites explícitos da evidência;
+- contexto semântico da definição;
+- condição completa somente quando a política autoriza; nos demais modos,
+  operadores, fact paths e resultado da validação estrutural;
+- timeline segura, resumos de materializações, source refs e atestação da versão;
+- política de redaction e limites explícitos da evidência;
 - nenhuma credencial, fact sensível, payload de banco ou dado individual.
+
+Esta primeira projeção ainda não comprova tipos/nullable dos facts, comportamento
+causal de missing/null, precedência entre regras, Test Runs, reviews, snapshot
+ativo ou autoridade runtime. A explicação deve dizer explicitamente quando esses
+dados não estão na evidência, em vez de inferi-los da condição.
 
 Antes de criar novo DTO, devem ser inventariados Definition detail, timeline,
 lifecycle, Test Run provenance, execution summary, materializations e metadata de
 facts já publicados. A nova projeção só pode agregar o que uma explicação correta
 não consegue obter dessas superfícies.
 
-Tools iniciais:
+Tools incrementais:
 
 - `searchDomainRules`: busca paginada no read model canônico, depois da intenção
   semanticamente resolvida;
-- `getDomainRuleExplanationEvidence`: read-only, exige papel leitor e devolve a
-  projeção sanitizada;
+- `inspectDomainDecision`: concluída; read-only, exige
+  `RULE_DEFINITION_READER`, relê a versão exata e devolve a projeção sanitizada;
 - `proposeDomainRuleChange`: posterior, devolve proposta tipada e nunca persiste
   por si só.
 
@@ -128,14 +133,14 @@ Ordem incremental:
 | provider, streaming, conversa e clarificação | `ja-suportado-so-ux` | reutilizar Config e `@praxisui/ai` |
 | reconhecimento de shared rules | `ja-suportado-mal-nomeado-ou-mal-materializado` | transformar handoff consultivo em domínio `domain_decision` |
 | busca de definitions | `suportado-parcialmente` | criar read model paginado sobre identidade canônica existente |
-| explicação causal com evidência | `lacuna-real-de-contrato` | agregar projeção sanitizada no Config após inventário |
+| explicação da definição com evidência | `suportado-parcialmente` | projeção sanitizada e tool concluídas; falta correlação causal com execução |
 | create/edit/test humano | `suportado-parcialmente` | expor os mesmos comandos como tools, sem executor paralelo |
 | publish/rollout pela IA | `suportado-parcialmente` | só após actions completas, confirmação e SoD comprovados |
 
 ## Consequências
 
 - não será criado outro motor LLM nem backend AI no Studio;
-- `@praxisui/ai` deixa de ser dependência ociosa quando o primeiro slice chegar;
+- `@praxisui/ai` deixou de ser dependência ociosa no primeiro slice read-only;
 - a primeira entrega de IA pode ser útil antes do authoring complexo completo;
 - ações humanas e de IA permanecem semanticamente idênticas e auditáveis;
 - mudanças futuras em tools/manifests exigem documentação pública, corpus HTTP,

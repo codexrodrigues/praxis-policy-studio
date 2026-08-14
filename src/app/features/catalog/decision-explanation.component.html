@@ -1,0 +1,52 @@
+@if (available()) {
+  <section
+    class="explanation"
+    aria-labelledby="decision-explanation-title"
+    [attr.aria-busy]="state().kind === 'progress'">
+    <header>
+      <div>
+        <p class="section-label" id="decision-explanation-title">{{ i18n.text('aiExplanation') }}</p>
+        <p class="boundary">{{ i18n.text('aiExplanationBoundary') }}</p>
+      </div>
+      <button
+        type="button"
+        class="explain-button"
+        [disabled]="state().kind === 'progress'"
+        (click)="explain()">
+        {{ i18n.text(state().kind === 'completed' ? 'explainAgain' : 'explainDecision') }}
+      </button>
+    </header>
+
+    @switch (state().kind) {
+      @case ('progress') {
+        <p class="progress" role="status" aria-live="polite">{{ i18n.text('explainingDecision') }}</p>
+      }
+      @case ('completed') {
+        @if (state(); as completed) {
+          @if (completed.kind === 'completed') {
+            <div class="answer" aria-live="polite">
+              <p>{{ completed.message }}</p>
+              <dl>
+                <div><dt>{{ i18n.text('explainedVersion') }}</dt><dd>{{ completed.evidence.resolvedVersion }}</dd></div>
+                <div><dt>{{ i18n.text('evidenceExposure') }}</dt><dd>{{ evidenceModeLabel(completed.evidence.exposureMode) }}</dd></div>
+                <div><dt>{{ i18n.text('redactionPolicy') }}</dt><dd>{{ evidenceModeLabel(completed.evidence.redactionMode) }}</dd></div>
+                <div><dt>{{ i18n.text('groundingSources') }}</dt><dd>{{ completed.evidence.sourceRefCount }}</dd></div>
+              </dl>
+              <small>{{ i18n.text('aiNoApply') }}</small>
+            </div>
+          }
+        }
+      }
+      @case ('failed') {
+        @if (state(); as failed) {
+          @if (failed.kind === 'failed') {
+            <div class="failure" role="alert">
+              <p>{{ failureMessage(failed.reason) }}</p>
+              <button type="button" class="quiet-button" (click)="retry()">{{ i18n.text('retryAiExplanation') }}</button>
+            </div>
+          }
+        }
+      }
+    }
+  </section>
+}

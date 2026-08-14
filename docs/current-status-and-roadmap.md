@@ -1,24 +1,24 @@
 # Estado e roadmap do Praxis Policy Studio
 
-- Baseline auditada: `0.1.0-beta.5` (`620757e`)
+- Baseline auditada: `0.1.0-beta.6` (`8275e49`), com beta.7 em validação
 - Data da auditoria: 2026-08-14
-- Escopo: Studio, Config `0.1.0-rc.109`, Quickstart `main` `e546b760`,
-  `@praxisui/*` `9.0.5-rc.19` e handoff Ergon #300
+- Escopo: Studio, Config `0.1.0-rc.112`, Quickstart `v2.0.0-rc.31`,
+  `@praxisui/*` `9.0.5-rc.21` e handoff Ergon #300
 
 ## Leitura executiva
 
-O produto corporativo completo está estimado em **48%**, com margem de ±5 pontos
+O produto corporativo completo está estimado em **52%**, com margem de ±5 pontos
 percentuais. Essa estimativa mede capabilities comprovadas, não linhas de código.
-A beta.5 demonstra um vertical slice relevante, mas ainda não é uma beta
+A beta.6 demonstra um vertical slice relevante, mas ainda não é uma beta
 corporativa segura para uso autônomo pelo Ergon.
 
 Marcos diferentes têm distâncias diferentes:
 
 | Marco | Estimativa atual | Significado |
 | --- | ---: | --- |
-| beta integrada controlada com Quickstart | 70% | jornada supervisionada em ambiente de referência |
-| versão estável corporativa | 40% | segurança, ações server-owned, E2E, operação e release coerentes |
-| produto maduro multi-cliente com authoring complexo e IA | 22–25% | RuleSet completo, discovery, impacto, execução explicável e agente governado |
+| beta integrada controlada com Quickstart | 76% | jornada supervisionada em ambiente de referência |
+| versão estável corporativa | 44% | segurança, actions restantes, E2E, operação e release coerentes |
+| produto maduro multi-cliente com authoring complexo e IA | 28–30% | RuleSet completo, discovery, impacto, execução explicável e agente governado |
 
 Rubrica das estimativas: `0` ausente, `25` seam/contrato, `50` vertical slice com
 testes focais, `75` prova end-to-end controlada e `100` prova corporativa
@@ -30,7 +30,7 @@ multi-consumidor.
 | --- | ---: | --- | --- |
 | fronteiras canônicas e neutralidade | 85 | `ja-suportado-mal-nomeado-ou-mal-materializado` | owners corretos; ainda existe normalização Ergon no core |
 | catálogo/discovery multi-domínio | 40 | `suportado-parcialmente` | carrega uma projeção configurada; não há registry governado |
-| inspeção e explicação humana | 60 | `suportado-parcialmente` | facts, precedência e expressão; falta explicação causal ligada à execução |
+| inspeção e explicação humana/IA | 72 | `suportado-parcialmente` | facts, precedência, expressão e explicação grounded da definição; falta correlação causal com execução |
 | editar regra existente | 45 | `suportado-parcialmente` | condição focal; parâmetros, outcomes e RuleSet completo não são authorados |
 | criar regra nova | 20 | `suportado-parcialmente` | Config possui intake; Studio apenas cria workspace de definição existente |
 | cenários, sandbox e Test Run | 60 | `suportado-parcialmente` | candidate × active existe; facts ainda são JSON e lane operacional não é remota |
@@ -38,16 +38,16 @@ multi-consumidor.
 | publicação/materialização | 50 | `lacuna-real-de-contrato` | readiness existe; action de publicação não é server-owned de ponta a ponta |
 | snapshot, rollback e staged rollout | 55 | `suportado-parcialmente` | actions de snapshots/rollouts existentes; create rollout e rollout-policy ainda inferidos |
 | evidência V57/Ergon | 40 | `suportado-parcialmente` | shape persiste; faltam baseline por cenário, idempotência, gate e endpoint operacional |
-| segurança, multitenancy e capabilities | 50 | `suportado-parcialmente` | role de leitura e criação de versão estão governadas; faltam actions de publicação/rollout e smokes cross-tenant |
+| segurança, multitenancy e capabilities | 58 | `suportado-parcialmente` | leitura, criação de versão e explicação estão governadas; faltam actions de publicação/rollout e smokes cross-tenant |
 | UX, i18n e acessibilidade | 40 | `ja-suportado-mal-nomeado-ou-mal-materializado` | workstation funcional; faltam i18n integral, E2E, axe e decomposição da página |
-| testes, release e documentação | 45 | `suportado-parcialmente` | CI focal verde; sem browser gates e com drift de versões/documentos |
-| assistente de decisões | 15 | `lacuna-real-de-contrato` | runtime horizontal de IA existe fora do Studio; faltam tools e evidência de domínio |
+| testes, release e documentação | 60 | `suportado-parcialmente` | releases coordenados e gates focais verdes; ainda faltam browser/axe e prova multi-persona completa |
+| assistente de decisões | 45 | `suportado-parcialmente` | explicação da definição passou pelo fluxo HTTP real com atestação e sem candidate API; busca, execução explicada e comandos delegados ainda faltam |
 
 ## Bloqueadores do próximo corte corporativo
 
-1. **Role matrix:** a correção para `RULE_DEFINITION_READER` já está integrada ao
-   Config e possui prova corporativa 200/403; falta incorporá-la ao próximo corte
-   publicado e ao smoke integrado.
+1. **Role matrix:** `RULE_DEFINITION_READER` está publicada desde o Config rc.111;
+   o rc.112 acrescenta o roteamento semântico focal e a cadeia Quickstart prova
+   401/403/201 antes de enfileirar a explicação.
 2. **Actions completas:** Definition capabilities já são consumidas pelo client e
    pelo Studio. Publicação, create rollout e lifecycle da
    rollout-policy precisam de actions próprias; uma action nunca autoriza outra.
@@ -55,9 +55,8 @@ multi-consumidor.
    independente por cenário, idempotência ou política de gate por estágio.
 4. **Lane operacional remota:** o executor Quickstart é uma seam interna usada por
    testes; não há endpoint/action/capability para Studio ou adapter Ergon.
-5. **Integridade de release:** a lane V57 do Quickstart está em commits posteriores
-   ao tag `v2.0.0-rc.27`, embora o POM ainda declare essa versão. É necessário novo
-   corte; o tag antigo não deve ser apresentado como laboratório atual.
+5. **Integridade de release:** a lane V57 nasceu no Quickstart `v2.0.0-rc.29`; o
+   `v2.0.0-rc.31` incorpora Config rc.112. As tags anteriores permanecem imutáveis.
 
 ## Gate de evidência
 
@@ -79,11 +78,12 @@ Antes de criar `evidenceRequirements`, o owner Config deve inventariar o objeto
 
 ### P0 — integridade e release
 
-- corrigir a role matrix e testar o `DomainRuleController` real em corporate mode;
+- manter a role matrix coberta no controller real e no host de referência;
 - corrigir a documentação V57 para quatro canários — CREATE/UPDATE × ALLOW/DENY;
 - reconciliar README, visão, arquitetura e handoff;
 - remover hardcodes Ergon e copy fora do i18n;
-- publicar novo corte Quickstart depois dos gates, sem reutilizar `rc.27`.
+- manter releases coordenados entre Config, Quickstart, `@praxisui/*` e Studio,
+  sem mover tags anteriores.
 
 ### P1 — capabilities e evidência
 
@@ -118,8 +118,8 @@ Antes de criar `evidenceRequirements`, o owner Config deve inventariar o objeto
 
 ### P5 — Policy Assistant
 
-- reutilizar runtime de IA do Config e `@praxisui/ai`;
-- entregar primeiro busca e explicação read-only com evidência sanitizada;
+- reutilizar runtime de IA do Config e `@praxisui/ai` — concluído para explicação;
+- explicação read-only com evidência sanitizada — concluída; busca/discovery permanece pendente;
 - depois propor cenários e diffs, criar/editar e submeter pela mesma API humana;
 - permitir publicação/operação apenas como comando delegado, com capability,
   confirmação, ETag e revalidação; o agente nunca se autoaprova nem contorna SoD.
@@ -130,6 +130,5 @@ Uma próxima beta para o agente Ergon exige P0, Definition/workspace capabilitie
 coerentes, client V57 público, um Test Run/quatro results e handoff fixado em
 commits publicados. Uma versão estável exige também P2/P3, isolamento entre
 tenant/environment, recuperação de conflito, auditoria/redaction, SLO e rollback
-comprovado. O assistente explicativo pode entrar de forma incremental depois que
-a projeção canônica de evidência read-only estiver disponível; não precisa esperar
-o authoring autônomo completo.
+comprovado. O assistente explicativo já pode ser validado de forma incremental e
+continua deliberadamente separado do authoring autônomo.

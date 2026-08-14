@@ -47,6 +47,8 @@ O percentual auditado, os bloqueadores e a sequência de cortes estão em
 [Estado e roadmap](docs/current-status-and-roadmap.md). A fronteira para busca,
 explicação e authoring por agente está em
 [ADR 0002 — Policy Assistant](docs/adr/0002-policy-assistant-boundary.md).
+O delta executável do novo corte está no
+[handoff Ergon beta.7](docs/ergon-handoff-beta7.md).
 
 ## Configuração
 
@@ -174,14 +176,25 @@ Consulte `docs/rfc/0001-quickstart-reference-case.md`.
 
 ## Policy Assistant
 
-O Studio não terá um motor LLM próprio. Providers, resolução semântica de
+O Studio não possui motor LLM próprio. Providers, resolução semântica de
 intenção, conversas, streaming, clarificação, identidade e registry de tools
-serão reutilizados do Praxis Config e de `@praxisui/ai`. O primeiro slice será
-read-only: busca e explicação grounded de decisões existentes. Create, edit,
-test, submit e, depois, publish/rollout poderão ser executados por um agente
-delegado somente pelas mesmas actions, capabilities, ETag, confirmação,
-evidência e segregação de funções usadas por pessoas. Não haverá autoaprovação
-nem API privilegiada de IA.
+são reutilizados do Praxis Config e de `@praxisui/ai`.
+
+O primeiro slice read-only já explica a definição selecionada. O browser envia
+somente `selectedDomainDecisionRef` com ID, rule key e versão. Em corporate mode,
+o Config exige `RULE_DEFINITION_READER` antes de enfileirar o turno, relê a
+definição no escopo do principal, aplica `governance.aiUsage` e devolve uma
+projeção sanitizada. O Studio só apresenta a resposta quando a evidência terminal
+vem de `inspectDomainDecision`, confirma exatamente a mesma versão, inclui os
+fingerprints e declara `canApply=false`; uma resposta divergente, incompleta ou
+aplicável é rejeitada. Facts runtime, tenant, atores, rationale e payloads
+materializados não são enviados ao provider nem exibidos nessa superfície.
+
+Busca/discovery, proposição de cenários e diff vêm nos próximos incrementos.
+Create, edit, test, submit e, depois, publish/rollout poderão ser executados por
+um agente delegado somente pelas mesmas actions, capabilities, ETag,
+confirmação, evidência e segregação de funções usadas por pessoas. Não haverá
+autoaprovação nem API privilegiada de IA.
 
 ## Execução observada
 

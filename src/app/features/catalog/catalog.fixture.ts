@@ -21,6 +21,7 @@ export interface DecisionSummary {
   readonly availableDefinitionActions: readonly DomainRuleDefinitionAction[];
   readonly reviewStatus?: string;
   readonly configDefinitionId?: string;
+  readonly configVersion?: number;
   readonly configStatus?: string;
   readonly workspaceId?: string;
   readonly workspaceStatus?: string;
