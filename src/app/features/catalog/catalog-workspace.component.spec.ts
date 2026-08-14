@@ -8,7 +8,7 @@ import { AuthSessionService } from '../../core/auth-session.service';
 import { PolicyStudioI18n } from '../../core/i18n';
 import { ProjectionCatalogService } from '../../core/projection-catalog.service';
 import { RuntimeConfigService } from '../../core/runtime-config.service';
-import type { DecisionSummary } from './catalog.fixture';
+import type { DecisionLifecycleSummary, DecisionSummary } from './catalog.fixture';
 import { CatalogWorkspaceComponent } from './catalog-workspace.component';
 
 TestBed.initTestEnvironment(BrowserTestingModule, platformBrowserTesting());
@@ -150,5 +150,27 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(component.hasWorkspaceAction('UPDATE_DRAFT')).toBe(false);
     expect(component.hasWorkspaceAction('SUBMIT')).toBe(false);
     expect(component.hasWorkspaceAction('PROMOTE')).toBe(false);
+  });
+
+  it('projects only sanitized operational evidence from the latest governed Test Run', () => {
+    component.lifecycle.set({
+      workspaceStatus: 'OPEN', workspaceRevision: 2, testRunCount: 1, reviewCount: 0,
+      materializationCount: 0, promotedDefinitionId: null,
+      latestTestRun: {
+        results: [{
+          scenarioKey: 'update-denied',
+          operationalEvidence: {
+            operationMode: 'UPDATE', beforeStateDigest: 'A'.repeat(64),
+            afterStateDigest: 'A'.repeat(64), mutationObserved: false,
+            noMutationVerified: true, cleanupVerified: true, baselineCallCount: 1
+          }
+        }]
+      }
+    } as unknown as DecisionLifecycleSummary);
+
+    expect(component.operationalTestEvidence()).toEqual([expect.objectContaining({
+      scenarioKey: 'update-denied',
+      evidence: expect.objectContaining({ operationMode: 'UPDATE', noMutationVerified: true })
+    })]);
   });
 });

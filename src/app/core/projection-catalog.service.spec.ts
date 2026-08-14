@@ -104,12 +104,21 @@ describe('ProjectionCatalogService', () => {
     http.expectOne('/api/praxis/config/domain-rules/workspaces/workspace%201').flush({
       id: 'workspace 1', status: 'APPROVED', revision: 4, promotedDefinitionId: null
     });
-    http.expectOne('/api/praxis/config/domain-rules/workspaces/workspace%201/test-runs').flush([{ runId: 'run-1' }]);
+    http.expectOne('/api/praxis/config/domain-rules/workspaces/workspace%201/test-runs').flush([{
+      runId: 'run-1',
+      baselineEvidence: { authorityType: 'LEGACY_ORACLE', eligibility: 'ELIGIBLE' },
+      results: [{ scenarioKey: 'update-denied', operationalEvidence: {
+        operationMode: 'UPDATE', mutationObserved: false, noMutationVerified: true,
+        cleanupVerified: true, baselineCallCount: 1
+      } }]
+    }]);
     http.expectOne('/api/praxis/config/domain-rules/workspaces/workspace%201/reviews').flush([{ id: 'review-1' }]);
     expect(lifecycle).toEqual(expect.objectContaining({
       workspaceStatus: 'APPROVED', workspaceRevision: 4, testRunCount: 1,
       reviewCount: 1
     }));
+    expect((lifecycle as unknown as import('../features/catalog/catalog.fixture').DecisionLifecycleSummary)
+      .latestTestRun?.baselineEvidence?.authorityType).toBe('LEGACY_ORACLE');
   });
 
   it('loads workspace actions and blockers from the public Core client', () => {
