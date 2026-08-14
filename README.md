@@ -43,6 +43,10 @@ Para integrar o primeiro consumidor, consulte o
 [handoff do Ergon para o corte beta.5](docs/ergon-handoff-beta5.md).
 O handoff referencia o corpus portátil executável mantido pelo Quickstart, que
 exercita riscos de migração sem transformar evidência sintética em prova Oracle.
+O percentual auditado, os bloqueadores e a sequência de cortes estão em
+[Estado e roadmap](docs/current-status-and-roadmap.md). A fronteira para busca,
+explicação e authoring por agente está em
+[ADR 0002 — Policy Assistant](docs/adr/0002-policy-assistant-boundary.md).
 
 ## Configuração
 
@@ -56,10 +60,14 @@ contém credenciais. O modo `remote` falha fechado quando `configApiBaseUrl` nã
 `/api/praxis/config/domain-rules/**` e usa a sessão autenticada do host. O
 browser não envia tenant, ambiente ou authority. Isso é uma restrição do cliente,
 não uma garantia de isolamento. Ações de workspace, snapshot e staged rollout
-vêm do servidor; publicação de Definition, criação de rollout e lifecycle de
-rollout-policy ainda carecem de catálogos server-owned próprios. Definitions, timelines
-e materializations exigem `ROLE_RULE_DEFINITION_READER`; o Config resolve
-principal, tenant e ambiente no servidor. Nenhum token ou segredo deve ser versionado.
+existentes vêm do servidor. Definition capabilities já existem no Config, mas
+ainda não estão expostas pelo client/consumidas pelo Studio; publicação, criação
+de rollout e lifecycle de rollout-policy ainda carecem de catálogos server-owned
+próprios. A política alvo para definitions, timelines e materializations é
+`ROLE_RULE_DEFINITION_READER`, mas a beta.5 possui um drift conhecido: o
+controller Config exige também o papel de snapshot reader. Esse bloqueador deve
+ser corrigido antes do modo corporativo. O Config resolve principal, tenant e
+ambiente no servidor. Nenhum token ou segredo deve ser versionado.
 
 O catálogo distingue indisponibilidade de falta de permissão e não transforma
 status técnico do Config em homologação de negócio. A projeção governada segue
@@ -82,7 +90,9 @@ A decisão focal editável abre o Visual Builder oficial em um chunk lazy quando
 uma condição detalhada correspondente é devolvida pelo Config. Alterações locais
 só se tornam governadas por comando explícito de save e ETag. O Studio mostra um
 diff semântico derivado entre definição-base e candidato, sem persistir uma
-segunda verdade. Cenários e Test Runs formam o gate de submissão.
+segunda verdade. Cenários e Test Runs formam o gate de submissão para
+revisão/hash/cobertura/outcome do workspace; a evidência operacional V57 ainda
+não governa promotion/publication por estágio.
 
 Workspaces expõem save, scenarios, Test Run, submit, review e promoção somente
 quando `GET /workspaces/{id}/capabilities` publica a ação correspondente. Os
@@ -161,6 +171,18 @@ npm run check:projections
 A projeção Quickstart é derivada e tem gatilho explícito de remoção: ela deixa
 de existir quando Config/Metadata fornecerem discovery governado equivalente.
 Consulte `docs/rfc/0001-quickstart-reference-case.md`.
+
+## Policy Assistant
+
+O Studio não terá um motor LLM próprio. Providers, resolução semântica de
+intenção, conversas, streaming, clarificação, identidade e registry de tools
+serão reutilizados do Praxis Config e de `@praxisui/ai`. O primeiro slice será
+read-only: busca e explicação grounded de decisões existentes. Create, edit,
+test, submit e, depois, publish/rollout poderão ser executados por um agente
+delegado somente pelas mesmas actions, capabilities, ETag, confirmação,
+evidência e segregação de funções usadas por pessoas. Não haverá autoaprovação
+nem API privilegiada de IA.
+
 ## Execução observada
 
 No modo governado, o cockpit do snapshot ativo consome o resumo redigido publicado pelo Config por

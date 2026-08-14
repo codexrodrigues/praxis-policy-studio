@@ -8,6 +8,7 @@
     "check:projections": "node tools/check-projections.mjs",
     "check:local-runtime": "node tools/check-local-runtime.mjs",
     "generate:ergonx-projection": "node tools/generate-ergonx-projection.mjs",
+    "sync:quickstart-projection": "node tools/sync-quickstart-projection.mjs",
     "lint": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.spec.json --noEmit",
     "test": "vitest run --environment jsdom"
   },

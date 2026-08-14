@@ -86,7 +86,8 @@ O Policy Studio não deve:
 - declarar significado de negócio como homologado apenas porque um checker passou;
 - transformar projeções de apresentação em segunda fonte semântica;
 - esconder falta de permissão, evidência ou conectividade usando dados fictícios;
-- promover automaticamente uma regra para produção.
+- permitir que uma pessoa ou agente contorne autorização, confirmação, ETag,
+  evidência obrigatória ou segregação de funções.
 
 ## 5. Personas
 
@@ -99,6 +100,7 @@ O Policy Studio não deve:
 | Owner de produto/domínio | homologar significado e impacto | pacote de revisão e histórico, sem aprovação automática |
 | Operador | publicar, ativar, observar e reverter | ações server-owned, estado ativo e timeline |
 | Auditor | reconstruir o que ocorreu | versões imutáveis, eventos, digests e correlação |
+| Agente delegado | explicar, propor e executar ações autorizadas | as mesmas tools, capabilities, ETag, blockers e auditoria da pessoa |
 | Desenvolvedor da plataforma | ampliar capacidades reutilizáveis | core neutro, fixtures e contratos independentes do ErgonX |
 
 ## 6. Casos de uso prioritários
@@ -108,20 +110,22 @@ Cada caso de uso indica o resultado esperado do produto completo. A coluna
 
 | ID | Caso de uso | Resultado esperado | Situação |
 | --- | --- | --- | --- |
-| UC-01 | Descobrir decisões | localizar domínio, RuleSet, decisão, reason code e estado | parcial: RN-013 disponível |
-| UC-02 | Inspecionar significado | ver descrição, facts, `null`, operações, ordem e evidências | implementado no primeiro pacote |
-| UC-03 | Ver autoridade | distinguir legado, Java, draft e runtime ativo | implementado como evidência; sem promoção |
+| UC-01 | Descobrir decisões | localizar domínio, RuleSet, decisão, reason code e estado | parcial: uma projeção configurada por vez |
+| UC-02 | Inspecionar significado | ver descrição, facts, `null`, operações, ordem e evidências | parcial: inspeção estrutural, sem causalidade runtime |
+| UC-03 | Ver autoridade | distinguir legado, Java, draft e runtime ativo | parcial: authority projetada, snapshots e resumos runtime |
 | UC-04 | Comparar versões | entender diferenças entre baseline, draft e versão publicada | parcial: baseline versus draft |
-| UC-05 | Criar draft | salvar nova versão imutável sem ativar | implementado para decisão focal autorizada |
+| UC-05 | Criar draft | salvar mudança concorrente sem ativar | parcial: change workspace focal com ETag |
 | UC-06 | Validar regra | verificar sintaxe, tipos, facts, contrato e invariantes | parcial: editor e projeção |
-| UC-07 | Simular decisão | executar casos positivos, negativos, fronteira, `null` e colisão | planejado |
-| UC-08 | Revisar mudança | produzir pacote de revisão com diff, testes e impactos | planejado |
-| UC-09 | Publicar versão | transicionar por lifecycle governado e segregação de papéis | planejado |
-| UC-10 | Ativar e reverter | trocar snapshot atomicamente e restaurar last-known-good | planejado |
-| UC-11 | Explicar execução | correlacionar resultado, versão, facts redigidos e reason code | planejado |
+| UC-07 | Simular decisão | executar casos positivos, negativos, fronteira, `null` e colisão | parcial: candidate × active e Test Run; facts ainda em JSON |
+| UC-08 | Revisar mudança | produzir pacote de revisão com diff, testes e impactos | parcial: submit/review/promotion; impacto transitivo ausente |
+| UC-09 | Publicar versão | transicionar por lifecycle governado e segregação de papéis | parcial: readiness/publicação; action de publish incompleta |
+| UC-10 | Ativar e reverter | trocar snapshot atomicamente e restaurar last-known-good | parcial: snapshot/rollback e staged rollout; actions incompletas |
+| UC-11 | Explicar execução | correlacionar resultado, versão, facts redigidos e reason code | parcial: resumo agregado; falta explicação causal por decisão |
 | UC-12 | Administrar portfólio | acompanhar cobertura, risco, dívida e progresso de RuleSets | planejado |
-| UC-13 | Integrar novo produto | adicionar pacote por contratos públicos, sem fork do Studio | contrato provado; UI multi-pacote planejada |
+| UC-13 | Integrar novo produto | adicionar pacote por contratos públicos, sem fork do Studio | parcial: dois pacotes; seleção ainda vem de `projectionPath` |
 | UC-14 | Trabalhar sem legado | evoluir UI/core com projeções e fixtures versionadas | implementado |
+| UC-15 | Explicar com IA | responder com grounding, versão, authority, evidência e incerteza | planejado; runtime horizontal existente, tools de decisão ausentes |
+| UC-16 | Operar por agente | criar, editar, testar, submeter e operar por delegação governada | planejado; deve usar a mesma API e SoD da pessoa |
 
 ## 7. Cenários detalhados
 
