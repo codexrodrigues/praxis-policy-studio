@@ -98,6 +98,10 @@
       </dl>
     </div>
 
+    @if (policyConfig(); as studioConfig) {
+      <pax-decision-explanation [decision]="current" [config]="studioConfig" />
+    }
+
     <section class="inspection" aria-labelledby="inspection-title">
       <header class="inspection-heading">
         <div>

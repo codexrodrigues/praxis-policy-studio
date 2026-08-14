@@ -284,7 +284,8 @@ fronteira da IA está em [ADR 0002 — Policy Assistant](adr/0002-policy-assista
   rollout e rollout-policy ainda não possuem consumo completo de capabilities;
 - a role leitora diverge entre host e controller Config em corporate mode;
 - a V57 persiste evidência consultiva, mas não governa o gate por estágio;
-- o Quickstart `main` contém a lane atual depois do tag `v2.0.0-rc.27`; falta novo corte;
+- o Quickstart `v2.0.0-rc.31` preserva a lane V57 e hospeda a explicação consultiva
+  do Config rc.112; isso não transforma o host em owner da projeção de evidência;
 - documentação de evidência histórica pode ficar stale e deve registrar commits;
 - uma projeção válida pode continuar semanticamente não homologada;
 - capabilities incompletas devem reduzir ações, nunca ser compensadas no cliente;

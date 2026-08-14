@@ -1,0 +1,39 @@
+:host { display: block; }
+.explanation {
+  display: grid;
+  gap: 1rem;
+  max-width: 68rem;
+  margin-top: clamp(1.5rem, 4vw, 3rem);
+  padding-block: 1.25rem;
+  border-block: 1px solid var(--pax-color-outline-variant, #b9c6cb);
+}
+header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; }
+p { margin: 0; }
+.section-label { color: var(--pax-color-primary, #076487); font-size: .72rem; font-weight: 750; letter-spacing: .09em; text-transform: uppercase; }
+.boundary { max-width: 48rem; margin-top: .35rem; color: var(--pax-color-on-surface-variant, #52636a); font-size: .82rem; line-height: 1.45; }
+.explain-button, .quiet-button {
+  border: 1px solid currentColor;
+  border-radius: .5rem;
+  padding: .6rem .9rem;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.explain-button { flex: 0 0 auto; background: var(--pax-color-primary, #076487); color: var(--pax-color-on-primary, #fff); border-color: var(--pax-color-primary, #076487); }
+.quiet-button { background: transparent; color: var(--pax-color-primary, #076487); }
+button:focus-visible { outline: 3px solid color-mix(in srgb, var(--pax-color-primary, #076487) 35%, transparent); outline-offset: 2px; }
+button:disabled { cursor: wait; opacity: .65; }
+.progress, .failure { padding: .85rem 1rem; background: var(--pax-color-surface-container-low, #f3f6f7); }
+.progress { border-inline-start: .25rem solid var(--pax-color-primary, #076487); }
+.failure { display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-inline-start: .25rem solid var(--pax-color-error, #ba1a1a); }
+.answer { display: grid; gap: 1rem; padding-inline-start: 1rem; border-inline-start: .25rem solid var(--pax-color-tertiary, #187457); }
+.answer > p { max-width: 70ch; line-height: 1.65; white-space: pre-line; }
+.answer dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; margin: 0; }
+.answer dt { color: var(--pax-color-on-surface-variant, #52636a); font-size: .72rem; font-weight: 700; }
+.answer dd { margin: .25rem 0 0; overflow-wrap: anywhere; }
+.answer small { color: var(--pax-color-on-surface-variant, #52636a); }
+@media (max-width: 760px) {
+  header, .failure { align-items: stretch; flex-direction: column; }
+  .explain-button { align-self: stretch; }
+  .answer dl { grid-template-columns: 1fr 1fr; }
+}

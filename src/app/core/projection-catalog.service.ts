@@ -106,6 +106,7 @@ export class ProjectionCatalogService {
           availableDefinitionActions: definitionCapability?.availableActions ?? [],
           reviewStatus: decision.reviewStatus,
           configDefinitionId: definition?.id,
+          configVersion: definition?.version ?? undefined,
           configStatus: definition?.status ?? undefined,
           workspaceId: workspace?.id,
           workspaceStatus: workspace?.status,

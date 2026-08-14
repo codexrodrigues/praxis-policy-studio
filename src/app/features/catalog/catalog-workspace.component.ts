@@ -37,10 +37,11 @@ import {
 import { semanticDecisionDiff } from '../../core/semantic-decision-diff';
 import { SnapshotCockpitComponent } from './snapshot-cockpit.component';
 import { forkJoin } from 'rxjs';
+import { DecisionExplanationComponent } from './decision-explanation.component';
 
 @Component({
   selector: 'pax-catalog-workspace',
-  imports: [FormsModule, LocalDraftWorkspaceComponent, SnapshotCockpitComponent],
+  imports: [FormsModule, LocalDraftWorkspaceComponent, SnapshotCockpitComponent, DecisionExplanationComponent],
   providers: [
     ProjectionCatalogService,
     DomainRuleService,
@@ -59,6 +60,10 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly query = signal('');
   readonly allDecisions = signal<readonly DecisionSummary[]>([]);
   readonly selected = signal<DecisionSummary | null>(null);
+  readonly policyConfig = computed(() => {
+    const state = this.runtime.state();
+    return state.kind === 'ready' ? state.config : null;
+  });
   readonly loadError = signal<string | null>(null);
   readonly loading = signal(true);
   readonly authenticationRequired = signal(false);
