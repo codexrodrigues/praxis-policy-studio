@@ -16,6 +16,7 @@ import {
   DomainRuleService,
   type DomainRuleChangeWorkspace,
   type DomainRuleDefinition,
+  type DomainRuleDefinitionCapabilities,
   type DomainRuleRequestOptions,
   type DomainRuleSnapshotActivation,
   type DomainRuleExecutionSummary,
@@ -47,8 +48,16 @@ export class ProjectionCatalogService {
     const workspaces = config.mode === 'remote'
       ? this.domainRules.listChangeWorkspaces(this.requestOptions(config))
       : of([] as readonly DomainRuleChangeWorkspace[]);
-    return forkJoin({ projection: this.http.get<unknown>(path).pipe(map(validateDomainProjection)), definitions, workspaces }).pipe(
-      switchMap(({ projection, definitions, workspaces }) => {
+    const definitionCapabilities = config.mode === 'remote'
+      ? this.domainRules.getDefinitionCapabilities(this.requestOptions(config))
+      : of({ tenantId: '', environment: '', definitions: [] } satisfies DomainRuleDefinitionCapabilities);
+    return forkJoin({
+      projection: this.http.get<unknown>(path).pipe(map(validateDomainProjection)),
+      definitions,
+      definitionCapabilities,
+      workspaces
+    }).pipe(
+      switchMap(({ projection, definitions, definitionCapabilities, workspaces }) => {
         const selectedDefinitions = projection.decisionRefs.map(decision =>
           this.latestDefinition(definitions, decision.decisionKey));
         const detailReads = selectedDefinitions.map(definition => definition && config.mode === 'remote'
@@ -57,6 +66,10 @@ export class ProjectionCatalogService {
         return (detailReads.length ? forkJoin(detailReads) : of([])).pipe(map(definitionDetails =>
           projection.decisionRefs.map((decision, index) => {
         const definition = definitionDetails[index];
+        const definitionCapability = definitionCapabilities.definitions.find(capability =>
+          capability.definitionId === definition?.id
+          && capability.ruleKey === definition.ruleKey
+          && (definition.version == null || capability.version === definition.version));
         const workspace = this.latestWorkspace(workspaces, decision.decisionKey);
         const conditionFactPaths = collectFactPaths(definition?.condition);
         if (conditionFactPaths.some(factPath => !decision.factPaths.includes(factPath))) {
@@ -89,7 +102,8 @@ export class ProjectionCatalogService {
           baselineAuthority: projection.authorityEvidence.baselineAuthority,
           source: decision.semanticSourceRef,
           evidenceCount: projection.sourceArtifacts.length,
-          editable: decision.editable,
+          authoringSupported: decision.editable,
+          availableDefinitionActions: definitionCapability?.availableActions ?? [],
           reviewStatus: decision.reviewStatus,
           configDefinitionId: definition?.id,
           configStatus: definition?.status ?? undefined,

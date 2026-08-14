@@ -59,15 +59,15 @@ contém credenciais. O modo `remote` falha fechado quando `configApiBaseUrl` nã
 é string, consulta definições e timeline por
 `/api/praxis/config/domain-rules/**` e usa a sessão autenticada do host. O
 browser não envia tenant, ambiente ou authority. Isso é uma restrição do cliente,
-não uma garantia de isolamento. Ações de workspace, snapshot e staged rollout
-existentes vêm do servidor. Definition capabilities já existem no Config, mas
-ainda não estão expostas pelo client/consumidas pelo Studio; publicação, criação
-de rollout e lifecycle de rollout-policy ainda carecem de catálogos server-owned
-próprios. A política alvo para definitions, timelines e materializations é
-`ROLE_RULE_DEFINITION_READER`, mas a beta.5 possui um drift conhecido: o
-controller Config exige também o papel de snapshot reader. Esse bloqueador deve
-ser corrigido antes do modo corporativo. O Config resolve principal, tenant e
-ambiente no servidor. Nenhum token ou segredo deve ser versionado.
+não uma garantia de isolamento. Ações de definition, workspace, snapshot e staged
+rollout existentes vêm do servidor. `CREATE_NEW_VERSION` é correlacionada à
+identidade e versão exatas da definição; o suporte estático do editor não concede
+autoridade. Publicação, criação de rollout e lifecycle de rollout-policy ainda
+carecem de catálogos server-owned próprios. A política alvo para definitions,
+timelines e materializations é
+`ROLE_RULE_DEFINITION_READER`; o drift anterior com snapshot reader foi corrigido
+no Config e precisa integrar o próximo corte publicado. O Config resolve principal,
+tenant e ambiente no servidor. Nenhum token ou segredo deve ser versionado.
 
 O catálogo distingue indisponibilidade de falta de permissão e não transforma
 status técnico do Config em homologação de negócio. A projeção governada segue

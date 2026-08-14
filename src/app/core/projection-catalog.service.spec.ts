@@ -70,6 +70,12 @@ describe('ProjectionCatalogService', () => {
     http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([{
       id: 'workspace-1', ruleKey: 'grant.amount-parameters', status: 'APPROVED', updatedAt: '2026-08-13T10:00:00Z'
     }]);
+    http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities').flush({
+      tenantId: 'default', environment: 'dev', definitions: [{
+        definitionId: 'v2', ruleKey: 'grant.amount-parameters', version: 2,
+        availableActions: ['CREATE_NEW_VERSION']
+      }]
+    });
     definitions.flush([
       { id: 'v1', ruleKey: 'grant.amount-parameters', version: 1, status: 'draft', condition: { '===': [1, 1] } },
       {
@@ -91,6 +97,8 @@ describe('ProjectionCatalogService', () => {
     expect(decisions[0]?.configStatus).toBe('approved');
     expect(decisions[0]?.ruleSetKey).toBe('extraordinary-grant-eligibility');
     expect(decisions[0]?.workspaceId).toBe('workspace-1');
+    expect(decisions[0]?.authoringSupported).toBe(true);
+    expect(decisions[0]?.availableDefinitionActions).toEqual(['CREATE_NEW_VERSION']);
     expect(decisions[0]?.condition).toEqual({ '<=': [{ var: 'request.requestedAmount' }, 3000] });
   });
 

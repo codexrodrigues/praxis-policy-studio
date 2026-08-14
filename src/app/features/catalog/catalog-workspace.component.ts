@@ -18,6 +18,7 @@ import {
   type ApiUrlConfig,
   type DomainRuleChangeWorkspace,
   type DomainRuleDecision,
+  type DomainRuleDefinitionAction,
   type DomainRuleExecutionSummary,
   type DomainRuleHostStatusSummary,
   type DomainRuleRolloutPolicy,
@@ -458,7 +459,7 @@ export class CatalogWorkspaceComponent implements OnInit {
   openAuthoring(): void {
     if (this.authoringOpen()) return;
     const decision = this.selected();
-    if (!decision?.editable || !decision.condition) return;
+    if (!decision?.authoringSupported || !decision.condition || !this.hasWorkspaceAction('VIEW')) return;
     this.draftCondition.set(decision.workspaceCondition ?? decision.condition);
     this.editorState.set(null);
     this.authoringOpen.set(true);
@@ -482,7 +483,8 @@ export class CatalogWorkspaceComponent implements OnInit {
   createWorkspace(): void {
     const state = this.runtime.state();
     const decision = this.selected();
-    if (state.kind !== 'ready' || !decision?.configDefinitionId || this.authoringBusy()) return;
+    if (state.kind !== 'ready' || !decision?.configDefinitionId
+      || !this.hasDefinitionAction('CREATE_NEW_VERSION') || this.authoringBusy()) return;
     this.authoringBusy.set(true);
     this.clearAuthoringMessage();
     this.catalog.createWorkspace(decision.configDefinitionId, decision.name, state.config).subscribe({
@@ -583,6 +585,10 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   hasWorkspaceAction(action: DomainRuleWorkspaceAction): boolean {
     return this.workspaceCapabilities()?.availableActions.includes(action) ?? false;
+  }
+
+  hasDefinitionAction(action: DomainRuleDefinitionAction): boolean {
+    return this.selected()?.availableDefinitionActions.includes(action) ?? false;
   }
 
   createScenario(

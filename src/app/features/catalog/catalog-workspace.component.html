@@ -174,7 +174,9 @@
         </section>
       }
 
-      @if (current.editable) {
+      @if (current.authoringSupported
+        && ((current.workspaceId && hasWorkspaceAction('VIEW'))
+          || (!current.workspaceId && hasDefinitionAction('CREATE_NEW_VERSION')))) {
         <div class="authoring-entry">
           <div>
             <strong>{{ i18n.text('draftWorkspace') }}</strong>

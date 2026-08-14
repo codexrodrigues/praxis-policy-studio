@@ -1,4 +1,4 @@
-import type { DomainRuleTestRun } from '@praxisui/core';
+import type { DomainRuleDefinitionAction, DomainRuleTestRun } from '@praxisui/core';
 
 export type DecisionState = 'technical-draft' | 'verified';
 
@@ -17,7 +17,8 @@ export interface DecisionSummary {
   readonly baselineAuthority: string;
   readonly source: string;
   readonly evidenceCount: number;
-  readonly editable?: boolean;
+  readonly authoringSupported: boolean;
+  readonly availableDefinitionActions: readonly DomainRuleDefinitionAction[];
   readonly reviewStatus?: string;
   readonly configDefinitionId?: string;
   readonly configStatus?: string;

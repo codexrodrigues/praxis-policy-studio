@@ -38,18 +38,18 @@ multi-consumidor.
 | publicação/materialização | 50 | `lacuna-real-de-contrato` | readiness existe; action de publicação não é server-owned de ponta a ponta |
 | snapshot, rollback e staged rollout | 55 | `suportado-parcialmente` | actions de snapshots/rollouts existentes; create rollout e rollout-policy ainda inferidos |
 | evidência V57/Ergon | 40 | `suportado-parcialmente` | shape persiste; faltam baseline por cenário, idempotência, gate e endpoint operacional |
-| segurança, multitenancy e capabilities | 40 | `ja-suportado-mal-nomeado-ou-mal-materializado` | principal server-owned existe; role de leitura diverge entre Config e host |
+| segurança, multitenancy e capabilities | 50 | `suportado-parcialmente` | role de leitura e criação de versão estão governadas; faltam actions de publicação/rollout e smokes cross-tenant |
 | UX, i18n e acessibilidade | 40 | `ja-suportado-mal-nomeado-ou-mal-materializado` | workstation funcional; faltam i18n integral, E2E, axe e decomposição da página |
 | testes, release e documentação | 45 | `suportado-parcialmente` | CI focal verde; sem browser gates e com drift de versões/documentos |
 | assistente de decisões | 15 | `lacuna-real-de-contrato` | runtime horizontal de IA existe fora do Studio; faltam tools e evidência de domínio |
 
 ## Bloqueadores do próximo corte corporativo
 
-1. **Role matrix:** o host protege reads com `RULE_DEFINITION_READER`, enquanto o
-   controller Config exige `RULE_SNAPSHOT_READER`. O controller real deve ser
-   provado em corporate mode com uma única política coerente.
-2. **Actions completas:** Definition capabilities existem no Config, mas não são
-   consumidas pelo client/Studio. Publicação, create rollout e lifecycle da
+1. **Role matrix:** a correção para `RULE_DEFINITION_READER` já está integrada ao
+   Config e possui prova corporativa 200/403; falta incorporá-la ao próximo corte
+   publicado e ao smoke integrado.
+2. **Actions completas:** Definition capabilities já são consumidas pelo client e
+   pelo Studio. Publicação, create rollout e lifecycle da
    rollout-policy precisam de actions próprias; uma action nunca autoriza outra.
 3. **Evidência governada:** a V57 armazena evidência, porém não oferece baseline
    independente por cenário, idempotência ou política de gate por estágio.
@@ -87,7 +87,8 @@ Antes de criar `evidenceRequirements`, o owner Config deve inventariar o objeto
 
 ### P1 — capabilities e evidência
 
-- expor Definition capabilities no `@praxisui/core` e consumi-las no Studio;
+- publicar o corte de `@praxisui/core` com Definition capabilities e provar o
+  consumo integrado no Studio;
 - publicar actions para publicação, create rollout e rollout-policy;
 - modelar baseline por cenário, idempotência e requirements por estágio no Config;
 - usar um Test Run idempotente com quatro results operacionais.

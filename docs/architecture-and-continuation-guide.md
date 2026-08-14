@@ -98,11 +98,12 @@ O adapter atual usa o `DomainRuleService` público, sob sessão autenticada, par
   rollout, executando os comandos já expostos pelo client.
 
 A definição mais recente é escolhida pela maior versão da mesma `ruleKey` e a
-condição é obtida por leitura de detalhe. O Studio **ainda não consome**
-`GET /definitions/capabilities`: a abertura/criação inicial de workspace depende
-do marcador estático `editable` da projeção. Esse marcador prova suporte do editor,
-não autorização. O Config já conhece `CREATE_NEW_VERSION`, mas o client público e
-o Studio precisam materializá-lo antes de tratar essa ação como governada.
+condição é obtida por leitura de detalhe. A projeção estática informa somente se
+o tipo de decisão possui suporte de authoring. A criação inicial de workspace é
+exibida e executada apenas quando o client público recebe
+`CREATE_NEW_VERSION` de `GET /definitions/capabilities` para o identificador,
+`ruleKey` e versão exatos da definição. Metadata da projeção nunca é tratada como
+autorização.
 
 Depois que o workspace existe, save, cenários, Test Run, submit, review e promoção
 usam `availableActions` e ETag server-owned. Publicação ainda é apresentada a partir
