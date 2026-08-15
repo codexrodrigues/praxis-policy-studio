@@ -30,6 +30,44 @@ e unauthorized no corte publicado.
 Oracle/HADES permanece responsabilidade do adapter Ergon em ambiente autorizado.
 Nenhuma evidência sintética ou Neon deve ser apresentada como paridade Oracle.
 
+## Próxima prova live multi-persona
+
+O candidato seguinte adiciona uma suíte isolada em
+`e2e/policy-studio-multipersona.live.spec.ts`. Ela não usa os mocks V62 e não é
+executada pelo `npm run e2e` comum. Com o Quickstart real ouvindo na porta oficial
+`8088`, execute:
+
+```bash
+POLICY_STUDIO_LIVE_AUTHOR_USERNAME=... \
+POLICY_STUDIO_LIVE_AUTHOR_PASSWORD=... \
+POLICY_STUDIO_LIVE_APPROVER_A_USERNAME=... \
+POLICY_STUDIO_LIVE_APPROVER_A_PASSWORD=... \
+POLICY_STUDIO_LIVE_APPROVER_B_USERNAME=... \
+POLICY_STUDIO_LIVE_APPROVER_B_PASSWORD=... \
+POLICY_STUDIO_LIVE_PUBLISHER_USERNAME=... \
+POLICY_STUDIO_LIVE_PUBLISHER_PASSWORD=... \
+POLICY_STUDIO_LIVE_OPERATOR_USERNAME=... \
+POLICY_STUDIO_LIVE_OPERATOR_PASSWORD=... \
+POLICY_STUDIO_LIVE_AUDITOR_USERNAME=... \
+POLICY_STUDIO_LIVE_AUDITOR_PASSWORD=... \
+npm run e2e:live:multipersona
+```
+
+A suíte abre o Studio pela porta `4302`, prova primeiro o browser sem sessão, cria
+uma sessão real para cada um dos seis sujeitos, carrega o catálogo governado e
+cruza um matcher HTTP permitido. Em seguida usa
+comandos intencionalmente incompletos sobre chaves inexistentes para provar `403`
+nas responsabilidades das outras personas sem materializar uma regra ou mover o
+head. Uma resposta funcional `400`, `404`, `409`, `412`, `422` ou `428` no probe
+permitido significa que a autorização foi atravessada; ela não é apresentada como
+sucesso do caso de negócio.
+
+Neste ambiente Codex, TypeScript e a enumeração dos sete testes passaram. A execução
+live ainda não foi reivindicada: abrir listeners locais em `4302` foi bloqueado pelo
+sandbox desta sessão. O gate só pode mudar de “preparado” para “comprovado” depois
+que os sete testes rodarem contra `4302 ↔ 8088` e as evidências registrarem os SHAs,
+versões e configuração de tenant/environment.
+
 ## Dívida visual observada
 
 O catálogo mantém a decisão selecionada e as ações são operáveis nos dois

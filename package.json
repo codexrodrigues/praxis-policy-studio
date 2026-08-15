@@ -10,8 +10,9 @@
     "generate:ergonx-projection": "node tools/generate-ergonx-projection.mjs",
     "sync:quickstart-projection": "node tools/sync-quickstart-projection.mjs",
     "lint": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.spec.json --noEmit",
-    "test": "vitest run --environment jsdom --exclude e2e/**",
-    "e2e": "playwright test"
+    "test": "vitest run --environment jsdom --exclude \"e2e/**\"",
+    "e2e": "playwright test",
+    "e2e:live:multipersona": "playwright test --config playwright.live.config.ts"
   },
   "dependencies": {
     "@angular/animations": "21.2.20",
