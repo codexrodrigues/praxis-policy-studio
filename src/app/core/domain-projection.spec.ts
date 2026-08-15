@@ -47,6 +47,13 @@ describe('validateDomainProjection', () => {
     })).toThrowError('PROJECTION_SEMANTIC_STATUS_UNSUPPORTED');
   });
 
+  it('rejects an empty host-owned operational resource binding', () => {
+    expect(() => validateDomainProjection({
+      ...valid,
+      ruleSetRef: { ...valid.ruleSetRef, operationalResourceKey: '  ' }
+    })).toThrowError('PROJECTION_OPERATIONAL_RESOURCE_INVALID');
+  });
+
   it('rejects a decision whose facts have no governed schema', () => {
     expect(() => validateDomainProjection({ ...valid, factSchemas: [] }))
       .toThrowError('PROJECTION_FACT_SCHEMAS_REQUIRED');

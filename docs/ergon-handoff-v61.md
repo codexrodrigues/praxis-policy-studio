@@ -15,7 +15,8 @@
    do change workspace identificado por `workspaceId`;
 4. `@praxisui/core` `9.0.5-rc.25` expõe os campos e discovery filtrado por
    `resourceKey`;
-5. Policy Studio `0.1.0-beta.9` correlaciona o `resourceKey` da Definition, exige
+5. Policy Studio correlaciona o `operationalResourceKey` publicado pelo host na
+   projeção (sem reinterpretar o `resourceKey` do RuleSet na Definition), exige
    exatamente uma action com tags `policy-studio` e `operational-proof`, apresenta
    CREATE/UPDATE por cenário, confirma o risco e executa o protocolo publicado.
 

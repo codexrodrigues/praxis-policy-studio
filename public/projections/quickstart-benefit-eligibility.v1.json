@@ -23,6 +23,7 @@
     "domainKey": "workforce-benefits",
     "boundedContextKey": "extraordinary-assistance",
     "ruleSetKey": "extraordinary-grant-eligibility",
+    "operationalResourceKey": "human-resources.extraordinary-benefit-requests",
     "hostContractVersion": "quickstart/1.0",
     "operationKeys": [
       "evaluate-extraordinary-grant"
