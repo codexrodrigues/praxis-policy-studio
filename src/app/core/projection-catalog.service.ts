@@ -101,7 +101,7 @@ export class ProjectionCatalogService {
           domain: projection.presentationLabels.domain[locale] ?? projection.ruleSetRef.boundedContextKey,
           ruleSet: projection.presentationLabels.ruleSet[locale] ?? projection.ruleSetRef.ruleSetKey,
           ruleSetKey: projection.ruleSetRef.ruleSetKey,
-          resourceKey: definition?.resourceKey?.trim() || null,
+          resourceKey: projection.ruleSetRef.operationalResourceKey?.trim() || null,
           serviceKey: definition?.serviceKey?.trim() || null,
           state: decision.semanticStatus === 'REFERENCE_IMPLEMENTED' ? 'verified' as const : 'technical-draft' as const,
           meaning: decision.presentationLabel,

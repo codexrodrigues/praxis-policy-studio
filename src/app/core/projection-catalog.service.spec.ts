@@ -16,7 +16,9 @@ const projection = {
   sourceArtifacts: [{ path: 'rule-set.java', kind: 'RULESET_DEFINITION', sha256: 'A'.repeat(64) }],
   ruleSetRef: {
     domainKey: 'workforce-benefits', boundedContextKey: 'extraordinary-assistance',
-    ruleSetKey: 'extraordinary-grant-eligibility', operationKeys: ['evaluate-extraordinary-grant']
+    ruleSetKey: 'extraordinary-grant-eligibility',
+    operationalResourceKey: 'human-resources.extraordinary-benefit-requests',
+    operationKeys: ['evaluate-extraordinary-grant']
   },
   decisionRefs: [{
     order: 1, decisionKey: 'grant.amount-parameters', reasonCode: 'LIMIT', presentationLabel: 'Amount limit',
@@ -80,7 +82,7 @@ describe('ProjectionCatalogService', () => {
       { id: 'v1', ruleKey: 'grant.amount-parameters', version: 1, status: 'draft', condition: { '===': [1, 1] } },
       {
         id: 'v2', ruleKey: 'grant.amount-parameters', version: 2, status: 'approved',
-        resourceKey: 'human-resources.extraordinary-benefit-requests',
+        resourceKey: 'extraordinary-grant-eligibility',
         serviceKey: 'extraordinary-benefit-request-service',
         condition: { '<=': [{ var: 'request.requestedAmount' }, 3000] },
         parameters: { nullSemantics: 'FAIL_CLOSED', operationKeys: ['evaluate-extraordinary-grant'] },
@@ -89,7 +91,7 @@ describe('ProjectionCatalogService', () => {
     ]);
     http.expectOne('/api/praxis/config/domain-rules/definitions/v2').flush({
       id: 'v2', ruleKey: 'grant.amount-parameters', version: 2, status: 'approved',
-      resourceKey: 'human-resources.extraordinary-benefit-requests',
+      resourceKey: 'extraordinary-grant-eligibility',
       serviceKey: 'extraordinary-benefit-request-service',
       condition: { '<=': [{ var: 'request.requestedAmount' }, 3000] },
       parameters: { nullSemantics: 'FAIL_CLOSED', operationKeys: ['evaluate-extraordinary-grant'] },

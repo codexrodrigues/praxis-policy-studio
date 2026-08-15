@@ -117,8 +117,10 @@ do owner antes de oferecer os próximos comandos.
 
 O Quickstart V61 publica uma action operacional protegida para executar cenários
 `CREATE`/`UPDATE` descartáveis e registrar a evidência V58. O Studio beta.10 a
-descobre semanticamente pelo `resourceKey` da Definition e pelas tags canônicas,
-exige uma única action, seleção explícita de operação e confirmação de alto risco.
+descobre semanticamente pelo `operationalResourceKey` host-owned da projeção e
+pelas tags canônicas. O `resourceKey` da Definition identifica o RuleSet governado
+e não é reinterpretado como recurso HTTP do host. O Studio exige uma única action,
+seleção explícita de operação e confirmação de alto risco.
 URL, método, autorização, idempotência e o `If-Match` cross-resource do workspace
 vêm do catálogo Metadata; o browser falha fechado quando o protocolo está ausente
 ou ambíguo.

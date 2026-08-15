@@ -6,6 +6,8 @@ export function validateProjection(projection) {
   if (projection?.kind !== PROJECTION_KIND && projection?.kind !== 'POLICY_STUDIO_PROJECTION_V1') errors.push('KIND_UNSUPPORTED');
   if (!projection?.projectionId || !projection?.projectionVersion) errors.push('IDENTITY_REQUIRED');
   if (!projection?.ruleSetRef?.domainKey || !projection?.ruleSetRef?.ruleSetKey) errors.push('RULESET_REQUIRED');
+  if (projection?.ruleSetRef?.operationalResourceKey !== undefined &&
+      !projection.ruleSetRef.operationalResourceKey?.trim?.()) errors.push('OPERATIONAL_RESOURCE_INVALID');
   if (!Array.isArray(projection?.decisionRefs) || projection.decisionRefs.length === 0) errors.push('DECISIONS_REQUIRED');
   if (!Array.isArray(projection?.sourceArtifacts) || projection.sourceArtifacts.length === 0) errors.push('SOURCES_REQUIRED');
   if (projection?.sourceArtifacts?.some(item => !/^[A-Fa-f0-9]{64}$/.test(item.sha256))) errors.push('SOURCE_DIGEST_INVALID');

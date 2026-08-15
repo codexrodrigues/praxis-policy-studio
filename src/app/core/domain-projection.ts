@@ -7,6 +7,7 @@ export interface DomainProjection {
     readonly domainKey: string;
     readonly boundedContextKey: string;
     readonly ruleSetKey: string;
+    readonly operationalResourceKey?: string;
     readonly hostContractVersion?: string;
     readonly operationKeys: readonly string[];
   };
@@ -65,6 +66,10 @@ export function validateDomainProjection(value: unknown): DomainProjection {
   const projection = value as Partial<DomainProjection>;
   if (!projection.projectionId || !projection.ruleSetRef?.domainKey || !projection.ruleSetRef.ruleSetKey) {
     throw new Error('PROJECTION_IDENTITY_REQUIRED');
+  }
+  if (projection.ruleSetRef.operationalResourceKey !== undefined
+      && !projection.ruleSetRef.operationalResourceKey.trim()) {
+    throw new Error('PROJECTION_OPERATIONAL_RESOURCE_INVALID');
   }
   if (!projection.decisionRefs?.length) throw new Error('PROJECTION_DECISIONS_REQUIRED');
   if (!projection.factSchemas?.length) throw new Error('PROJECTION_FACT_SCHEMAS_REQUIRED');
