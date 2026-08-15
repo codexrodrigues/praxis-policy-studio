@@ -1,5 +1,8 @@
 # Handoff Ergon — Policy Studio beta.8 / evidência V58
 
+> Este documento preserva o corte publicado beta.8/rc.32. A action host-owned posterior e os
+> limites atuais estão no [complemento V59](ergon-handoff-v59.md).
+
 - Estado: publicado; apto para a fase repository-only da issue #300
 - Issue de coordenação: Ergon #300
 - Autoridade operacional: `LEGACY_AUTHORITATIVE`; este corte não promove Java nem toca Oracle

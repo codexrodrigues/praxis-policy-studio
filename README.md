@@ -42,6 +42,9 @@ Abra `http://localhost:4302/catalog`.
 Para integrar o primeiro consumidor, consulte o histórico no
 [handoff do Ergon beta.7](docs/ergon-handoff-beta7.md) e o corte V58 no
 [handoff Ergon beta.8](docs/ergon-handoff-beta8.md).
+O complemento operacional corrente está no
+[handoff V59](docs/ergon-handoff-v59.md): ele documenta a action host-owned do
+Quickstart sem afirmar que a UI beta.8 já a materializa.
 O beta.8 usa exclusivamente a cadeia publicada Contracts beta.4, Config rc.113,
 Quickstart rc.32 e `@praxisui/core` rc.23; tags anteriores não contêm o V58.
 O handoff referencia o corpus portátil executável mantido pelo Quickstart, que
@@ -102,6 +105,12 @@ server-owned opt-in para `SUBMIT` e `PROMOTE`. Publication/snapshot/activation
 ainda não reutilizam esse gate por estágio. Criar ou alterar um cenário rotaciona
 a revisão do workspace e invalida a evidência anterior; o Studio recarrega o ETag
 do owner antes de oferecer os próximos comandos.
+
+O Quickstart V59 publica uma action operacional protegida para executar cenários
+`CREATE`/`UPDATE` descartáveis e registrar a evidência V58. O Studio beta.8 ainda
+não oferece esse comando. A integração deve aguardar a capability representar a
+precondition `If-Match` do workspace referenciado; não é aceitável hardcodar o
+endpoint ou inferir a autorização no browser.
 
 Workspaces expõem save, scenarios, Test Run, submit, review e promoção somente
 quando `GET /workspaces/{id}/capabilities` publica a ação correspondente. Os
