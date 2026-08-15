@@ -173,13 +173,17 @@ export class ProjectionCatalogService {
   runSandbox(
     workspaceId: string,
     scenarioIds: readonly string[],
+    idempotencyKey: string,
+    evaluatedAtUtc: string,
     config: PolicyStudioRuntimeConfig
   ): Observable<PolicySandboxRun> {
     const baseUrl = (config.configApiBaseUrl ?? '').replace(/\/$/, '');
     return this.http.post<PolicySandboxRun>(`${baseUrl}/api/praxis/policy-studio/sandbox/runs`, {
       workspaceId,
       scenarioIds,
-      userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+      userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      idempotencyKey,
+      evaluatedAtUtc
     });
   }
 
@@ -264,6 +268,7 @@ export class ProjectionCatalogService {
       reviewCount: inspection.reviews.length,
       materializationCount: inspection.materializations.length,
       promotedDefinitionId: inspection.workspace.promotedDefinitionId ?? null,
+      submittedTestRunId: inspection.workspace.submittedTestRunId,
       latestTestRun: inspection.testRuns[0] ?? null
     })));
   }

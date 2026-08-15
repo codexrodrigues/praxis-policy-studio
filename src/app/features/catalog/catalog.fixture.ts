@@ -71,6 +71,7 @@ export interface DecisionLifecycleSummary {
   readonly reviewCount: number;
   readonly materializationCount: number;
   readonly promotedDefinitionId: string | null;
+  readonly submittedTestRunId: string | null;
   readonly latestTestRun: DomainRuleTestRun | null;
 }
 
