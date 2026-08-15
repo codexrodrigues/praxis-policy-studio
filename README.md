@@ -46,8 +46,8 @@ O complemento operacional corrente está no
 [handoff V61](docs/ergon-handoff-v61.md): ele registra a cadeia de discovery
 cross-resource consumida pelo Studio e preserva a prova Neon do V60 sem a
 confundir com evidência Oracle.
-O beta.10 usa a cadeia publicada Contracts beta.4, Config rc.114,
-Metadata rc.127, Quickstart rc.35 e `@praxisui/core` rc.25.
+O beta.11 usa a cadeia Contracts beta.4, Config rc.115,
+Metadata rc.127, Quickstart rc.36 e `@praxisui/core` rc.26.
 O corte acrescenta uma prova de navegador desktop/narrow, teclado e axe com
 backend hermético; ela não substitui a prova integrada com Quickstart/Neon e
 personas reais.
@@ -75,8 +75,9 @@ browser não envia tenant, ambiente ou authority. Isso é uma restrição do cli
 não uma garantia de isolamento. Ações de definition, workspace, snapshot e staged
 rollout existentes vêm do servidor. `CREATE_NEW_VERSION` é correlacionada à
 identidade e versão exatas da definição; o suporte estático do editor não concede
-autoridade. Publicação, criação de rollout e lifecycle de rollout-policy ainda
-carecem de catálogos server-owned próprios. A política alvo para definitions,
+autoridade. Publicação, criação de rollout e lifecycle de rollout-policy usam
+actions principal-specific de catálogos server-owned; o browser não reutiliza
+uma capability para autorizar outra operação. A política alvo para definitions,
 timelines e materializations é
 `ROLE_RULE_DEFINITION_READER`; o drift anterior com snapshot reader foi corrigido
 no Config e precisa integrar o próximo corte publicado. O Config resolve principal,

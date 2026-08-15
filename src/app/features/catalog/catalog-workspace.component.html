@@ -419,7 +419,7 @@
               @for (target of readiness.predictedMaterializations; track $index) { <code>{{ displayDiffValue(target) }}</code> }
               @for (warning of readiness.warnings; track $index) { <code class="warning">{{ displayDiffValue(warning) }}</code> }
             </div>
-            <button type="button" [disabled]="authoringBusy() || readiness.readiness !== 'ready_to_publish'" (click)="publishGovernedDefinition()">
+            <button type="button" [disabled]="authoringBusy() || readiness.readiness !== 'ready_to_publish' || !hasDefinitionAction('PUBLISH')" (click)="publishGovernedDefinition()">
               {{ i18n.text('publishDefinition') }}
             </button>
           }

@@ -48,11 +48,40 @@ describe('SnapshotCockpitComponent', () => {
       policyVersion: 1, status: 'DRAFT', enforcementMode: 'REQUIRED', minimumFreshProbes: 2,
       minimumReadyRatio: 1, blockOnIncompatible: true, staleAfterSeconds: 120,
       maximumRolloutAgeSeconds: 900, createdBy: 'author', createdAt: '2026-08-13T12:00:00Z',
-      approvedBy: null, approvedAt: null, activatedBy: null, activatedAt: null
+      approvedBy: null, approvedAt: null, activatedBy: null, activatedAt: null,
+      availableActions: ['APPROVE']
     };
     expect(component.policyActionLabel(policy)).toContain('Aprovar');
-    expect(component.policyActionLabel({ ...policy, status: 'APPROVED' })).toContain('Ativar');
-    expect(component.policyActionLabel({ ...policy, status: 'ACTIVE' })).toContain('ativa');
+    expect(component.policyActionLabel({
+      ...policy, status: 'APPROVED', availableActions: ['ACTIVATE']
+    })).toContain('Ativar');
+    expect(component.policyActionLabel({
+      ...policy, status: 'ACTIVE', availableActions: []
+    })).toBe('ACTIVE');
+  });
+
+  it('creates rollout controls only from the rollout catalog action', () => {
+    const component = TestBed.runInInjectionContext(() => new SnapshotCockpitComponent());
+    const version: DomainRuleSnapshotVersion = {
+      snapshotKey: 'candidate-2', ruleSetKey: 'benefit-rules', ruleSetVersion: 2,
+      publicationRevision: 2, snapshotContentHash: 'A'.repeat(64), publishedBy: 'publisher',
+      publishedAtUtc: '2026-08-13T12:00:00Z', active: false,
+      governanceState: 'READY', availableAction: 'UNAVAILABLE'
+    };
+    Object.defineProperty(component, 'rolloutCatalog', {
+      configurable: true,
+      value: () => ({ ruleSetKey: 'benefit-rules', rollouts: [], availableActions: [] })
+    });
+    expect(component.canCreateRollout(version)).toBe(false);
+
+    Object.defineProperty(component, 'rolloutCatalog', {
+      configurable: true,
+      value: () => ({
+        ruleSetKey: 'benefit-rules', rollouts: [], availableActions: ['CREATE_ROLLOUT']
+      })
+    });
+    expect(component.canCreateRollout(version)).toBe(true);
+    expect(component.canCreateRollout({ ...version, active: true })).toBe(false);
   });
 
 });

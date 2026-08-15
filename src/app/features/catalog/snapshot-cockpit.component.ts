@@ -76,16 +76,14 @@ export class SnapshotCockpitComponent {
   }
 
   policyActionLabel(policy: DomainRuleRolloutPolicy): string {
-    if (policy.status === 'DRAFT') return this.i18n.text('approveRolloutPolicy');
-    if (policy.status === 'APPROVED' || policy.status === 'SUPERSEDED') {
-      return this.i18n.text('activateRolloutPolicy');
-    }
-    return this.i18n.text('activeRolloutPolicy');
+    if (policy.availableActions.includes('APPROVE')) return this.i18n.text('approveRolloutPolicy');
+    if (policy.availableActions.includes('ACTIVATE')) return this.i18n.text('activateRolloutPolicy');
+    return policy.status;
   }
 
   canCreateRollout(version: DomainRuleSnapshotVersion): boolean {
-    return version.availableAction === 'ACTIVATE'
-      && !(this.rolloutCatalog()?.rollouts.length);
+    return !version.active
+      && (this.rolloutCatalog()?.availableActions.includes('CREATE_ROLLOUT') ?? false);
   }
 
   submitPolicy(
