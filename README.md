@@ -46,11 +46,14 @@ O complemento operacional corrente está no
 [handoff V61](docs/ergon-handoff-v61.md): ele registra a cadeia de discovery
 cross-resource consumida pelo Studio e preserva a prova Neon do V60 sem a
 confundir com evidência Oracle.
-O beta.12 usa a cadeia Contracts beta.4, Config rc.115,
-Metadata rc.127, Quickstart rc.36 e `@praxisui/core` rc.26.
+O beta.13 usa a cadeia Contracts beta.4, Config rc.118,
+Metadata rc.127, Quickstart rc.39 e `@praxisui/*` rc.27.
 O corte acrescenta uma prova de navegador desktop/narrow, teclado e axe com
 backend hermético; ela não substitui a prova integrada com Quickstart/Neon e
 personas reais.
+Na composição de snapshot, o Config devolve blockers governados tipados e o
+Studio os apresenta por códigos estáveis em pt-BR/en-US. A UI não interpreta nem
+expõe a mensagem técnica do backend como contrato de produto.
 O handoff referencia o corpus portátil executável mantido pelo Quickstart, que
 exercita riscos de migração sem transformar evidência sintética em prova Oracle.
 O percentual auditado, os bloqueadores e a sequência de cortes estão em

@@ -1,16 +1,17 @@
 # Estado e roadmap do Praxis Policy Studio
 
-- Baseline validada: candidato Studio `0.1.0-beta.12` e Quickstart V63/`v2.0.0-rc.36`,
+- Baseline validada: candidato Studio `0.1.0-beta.13` e Quickstart `v2.0.0-rc.39`,
   com transporte, governance V58 e prova host-owned em dois datasources Neon
 - Data da auditoria: 2026-08-15
-- Escopo: Studio beta.12, Metadata rc.127, Config rc.115, Quickstart rc.36,
-  Contracts beta.4, `@praxisui/*` rc.26 e handoff Ergon #300
+- Escopo: Studio beta.13, Metadata rc.127, Config rc.118, Quickstart rc.39,
+  Contracts beta.4, `@praxisui/*` rc.27 e handoff Ergon #300
 
 ## Leitura executiva
 
 O produto corporativo completo está estimado em **65%**, com margem de ±5 pontos
 percentuais. Essa estimativa mede capabilities comprovadas, não linhas de código.
-A beta.12 demonstra um vertical slice relevante; o corte V63 fecha as actions
+A beta.13 demonstra um vertical slice relevante e materializa no cockpit os
+blockers tipados do gate de snapshot; o corte V63 fecha as actions
 principal-specific de publicação e rollout; o corte V61 fecha o discovery
 operacional cross-resource e o corte V58 fecha o transporte,
 parte dos gates de evidência e a execução idempotente no Neon, mas ainda não é uma beta
@@ -40,7 +41,7 @@ multi-consumidor.
 | cenários, sandbox e Test Run | 84 | `suportado-parcialmente` | candidate × active, baseline independente, retry e action host-owned consumida por discovery existem; facts ainda são JSON |
 | review/maker-checker | 70 | `suportado-parcialmente` | workspace, ETag, blockers, run submetido e segregação existem; política cobre SUBMIT/PROMOTE, não estágios posteriores |
 | publicação/materialização | 58 | `suportado-parcialmente` | readiness e action `PUBLISH` são server-owned; o gate de evidência ainda não alcança publicação |
-| snapshot, rollback e staged rollout | 68 | `suportado-parcialmente` | create/cancel/activate rollout e lifecycle de rollout-policy são principal-specific; faltam gates de evidência e prova multi-persona integrada |
+| snapshot, rollback e staged rollout | 72 | `suportado-parcialmente` | blockers de evidência são server-owned, tipados e explicados pelo Studio; create/cancel/activate rollout e lifecycle de rollout-policy são principal-specific; falta prova multi-persona integrada |
 | evidência V58/V60/Ergon | 86 | `suportado-parcialmente` | contrato leve, action dedicada, reserva pré-DML e quatro quadrantes foram provados em dois datasources Neon preservando o ledger append-only; faltam adapter Ergon e Oracle/HADES |
 | segurança, multitenancy e capabilities | 74 | `suportado-parcialmente` | publicação e rollout não são mais inferidos no browser; faltam smokes cross-tenant e prova multi-persona integrada |
 | UX, i18n e acessibilidade | 48 | `ja-suportado-mal-nomeado-ou-mal-materializado` | Playwright desktop/narrow, teclado e axe cobrem estados corporativos focais; faltam i18n integral, personas reais e decomposição da página |
@@ -53,11 +54,13 @@ multi-consumidor.
    lifecycle de rollout-policy. Config publica ações principal-specific e o Studio
    nunca reutiliza uma action para autorizar outra operação.
 2. **Evidência governada:** a V58 oferece baseline independente por cenário,
-   idempotência, vínculo do run submetido e política opt-in para `SUBMIT`/`PROMOTE`.
-   Estágios posteriores ainda não vinculam/revalidam esse receipt.
+   idempotência, vínculo do run submetido e política opt-in. O Config rc.118
+   revalida o receipt na composição de snapshot e devolve blockers tipados; o
+   Studio beta.13 os explica sem interpretar mensagens humanas. Ainda falta
+   provar essa cadeia no browser integrado multi-persona.
 3. **Consumo operacional governado:** concluído no V61. Metadata representa o
    `If-Match` cross-resource e Core/Studio descobrem e executam a action sem URL local.
-   O beta.12 também congela `Idempotency-Key` e `evaluatedAtUtc` após falha incerta,
+   Desde o beta.12, o Studio também congela `Idempotency-Key` e `evaluatedAtUtc` após falha incerta,
    fechando no browser a mesma garantia de replay já existente no host e no Config.
 4. **Prova corporativa:** o comando no Neon cobre `403`, `409`, `412`, `422`, `428`,
    retry sem duplicação, quatro quadrantes e rollback que preserva o audit append-only;
@@ -72,8 +75,9 @@ O gate pertence à governance server-owned da Definition/RuleSet:
   permitir; o blocker continua visível;
 - `PROMOTE` bloqueia, quando exigido, baseline inelegível, matriz incompleta,
   paridade incompleta e cleanup não comprovado;
-- `PUBLISH`, snapshot, rollout e `ACTIVATE` ainda não reutilizam esse gate V58;
-  essa extensão deve permanecer server-owned e vinculada ao receipt revisado;
+- a composição de snapshot revalida o receipt revisado e publica blockers
+  estáveis; políticas adicionais de `PUBLISH`, rollout e `ACTIVATE` devem
+  permanecer server-owned;
 - exigir evidência antes de revisão é uma opção de governance, não default da V58
   nem inferência do browser.
 
