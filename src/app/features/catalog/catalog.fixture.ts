@@ -11,6 +11,8 @@ export interface DecisionSummary {
   readonly domain: string;
   readonly ruleSet: string;
   readonly ruleSetKey: string;
+  readonly resourceKey: string | null;
+  readonly serviceKey: string | null;
   readonly state: DecisionState;
   readonly meaning: string;
   readonly authority: string;

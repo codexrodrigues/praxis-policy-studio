@@ -279,13 +279,15 @@ fronteira da IA está em [ADR 0002 — Policy Assistant](adr/0002-policy-assista
 - o catálogo carrega um único `projectionPath`; não existe discovery multi-pacote;
 - apenas um slice focal está editável;
 - comparison candidate × active, baseline independente por resultado, idempotência
-  do Test Run e action remota host-owned existem; consumo Studio e Oracle ainda são lacunas;
+  do Test Run e action remota host-owned consumida por discovery existem; Oracle ainda é lacuna;
 - workspace usa actions server-owned, mas Definition create, publicação, create
   rollout e rollout-policy ainda não possuem consumo completo de capabilities;
-- a role leitora diverge entre host e controller Config em corporate mode;
+- a role leitora foi alinhada no Config; a cadeia corporate multi-persona ainda
+  precisa de prova integrada no corte publicado;
 - a V58 governa `SUBMIT`/`PROMOTE` por política opt-in; publication, snapshot e
   activation ainda precisam vincular e revalidar o mesmo receipt;
-- o corte Quickstart V60 hospeda a prova HTTP/Neon e a explicação consultiva do Config;
+- o corte Quickstart V61 hospeda a action descoberta pelo Studio; o V60 preserva
+  a prova HTTP/Neon e a explicação consultiva do Config;
   isso não transforma o host em owner da projeção de evidência;
 - documentação de evidência histórica pode ficar stale e deve registrar commits;
 - uma projeção válida pode continuar semanticamente não homologada;

@@ -43,11 +43,11 @@ Para integrar o primeiro consumidor, consulte o histórico no
 [handoff do Ergon beta.7](docs/ergon-handoff-beta7.md) e o corte V58 no
 [handoff Ergon beta.8](docs/ergon-handoff-beta8.md).
 O complemento operacional corrente está no
-[handoff V60](docs/ergon-handoff-v60.md): ele registra a prova da action host-owned
-contra os dois datasources Neon e a preservação do ledger append-only, sem afirmar
-que a UI beta.8 já materializa o comando.
-O beta.8 usa exclusivamente a cadeia publicada Contracts beta.4, Config rc.113,
-Quickstart rc.32 e `@praxisui/core` rc.23; tags anteriores não contêm o V58.
+[handoff V61](docs/ergon-handoff-v61.md): ele registra a cadeia de discovery
+cross-resource consumida pelo Studio e preserva a prova Neon do V60 sem a
+confundir com evidência Oracle.
+O beta.9 usa a cadeia publicada Contracts beta.4, Config rc.114,
+Metadata rc.127, Quickstart rc.35 e `@praxisui/core` rc.25.
 O handoff referencia o corpus portátil executável mantido pelo Quickstart, que
 exercita riscos de migração sem transformar evidência sintética em prova Oracle.
 O percentual auditado, os bloqueadores e a sequência de cortes estão em
@@ -107,11 +107,13 @@ ainda não reutilizam esse gate por estágio. Criar ou alterar um cenário rotac
 a revisão do workspace e invalida a evidência anterior; o Studio recarrega o ETag
 do owner antes de oferecer os próximos comandos.
 
-O Quickstart V60 publica uma action operacional protegida para executar cenários
-`CREATE`/`UPDATE` descartáveis e registrar a evidência V58. O Studio beta.8 ainda
-não oferece esse comando. A integração deve aguardar a capability representar a
-precondition `If-Match` do workspace referenciado; não é aceitável hardcodar o
-endpoint ou inferir a autorização no browser.
+O Quickstart V61 publica uma action operacional protegida para executar cenários
+`CREATE`/`UPDATE` descartáveis e registrar a evidência V58. O Studio beta.9 a
+descobre semanticamente pelo `resourceKey` da Definition e pelas tags canônicas,
+exige uma única action, seleção explícita de operação e confirmação de alto risco.
+URL, método, autorização, idempotência e o `If-Match` cross-resource do workspace
+vêm do catálogo Metadata; o browser falha fechado quando o protocolo está ausente
+ou ambíguo.
 
 Workspaces expõem save, scenarios, Test Run, submit, review e promoção somente
 quando `GET /workspaces/{id}/capabilities` publica a ação correspondente. Os
