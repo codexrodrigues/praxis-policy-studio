@@ -1,6 +1,6 @@
 # Handoff Ergon — Policy Studio beta.8 / evidência V58
 
-- Estado: candidato; usar somente depois da cadeia de artefatos abaixo estar publicada
+- Estado: publicado; apto para a fase repository-only da issue #300
 - Issue de coordenação: Ergon #300
 - Autoridade operacional: `LEGACY_AUTHORITATIVE`; este corte não promove Java nem toca Oracle
 - Data: 2026-08-14
@@ -16,7 +16,17 @@ submetido e avalia política server-owned opt-in em `SUBMIT` e `PROMOTE`.
 O laboratório Quickstart executa os quatro quadrantes CREATE/UPDATE × ALLOW/DENY no
 workflow real do caso neutro, mede chamadas ao baseline por observer, falha fechado em
 mutação/cleanup divergentes e persiste um Test Run com quatro results em PostgreSQL real
-descartável. Esse teste é estrutural e operacional; não é paridade Oracle nem prova Neon.
+descartável. Esse teste é estrutural e operacional; não é paridade Oracle.
+
+O Config aplicou a migração V58 no banco Neon já configurado para o Quickstart e,
+após reinício, confirmou o schema atual sem reaplicar a migration. Nenhum banco ou
+schema paralelo foi criado. Essa é prova de persistência/migração, não prova de Test
+Run operacional remoto, porque o executor do Quickstart ainda não publica endpoint.
+O Studio também foi validado em `4302 ↔ 8088`: sessão local, catálogo neutro com
+10 decisões, lifecycle, snapshot ativo, alinhamento agregado do host e explicação
+assistida terminal. A explicação permaneceu consultiva e recusou inferir dados que
+o envelope sanitizado não atestava. Essa prova usou uma persona administrativa;
+não substitui a matriz maker-checker/unauthorized.
 
 ## Cadeia de versões
 
@@ -28,8 +38,9 @@ Adotar somente a cadeia completa, sem `SNAPSHOT`:
 4. `@praxisui/core:9.0.5-rc.23` para projetar o run vinculado;
 5. `praxis-policy-studio:0.1.0-beta.8`.
 
-Se qualquer artefato ainda não estiver público, interromper a integração e manter a
-atividade repository-only. Não importar `praxis-config-starter` no Ergon para obter DTOs.
+A cadeia acima está publicada. Fixar essas versões exatas ou seus commits de release;
+não reutilizar tags anteriores. Não importar `praxis-config-starter` no Ergon para
+obter DTOs.
 
 ## Cadeia de trabalho do agente Ergon
 
@@ -102,7 +113,8 @@ vinculado à submissão é o mesmo receipt homologado.
 
 ## Limites ainda abertos
 
-- o corte local não prova Neon, Oracle ou HADES;
+- o corte prova a migration/restart V58 no Neon, mas não um Test Run operacional
+  remoto nesse banco, nem Oracle ou HADES;
 - o executor operacional Quickstart permanece interno e não publica capability/endpoint humano;
 - V58 governa `SUBMIT`/`PROMOTE`, não publication/snapshot/activation;
 - o laboratório é compatível com a topologia RN-013, mas não replica o Oracle nem a totalidade

@@ -42,6 +42,8 @@ Abra `http://localhost:4302/catalog`.
 Para integrar o primeiro consumidor, consulte o histórico no
 [handoff do Ergon beta.7](docs/ergon-handoff-beta7.md) e o corte V58 no
 [handoff Ergon beta.8](docs/ergon-handoff-beta8.md).
+O beta.8 usa exclusivamente a cadeia publicada Contracts beta.4, Config rc.113,
+Quickstart rc.32 e `@praxisui/core` rc.23; tags anteriores não contêm o V58.
 O handoff referencia o corpus portátil executável mantido pelo Quickstart, que
 exercita riscos de migração sem transformar evidência sintética em prova Oracle.
 O percentual auditado, os bloqueadores e a sequência de cortes estão em

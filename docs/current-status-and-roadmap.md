@@ -1,24 +1,24 @@
 # Estado e roadmap do Praxis Policy Studio
 
-- Baseline publicada: `0.1.0-beta.7` (`ebea1eb`), com beta.8/V58 em validação local
+- Baseline publicada: `0.1.0-beta.8`, com transporte e governance V58
 - Data da auditoria: 2026-08-14
-- Escopo: Studio beta.8 candidato, Config rc.113 candidato, Quickstart rc.32
-  candidato, Contracts beta.4 candidato, `@praxisui/*` rc.23 candidato e handoff Ergon #300
+- Escopo: Studio beta.8, Config rc.113, Quickstart rc.32, Contracts beta.4,
+  `@praxisui/*` rc.23 e handoff Ergon #300
 
 ## Leitura executiva
 
-O produto corporativo completo está estimado em **56%**, com margem de ±5 pontos
+O produto corporativo completo está estimado em **58%**, com margem de ±5 pontos
 percentuais. Essa estimativa mede capabilities comprovadas, não linhas de código.
-A beta.7 demonstra um vertical slice relevante; o corte V58 fecha o transporte
-e parte dos gates de evidência, mas ainda não é uma beta
+A beta.8 demonstra um vertical slice relevante; o corte V58 fecha o transporte,
+parte dos gates de evidência e a migração idempotente no Neon, mas ainda não é uma beta
 corporativa segura para uso autônomo pelo Ergon.
 
 Marcos diferentes têm distâncias diferentes:
 
 | Marco | Estimativa atual | Significado |
 | --- | ---: | --- |
-| beta integrada controlada com Quickstart | 82% | jornada supervisionada em ambiente de referência; falta Neon/browser multi-persona |
-| versão estável corporativa | 49% | segurança, actions restantes, E2E, operação e release coerentes |
+| beta integrada controlada com Quickstart | 88% | jornada 4302↔8088 e explicação IA comprovadas com uma persona; faltam lane operacional remota e browser multi-persona |
+| versão estável corporativa | 50% | segurança, actions restantes, E2E e operação corporativa |
 | produto maduro multi-cliente com authoring complexo e IA | 31% | RuleSet completo, discovery, impacto, execução explicável e agente governado |
 
 Rubrica das estimativas: `0` ausente, `25` seam/contrato, `50` vertical slice com
@@ -38,28 +38,24 @@ multi-consumidor.
 | review/maker-checker | 70 | `suportado-parcialmente` | workspace, ETag, blockers, run submetido e segregação existem; política cobre SUBMIT/PROMOTE, não estágios posteriores |
 | publicação/materialização | 50 | `lacuna-real-de-contrato` | readiness existe; action de publicação não é server-owned de ponta a ponta |
 | snapshot, rollback e staged rollout | 55 | `suportado-parcialmente` | actions de snapshots/rollouts existentes; create rollout e rollout-policy ainda inferidos |
-| evidência V58/Ergon | 65 | `suportado-parcialmente` | contrato leve, baseline por cenário, idempotência, quatro quadrantes locais e gates existem; faltam adapter Ergon, Neon/Oracle e endpoint operacional |
+| evidência V58/Ergon | 72 | `suportado-parcialmente` | contrato leve, baseline por cenário, idempotência, quatro quadrantes locais, gates e migração Neon existem; faltam adapter Ergon, Oracle/HADES e endpoint operacional |
 | segurança, multitenancy e capabilities | 58 | `suportado-parcialmente` | leitura, criação de versão e explicação estão governadas; faltam actions de publicação/rollout e smokes cross-tenant |
 | UX, i18n e acessibilidade | 40 | `ja-suportado-mal-nomeado-ou-mal-materializado` | workstation funcional; faltam i18n integral, E2E, axe e decomposição da página |
-| testes, release e documentação | 66 | `suportado-parcialmente` | gates focais, 505 testes Quickstart e docs V58; faltam releases finais, browser/axe, Neon e prova multi-persona |
-| assistente de decisões | 45 | `suportado-parcialmente` | explicação da definição passou pelo fluxo HTTP real com atestação e sem candidate API; busca, execução explicada e comandos delegados ainda faltam |
+| testes, release e documentação | 78 | `suportado-parcialmente` | cadeia V58 publicada, 505 testes Quickstart, docs, restart Neon e browser integrado; faltam axe e prova multi-persona |
+| assistente de decisões | 48 | `suportado-parcialmente` | explicação da definição passou pelo browser e fluxo HTTP real com atestação e sem candidate API; busca, execução explicada e comandos delegados ainda faltam |
 
 ## Bloqueadores do próximo corte corporativo
 
-1. **Role matrix:** `RULE_DEFINITION_READER` está publicada desde o Config rc.111;
-   o rc.112 acrescenta o roteamento semântico focal e a cadeia Quickstart prova
-   401/403/201 antes de enfileirar a explicação.
-2. **Actions completas:** Definition capabilities já são consumidas pelo client e
+1. **Actions completas:** Definition capabilities já são consumidas pelo client e
    pelo Studio. Publicação, create rollout e lifecycle da
    rollout-policy precisam de actions próprias; uma action nunca autoriza outra.
-3. **Evidência governada:** a V58 oferece baseline independente por cenário,
+2. **Evidência governada:** a V58 oferece baseline independente por cenário,
    idempotência, vínculo do run submetido e política opt-in para `SUBMIT`/`PROMOTE`.
    Estágios posteriores ainda não vinculam/revalidam esse receipt.
-4. **Lane operacional remota:** o executor Quickstart é uma seam interna usada por
+3. **Lane operacional remota:** o executor Quickstart é uma seam interna usada por
    testes; não há endpoint/action/capability para Studio ou adapter Ergon.
-5. **Integridade de release:** Contracts beta.4, Config rc.113, Quickstart rc.32,
-   UI rc.23 e Studio beta.8 precisam ser publicados nessa ordem. Tags anteriores
-   permanecem imutáveis e não contêm o corte V58.
+4. **Prova corporativa:** ainda faltam browser multi-persona, isolamento negativo
+   tenant/environment, `403`/`412` no comando operacional e Oracle/HADES autorizado.
 
 ## Gate de evidência
 
@@ -79,14 +75,21 @@ Não existe uma segunda entidade de requirements apenas para o Studio.
 
 ## Sequência de entrega
 
-### P0 — integridade e release
+### P0 — integridade e release (concluído para a beta.8)
 
-- publicar, em ordem, Contracts beta.4, Config rc.113, Quickstart rc.32, UI rc.23
-  e Studio beta.8; nenhuma dependência `SNAPSHOT` entra no release;
-- executar prova integrada `4302 ↔ 8088` com author/reviewer/unauthorized e retry;
-- executar o mesmo schema V58 numa branch Neon efêmera;
-- remover hardcodes Ergon e copy fora do i18n;
-- manter tags anteriores imutáveis.
+- Contracts beta.4, Config rc.113, Quickstart rc.32, UI rc.23 e Studio beta.8
+  foram publicados sem dependência `SNAPSHOT`;
+- o Config aplicou V58 no banco Neon já configurado e, no reinício, confirmou
+  schema atual sem reaplicação; nenhum banco ou schema paralelo foi criado;
+- o host respondeu health e o Studio em 4302 autenticou no Quickstart em 8088,
+  leu 10 decisões, lifecycle, snapshot ativo e alinhamento agregado do host;
+- a explicação assistida terminou no browser com versão/fingerprints atestados,
+  redaction e recusa explícita de inferir evidência ausente;
+- tags anteriores permaneceram imutáveis.
+
+Continuam fora desse gate a jornada visual multi-persona `4302 ↔ 8088`, axe, a lane
+operacional remota e uma prova Oracle/HADES. Elas pertencem aos próximos marcos,
+não devem ser inferidas da migração de banco.
 
 ### P1 — capabilities e evidência
 
@@ -101,7 +104,8 @@ Não existe uma segunda entidade de requirements apenas para o Studio.
 - criar endpoint/action host-owned com bindings explícitos e capability dedicada;
 - integrar o observer do baseline ao adapter Ergon real;
 - provar `403`, `412`, retry concorrente, no-mutation e cleanup;
-- repetir em branch/schema Neon efêmero, sem usar create-drop ou limpeza ampla.
+- persistir a execução pelo endpoint no Neon e provar retry sem duplicação; a
+  migração V58 e seu restart idempotente já foram comprovados no banco existente.
 
 ### P3 — hardening do Studio
 
@@ -129,8 +133,10 @@ Não existe uma segunda entidade de requirements apenas para o Studio.
 
 ## Gatilhos de release
 
-Uma próxima beta para o agente Ergon exige a cadeia V58 publicada, client leve
-beta.4, um Test Run/quatro results e handoff beta.8 fixado em commits publicados.
+O agente Ergon pode iniciar a fase repository-only usando a cadeia V58 publicada,
+o client leve beta.4, o exemplo de um Test Run/quatro results e este handoff.
+Canários Oracle/HADES continuam condicionados ao ambiente autorizado e à lane
+operacional remota ou a um adapter host-owned equivalente.
 Uma versão estável exige também P2/P3, isolamento entre
 tenant/environment, recuperação de conflito, auditoria/redaction, SLO e rollback
 comprovado. O assistente explicativo já pode ser validado de forma incremental e
