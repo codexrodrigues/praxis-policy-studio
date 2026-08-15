@@ -12,6 +12,13 @@ URL do ambiente. O build continua produzindo o mesmo app Angular e materializa o
   HTTPS do Quickstart, sem path, query, fragmento ou credenciais;
 - rewrite SPA: `/*` para `/index.html`.
 
+A homologação oficial está publicada em
+`https://praxis-policy-studio-homolog.onrender.com` (serviço Render
+`srv-da0fbqlbedkc73ald6e0`) e aponta para o Quickstart homologado
+`https://praxis-enterprise-proof-sandbox-v2.onrender.com`. A URL e o identificador
+do serviço são evidência operacional; não são contrato de produto nem endpoint de
+produção.
+
 O script falha fechado quando a variável está ausente, malformada ou contém uma
 URL que não seja uma origin HTTPS. Ele altera apenas o `app-config.json` dentro de
 `dist`; `public/app-config.json` permanece adequado ao proxy local oficial.
@@ -26,3 +33,22 @@ publicar a origin exata do site em CORS e no filtro de Origin do Config.
 Este deployment é uma superfície de homologação. Ele não substitui IdP/BFF
 corporativo, não transforma o login do Quickstart em IAM de produção e não muda
 tenant, environment, capabilities, ETag ou segregação de funções no browser.
+
+## Prova publicada de 2026-08-15
+
+O build do PR `#29` passou pelo CI e pelo Render com `npm ci` e
+`npm run build:static`. O log confirmou o backend derivado sem persistir a URL no
+fonte. No container novo do Quickstart, a origin do Studio apareceu tanto em
+`CORS_ALLOWED_ORIGINS` quanto em
+`APP_SECURITY_CONFIG_ORIGIN_RESTRICTION_ALLOWED_ORIGINS`; o preflight real
+retornou `200`.
+
+Pelo site publicado, uma sessão de author carregou as dez decisões do caso de
+referência. Em uma sessão separada de auditor, o backend publicou leitura `200`
+e recusou a action operacional com `403`. Nenhuma Definition, workspace,
+publicação, snapshot ou autoridade foi alterada durante essa prova.
+
+O catálogo ainda mostrou `condition` ausente para a decisão focal, embora sua
+Definition estivesse projetada. Portanto a prova fecha deployment, sessão,
+catálogo e segregação read-only, mas não reivindica authoring completo nem a
+matriz Playwright live de seis personas.

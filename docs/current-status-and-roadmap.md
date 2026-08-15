@@ -9,7 +9,7 @@
 
 ## Leitura executiva
 
-O produto corporativo completo está estimado em **67%**, com margem de ±5 pontos
+O produto corporativo completo está estimado em **68%**, com margem de ±5 pontos
 percentuais. Essa estimativa mede capabilities comprovadas, não linhas de código.
 A beta.14 demonstra um vertical slice relevante, materializa no cockpit os
 blockers tipados do gate de snapshot e separa explicitamente a identidade do
@@ -26,7 +26,7 @@ Marcos diferentes têm distâncias diferentes:
 | Marco | Estimativa atual | Significado |
 | --- | ---: | --- |
 | beta integrada controlada com Quickstart | 99% | contratos, action discovery e matriz HTTP multi-persona foram comprovados no corte publicado; falta executar a suíte visual live do Studio contra esse host |
-| versão estável corporativa | 60% | isolamento estrutural e segregação publicada foram provados; faltam Neon cross-tenant, gates posteriores, E2E live integrado e operação corporativa |
+| versão estável corporativa | 61% | isolamento estrutural, segregação publicada e sessão/catálogo no site homologado foram provados; faltam Neon cross-tenant, gates posteriores, matriz browser multi-persona e operação corporativa |
 | produto maduro multi-cliente com authoring complexo e IA | 34% | RuleSet completo, discovery amplo, impacto, execução explicável e agente governado |
 
 Rubrica das estimativas: `0` ausente, `25` seam/contrato, `50` vertical slice com
@@ -47,9 +47,9 @@ multi-consumidor.
 | publicação/materialização | 58 | `suportado-parcialmente` | readiness e action `PUBLISH` são server-owned; o gate de evidência ainda não alcança publicação |
 | snapshot, rollback e staged rollout | 72 | `suportado-parcialmente` | blockers de evidência são server-owned, tipados e explicados pelo Studio; create/cancel/activate rollout e lifecycle de rollout-policy são principal-specific; falta prova multi-persona integrada |
 | evidência V58/V60/Ergon | 86 | `suportado-parcialmente` | contrato leve, action dedicada, reserva pré-DML e quatro quadrantes foram provados em dois datasources Neon preservando o ledger append-only; faltam adapter Ergon e Oracle/HADES |
-| segurança, multitenancy e capabilities | 83 | `suportado-parcialmente` | publicação e rollout não são mais inferidos no browser; seis sujeitos separados passaram pela cadeia HTTP publicada; cabeçalhos conflitantes não alteram o principal e workspace estrangeiro fica oculto no mesmo PostgreSQL/schema; faltam Neon cross-tenant e prova visual multi-persona integrada |
-| UX, i18n e acessibilidade | 48 | `ja-suportado-mal-nomeado-ou-mal-materializado` | Playwright desktop/narrow, teclado e axe cobrem estados corporativos focais; faltam i18n integral, personas reais e decomposição da página |
-| testes, release e documentação | 94 | `suportado-parcialmente` | cadeia V61, prova HTTP/PostgreSQL/Neon V60, E2E hermético V62 e matriz de segurança multi-persona publicada; falta prova browser live multi-persona integrada |
+| segurança, multitenancy e capabilities | 85 | `suportado-parcialmente` | publicação e rollout não são mais inferidos no browser; seis sujeitos separados passaram pela cadeia HTTP publicada; author abriu o catálogo no site homologado e auditor permaneceu read-only; faltam Neon cross-tenant e matriz visual multi-persona completa |
+| UX, i18n e acessibilidade | 50 | `ja-suportado-mal-nomeado-ou-mal-materializado` | Playwright desktop/narrow, teclado e axe cobrem estados corporativos focais; o site homologado prova shell, sessão e catálogo reais; faltam i18n integral, seis personas no browser e decomposição da página |
+| testes, release e documentação | 95 | `suportado-parcialmente` | cadeia V61, prova HTTP/PostgreSQL/Neon V60, E2E hermético V62, matriz de segurança multi-persona e deployment estático publicados; falta executar a suíte browser live completa |
 | assistente de decisões | 48 | `suportado-parcialmente` | explicação da definição passou pelo browser e fluxo HTTP real com atestação e sem candidate API; busca, execução explicada e comandos delegados ainda faltam |
 
 ## Bloqueadores do próximo corte corporativo
@@ -94,9 +94,13 @@ A prova sanitizada confirmou:
 - payloads deliberadamente inválidos nos probes autorizados, evitando criar
   Definition, workspace, publicação, snapshot ou Test Run durante a matriz.
 
-Essa prova fecha autenticação e segregação do backend publicado. Ela não executa
-a suíte Playwright live do Studio, não repete o workspace estrangeiro no Neon e
-não constitui paridade Oracle/HADES.
+O PR `#29` publicou depois o Studio em
+`https://praxis-policy-studio-homolog.onrender.com`. A origin exata passou por
+CORS e pelo filtro do Config; uma sessão de author carregou as dez decisões no
+browser e uma sessão de auditor preservou leitura `200` com escrita `403`. A
+condição governada da decisão focal permaneceu ausente, logo essa prova não fecha
+authoring. Ela também não executa a suíte Playwright completa de seis personas,
+não repete o workspace estrangeiro no Neon e não constitui paridade Oracle/HADES.
 
 ## Gate de evidência
 
@@ -156,7 +160,8 @@ não devem ser inferidas da migração de banco.
 ### P3 — hardening do Studio
 
 - manter a matriz HTTP real de seis personas como gate do Quickstart — concluído
-  no host publicado; a suíte Playwright live do Studio continua pendente;
+  no host publicado; o site estático prova author e auditor, enquanto a suíte
+  Playwright live completa continua pendente;
 - decompor o workspace em catálogo, inspeção, authoring, testes, review/publicação
   e operação, sob uma facade/store;
 - substituir Facts JSON por editor derivado do fact schema;
