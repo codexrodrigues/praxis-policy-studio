@@ -1,17 +1,18 @@
 # Estado e roadmap do Praxis Policy Studio
 
-- Baseline validada: candidato Studio `0.1.0-beta.13` e Quickstart `v2.0.0-rc.39`,
+- Baseline validada: candidato Studio `0.1.0-beta.14` e Quickstart `v2.0.0-rc.40`,
   com transporte, governance V58 e prova host-owned em dois datasources Neon
 - Data da auditoria: 2026-08-15
-- Escopo: Studio beta.13, Metadata rc.127, Config rc.118, Quickstart rc.39,
+- Escopo: Studio beta.14, Metadata rc.127, Config rc.118, Quickstart rc.40,
   Contracts beta.4, `@praxisui/*` rc.27 e handoff Ergon #300
 
 ## Leitura executiva
 
 O produto corporativo completo está estimado em **65%**, com margem de ±5 pontos
 percentuais. Essa estimativa mede capabilities comprovadas, não linhas de código.
-A beta.13 demonstra um vertical slice relevante e materializa no cockpit os
-blockers tipados do gate de snapshot; o corte V63 fecha as actions
+A beta.14 demonstra um vertical slice relevante, materializa no cockpit os
+blockers tipados do gate de snapshot e separa explicitamente a identidade do
+RuleSet do recurso operacional host-owned usado para action discovery; o corte V63 fecha as actions
 principal-specific de publicação e rollout; o corte V61 fecha o discovery
 operacional cross-resource e o corte V58 fecha o transporte,
 parte dos gates de evidência e a execução idempotente no Neon, mas ainda não é uma beta
@@ -21,7 +22,7 @@ Marcos diferentes têm distâncias diferentes:
 
 | Marco | Estimativa atual | Significado |
 | --- | ---: | --- |
-| beta integrada controlada com Quickstart | 98% | contratos, proxy e actions do consumo UI estão fechados; falta repetir a jornada 4302↔8088 multi-persona no corte publicado |
+| beta integrada controlada com Quickstart | 98% | contratos, proxy e action discovery foram comprovados em 4302↔8088 + Neon; falta a matriz multi-persona no corte publicado |
 | versão estável corporativa | 56% | segurança cross-tenant, gates posteriores, E2E integrado e operação corporativa |
 | produto maduro multi-cliente com authoring complexo e IA | 34% | RuleSet completo, discovery amplo, impacto, execução explicável e agente governado |
 
