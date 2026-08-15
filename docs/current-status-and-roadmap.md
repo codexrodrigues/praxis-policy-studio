@@ -1,31 +1,32 @@
 # Estado e roadmap do Praxis Policy Studio
 
-- Baseline validada: candidato Studio `0.1.0-beta.14` e Quickstart `v2.0.0-rc.40`,
-  com transporte, governance V58 e prova host-owned em dois datasources Neon
+- Baseline validada: Studio `0.1.0-beta.14` e Quickstart `v2.0.0-rc.40`
+  no commit publicado `608584c`, com transporte, governance V58 e prova
+  host-owned em dois datasources Neon
 - Data da auditoria: 2026-08-15
 - Escopo: Studio beta.14, Metadata rc.127, Config rc.118, Quickstart rc.40,
   Contracts beta.4, `@praxisui/*` rc.27 e handoff Ergon #300
 
 ## Leitura executiva
 
-O produto corporativo completo está estimado em **66%**, com margem de ±5 pontos
+O produto corporativo completo está estimado em **67%**, com margem de ±5 pontos
 percentuais. Essa estimativa mede capabilities comprovadas, não linhas de código.
 A beta.14 demonstra um vertical slice relevante, materializa no cockpit os
 blockers tipados do gate de snapshot e separa explicitamente a identidade do
 RuleSet do recurso operacional host-owned usado para action discovery; o corte V63 fecha as actions
 principal-specific de publicação e rollout; o corte V61 fecha o discovery
 operacional cross-resource e o corte V58 fecha o transporte,
-parte dos gates de evidência e a execução idempotente no Neon. O candidato do próximo corte também
-separa seis identidades de laboratório e prova a matriz positiva/negativa por login, JWT, cookie,
-troca de sessão e matchers HTTP reais. Ainda não é uma beta corporativa segura para uso autônomo
+parte dos gates de evidência e a execução idempotente no Neon. O corte publicado
+também separa seis identidades de laboratório e prova a matriz positiva/negativa por
+login, JWT, cookie, troca de sessão e matchers HTTP reais. Ainda não é uma beta corporativa segura para uso autônomo
 pelo Ergon.
 
 Marcos diferentes têm distâncias diferentes:
 
 | Marco | Estimativa atual | Significado |
 | --- | ---: | --- |
-| beta integrada controlada com Quickstart | 98% | contratos, proxy e action discovery foram comprovados em 4302↔8088 + Neon; falta a matriz multi-persona no corte publicado |
-| versão estável corporativa | 58% | isolamento estrutural no mesmo PostgreSQL foi provado; faltam Neon cross-tenant, gates posteriores, E2E integrado e operação corporativa |
+| beta integrada controlada com Quickstart | 99% | contratos, action discovery e matriz HTTP multi-persona foram comprovados no corte publicado; falta executar a suíte visual live do Studio contra esse host |
+| versão estável corporativa | 60% | isolamento estrutural e segregação publicada foram provados; faltam Neon cross-tenant, gates posteriores, E2E live integrado e operação corporativa |
 | produto maduro multi-cliente com authoring complexo e IA | 34% | RuleSet completo, discovery amplo, impacto, execução explicável e agente governado |
 
 Rubrica das estimativas: `0` ausente, `25` seam/contrato, `50` vertical slice com
@@ -46,9 +47,9 @@ multi-consumidor.
 | publicação/materialização | 58 | `suportado-parcialmente` | readiness e action `PUBLISH` são server-owned; o gate de evidência ainda não alcança publicação |
 | snapshot, rollback e staged rollout | 72 | `suportado-parcialmente` | blockers de evidência são server-owned, tipados e explicados pelo Studio; create/cancel/activate rollout e lifecycle de rollout-policy são principal-specific; falta prova multi-persona integrada |
 | evidência V58/V60/Ergon | 86 | `suportado-parcialmente` | contrato leve, action dedicada, reserva pré-DML e quatro quadrantes foram provados em dois datasources Neon preservando o ledger append-only; faltam adapter Ergon e Oracle/HADES |
-| segurança, multitenancy e capabilities | 80 | `suportado-parcialmente` | publicação e rollout não são mais inferidos no browser; seis sujeitos separados passaram pela cadeia HTTP real; cabeçalhos conflitantes não alteram o principal e workspace estrangeiro fica oculto no mesmo PostgreSQL/schema; faltam Neon cross-tenant e prova visual multi-persona integrada |
+| segurança, multitenancy e capabilities | 83 | `suportado-parcialmente` | publicação e rollout não são mais inferidos no browser; seis sujeitos separados passaram pela cadeia HTTP publicada; cabeçalhos conflitantes não alteram o principal e workspace estrangeiro fica oculto no mesmo PostgreSQL/schema; faltam Neon cross-tenant e prova visual multi-persona integrada |
 | UX, i18n e acessibilidade | 48 | `ja-suportado-mal-nomeado-ou-mal-materializado` | Playwright desktop/narrow, teclado e axe cobrem estados corporativos focais; faltam i18n integral, personas reais e decomposição da página |
-| testes, release e documentação | 92 | `suportado-parcialmente` | cadeia V61, prova HTTP/PostgreSQL/Neon V60, E2E hermético V62 e matriz de segurança multi-persona local; falta prova browser multi-persona integrada |
+| testes, release e documentação | 94 | `suportado-parcialmente` | cadeia V61, prova HTTP/PostgreSQL/Neon V60, E2E hermético V62 e matriz de segurança multi-persona publicada; falta prova browser live multi-persona integrada |
 | assistente de decisões | 48 | `suportado-parcialmente` | explicação da definição passou pelo browser e fluxo HTTP real com atestação e sem candidate API; busca, execução explicada e comandos delegados ainda faltam |
 
 ## Bloqueadores do próximo corte corporativo
@@ -67,11 +68,35 @@ multi-consumidor.
    fechando no browser a mesma garantia de replay já existente no host e no Config.
 4. **Prova corporativa:** o comando no Neon cobre `403`, `409`, `412`, `422`, `428`,
    retry sem duplicação, quatro quadrantes e rollback que preserva o audit append-only;
-   o browser hermético cobre capability negada, confirmação e `412`. O candidato seguinte prova
+   o browser hermético cobre capability negada, confirmação e `412`. O host publicado prova
    author, dois approvers, publisher, operator e auditor como sujeitos mutuamente exclusivos na
-   cadeia HTTP. A prova local no mesmo PostgreSQL também confirma escopo server-owned, replay
+   cadeia HTTP publicada. A prova local no mesmo PostgreSQL também confirma escopo server-owned, replay
    idempotente no escopo do principal e `404` para workspace estrangeiro; ainda faltam browser
    multi-persona integrado, repetição cross-tenant no Neon e Oracle/HADES autorizado.
+
+## Prova publicada multi-persona de 2026-08-15
+
+O Quickstart no Render executou o commit `608584c` com health `200`, build
+`2.0.0-rc.40`, schema operacional `20260814.001` e Config `V58`. O datasource
+operacional foi confirmado na branch Neon autorizada `enterprise-proof-homolog`;
+o Config permaneceu no datasource Neon versionado já existente. Nenhum banco ou
+schema paralelo foi criado.
+
+A prova sanitizada confirmou:
+
+- login e sessão reais das seis personas;
+- leitura de Definitions por todas elas;
+- authoring somente pelo author, review somente pelos dois approvers, publicação
+  somente pelo publisher e operação somente pelo operator;
+- auditor read-only, com a action operacional negada por `403`;
+- Origin e CORS oficiais para `http://localhost:4302` e
+  `http://127.0.0.1:4302`, incluindo preflight `200`;
+- payloads deliberadamente inválidos nos probes autorizados, evitando criar
+  Definition, workspace, publicação, snapshot ou Test Run durante a matriz.
+
+Essa prova fecha autenticação e segregação do backend publicado. Ela não executa
+a suíte Playwright live do Studio, não repete o workspace estrangeiro no Neon e
+não constitui paridade Oracle/HADES.
 
 ## Gate de evidência
 
@@ -130,8 +155,8 @@ não devem ser inferidas da migração de banco.
 
 ### P3 — hardening do Studio
 
-- manter a matriz HTTP real de seis personas como gate do Quickstart — concluído localmente para o
-  candidato seguinte, ainda não publicado;
+- manter a matriz HTTP real de seis personas como gate do Quickstart — concluído
+  no host publicado; a suíte Playwright live do Studio continua pendente;
 - decompor o workspace em catálogo, inspeção, authoring, testes, review/publicação
   e operação, sob uma facade/store;
 - substituir Facts JSON por editor derivado do fact schema;
