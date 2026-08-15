@@ -30,7 +30,7 @@ e unauthorized no corte publicado.
 Oracle/HADES permanece responsabilidade do adapter Ergon em ambiente autorizado.
 Nenhuma evidência sintética ou Neon deve ser apresentada como paridade Oracle.
 
-## Próxima prova live multi-persona
+## Suíte live multi-persona preparada
 
 O candidato seguinte adiciona uma suíte isolada em
 `e2e/policy-studio-multipersona.live.spec.ts`. Ela não usa os mocks V62 e não é
@@ -66,12 +66,21 @@ verificam que esses valores não são projetados pelo catálogo. A garantia pers
 de que o escopo vem do principal — inclusive `404` para workspace estrangeiro —
 permanece no teste PostgreSQL do Quickstart; o browser não se torna owner dessa regra.
 
-Neste ambiente Codex, TypeScript e a enumeração dos sete testes passaram. A execução
-live ainda não foi reivindicada: abrir listeners locais em `4302`/`8088` foi bloqueado
-pelo sandbox e o hostname Neon configurado não pôde ser resolvido nesta sessão. Nenhuma
-migração ou escrita remota ocorreu. O gate só pode mudar de “preparado” para “comprovado”
-depois que os sete testes rodarem contra `4302 ↔ 8088` e as evidências registrarem os
-SHAs, versões e configuração de tenant/environment.
+TypeScript, os testes unitários, os checkers e o CI do PR `#27` passaram. A cadeia
+de backend correspondente também foi comprovada no Quickstart publicado, commit
+`608584c`, contra o Neon autorizado: seis logins, reads, responsabilidades
+positivas, negativas `403`, auditor read-only e Origin/CORS para a porta oficial
+`4302`. O datasource operacional foi confirmado como a branch
+`enterprise-proof-homolog`; o Config continuou no datasource Neon versionado já
+existente.
+
+A execução Playwright live do Studio ainda não é reivindicada: este sandbox não
+permite abrir os listeners `4302`/`8088` e não existe, neste corte, um deployment
+estático publicado do Studio para substituir o listener local. O gate visual só
+muda de “preparado” para “comprovado” depois que os sete testes rodarem contra o
+host publicado e registrarem SHAs, versões e configuração sanitizada de
+tenant/environment. A prova HTTP do backend não deve ser renomeada como prova de
+navegador.
 
 ## Dívida visual observada
 
