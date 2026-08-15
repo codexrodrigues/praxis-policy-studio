@@ -864,7 +864,8 @@ export class CatalogWorkspaceComponent implements OnInit {
     const state = this.runtime.state();
     const definitionId = this.selected()?.promotedDefinitionId;
     if (state.kind !== 'ready' || !definitionId || this.authoringBusy()
-      || this.publicationReadiness()?.readiness !== 'ready_to_publish') return;
+      || this.publicationReadiness()?.readiness !== 'ready_to_publish'
+      || !this.hasDefinitionAction('PUBLISH')) return;
     this.authoringBusy.set(true);
     this.clearAuthoringMessage();
     this.catalog.publishDefinition(definitionId, state.config).subscribe({
@@ -883,7 +884,8 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   createRolloutPolicy(request: DomainRuleRolloutPolicyCreateRequest): void {
     const state = this.runtime.state();
-    if (state.kind !== 'ready' || this.rolloutPolicyBusy()) return;
+    if (state.kind !== 'ready' || this.rolloutPolicyBusy()
+      || !this.rolloutPolicyCatalog()?.availableActions.includes('CREATE_POLICY_VERSION')) return;
     this.rolloutPolicyBusy.set(true);
     this.rolloutPolicyFeedback.set(null);
     this.rolloutPolicyFeedbackError.set(false);
@@ -899,7 +901,8 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   approveRolloutPolicy(policy: DomainRuleRolloutPolicy): void {
     const state = this.runtime.state();
-    if (state.kind !== 'ready' || this.rolloutPolicyBusy() || policy.status !== 'DRAFT') return;
+    if (state.kind !== 'ready' || this.rolloutPolicyBusy()
+      || !policy.availableActions.includes('APPROVE')) return;
     if (!window.confirm(`${this.i18n.text('confirmRolloutPolicyApproval')}\n${policy.policyKey} v${policy.policyVersion}`)) return;
     this.rolloutPolicyBusy.set(true);
     this.rolloutPolicyFeedback.set(null);
@@ -918,7 +921,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     const state = this.runtime.state();
     const headEtag = this.rolloutPolicyCatalog()?.headEtag;
     if (state.kind !== 'ready' || !headEtag || this.rolloutPolicyBusy()
-      || (policy.status !== 'APPROVED' && policy.status !== 'SUPERSEDED')) return;
+      || !policy.availableActions.includes('ACTIVATE')) return;
     if (!window.confirm(`${this.i18n.text('confirmRolloutPolicyActivation')}\n${policy.policyKey} v${policy.policyVersion}`)) return;
     this.rolloutPolicyBusy.set(true);
     this.rolloutPolicyFeedback.set(null);
@@ -937,7 +940,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     const state = this.runtime.state();
     const headEtag = this.snapshotHead()?.headEtag;
     if (state.kind !== 'ready' || !headEtag || this.rolloutBusy()
-      || this.rolloutCatalog()?.rollouts.length) return;
+      || !this.rolloutCatalog()?.availableActions.includes('CREATE_ROLLOUT')) return;
     if (!window.confirm(`${this.i18n.text('confirmStartRollout')}\n${candidateSnapshotKey}`)) return;
     this.rolloutBusy.set(true);
     this.clearRolloutFeedback();

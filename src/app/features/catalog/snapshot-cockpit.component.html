@@ -118,9 +118,9 @@
                     <small>{{ policy.status }} · {{ policy.enforcementMode }}</small>
                   </div>
                   <small>{{ policy.minimumFreshProbes }} {{ i18n.text('freshProbesShort') }} · {{ policy.minimumReadyRatio }} {{ i18n.text('readyRatioShort') }}</small>
-                  @if (policy.status === 'DRAFT') {
+                  @if (policy.availableActions.includes('APPROVE')) {
                     <button type="button" class="quiet-button" [disabled]="rolloutPolicyBusy()" (click)="approveRolloutPolicy.emit(policy)">{{ policyActionLabel(policy) }}</button>
-                  } @else if (policy.status === 'APPROVED' || policy.status === 'SUPERSEDED') {
+                  } @else if (policy.availableActions.includes('ACTIVATE')) {
                     <button type="button" class="quiet-button" [disabled]="rolloutPolicyBusy() || !policies.headEtag" (click)="activateRolloutPolicy.emit(policy)">{{ policyActionLabel(policy) }}</button>
                   } @else {
                     <span class="snapshot-action-state">{{ policyActionLabel(policy) }}</span>
@@ -132,10 +132,12 @@
             <p class="empty">{{ i18n.text('noRolloutPolicy') }}</p>
           }
 
-          <button type="button" class="quiet-button" [attr.aria-expanded]="policyAuthoringOpen()" (click)="policyAuthoringOpen.set(!policyAuthoringOpen())">
-            {{ i18n.text(policyAuthoringOpen() ? 'closeRolloutPolicyAuthoring' : 'createRolloutPolicy') }}
-          </button>
-          @if (policyAuthoringOpen()) {
+          @if (rolloutPolicyCatalog()?.availableActions?.includes('CREATE_POLICY_VERSION')) {
+            <button type="button" class="quiet-button" [attr.aria-expanded]="policyAuthoringOpen()" (click)="policyAuthoringOpen.set(!policyAuthoringOpen())">
+              {{ i18n.text(policyAuthoringOpen() ? 'closeRolloutPolicyAuthoring' : 'createRolloutPolicy') }}
+            </button>
+          }
+          @if (policyAuthoringOpen() && rolloutPolicyCatalog()?.availableActions?.includes('CREATE_POLICY_VERSION')) {
             <form class="rollout-policy-form" (submit)="$event.preventDefault(); submitPolicy(policyKey.value, enforcementMode.value, minimumFreshProbes.value, minimumReadyRatio.value, blockOnIncompatible.checked, staleAfterSeconds.value, maximumRolloutAgeSeconds.value)">
               <label>{{ i18n.text('policyKey') }}<input #policyKey required pattern="[a-z0-9][a-z0-9._-]{0,127}" autocomplete="off" placeholder="host-quorum" /></label>
               <label>{{ i18n.text('enforcementMode') }}
