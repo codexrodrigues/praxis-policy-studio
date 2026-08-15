@@ -8,22 +8,24 @@
 
 ## Leitura executiva
 
-O produto corporativo completo está estimado em **65%**, com margem de ±5 pontos
+O produto corporativo completo está estimado em **66%**, com margem de ±5 pontos
 percentuais. Essa estimativa mede capabilities comprovadas, não linhas de código.
 A beta.14 demonstra um vertical slice relevante, materializa no cockpit os
 blockers tipados do gate de snapshot e separa explicitamente a identidade do
 RuleSet do recurso operacional host-owned usado para action discovery; o corte V63 fecha as actions
 principal-specific de publicação e rollout; o corte V61 fecha o discovery
 operacional cross-resource e o corte V58 fecha o transporte,
-parte dos gates de evidência e a execução idempotente no Neon, mas ainda não é uma beta
-corporativa segura para uso autônomo pelo Ergon.
+parte dos gates de evidência e a execução idempotente no Neon. O candidato do próximo corte também
+separa seis identidades de laboratório e prova a matriz positiva/negativa por login, JWT, cookie,
+troca de sessão e matchers HTTP reais. Ainda não é uma beta corporativa segura para uso autônomo
+pelo Ergon.
 
 Marcos diferentes têm distâncias diferentes:
 
 | Marco | Estimativa atual | Significado |
 | --- | ---: | --- |
 | beta integrada controlada com Quickstart | 98% | contratos, proxy e action discovery foram comprovados em 4302↔8088 + Neon; falta a matriz multi-persona no corte publicado |
-| versão estável corporativa | 56% | segurança cross-tenant, gates posteriores, E2E integrado e operação corporativa |
+| versão estável corporativa | 58% | isolamento estrutural no mesmo PostgreSQL foi provado; faltam Neon cross-tenant, gates posteriores, E2E integrado e operação corporativa |
 | produto maduro multi-cliente com authoring complexo e IA | 34% | RuleSet completo, discovery amplo, impacto, execução explicável e agente governado |
 
 Rubrica das estimativas: `0` ausente, `25` seam/contrato, `50` vertical slice com
@@ -44,9 +46,9 @@ multi-consumidor.
 | publicação/materialização | 58 | `suportado-parcialmente` | readiness e action `PUBLISH` são server-owned; o gate de evidência ainda não alcança publicação |
 | snapshot, rollback e staged rollout | 72 | `suportado-parcialmente` | blockers de evidência são server-owned, tipados e explicados pelo Studio; create/cancel/activate rollout e lifecycle de rollout-policy são principal-specific; falta prova multi-persona integrada |
 | evidência V58/V60/Ergon | 86 | `suportado-parcialmente` | contrato leve, action dedicada, reserva pré-DML e quatro quadrantes foram provados em dois datasources Neon preservando o ledger append-only; faltam adapter Ergon e Oracle/HADES |
-| segurança, multitenancy e capabilities | 74 | `suportado-parcialmente` | publicação e rollout não são mais inferidos no browser; faltam smokes cross-tenant e prova multi-persona integrada |
+| segurança, multitenancy e capabilities | 80 | `suportado-parcialmente` | publicação e rollout não são mais inferidos no browser; seis sujeitos separados passaram pela cadeia HTTP real; cabeçalhos conflitantes não alteram o principal e workspace estrangeiro fica oculto no mesmo PostgreSQL/schema; faltam Neon cross-tenant e prova visual multi-persona integrada |
 | UX, i18n e acessibilidade | 48 | `ja-suportado-mal-nomeado-ou-mal-materializado` | Playwright desktop/narrow, teclado e axe cobrem estados corporativos focais; faltam i18n integral, personas reais e decomposição da página |
-| testes, release e documentação | 91 | `suportado-parcialmente` | cadeia V61, prova HTTP/PostgreSQL/Neon V60 e E2E hermético V62; falta prova browser multi-persona integrada |
+| testes, release e documentação | 92 | `suportado-parcialmente` | cadeia V61, prova HTTP/PostgreSQL/Neon V60, E2E hermético V62 e matriz de segurança multi-persona local; falta prova browser multi-persona integrada |
 | assistente de decisões | 48 | `suportado-parcialmente` | explicação da definição passou pelo browser e fluxo HTTP real com atestação e sem candidate API; busca, execução explicada e comandos delegados ainda faltam |
 
 ## Bloqueadores do próximo corte corporativo
@@ -65,8 +67,11 @@ multi-consumidor.
    fechando no browser a mesma garantia de replay já existente no host e no Config.
 4. **Prova corporativa:** o comando no Neon cobre `403`, `409`, `412`, `422`, `428`,
    retry sem duplicação, quatro quadrantes e rollback que preserva o audit append-only;
-   o browser hermético cobre capability negada, confirmação e `412`; ainda faltam
-   browser multi-persona integrado, isolamento cross-tenant e Oracle/HADES autorizado.
+   o browser hermético cobre capability negada, confirmação e `412`. O candidato seguinte prova
+   author, dois approvers, publisher, operator e auditor como sujeitos mutuamente exclusivos na
+   cadeia HTTP. A prova local no mesmo PostgreSQL também confirma escopo server-owned, replay
+   idempotente no escopo do principal e `404` para workspace estrangeiro; ainda faltam browser
+   multi-persona integrado, repetição cross-tenant no Neon e Oracle/HADES autorizado.
 
 ## Gate de evidência
 
@@ -118,12 +123,15 @@ não devem ser inferidas da migração de banco.
 - `If-Match` cross-resource no contrato canônico e consumo por discovery no Studio — concluídos no V61;
 - integrar o observer do baseline ao adapter Ergon real;
 - `403`, `409`, `412`, `422`, `428`, retry, no-mutation e cleanup estão cobertos localmente;
-  faltam cross-tenant e browser multi-persona;
+  o isolamento de workspace entre dois tenants no mesmo PostgreSQL/schema também está coberto,
+  sem confiar em `X-Tenant-ID`/`X-Env`; faltam repetição no Neon e browser multi-persona;
 - execução pelo endpoint no Neon e retry sem duplicação — comprovados em um Test Run
   com quatro resultados; a migração V58 e seu restart idempotente usam o banco existente.
 
 ### P3 — hardening do Studio
 
+- manter a matriz HTTP real de seis personas como gate do Quickstart — concluído localmente para o
+  candidato seguinte, ainda não publicado;
 - decompor o workspace em catálogo, inspeção, authoring, testes, review/publicação
   e operação, sob uma facade/store;
 - substituir Facts JSON por editor derivado do fact schema;
@@ -153,7 +161,7 @@ o contrato da action V60 como referência de host, junto do client leve beta.4,
 do exemplo de um Test Run/quatro results e deste handoff.
 Canários Oracle/HADES continuam condicionados ao ambiente autorizado e à lane
 operacional remota ou a um adapter host-owned equivalente.
-Uma versão estável exige também P2/P3, isolamento entre
-tenant/environment, recuperação de conflito, auditoria/redaction, SLO e rollback
+Uma versão estável exige também P2/P3, repetição do isolamento entre
+tenant/environment no Neon, recuperação de conflito, auditoria/redaction, SLO e rollback
 comprovado. O assistente explicativo já pode ser validado de forma incremental e
 continua deliberadamente separado do authoring autônomo.
