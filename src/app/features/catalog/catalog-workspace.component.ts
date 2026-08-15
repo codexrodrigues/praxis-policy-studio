@@ -40,6 +40,13 @@ import { SnapshotCockpitComponent } from './snapshot-cockpit.component';
 import { forkJoin } from 'rxjs';
 import { DecisionExplanationComponent } from './decision-explanation.component';
 
+interface PendingOperationalCommand {
+  readonly workspaceId: string;
+  readonly selectionFingerprint: string;
+  readonly idempotencyKey: string;
+  readonly evaluatedAtUtc: string;
+}
+
 @Component({
   selector: 'pax-catalog-workspace',
   imports: [FormsModule, LocalDraftWorkspaceComponent, SnapshotCockpitComponent, DecisionExplanationComponent],
@@ -145,6 +152,7 @@ export class CatalogWorkspaceComponent implements OnInit {
   private executionSummaryLoadRevision = 0;
   private sandboxIdempotencyKey: string | null = null;
   private sandboxEvaluatedAtUtc: string | null = null;
+  private pendingOperationalCommand: PendingOperationalCommand | null = null;
   readonly draftCondition = signal<unknown | null>(null);
   readonly editorState = signal<RuleBuilderState | null>(null);
   readonly originalExpression = computed(() => formatDecisionExpression(this.selected()?.condition));
@@ -265,6 +273,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.sandboxRun.set(null);
     this.sandboxIdempotencyKey = null;
     this.sandboxEvaluatedAtUtc = null;
+    this.pendingOperationalCommand = null;
     this.publicationReadiness.set(null);
     this.publicationResult.set(null);
     this.authoringFeedback.set(null);
@@ -648,6 +657,7 @@ export class CatalogWorkspaceComponent implements OnInit {
   setOperationalScenarioMode(scenarioId: string, value: string): void {
     const mode = value === 'CREATE' || value === 'UPDATE' ? value : '';
     this.operationalScenarioModes.update(current => ({ ...current, [scenarioId]: mode }));
+    this.pendingOperationalCommand = null;
     this.operationalConfirmationOpen.set(false);
   }
 
@@ -675,14 +685,14 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.operationalConfirmationOpen.set(false);
     this.clearAuthoringMessage();
     const commandSelectionRevision = this.selectionRevision;
-    const idempotencyKey = `policy-studio:operational:${decision.workspaceId}:${crypto.randomUUID()}`;
+    const command = this.operationalCommand(decision.workspaceId, selections);
     this.catalog.runOperationalTest(
       action,
       decision.workspaceId,
       decision.workspaceEtag,
       selections,
-      idempotencyKey,
-      new Date().toISOString(),
+      command.idempotencyKey,
+      command.evaluatedAtUtc,
       state.config
     ).subscribe({
       next: receipt => {
@@ -696,6 +706,7 @@ export class CatalogWorkspaceComponent implements OnInit {
         this.allDecisions.update(items => items.map(patch));
         const current = this.selected();
         if (current?.key === decision.key) this.selected.set(patch(current));
+        this.pendingOperationalCommand = null;
         this.authoringBusy.set(false);
         this.authoringFeedback.set(this.i18n.text('operationalTestCompleted'));
         this.loadLifecycle();
@@ -709,6 +720,28 @@ export class CatalogWorkspaceComponent implements OnInit {
         this.failAuthoring(error);
       }
     });
+  }
+
+  private operationalCommand(
+    workspaceId: string,
+    selections: readonly { readonly scenarioId: string; readonly operationMode: 'CREATE' | 'UPDATE' }[]
+  ): PendingOperationalCommand {
+    const selectionFingerprint = [...selections]
+      .sort((left, right) => left.scenarioId.localeCompare(right.scenarioId))
+      .map(item => `${item.scenarioId}:${item.operationMode}`)
+      .join('|');
+    const pending = this.pendingOperationalCommand;
+    if (pending?.workspaceId === workspaceId && pending.selectionFingerprint === selectionFingerprint) {
+      return pending;
+    }
+    const created = {
+      workspaceId,
+      selectionFingerprint,
+      idempotencyKey: `policy-studio:operational:${workspaceId}:${crypto.randomUUID()}`,
+      evaluatedAtUtc: new Date().toISOString()
+    } satisfies PendingOperationalCommand;
+    this.pendingOperationalCommand = created;
+    return created;
   }
 
   createScenario(
@@ -1089,6 +1122,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.sandboxRun.set(null);
     this.sandboxIdempotencyKey = null;
     this.sandboxEvaluatedAtUtc = null;
+    this.pendingOperationalCommand = null;
     this.publicationReadiness.set(null);
     this.publicationResult.set(null);
     this.snapshotHead.set(null);

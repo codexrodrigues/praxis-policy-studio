@@ -46,7 +46,7 @@ O complemento operacional corrente está no
 [handoff V61](docs/ergon-handoff-v61.md): ele registra a cadeia de discovery
 cross-resource consumida pelo Studio e preserva a prova Neon do V60 sem a
 confundir com evidência Oracle.
-O beta.11 usa a cadeia Contracts beta.4, Config rc.115,
+O beta.12 usa a cadeia Contracts beta.4, Config rc.115,
 Metadata rc.127, Quickstart rc.36 e `@praxisui/core` rc.26.
 O corte acrescenta uma prova de navegador desktop/narrow, teclado e axe com
 backend hermético; ela não substitui a prova integrada com Quickstart/Neon e
@@ -244,3 +244,8 @@ visuais distintos.
 O mesmo cockpit consulta o resumo de alinhamento do head ativo. O browser não
 enumera hosts nem recebe hostname, IP, actorRef ou payload runtime; loading,
 ausência, sessão expirada, permissão limitada e retry também são estados distintos.
+
+Na prova operacional, uma tentativa conserva `Idempotency-Key` e `evaluatedAtUtc`
+depois de falha incerta. O par só é rotacionado após receipt confirmado, mudança
+de workspace ou alteração da matriz cenário/operação; assim, retry do browser não
+repete DML quando a resposta se perde depois do commit.
