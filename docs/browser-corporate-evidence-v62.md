@@ -60,13 +60,18 @@ comandos intencionalmente incompletos sobre chaves inexistentes para provar `403
 nas responsabilidades das outras personas sem materializar uma regra ou mover o
 head. Uma resposta funcional `400`, `404`, `409`, `412`, `422` ou `428` no probe
 permitido significa que a autorização foi atravessada; ela não é apresentada como
-sucesso do caso de negócio.
+sucesso do caso de negócio. `5xx`, `401`, `403`, redirect ou status inesperado falham
+o gate. Todas as chamadas também enviam `X-Tenant-ID` e `X-Env` adversariais e
+verificam que esses valores não são projetados pelo catálogo. A garantia persistente
+de que o escopo vem do principal — inclusive `404` para workspace estrangeiro —
+permanece no teste PostgreSQL do Quickstart; o browser não se torna owner dessa regra.
 
 Neste ambiente Codex, TypeScript e a enumeração dos sete testes passaram. A execução
-live ainda não foi reivindicada: abrir listeners locais em `4302` foi bloqueado pelo
-sandbox desta sessão. O gate só pode mudar de “preparado” para “comprovado” depois
-que os sete testes rodarem contra `4302 ↔ 8088` e as evidências registrarem os SHAs,
-versões e configuração de tenant/environment.
+live ainda não foi reivindicada: abrir listeners locais em `4302`/`8088` foi bloqueado
+pelo sandbox e o hostname Neon configurado não pôde ser resolvido nesta sessão. Nenhuma
+migração ou escrita remota ocorreu. O gate só pode mudar de “preparado” para “comprovado”
+depois que os sete testes rodarem contra `4302 ↔ 8088` e as evidências registrarem os
+SHAs, versões e configuração de tenant/environment.
 
 ## Dívida visual observada
 

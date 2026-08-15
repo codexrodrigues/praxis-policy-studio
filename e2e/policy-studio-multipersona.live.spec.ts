@@ -15,6 +15,9 @@ const publication = '/api/praxis/config/domain-rules/publications';
 const activate = '/api/praxis/config/domain-rules/snapshots/policy-studio-live-missing/activate';
 const operationalTest =
   '/api/human-resources/extraordinary-benefit-requests/actions/run-policy-studio-operational-test';
+const adversarialTenant = 'tenant-from-browser';
+const adversarialEnvironment = 'environment-from-browser';
+const authorizedProbeStatuses = [200, 201, 204, 400, 404, 409, 412, 422, 428] as const;
 
 const personas: readonly Persona[] = [
   {
@@ -110,9 +113,17 @@ test.describe('Policy Studio live multi-persona governance', () => {
 
       const definitionsResponse = await governedRequest(page.request, { method: 'GET', path: definitions });
       expect(definitionsResponse.status(), `${persona.key} definition catalog`).toBe(200);
+      const definitionsBody = await definitionsResponse.text();
+      expect(definitionsBody, `${persona.key} must not project the caller tenant header`)
+        .not.toContain(adversarialTenant);
+      expect(definitionsBody, `${persona.key} must not project the caller environment header`)
+        .not.toContain(adversarialEnvironment);
 
       const allowed = await governedRequest(page.request, persona.allowedProbe);
-      expect([401, 403], `${persona.key} must cross its allowed route matcher`).not.toContain(allowed.status());
+      expect(
+        authorizedProbeStatuses,
+        `${persona.key} must cross its allowed route matcher without a server error`
+      ).toContain(allowed.status());
 
       for (const probe of persona.forbiddenProbes) {
         const forbidden = await governedRequest(page.request, probe);
@@ -133,7 +144,11 @@ async function governedRequest(
   request: APIRequestContext,
   probe: { readonly method: 'GET' | 'POST'; readonly path: string }
 ) {
-  const headers = { Origin: 'http://127.0.0.1:4302' };
+  const headers = {
+    Origin: 'http://127.0.0.1:4302',
+    'X-Tenant-ID': adversarialTenant,
+    'X-Env': adversarialEnvironment
+  };
   return probe.method === 'GET'
     ? request.get(probe.path, { headers })
     : request.post(probe.path, { headers, data: {} });
