@@ -25,6 +25,7 @@ function decision(key: string): DecisionSummary {
   return {
     order: 1, totalDecisions: 2, key, code: key, name: key, domain: 'test',
     ruleSet: 'Test', ruleSetKey: 'test-rules', state: 'verified', meaning: key,
+    resourceKey: 'human-resources.extraordinary-benefit-requests', serviceKey: 'test-service',
     authority: 'CONFIG', baselineAuthority: 'SYNTHETIC_BASELINE', source: 'test',
     evidenceCount: 0, authoringSupported: true, availableDefinitionActions: [],
     configDefinitionId: `definition-${key}`, workspaceId: `workspace-${key}`,
@@ -44,6 +45,8 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
   const createWorkspace = vi.fn();
   let sandboxRuns: Subject<any>[];
   let runSandbox: ReturnType<typeof vi.fn>;
+  const operationalTestAction = vi.fn();
+  const runOperationalTest = vi.fn();
   let component: CatalogWorkspaceComponent;
 
   const stream = (streams: Record<'A' | 'B', Subject<any>[]>, id: string) => {
@@ -65,6 +68,9 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
       return subject.asObservable();
     });
     createWorkspace.mockReset();
+    operationalTestAction.mockReset();
+    runOperationalTest.mockReset();
+    operationalTestAction.mockReturnValue(of(null));
     createWorkspace.mockReturnValue(of({
       id: 'workspace-A', ruleKey: 'A', status: 'OPEN', etag: 'etag-new', revision: 1,
       parameters: {}
@@ -84,6 +90,8 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
         scenarios: (id: string) => stream(scenarios, id),
         reviews: (id: string) => stream(reviews, id),
         workspaceCapabilities: (id: string) => stream(capabilities, id),
+        operationalTestAction,
+        runOperationalTest,
         createWorkspace,
         runSandbox
       } }
@@ -142,6 +150,36 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     component.createWorkspace();
     expect(createWorkspace).toHaveBeenCalledOnce();
     expect(createWorkspace).toHaveBeenCalledWith('definition-A', 'A', config);
+  });
+
+  it('requires an explicit operation and confirmation before invoking the discovered host action', () => {
+    const action = {
+      id: 'operational-proof', availability: { allowed: true }, title: 'Operational proof'
+    };
+    operationalTestAction.mockReturnValue(of(action));
+    runOperationalTest.mockReturnValue(of({
+      run: { runId: 'run-operational', workspaceId: 'workspace-A', workspaceRevision: 3, results: [] },
+      workspaceEtag: 'etag-operational-3'
+    }));
+
+    component.select(decision('A'));
+    component.scenarios.set([{ id: 'scenario-A', scenarioKey: 'allow-create' }] as any);
+    component.reviewOperationalTest();
+    expect(component.operationalConfirmationOpen()).toBe(false);
+
+    component.setOperationalScenarioMode('scenario-A', 'CREATE');
+    component.reviewOperationalTest();
+    expect(component.operationalConfirmationOpen()).toBe(true);
+    component.runOperationalTest();
+
+    expect(runOperationalTest).toHaveBeenCalledOnce();
+    expect(runOperationalTest.mock.calls[0][1]).toBe('workspace-A');
+    expect(runOperationalTest.mock.calls[0][2]).toBe('etag-A');
+    expect(runOperationalTest.mock.calls[0][3]).toEqual([
+      { scenarioId: 'scenario-A', operationMode: 'CREATE' }
+    ]);
+    expect(component.selected()?.workspaceEtag).toBe('etag-operational-3');
+    expect(component.selected()?.workspaceRevision).toBe(3);
   });
 
   it('reuses the sandbox idempotency key after an uncertain failure and rotates it after success', () => {

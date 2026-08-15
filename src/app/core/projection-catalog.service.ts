@@ -1,4 +1,4 @@
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { catchError, forkJoin, map, Observable, of, switchMap, throwError } from 'rxjs';
 import { PolicyStudioRuntimeConfig, SupportedLocale } from './runtime-config';
@@ -14,6 +14,9 @@ import {
 import { collectFactPaths, formatDecisionExpression } from './decision-inspection';
 import {
   DomainRuleService,
+  ResourceDiscoveryService,
+  type ResourceActionCatalogItem,
+  type RestApiResponse,
   type DomainRuleChangeWorkspace,
   type DomainRuleDefinition,
   type DomainRuleDefinitionCapabilities,
@@ -33,6 +36,7 @@ import {
   type DomainRuleSnapshotVersion,
   type DomainRuleTestScenario,
   type DomainRuleTestScenarioRequest,
+  type DomainRuleTestRun,
   type DomainRuleWorkspaceCapabilities
 } from '@praxisui/core';
 
@@ -40,6 +44,7 @@ import {
 export class ProjectionCatalogService {
   private readonly http = inject(HttpClient);
   private readonly domainRules = inject(DomainRuleService);
+  private readonly discovery = inject(ResourceDiscoveryService);
 
   load(path: string, locale: SupportedLocale, config: PolicyStudioRuntimeConfig): Observable<readonly DecisionSummary[]> {
     const definitions = config.mode === 'remote'
@@ -96,6 +101,8 @@ export class ProjectionCatalogService {
           domain: projection.presentationLabels.domain[locale] ?? projection.ruleSetRef.boundedContextKey,
           ruleSet: projection.presentationLabels.ruleSet[locale] ?? projection.ruleSetRef.ruleSetKey,
           ruleSetKey: projection.ruleSetRef.ruleSetKey,
+          resourceKey: definition?.resourceKey?.trim() || null,
+          serviceKey: definition?.serviceKey?.trim() || null,
           state: decision.semanticStatus === 'REFERENCE_IMPLEMENTED' ? 'verified' as const : 'technical-draft' as const,
           meaning: decision.presentationLabel,
           authority: `${projection.authorityEvidence.currentAuthority} · ${projection.authorityEvidence.baselineAuthority}`,
@@ -185,6 +192,64 @@ export class ProjectionCatalogService {
       idempotencyKey,
       evaluatedAtUtc
     });
+  }
+
+  operationalTestAction(
+    resourceKey: string,
+    config: PolicyStudioRuntimeConfig
+  ): Observable<ResourceActionCatalogItem | null> {
+    return this.discovery.getActionsByResourceKey(resourceKey, this.requestOptions(config)).pipe(
+      map(catalog => {
+        const candidates = catalog.actions.filter(action =>
+          action.tags.includes('policy-studio') && action.tags.includes('operational-proof'));
+        if (candidates.length > 1) {
+          throw new Error(`OPERATIONAL_ACTION_AMBIGUOUS ${resourceKey}`);
+        }
+        return candidates[0] ?? null;
+      })
+    );
+  }
+
+  runOperationalTest(
+    action: ResourceActionCatalogItem,
+    workspaceId: string,
+    workspaceEtag: string,
+    scenarios: readonly { readonly scenarioId: string; readonly operationMode: 'CREATE' | 'UPDATE' }[],
+    idempotencyKey: string,
+    evaluatedAtUtc: string,
+    config: PolicyStudioRuntimeConfig
+  ): Observable<{ readonly run: DomainRuleTestRun; readonly workspaceEtag: string }> {
+    const preconditions = action.execution?.preconditions;
+    const targetIdField = preconditions?.resourceVersionTargetIdField?.trim();
+    if (!action.availability.allowed
+      || action.method.toUpperCase() !== 'POST'
+      || preconditions?.resourceVersion !== 'REQUIRED'
+      || preconditions.resourceVersionTransport !== 'IF_MATCH'
+      || !preconditions.resourceVersionTargetResourceKey?.trim()
+      || !targetIdField
+      || preconditions.idempotencyKey !== 'REQUIRED') {
+      return throwError(() => new Error('OPERATIONAL_ACTION_CONTRACT_UNAVAILABLE'));
+    }
+    const headers = new HttpHeaders()
+      .set('If-Match', workspaceEtag)
+      .set('Idempotency-Key', idempotencyKey)
+      .set('X-Correlation-ID', crypto.randomUUID());
+    const body: Record<string, unknown> = {
+      [targetIdField]: workspaceId,
+      scenarios,
+      userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      evaluatedAtUtc
+    };
+    return this.http.request<RestApiResponse<DomainRuleTestRun>>(
+      action.method,
+      this.discovery.resolveHref(action.path, this.requestOptions(config)),
+      { body, headers, observe: 'response' }
+    ).pipe(map(response => {
+      if (!response.body?.data) throw new Error('OPERATIONAL_TEST_RUN_MISSING');
+      const nextEtag = response.headers.get('ETag')?.trim();
+      if (!nextEtag) throw new Error('OPERATIONAL_WORKSPACE_ETAG_MISSING');
+      return { run: response.body.data, workspaceEtag: nextEtag };
+    }));
   }
 
   submitWorkspace(

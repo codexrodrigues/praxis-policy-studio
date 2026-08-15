@@ -23,6 +23,7 @@ function decision(version = 2): DecisionSummary {
     order: 1, totalDecisions: 1, key: 'grant.amount-parameters', code: 'GRANT-10',
     name: 'Limite do auxílio', domain: 'benefits', ruleSet: 'Extraordinary grant',
     ruleSetKey: 'grant-rules', state: 'verified', meaning: 'Limita o valor solicitado.',
+    resourceKey: 'test-resource', serviceKey: 'test-service',
     authority: 'CONFIG', baselineAuthority: 'SYNTHETIC_BASELINE', source: 'quickstart',
     evidenceCount: 1, authoringSupported: true, availableDefinitionActions: [],
     configDefinitionId: '7b0fca89-cb64-40bf-8eea-d3467083bbf4', configVersion: version,

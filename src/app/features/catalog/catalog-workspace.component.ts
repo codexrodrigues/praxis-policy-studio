@@ -32,7 +32,8 @@ import {
   type DomainRuleTestScenario,
   type DomainRuleWorkspaceAction,
   type DomainRuleWorkspaceCapabilities,
-  type DomainRuleWorkspaceReview
+  type DomainRuleWorkspaceReview,
+  type ResourceActionCatalogItem
 } from '@praxisui/core';
 import { semanticDecisionDiff } from '../../core/semantic-decision-diff';
 import { SnapshotCockpitComponent } from './snapshot-cockpit.component';
@@ -89,6 +90,17 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly workspaceCapabilities = signal<DomainRuleWorkspaceCapabilities | null>(null);
   readonly workspaceCapabilitiesLoading = signal(false);
   readonly workspaceCapabilitiesError = signal(false);
+  readonly operationalAction = signal<ResourceActionCatalogItem | null>(null);
+  readonly operationalActionLoading = signal(false);
+  readonly operationalActionError = signal(false);
+  readonly operationalScenarioModes = signal<Readonly<Record<string, 'CREATE' | 'UPDATE' | ''>>>({});
+  readonly operationalConfirmationOpen = signal(false);
+  readonly operationalSelections = computed(() => this.scenarios().flatMap(scenario => {
+    const operationMode = this.operationalScenarioModes()[scenario.id];
+    return operationMode === 'CREATE' || operationMode === 'UPDATE'
+      ? [{ scenarioId: scenario.id, operationMode }]
+      : [];
+  }));
   readonly sandboxRun = signal<PolicySandboxRun | null>(null);
   readonly publicationReadiness = signal<PublicationReadiness | null>(null);
   readonly publicationResult = signal<DecisionPublicationResult | null>(null);
@@ -125,6 +137,7 @@ export class CatalogWorkspaceComponent implements OnInit {
   private scenariosLoadRevision = 0;
   private reviewsLoadRevision = 0;
   private workspaceCapabilitiesLoadRevision = 0;
+  private operationalActionLoadRevision = 0;
   private snapshotLoadRevision = 0;
   private rolloutPolicyLoadRevision = 0;
   private rolloutLoadRevision = 0;
@@ -256,6 +269,10 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.publicationResult.set(null);
     this.authoringFeedback.set(null);
     this.authoringError.set(false);
+    this.operationalAction.set(null);
+    this.operationalActionError.set(false);
+    this.operationalScenarioModes.set({});
+    this.operationalConfirmationOpen.set(false);
     this.snapshotFeedback.set(null);
     this.snapshotFeedbackError.set(false);
     this.loadTimeline(selectionRevision);
@@ -263,6 +280,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.loadScenarios(selectionRevision);
     this.loadReviews(selectionRevision);
     this.loadWorkspaceCapabilities(selectionRevision);
+    this.loadOperationalTestAction(selectionRevision);
     this.loadSnapshots();
     this.revealSelectedDecision();
   }
@@ -598,6 +616,99 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   hasDefinitionAction(action: DomainRuleDefinitionAction): boolean {
     return this.selected()?.availableDefinitionActions.includes(action) ?? false;
+  }
+
+  loadOperationalTestAction(selectionRevision = this.selectionRevision): void {
+    const loadRevision = ++this.operationalActionLoadRevision;
+    const state = this.runtime.state();
+    const resourceKey = this.selected()?.resourceKey;
+    this.operationalAction.set(null);
+    this.operationalActionError.set(false);
+    if (state.kind !== 'ready' || !resourceKey) {
+      this.operationalActionLoading.set(false);
+      return;
+    }
+    this.operationalActionLoading.set(true);
+    this.catalog.operationalTestAction(resourceKey, state.config).subscribe({
+      next: action => {
+        if (loadRevision !== this.operationalActionLoadRevision
+          || selectionRevision !== this.selectionRevision) return;
+        this.operationalAction.set(action);
+        this.operationalActionLoading.set(false);
+      },
+      error: () => {
+        if (loadRevision !== this.operationalActionLoadRevision
+          || selectionRevision !== this.selectionRevision) return;
+        this.operationalActionLoading.set(false);
+        this.operationalActionError.set(true);
+      }
+    });
+  }
+
+  setOperationalScenarioMode(scenarioId: string, value: string): void {
+    const mode = value === 'CREATE' || value === 'UPDATE' ? value : '';
+    this.operationalScenarioModes.update(current => ({ ...current, [scenarioId]: mode }));
+    this.operationalConfirmationOpen.set(false);
+  }
+
+  reviewOperationalTest(): void {
+    if (!this.operationalAction()?.availability.allowed
+      || !this.selected()?.workspaceEtag
+      || !this.operationalSelections().length
+      || this.authoringBusy()) return;
+    this.operationalConfirmationOpen.set(true);
+  }
+
+  cancelOperationalTest(): void {
+    this.operationalConfirmationOpen.set(false);
+  }
+
+  runOperationalTest(): void {
+    const state = this.runtime.state();
+    const decision = this.selected();
+    const action = this.operationalAction();
+    const selections = this.operationalSelections();
+    if (state.kind !== 'ready' || !decision?.workspaceId || !decision.workspaceEtag
+      || !action?.availability.allowed || !selections.length
+      || !this.operationalConfirmationOpen() || this.authoringBusy()) return;
+    this.authoringBusy.set(true);
+    this.operationalConfirmationOpen.set(false);
+    this.clearAuthoringMessage();
+    const commandSelectionRevision = this.selectionRevision;
+    const idempotencyKey = `policy-studio:operational:${decision.workspaceId}:${crypto.randomUUID()}`;
+    this.catalog.runOperationalTest(
+      action,
+      decision.workspaceId,
+      decision.workspaceEtag,
+      selections,
+      idempotencyKey,
+      new Date().toISOString(),
+      state.config
+    ).subscribe({
+      next: receipt => {
+        if (!this.isCurrentWorkspace(commandSelectionRevision, decision.workspaceId!)) {
+          this.authoringBusy.set(false);
+          return;
+        }
+        const patch = (item: DecisionSummary): DecisionSummary => item.key === decision.key
+          ? { ...item, workspaceEtag: receipt.workspaceEtag, workspaceRevision: receipt.run.workspaceRevision }
+          : item;
+        this.allDecisions.update(items => items.map(patch));
+        const current = this.selected();
+        if (current?.key === decision.key) this.selected.set(patch(current));
+        this.authoringBusy.set(false);
+        this.authoringFeedback.set(this.i18n.text('operationalTestCompleted'));
+        this.loadLifecycle();
+        this.loadWorkspaceCapabilities();
+      },
+      error: error => {
+        if (!this.isCurrentWorkspace(commandSelectionRevision, decision.workspaceId!)) {
+          this.authoringBusy.set(false);
+          return;
+        }
+        this.failAuthoring(error);
+      }
+    });
   }
 
   createScenario(
@@ -952,6 +1063,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     ++this.scenariosLoadRevision;
     ++this.reviewsLoadRevision;
     ++this.workspaceCapabilitiesLoadRevision;
+    ++this.operationalActionLoadRevision;
     ++this.snapshotLoadRevision;
     ++this.rolloutPolicyLoadRevision;
     ++this.rolloutLoadRevision;
@@ -966,6 +1078,11 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.scenarios.set([]);
     this.reviews.set([]);
     this.workspaceCapabilities.set(null);
+    this.operationalAction.set(null);
+    this.operationalActionLoading.set(false);
+    this.operationalActionError.set(false);
+    this.operationalScenarioModes.set({});
+    this.operationalConfirmationOpen.set(false);
     this.sandboxRun.set(null);
     this.sandboxIdempotencyKey = null;
     this.sandboxEvaluatedAtUtc = null;

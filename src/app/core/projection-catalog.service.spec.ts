@@ -80,6 +80,8 @@ describe('ProjectionCatalogService', () => {
       { id: 'v1', ruleKey: 'grant.amount-parameters', version: 1, status: 'draft', condition: { '===': [1, 1] } },
       {
         id: 'v2', ruleKey: 'grant.amount-parameters', version: 2, status: 'approved',
+        resourceKey: 'human-resources.extraordinary-benefit-requests',
+        serviceKey: 'extraordinary-benefit-request-service',
         condition: { '<=': [{ var: 'request.requestedAmount' }, 3000] },
         parameters: { nullSemantics: 'FAIL_CLOSED', operationKeys: ['evaluate-extraordinary-grant'] },
         governance: { lifecycleBoundary: 'REFERENCE_DRAFT_ONLY' }
@@ -87,6 +89,8 @@ describe('ProjectionCatalogService', () => {
     ]);
     http.expectOne('/api/praxis/config/domain-rules/definitions/v2').flush({
       id: 'v2', ruleKey: 'grant.amount-parameters', version: 2, status: 'approved',
+      resourceKey: 'human-resources.extraordinary-benefit-requests',
+      serviceKey: 'extraordinary-benefit-request-service',
       condition: { '<=': [{ var: 'request.requestedAmount' }, 3000] },
       parameters: { nullSemantics: 'FAIL_CLOSED', operationKeys: ['evaluate-extraordinary-grant'] },
       governance: { lifecycleBoundary: 'REFERENCE_DRAFT_ONLY' }
@@ -98,9 +102,88 @@ describe('ProjectionCatalogService', () => {
     expect(decisions[0]?.configStatus).toBe('approved');
     expect(decisions[0]?.ruleSetKey).toBe('extraordinary-grant-eligibility');
     expect(decisions[0]?.workspaceId).toBe('workspace-1');
+    expect(decisions[0]?.resourceKey).toBe('human-resources.extraordinary-benefit-requests');
+    expect(decisions[0]?.serviceKey).toBe('extraordinary-benefit-request-service');
     expect(decisions[0]?.authoringSupported).toBe(true);
     expect(decisions[0]?.availableDefinitionActions).toEqual(['CREATE_NEW_VERSION']);
     expect(decisions[0]?.condition).toEqual({ '<=': [{ var: 'request.requestedAmount' }, 3000] });
+  });
+
+  it('discovers one operational command semantically and executes its published protocol', () => {
+    const config = {
+      mode: 'remote' as const, configApiBaseUrl: '', locale: 'en-US' as const,
+      projectionPath: '/projections/reference.json', initialDecisionKey: null
+    };
+    const action = {
+      id: 'record-operational-test-run',
+      resourceKey: 'human-resources.extraordinary-benefit-requests',
+      scope: 'COLLECTION' as const,
+      title: 'Run operational proof',
+      description: 'Runs disposable host commands.',
+      operationId: 'recordOperationalTestRun',
+      path: '/api/quickstart/extraordinary-benefit-requests/policy-studio/operational-test-runs',
+      method: 'POST',
+      availability: { allowed: true, reasonCode: 'ALLOWED', reasons: [] },
+      order: 10,
+      tags: ['policy-studio', 'operational-proof'],
+      execution: {
+        interaction: { mode: 'CONFIRM' as const, risk: 'HIGH' as const, confirmationRequired: true, reversible: true },
+        preconditions: {
+          idempotencyKey: 'REQUIRED' as const, correlationId: 'REQUIRED' as const,
+          resourceVersion: 'REQUIRED' as const, resourceVersionTransport: 'IF_MATCH' as const,
+          resourceVersionTargetResourceKey: 'praxis.config.domain-rule-change-workspaces',
+          resourceVersionTargetIdField: 'workspaceId'
+        },
+        selection: {},
+        outcome: { mode: 'SINGLE' as const, atomicity: 'ATOMIC' as const },
+        refresh: { item: false, collection: false, actions: true, capabilities: true, resourceKeys: [] }
+      }
+    };
+
+    let discovered: typeof action | null = null;
+    service.operationalTestAction(action.resourceKey, config).subscribe(value => discovered = value as typeof action);
+    const discovery = http.expectOne(request =>
+      request.url === '/schemas/actions'
+      && request.params.get('resource') === action.resourceKey);
+    discovery.flush({ resourceKey: action.resourceKey, resourcePath: '/api/quickstart/extraordinary-benefit-requests', actions: [action] });
+    expect(discovered).toEqual(expect.objectContaining({ id: action.id }));
+
+    let nextEtag = '';
+    service.runOperationalTest(
+      action, 'workspace-1', 'workspace-etag-4',
+      [{ scenarioId: 'scenario-create', operationMode: 'CREATE' }],
+      'policy-studio:workspace-1:proof-1', '2026-08-15T05:00:00Z', config
+    ).subscribe(result => nextEtag = result.workspaceEtag);
+    const execute = http.expectOne(action.path);
+    expect(execute.request.method).toBe('POST');
+    expect(execute.request.headers.get('If-Match')).toBe('workspace-etag-4');
+    expect(execute.request.headers.get('Idempotency-Key')).toBe('policy-studio:workspace-1:proof-1');
+    expect(execute.request.headers.has('X-Correlation-ID')).toBe(true);
+    expect(execute.request.body).toEqual(expect.objectContaining({
+      workspaceId: 'workspace-1',
+      scenarios: [{ scenarioId: 'scenario-create', operationMode: 'CREATE' }]
+    }));
+    execute.flush({ data: { runId: 'run-1', workspaceId: 'workspace-1', results: [] } }, {
+      headers: { ETag: 'workspace-etag-5' }
+    });
+    expect(nextEtag).toBe('workspace-etag-5');
+  });
+
+  it('fails closed when operational discovery publishes more than one semantic candidate', () => {
+    const config = {
+      mode: 'remote' as const, configApiBaseUrl: '', locale: 'en-US' as const,
+      projectionPath: '/projections/reference.json', initialDecisionKey: null
+    };
+    let failed = false;
+    service.operationalTestAction('resource', config).subscribe({ error: () => failed = true });
+    const request = http.expectOne(candidate => candidate.url === '/schemas/actions');
+    const candidate = {
+      id: 'one', resourceKey: 'resource', scope: 'COLLECTION', title: 'One', operationId: 'one',
+      path: '/one', method: 'POST', availability: { allowed: true, reasons: [] }, order: 1,
+      tags: ['policy-studio', 'operational-proof']
+    };
+    request.flush({ resourceKey: 'resource', resourcePath: '/resource', actions: [candidate, { ...candidate, id: 'two' }] });
+    expect(failed).toBe(true);
   });
 
   it('composes lifecycle evidence through the public Core client', () => {

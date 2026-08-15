@@ -267,7 +267,20 @@
         </form>
         <div class="scenario-list">
           @for (scenario of scenarios(); track scenario.id) {
-            <article><strong>{{ scenario.name }}</strong><code>{{ scenario.scenarioKey }}</code><span>{{ scenario.expectedDecision }} · {{ scenario.status }}</span></article>
+            <article>
+              <strong>{{ scenario.name }}</strong><code>{{ scenario.scenarioKey }}</code>
+              <span>{{ scenario.expectedDecision }} · {{ scenario.status }}</span>
+              @if (operationalAction()) {
+                <label class="operation-mode">
+                  <span>{{ i18n.text('operationalMode') }}</span>
+                  <select #operationMode [value]="operationalScenarioModes()[scenario.id]" (change)="setOperationalScenarioMode(scenario.id, operationMode.value)">
+                    <option value="">{{ i18n.text('excludeOperationalScenario') }}</option>
+                    <option value="CREATE">CREATE</option>
+                    <option value="UPDATE">UPDATE</option>
+                  </select>
+                </label>
+              }
+            </article>
           } @empty { <p class="empty">{{ i18n.text('noScenarios') }}</p> }
         </div>
         <div class="governed-actions">
@@ -278,6 +291,36 @@
             {{ i18n.text('submitReview') }}
           </button>
         </div>
+        @if (operationalActionLoading()) {
+          <p class="empty" role="status">{{ i18n.text('loadingOperationalAction') }}</p>
+        } @else if (operationalActionError()) {
+          <p class="state-message" role="alert">{{ i18n.text('operationalActionLoadError') }}</p>
+          <button type="button" class="quiet-button" (click)="loadOperationalTestAction()">{{ i18n.text('retryOperationalAction') }}</button>
+        } @else if (operationalAction(); as action) {
+          <section class="operational-command" aria-labelledby="operational-command-title">
+            <div>
+              <strong id="operational-command-title">{{ action.title }}</strong>
+              <p>{{ action.description }}</p>
+              <small>{{ i18n.text('operationalSelectionCount') }}: {{ operationalSelections().length }}</small>
+            </div>
+            <button type="button" [disabled]="authoringBusy() || !action.availability.allowed || !current.workspaceEtag || !operationalSelections().length" (click)="reviewOperationalTest()">
+              {{ i18n.text('reviewOperationalTest') }}
+            </button>
+          </section>
+          @if (!action.availability.allowed) {
+            <p class="empty">{{ i18n.text('operationalActionUnavailable') }}</p>
+          }
+          @if (operationalConfirmationOpen()) {
+            <section class="operational-confirmation" role="group" [attr.aria-label]="i18n.text('confirmOperationalTest')">
+              <strong>{{ i18n.text('confirmOperationalTest') }}</strong>
+              <p>{{ i18n.text('operationalTestBoundary') }}</p>
+              <div class="authoring-actions">
+                <button type="button" class="quiet-button" (click)="cancelOperationalTest()">{{ i18n.text('cancel') }}</button>
+                <button type="button" [disabled]="authoringBusy()" (click)="runOperationalTest()">{{ i18n.text('executeOperationalTest') }}</button>
+              </div>
+            </section>
+          }
+        }
         @if (sandboxRun(); as run) {
           <div class="sandbox-results" aria-live="polite">
             @for (result of run.results; track result.scenarioId) {

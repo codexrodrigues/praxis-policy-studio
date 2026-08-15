@@ -1,16 +1,17 @@
 # Estado e roadmap do Praxis Policy Studio
 
-- Baseline validada: Studio `0.1.0-beta.8` e candidato Quickstart V60/`v2.0.0-rc.34`,
+- Baseline validada: candidato Studio `0.1.0-beta.9` e Quickstart V61/`v2.0.0-rc.35`,
   com transporte, governance V58 e prova host-owned em dois datasources Neon
 - Data da auditoria: 2026-08-15
-- Escopo: Studio beta.8, Config rc.113, Quickstart rc.34, Contracts beta.4,
-  `@praxisui/*` rc.23 e handoff Ergon #300
+- Escopo: Studio beta.9, Metadata rc.127, Config rc.114, Quickstart rc.35,
+  Contracts beta.4, `@praxisui/*` rc.25 e handoff Ergon #300
 
 ## Leitura executiva
 
-O produto corporativo completo está estimado em **61%**, com margem de ±5 pontos
+O produto corporativo completo está estimado em **63%**, com margem de ±5 pontos
 percentuais. Essa estimativa mede capabilities comprovadas, não linhas de código.
-A beta.8 demonstra um vertical slice relevante; o corte V58 fecha o transporte,
+A beta.9 demonstra um vertical slice relevante; o corte V61 fecha o discovery
+operacional cross-resource e o corte V58 fecha o transporte,
 parte dos gates de evidência e a execução idempotente no Neon, mas ainda não é uma beta
 corporativa segura para uso autônomo pelo Ergon.
 
@@ -18,9 +19,9 @@ Marcos diferentes têm distâncias diferentes:
 
 | Marco | Estimativa atual | Significado |
 | --- | ---: | --- |
-| beta integrada controlada com Quickstart | 93% | jornada 4302↔8088, explicação IA e action operacional host-owned provada no Neon existem; faltam consumo UI e browser multi-persona |
-| versão estável corporativa | 52% | segurança, actions restantes, E2E e operação corporativa |
-| produto maduro multi-cliente com authoring complexo e IA | 32% | RuleSet completo, discovery, impacto, execução explicável e agente governado |
+| beta integrada controlada com Quickstart | 96% | contratos e consumo UI estão fechados; falta repetir a jornada 4302↔8088 multi-persona no corte publicado |
+| versão estável corporativa | 54% | segurança, actions restantes, E2E e operação corporativa |
+| produto maduro multi-cliente com authoring complexo e IA | 34% | RuleSet completo, discovery amplo, impacto, execução explicável e agente governado |
 
 Rubrica das estimativas: `0` ausente, `25` seam/contrato, `50` vertical slice com
 testes focais, `75` prova end-to-end controlada e `100` prova corporativa
@@ -35,14 +36,14 @@ multi-consumidor.
 | inspeção e explicação humana/IA | 72 | `suportado-parcialmente` | facts, precedência, expressão e explicação grounded da definição; falta correlação causal com execução |
 | editar regra existente | 45 | `suportado-parcialmente` | condição focal; parâmetros, outcomes e RuleSet completo não são authorados |
 | criar regra nova | 20 | `suportado-parcialmente` | Config possui intake; Studio apenas cria workspace de definição existente |
-| cenários, sandbox e Test Run | 78 | `suportado-parcialmente` | candidate × active, baseline independente, retry e action host-owned existem; facts ainda são JSON e o Studio não consome a action |
+| cenários, sandbox e Test Run | 84 | `suportado-parcialmente` | candidate × active, baseline independente, retry e action host-owned consumida por discovery existem; facts ainda são JSON |
 | review/maker-checker | 70 | `suportado-parcialmente` | workspace, ETag, blockers, run submetido e segregação existem; política cobre SUBMIT/PROMOTE, não estágios posteriores |
 | publicação/materialização | 50 | `lacuna-real-de-contrato` | readiness existe; action de publicação não é server-owned de ponta a ponta |
 | snapshot, rollback e staged rollout | 55 | `suportado-parcialmente` | actions de snapshots/rollouts existentes; create rollout e rollout-policy ainda inferidos |
 | evidência V58/V60/Ergon | 86 | `suportado-parcialmente` | contrato leve, action dedicada, reserva pré-DML e quatro quadrantes foram provados em dois datasources Neon preservando o ledger append-only; faltam adapter Ergon e Oracle/HADES |
-| segurança, multitenancy e capabilities | 62 | `suportado-parcialmente` | leitura, criação de versão, explicação e action operacional estão governadas; faltam actions de publicação/rollout, metadata de precondition e smokes cross-tenant |
+| segurança, multitenancy e capabilities | 66 | `suportado-parcialmente` | leitura, criação de versão, explicação e action operacional cross-resource estão governadas; faltam actions de publicação/rollout e smokes cross-tenant |
 | UX, i18n e acessibilidade | 40 | `ja-suportado-mal-nomeado-ou-mal-materializado` | workstation funcional; faltam i18n integral, E2E, axe e decomposição da página |
-| testes, release e documentação | 83 | `suportado-parcialmente` | cadeia V58 e Quickstart rc.34 validada; V60 prova HTTP/PostgreSQL e Neon; faltam axe, consumo Studio e prova browser multi-persona |
+| testes, release e documentação | 87 | `suportado-parcialmente` | cadeia V61 validada e V60 prova HTTP/PostgreSQL e Neon; faltam axe e prova browser multi-persona |
 | assistente de decisões | 48 | `suportado-parcialmente` | explicação da definição passou pelo browser e fluxo HTTP real com atestação e sem candidate API; busca, execução explicada e comandos delegados ainda faltam |
 
 ## Bloqueadores do próximo corte corporativo
@@ -53,9 +54,8 @@ multi-consumidor.
 2. **Evidência governada:** a V58 oferece baseline independente por cenário,
    idempotência, vínculo do run submetido e política opt-in para `SUBMIT`/`PROMOTE`.
    Estágios posteriores ainda não vinculam/revalidam esse receipt.
-3. **Consumo operacional governado:** a action Quickstart V60 existe, mas o Studio
-   ainda não a consome. A metadata de collection action não representa o
-   `If-Match` cross-resource do workspace; isso deve ser corrigido no owner antes da UI.
+3. **Consumo operacional governado:** concluído no V61. Metadata representa o
+   `If-Match` cross-resource e Core/Studio descobrem e executam a action sem URL local.
 4. **Prova corporativa:** o comando no Neon cobre `403`, `409`, `412`, `422`, `428`,
    retry sem duplicação, quatro quadrantes e rollback que preserva o audit append-only;
    ainda faltam browser multi-persona, isolamento cross-tenant e Oracle/HADES autorizado.
@@ -90,8 +90,8 @@ Não existe uma segunda entidade de requirements apenas para o Studio.
   redaction e recusa explícita de inferir evidência ausente;
 - tags anteriores permaneceram imutáveis.
 
-Continuam fora desse gate a jornada visual multi-persona `4302 ↔ 8088`, axe, o consumo
-da action operacional no Studio e uma prova Oracle/HADES. Elas pertencem aos próximos marcos,
+Continuam fora desse gate a jornada visual multi-persona `4302 ↔ 8088`, axe e uma
+prova Oracle/HADES. Elas pertencem aos próximos marcos,
 não devem ser inferidas da migração de banco.
 
 ### P1 — capabilities e evidência
@@ -106,7 +106,7 @@ não devem ser inferidas da migração de banco.
 
 - endpoint/action host-owned, bindings explícitos, capability dedicada, verificação integral
   `candidate × active` e reserva idempotente pré-DML — validados no Quickstart rc.34/V60;
-- representar `If-Match` cross-resource no contrato canônico e só então consumir no Studio;
+- `If-Match` cross-resource no contrato canônico e consumo por discovery no Studio — concluídos no V61;
 - integrar o observer do baseline ao adapter Ergon real;
 - `403`, `409`, `412`, `422`, `428`, retry, no-mutation e cleanup estão cobertos localmente;
   faltam cross-tenant e browser multi-persona;
