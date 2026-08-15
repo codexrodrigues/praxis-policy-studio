@@ -111,7 +111,8 @@ describe('ProjectionCatalogService', () => {
     }).subscribe(value => lifecycle = value);
 
     http.expectOne('/api/praxis/config/domain-rules/workspaces/workspace%201').flush({
-      id: 'workspace 1', status: 'APPROVED', revision: 4, promotedDefinitionId: null
+      id: 'workspace 1', status: 'APPROVED', revision: 4, promotedDefinitionId: null,
+      submittedTestRunId: 'run-1'
     });
     http.expectOne('/api/praxis/config/domain-rules/workspaces/workspace%201/test-runs').flush([{
       runId: 'run-1',
@@ -124,7 +125,7 @@ describe('ProjectionCatalogService', () => {
     http.expectOne('/api/praxis/config/domain-rules/workspaces/workspace%201/reviews').flush([{ id: 'review-1' }]);
     expect(lifecycle).toEqual(expect.objectContaining({
       workspaceStatus: 'APPROVED', workspaceRevision: 4, testRunCount: 1,
-      reviewCount: 1
+      reviewCount: 1, submittedTestRunId: 'run-1'
     }));
     expect((lifecycle as unknown as import('../features/catalog/catalog.fixture').DecisionLifecycleSummary)
       .latestTestRun?.baselineEvidence?.authorityType).toBe('LEGACY_ORACLE');
@@ -252,10 +253,15 @@ describe('ProjectionCatalogService', () => {
     expect(scenario.request.method).toBe('POST');
     scenario.flush({ id: 'scenario-1', expectedDecision: 'ALLOW' });
 
-    service.runSandbox('workspace-1', ['scenario-1'], config).subscribe();
+    service.runSandbox(
+      'workspace-1', ['scenario-1'], 'policy-studio:workspace-1:command-1',
+      '2026-08-14T12:00:00.000Z', config
+    ).subscribe();
     const sandbox = http.expectOne('/api/praxis/policy-studio/sandbox/runs');
     expect(sandbox.request.body).toEqual(expect.objectContaining({
-      workspaceId: 'workspace-1', scenarioIds: ['scenario-1']
+      workspaceId: 'workspace-1', scenarioIds: ['scenario-1'],
+      idempotencyKey: 'policy-studio:workspace-1:command-1',
+      evaluatedAtUtc: '2026-08-14T12:00:00.000Z'
     }));
     sandbox.flush({ runId: 'run-1', workspaceId: 'workspace-1', results: [] });
 

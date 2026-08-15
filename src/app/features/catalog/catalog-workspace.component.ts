@@ -130,6 +130,8 @@ export class CatalogWorkspaceComponent implements OnInit {
   private rolloutLoadRevision = 0;
   private hostStatusLoadRevision = 0;
   private executionSummaryLoadRevision = 0;
+  private sandboxIdempotencyKey: string | null = null;
+  private sandboxEvaluatedAtUtc: string | null = null;
   readonly draftCondition = signal<unknown | null>(null);
   readonly editorState = signal<RuleBuilderState | null>(null);
   readonly originalExpression = computed(() => formatDecisionExpression(this.selected()?.condition));
@@ -248,6 +250,8 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.editorState.set(null);
     this.timeline.set([]);
     this.sandboxRun.set(null);
+    this.sandboxIdempotencyKey = null;
+    this.sandboxEvaluatedAtUtc = null;
     this.publicationReadiness.set(null);
     this.publicationResult.set(null);
     this.authoringFeedback.set(null);
@@ -627,9 +631,12 @@ export class CatalogWorkspaceComponent implements OnInit {
     }, state.config).subscribe({
       next: scenario => {
         this.scenarios.update(items => [...items, scenario]);
+        this.sandboxIdempotencyKey = null;
+        this.sandboxEvaluatedAtUtc = null;
         this.authoringBusy.set(false);
         this.authoringFeedback.set(this.i18n.text('scenarioCreated'));
         form.reset();
+        this.loadLifecycle();
       },
       error: error => this.failAuthoring(error)
     });
@@ -642,8 +649,19 @@ export class CatalogWorkspaceComponent implements OnInit {
       || !this.hasWorkspaceAction('RECORD_TEST_RUN') || this.authoringBusy()) return;
     this.authoringBusy.set(true);
     this.clearAuthoringMessage();
-    this.catalog.runSandbox(workspaceId, this.scenarios().map(item => item.id), state.config).subscribe({
+    const idempotencyKey = this.sandboxIdempotencyKey
+      ??= `policy-studio:${workspaceId}:${crypto.randomUUID()}`;
+    const evaluatedAtUtc = this.sandboxEvaluatedAtUtc ??= new Date().toISOString();
+    this.catalog.runSandbox(
+      workspaceId,
+      this.scenarios().map(item => item.id),
+      idempotencyKey,
+      evaluatedAtUtc,
+      state.config
+    ).subscribe({
       next: run => {
+        this.sandboxIdempotencyKey = null;
+        this.sandboxEvaluatedAtUtc = null;
         this.sandboxRun.set(run);
         this.authoringBusy.set(false);
         this.authoringFeedback.set(this.i18n.text('sandboxCompleted'));
@@ -949,6 +967,8 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.reviews.set([]);
     this.workspaceCapabilities.set(null);
     this.sandboxRun.set(null);
+    this.sandboxIdempotencyKey = null;
+    this.sandboxEvaluatedAtUtc = null;
     this.publicationReadiness.set(null);
     this.publicationResult.set(null);
     this.snapshotHead.set(null);
@@ -981,6 +1001,8 @@ export class CatalogWorkspaceComponent implements OnInit {
     if (current?.key === workspace.ruleKey) this.selected.set(patch(current));
     this.draftCondition.set(workspace.condition ?? null);
     this.sandboxRun.set(null);
+    this.sandboxIdempotencyKey = null;
+    this.sandboxEvaluatedAtUtc = null;
     this.publicationReadiness.set(null);
     this.publicationResult.set(null);
     this.loadScenarios();

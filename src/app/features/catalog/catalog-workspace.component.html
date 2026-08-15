@@ -458,6 +458,9 @@
             <div><dt>{{ i18n.text('testRuns') }}</dt><dd>{{ governed.testRunCount }}</dd></div>
             <div><dt>{{ i18n.text('reviews') }}</dt><dd>{{ governed.reviewCount }}</dd></div>
             <div><dt>{{ i18n.text('materializations') }}</dt><dd>{{ governed.materializationCount }}</dd></div>
+            @if (governed.submittedTestRunId) {
+              <div><dt>{{ i18n.text('submittedTestRun') }}</dt><dd><code>{{ governed.submittedTestRunId }}</code></dd></div>
+            }
           </dl>
           @if (governed.latestTestRun?.baselineEvidence; as baseline) {
             <section aria-labelledby="test-evidence-title">

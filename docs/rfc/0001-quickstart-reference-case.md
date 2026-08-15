@@ -44,7 +44,7 @@ ela não se torna fonte semântica, endpoint ou contrato público.
 | Draft persistido e concorrente | `ja-suportado-so-ux` | Config mantém change workspace, base hash/ETag e ações server-owned |
 | Scenario e Test Run governados | `ja-suportado-so-ux` | Config persiste; sandbox host-owned avalia sem efeitos |
 | Sandbox candidate versus active | `ja-suportado-mal-nomeado-ou-mal-materializado` | já executa as duas lanes; não deve ser confundido com readiness estrutural nem oracle legado |
-| Proveniência de baseline e prova CREATE/UPDATE | `suportado-parcialmente` | Config V57 persiste contrato sanitizado; adapters host-owned ainda precisam produzir a evidência operacional |
+| Proveniência de baseline e prova CREATE/UPDATE | `suportado-parcialmente` | Config V58 persiste lane independente, receipt idempotente e gates opt-in; Quickstart prova os quatro quadrantes localmente, mas adapter Ergon/Neon/Oracle ainda são externos |
 | Decision execution log redigido | `suportado-parcialmente` | observações e resumos existem; faltam completar prova corporativa, retenção, redaction e isolamento sob carga |
 
 ## Remoção da ponte

@@ -42,6 +42,8 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
   const reviews = { A: [] as Subject<any>[], B: [] as Subject<any>[] };
   const capabilities = { A: [] as Subject<any>[], B: [] as Subject<any>[] };
   const createWorkspace = vi.fn();
+  let sandboxRuns: Subject<any>[];
+  let runSandbox: ReturnType<typeof vi.fn>;
   let component: CatalogWorkspaceComponent;
 
   const stream = (streams: Record<'A' | 'B', Subject<any>[]>, id: string) => {
@@ -56,6 +58,12 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
       streams.A.length = 0;
       streams.B.length = 0;
     }
+    sandboxRuns = [];
+    runSandbox = vi.fn(() => {
+      const subject = new Subject<any>();
+      sandboxRuns.push(subject);
+      return subject.asObservable();
+    });
     createWorkspace.mockReset();
     createWorkspace.mockReturnValue(of({
       id: 'workspace-A', ruleKey: 'A', status: 'OPEN', etag: 'etag-new', revision: 1,
@@ -76,7 +84,8 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
         scenarios: (id: string) => stream(scenarios, id),
         reviews: (id: string) => stream(reviews, id),
         workspaceCapabilities: (id: string) => stream(capabilities, id),
-        createWorkspace
+        createWorkspace,
+        runSandbox
       } }
     ] });
     component = TestBed.runInInjectionContext(() => new CatalogWorkspaceComponent(TestBed.inject(PolicyStudioI18n)));
@@ -95,13 +104,13 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     component.select(decision('B'));
 
     timelines.B[0].next([{ eventType: 'B', occurredAt: '2026-08-13T12:00:00Z', summary: 'B', status: null, actor: null }]);
-    lifecycles.B[0].next({ workspaceStatus: 'B', workspaceRevision: 2, testRunCount: 1, reviewCount: 1, materializationCount: 0, promotedDefinitionId: null });
+    lifecycles.B[0].next({ workspaceStatus: 'B', workspaceRevision: 2, testRunCount: 1, reviewCount: 1, materializationCount: 0, promotedDefinitionId: null, submittedTestRunId: 'run-B', latestTestRun: null });
     scenarios.B[0].next([{ id: 'scenario-B' }]);
     reviews.B[0].next([{ id: 'review-B' }]);
     capabilities.B[0].next({ workspaceId: 'workspace-B', availableActions: ['VIEW', 'REVIEW'], blockers: [] });
 
     timelines.A[0].next([{ eventType: 'A', occurredAt: '2026-08-13T11:00:00Z', summary: 'A', status: null, actor: null }]);
-    lifecycles.A[0].next({ workspaceStatus: 'A', workspaceRevision: 1, testRunCount: 0, reviewCount: 0, materializationCount: 0, promotedDefinitionId: null });
+    lifecycles.A[0].next({ workspaceStatus: 'A', workspaceRevision: 1, testRunCount: 0, reviewCount: 0, materializationCount: 0, promotedDefinitionId: null, submittedTestRunId: null, latestTestRun: null });
     scenarios.A[0].error(new Error('stale scenario failure'));
     reviews.A[0].error(new Error('stale review failure'));
     capabilities.A[0].error(new Error('stale capabilities failure'));
@@ -135,6 +144,35 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(createWorkspace).toHaveBeenCalledWith('definition-A', 'A', config);
   });
 
+  it('reuses the sandbox idempotency key after an uncertain failure and rotates it after success', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-08-14T12:00:00.000Z'));
+      component.select(decision('A'));
+      scenarios.A[0].next([{ id: 'scenario-A' }]);
+      capabilities.A[0].next({
+        workspaceId: 'workspace-A', availableActions: ['VIEW', 'RECORD_TEST_RUN'], blockers: []
+      });
+
+      component.runGovernedSandbox();
+      const firstKey = runSandbox.mock.calls[0][2];
+      const firstEvaluatedAt = runSandbox.mock.calls[0][3];
+      sandboxRuns[0].error(new Error('response lost after dispatch'));
+
+      component.runGovernedSandbox();
+      expect(runSandbox.mock.calls[1][2]).toBe(firstKey);
+      expect(runSandbox.mock.calls[1][3]).toBe(firstEvaluatedAt);
+      sandboxRuns[1].next({ runId: 'run-A', workspaceId: 'workspace-A', results: [] });
+
+      vi.advanceTimersByTime(1);
+      component.runGovernedSandbox();
+      expect(runSandbox.mock.calls[2][2]).not.toBe(firstKey);
+      expect(runSandbox.mock.calls[2][3]).not.toBe(firstEvaluatedAt);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('ignores older success and error responses when the same resource is reloaded', () => {
     component.select(decision('A'));
     component.loadTimeline();
@@ -144,13 +182,13 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     component.loadWorkspaceCapabilities();
 
     timelines.A[1].next([{ eventType: 'NEW', occurredAt: '2026-08-13T12:00:00Z', summary: 'new', status: null, actor: null }]);
-    lifecycles.A[1].next({ workspaceStatus: 'NEW', workspaceRevision: 2, testRunCount: 1, reviewCount: 1, materializationCount: 0, promotedDefinitionId: null });
+    lifecycles.A[1].next({ workspaceStatus: 'NEW', workspaceRevision: 2, testRunCount: 1, reviewCount: 1, materializationCount: 0, promotedDefinitionId: null, submittedTestRunId: 'run-new', latestTestRun: null });
     scenarios.A[1].next([{ id: 'scenario-new' }]);
     reviews.A[1].next([{ id: 'review-new' }]);
     capabilities.A[1].next({ workspaceId: 'workspace-A', availableActions: ['VIEW', 'SUBMIT'], blockers: [] });
 
     timelines.A[0].next([{ eventType: 'OLD', occurredAt: '2026-08-13T11:00:00Z', summary: 'old', status: null, actor: null }]);
-    lifecycles.A[0].next({ workspaceStatus: 'OLD', workspaceRevision: 1, testRunCount: 0, reviewCount: 0, materializationCount: 0, promotedDefinitionId: null });
+    lifecycles.A[0].next({ workspaceStatus: 'OLD', workspaceRevision: 1, testRunCount: 0, reviewCount: 0, materializationCount: 0, promotedDefinitionId: null, submittedTestRunId: null, latestTestRun: null });
     scenarios.A[0].error(new Error('older scenario failure'));
     reviews.A[0].error(new Error('older review failure'));
     capabilities.A[0].error(new Error('older capabilities failure'));

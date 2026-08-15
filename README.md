@@ -11,7 +11,7 @@ um change workspace governado, persiste drafts com ETag, mantém cenários de
 outcome, executa candidate × active no sandbox do host, registra Test Runs
 imutáveis, submete para revisão independente e projeta review/promotion. O
 lifecycle também apresenta a autoridade e a elegibilidade do baseline e, quando
-o host fornece a prova V57, resume CREATE/UPDATE, mutação ou não mutação, cleanup e
+o host fornece a prova V58, resume CREATE/UPDATE, mutação ou não mutação, cleanup e
 chamadas ao baseline sem expor facts, payloads ou linhas de banco.
 Não há composição de snapshot no browser: o Studio publica definições/materializações
 e opera versões de snapshot somente pelas ações e pelo ETag fornecidos pelo Config.
@@ -39,16 +39,17 @@ No modo remoto, uma sessão ausente exibe o login explícito do ambiente de dese
 
 Abra `http://localhost:4302/catalog`.
 
-Para integrar o primeiro consumidor, consulte o
-[handoff do Ergon para o corte beta.5](docs/ergon-handoff-beta5.md).
+Para integrar o primeiro consumidor, consulte o histórico no
+[handoff do Ergon beta.7](docs/ergon-handoff-beta7.md) e o corte V58 no
+[handoff Ergon beta.8](docs/ergon-handoff-beta8.md).
 O handoff referencia o corpus portátil executável mantido pelo Quickstart, que
 exercita riscos de migração sem transformar evidência sintética em prova Oracle.
 O percentual auditado, os bloqueadores e a sequência de cortes estão em
 [Estado e roadmap](docs/current-status-and-roadmap.md). A fronteira para busca,
 explicação e authoring por agente está em
 [ADR 0002 — Policy Assistant](docs/adr/0002-policy-assistant-boundary.md).
-O delta executável do novo corte está no
-[handoff Ergon beta.7](docs/ergon-handoff-beta7.md).
+O [Estado e roadmap](docs/current-status-and-roadmap.md) separa o que já foi provado
+do que ainda depende de Neon, Oracle/HADES, UX corporativa ou releases coordenados.
 
 ## Configuração
 
@@ -93,8 +94,12 @@ uma condição detalhada correspondente é devolvida pelo Config. Alterações l
 só se tornam governadas por comando explícito de save e ETag. O Studio mostra um
 diff semântico derivado entre definição-base e candidato, sem persistir uma
 segunda verdade. Cenários e Test Runs formam o gate de submissão para
-revisão/hash/cobertura/outcome do workspace; a evidência operacional V57 ainda
-não governa promotion/publication por estágio.
+revisão/hash/cobertura/outcome do workspace. A V58 acrescenta baseline independente
+por cenário, retry idempotente, vínculo imutável do run submetido e política
+server-owned opt-in para `SUBMIT` e `PROMOTE`. Publication/snapshot/activation
+ainda não reutilizam esse gate por estágio. Criar ou alterar um cenário rotaciona
+a revisão do workspace e invalida a evidência anterior; o Studio recarrega o ETag
+do owner antes de oferecer os próximos comandos.
 
 Workspaces expõem save, scenarios, Test Run, submit, review e promoção somente
 quando `GET /workspaces/{id}/capabilities` publica a ação correspondente. Os

@@ -178,7 +178,7 @@ Config publicar a capability correta.
 | inspeção | parcial | catálogo e `decision-inspection.ts`; falta causalidade runtime |
 | editor | implementado para condição focal | Visual Builder; parâmetros/outcomes/RuleSet completo ausentes |
 | persistência | workspace concorrente com ETag | `ProjectionCatalogService` e testes de integração |
-| simulação | candidate × active implementada; provenance operacional parcial | cenários/Test Runs do Config e sandbox do host; V57 ainda não possui baseline independente por cenário, idempotência ou gate por estágio |
+| simulação | candidate × active e transporte V58 implementados; provenance operacional parcial | cenários/Test Runs do Config, sandbox host-owned, baseline independente por cenário, retry idempotente e gates opt-in de SUBMIT/PROMOTE; ainda faltam adapter remoto/Neon/Oracle e gates posteriores |
 | publicação/ativação/rollback | parcialmente implementados | readiness/materializações, snapshot e staged rollout; actions de publicação, criação de rollout e rollout-policy precisam ser server-owned |
 | assistente de decisões | planejado sobre runtime existente | Config/`@praxisui/ai` fornecem a base horizontal; faltam tools e projeção de evidência de domínio |
 | autoridade Java/produção | não alterada pelo Studio | projeção e docs de evidência |
@@ -214,8 +214,8 @@ readiness, publicação e cockpit operacional dentro das ações disponíveis.
 4. autentique com uma conta de desenvolvimento fornecida fora do repositório;
 5. confirme que leitura anônima é negada e leitura autorizada funciona;
 6. prove ETag, capability negativa e as transições que a persona realmente possui;
-7. não trate Test Run V57 como gate de produção enquanto evidence requirements,
-   baseline por cenário e idempotência não estiverem implementados.
+7. não trate o Test Run V58 como paridade Oracle: o contrato e os gates existem,
+   mas o adapter Ergon, os quatro canários reais e a prova Neon/Oracle permanecem externos.
 
 ### Caminho C — atualizar o pacote ErgonX
 
@@ -278,14 +278,15 @@ fronteira da IA está em [ADR 0002 — Policy Assistant](adr/0002-policy-assista
 
 - o catálogo carrega um único `projectionPath`; não existe discovery multi-pacote;
 - apenas um slice focal está editável;
-- comparison candidate × active existe; baseline legado independente por resultado
-  e idempotência do Test Run ainda são lacunas canônicas;
+- comparison candidate × active, baseline independente por resultado e idempotência
+  do Test Run existem; adapter remoto e prova Oracle ainda são lacunas de integração;
 - workspace usa actions server-owned, mas Definition create, publicação, create
   rollout e rollout-policy ainda não possuem consumo completo de capabilities;
 - a role leitora diverge entre host e controller Config em corporate mode;
-- a V57 persiste evidência consultiva, mas não governa o gate por estágio;
-- o Quickstart `v2.0.0-rc.31` preserva a lane V57 e hospeda a explicação consultiva
-  do Config rc.112; isso não transforma o host em owner da projeção de evidência;
+- a V58 governa `SUBMIT`/`PROMOTE` por política opt-in; publication, snapshot e
+  activation ainda precisam vincular e revalidar o mesmo receipt;
+- o corte Quickstart V58 hospeda a prova local e a explicação consultiva do Config;
+  isso não transforma o host em owner da projeção de evidência;
 - documentação de evidência histórica pode ficar stale e deve registrar commits;
 - uma projeção válida pode continuar semanticamente não homologada;
 - capabilities incompletas devem reduzir ações, nunca ser compensadas no cliente;
