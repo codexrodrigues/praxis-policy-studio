@@ -11,6 +11,7 @@ import type {
   DomainRuleRolloutCatalog,
   DomainRuleRolloutCatalogItem,
   DomainRuleSnapshotHeadStatus,
+  DomainRuleSnapshotBlocker,
   DomainRuleSnapshotVersion
 } from '@praxisui/core';
 import { PolicyStudioI18n } from '../../core/i18n';
@@ -30,6 +31,7 @@ export class SnapshotCockpitComponent {
   readonly busy = input(false);
   readonly feedback = input<string | null>(null);
   readonly feedbackError = input(false);
+  readonly blockers = input<readonly DomainRuleSnapshotBlocker[]>([]);
   readonly executionSummary = input<DomainRuleExecutionSummary | null>(null);
   readonly executionSummaryLoading = input(false);
   readonly executionSummaryError = input<'authentication' | 'forbidden' | 'failed' | null>(null);
@@ -73,6 +75,21 @@ export class SnapshotCockpitComponent {
     if (version.availableAction === 'ROLLBACK') return this.i18n.text('rollbackSnapshot');
     if (version.availableAction === 'ACTIVE') return this.i18n.text('activeSnapshot');
     return this.i18n.text('snapshotUnavailable');
+  }
+
+  blockerLabel(code: string): string {
+    switch (code) {
+      case 'BOUND_TEST_RUN_REQUIRED': return this.i18n.text('snapshotBlockerBoundTestRunRequired');
+      case 'REQUIRED_BASELINE_AUTHORITY_MISSING': return this.i18n.text('snapshotBlockerBaselineAuthorityMissing');
+      case 'REQUIRED_BASELINE_ELIGIBILITY_MISSING': return this.i18n.text('snapshotBlockerBaselineEligibilityMissing');
+      case 'CLEANUP_EVIDENCE_INCOMPLETE': return this.i18n.text('snapshotBlockerCleanupIncomplete');
+      case 'BASELINE_PARITY_INCOMPLETE': return this.i18n.text('snapshotBlockerBaselineParityIncomplete');
+      case 'OPERATION_DECISION_MATRIX_INCOMPLETE': return this.i18n.text('snapshotBlockerOperationMatrixIncomplete');
+      case 'REVIEWED_TEST_RUN_PROVENANCE_AMBIGUOUS': return this.i18n.text('snapshotBlockerProvenanceAmbiguous');
+      case 'TEST_EVIDENCE_POLICY_INVALID': return this.i18n.text('snapshotBlockerPolicyInvalid');
+      case 'TEST_EVIDENCE_GATE_UNAVAILABLE': return this.i18n.text('snapshotBlockerGateUnavailable');
+      default: return this.i18n.text('snapshotBlockerUnknown');
+    }
   }
 
   policyActionLabel(policy: DomainRuleRolloutPolicy): string {

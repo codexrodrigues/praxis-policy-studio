@@ -274,6 +274,19 @@
     @if (feedback()) {
       <p [class.state-message]="feedbackError()" [attr.role]="feedbackError() ? 'alert' : 'status'">{{ feedback() }}</p>
     }
+    @if (blockers().length) {
+      <section class="snapshot-blockers" aria-labelledby="snapshot-blockers-title">
+        <strong id="snapshot-blockers-title">{{ i18n.text('snapshotBlockersTitle') }}</strong>
+        <ul>
+          @for (blocker of blockers(); track blocker.code + ':' + blocker.definitionId) {
+            <li>
+              <span>{{ blockerLabel(blocker.code) }}</span>
+              @if (blocker.definitionId) { <code>{{ blocker.definitionId }}</code> }
+            </li>
+          }
+        </ul>
+      </section>
+    }
   }
   <div class="snapshot-prerequisites">
     <small>{{ i18n.text('snapshotCompositionBoundary') }}</small>
