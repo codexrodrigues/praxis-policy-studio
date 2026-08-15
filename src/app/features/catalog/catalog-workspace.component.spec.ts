@@ -182,6 +182,49 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(component.selected()?.workspaceRevision).toBe(3);
   });
 
+  it('reuses the operational command after an uncertain failure and rotates it after success', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-08-14T12:00:00.000Z'));
+      const action = {
+        id: 'operational-proof', availability: { allowed: true }, title: 'Operational proof'
+      };
+      const attempts: Subject<any>[] = [];
+      operationalTestAction.mockReturnValue(of(action));
+      runOperationalTest.mockImplementation(() => {
+        const attempt = new Subject<any>();
+        attempts.push(attempt);
+        return attempt.asObservable();
+      });
+
+      component.select(decision('A'));
+      component.scenarios.set([{ id: 'scenario-A', scenarioKey: 'allow-create' }] as any);
+      component.setOperationalScenarioMode('scenario-A', 'CREATE');
+      component.reviewOperationalTest();
+      component.runOperationalTest();
+      const firstKey = runOperationalTest.mock.calls[0][4];
+      const firstEvaluatedAt = runOperationalTest.mock.calls[0][5];
+      attempts[0].error(new Error('response lost after commit'));
+
+      component.reviewOperationalTest();
+      component.runOperationalTest();
+      expect(runOperationalTest.mock.calls[1][4]).toBe(firstKey);
+      expect(runOperationalTest.mock.calls[1][5]).toBe(firstEvaluatedAt);
+      attempts[1].next({
+        run: { runId: 'run-operational', workspaceId: 'workspace-A', workspaceRevision: 3, results: [] },
+        workspaceEtag: 'etag-operational-3'
+      });
+
+      vi.advanceTimersByTime(1);
+      component.reviewOperationalTest();
+      component.runOperationalTest();
+      expect(runOperationalTest.mock.calls[2][4]).not.toBe(firstKey);
+      expect(runOperationalTest.mock.calls[2][5]).not.toBe(firstEvaluatedAt);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('reuses the sandbox idempotency key after an uncertain failure and rotates it after success', () => {
     vi.useFakeTimers();
     try {

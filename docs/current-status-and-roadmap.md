@@ -1,16 +1,16 @@
 # Estado e roadmap do Praxis Policy Studio
 
-- Baseline validada: candidato Studio `0.1.0-beta.11` e Quickstart V63/`v2.0.0-rc.36`,
+- Baseline validada: candidato Studio `0.1.0-beta.12` e Quickstart V63/`v2.0.0-rc.36`,
   com transporte, governance V58 e prova host-owned em dois datasources Neon
 - Data da auditoria: 2026-08-15
-- Escopo: Studio beta.11, Metadata rc.127, Config rc.115, Quickstart rc.36,
+- Escopo: Studio beta.12, Metadata rc.127, Config rc.115, Quickstart rc.36,
   Contracts beta.4, `@praxisui/*` rc.26 e handoff Ergon #300
 
 ## Leitura executiva
 
 O produto corporativo completo está estimado em **65%**, com margem de ±5 pontos
 percentuais. Essa estimativa mede capabilities comprovadas, não linhas de código.
-A beta.11 demonstra um vertical slice relevante; o corte V63 fecha as actions
+A beta.12 demonstra um vertical slice relevante; o corte V63 fecha as actions
 principal-specific de publicação e rollout; o corte V61 fecha o discovery
 operacional cross-resource e o corte V58 fecha o transporte,
 parte dos gates de evidência e a execução idempotente no Neon, mas ainda não é uma beta
@@ -57,6 +57,8 @@ multi-consumidor.
    Estágios posteriores ainda não vinculam/revalidam esse receipt.
 3. **Consumo operacional governado:** concluído no V61. Metadata representa o
    `If-Match` cross-resource e Core/Studio descobrem e executam a action sem URL local.
+   O beta.12 também congela `Idempotency-Key` e `evaluatedAtUtc` após falha incerta,
+   fechando no browser a mesma garantia de replay já existente no host e no Config.
 4. **Prova corporativa:** o comando no Neon cobre `403`, `409`, `412`, `422`, `428`,
    retry sem duplicação, quatro quadrantes e rollback que preserva o audit append-only;
    o browser hermético cobre capability negada, confirmação e `412`; ainda faltam
