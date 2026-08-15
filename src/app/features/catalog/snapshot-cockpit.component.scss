@@ -14,6 +14,10 @@ p { margin: 0; }
 .authority-note { color: var(--pax-color-on-surface-variant, #52636a); }
 .empty { padding: 1rem .75rem; color: var(--pax-color-on-surface-variant, #52636a); }
 .state-message { border-inline-start: .25rem solid var(--pax-color-error, #ba1a1a); padding-inline-start: 1rem; }
+.snapshot-blockers { display: grid; gap: .5rem; padding: 1rem; border-inline-start: .25rem solid var(--pax-color-error, #ba1a1a); background: var(--pax-color-error-container, #ffdad6); }
+.snapshot-blockers ul { display: grid; gap: .5rem; margin: 0; padding-inline-start: 1.25rem; }
+.snapshot-blockers li { display: grid; gap: .2rem; }
+.snapshot-blockers code { overflow-wrap: anywhere; font-size: .72rem; }
 .quiet-button { justify-self: start; border: 1px solid currentColor; background: transparent; border-radius: .5rem; padding: .55rem .85rem; }
 .snapshot-version-list { display: grid; gap: .75rem; }
 .snapshot-version-list > article { display: grid; grid-template-columns: minmax(12rem, .8fr) minmax(0, 1.4fr) auto; align-items: center; gap: 1rem; padding: 1rem; border: 1px solid var(--pax-color-outline-variant, #b9c6cb); border-radius: .75rem; }

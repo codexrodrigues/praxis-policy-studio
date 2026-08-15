@@ -15,6 +15,7 @@ import {
   API_URL,
   DomainRuleService,
   ResourceDiscoveryService,
+  isDomainRuleSnapshotProblemResponse,
   type ApiUrlConfig,
   type DomainRuleChangeWorkspace,
   type DomainRuleDecision,
@@ -28,6 +29,7 @@ import {
   type DomainRuleRolloutCatalog,
   type DomainRuleRolloutCatalogItem,
   type DomainRuleSnapshotHeadStatus,
+  type DomainRuleSnapshotBlocker,
   type DomainRuleSnapshotVersion,
   type DomainRuleTestScenario,
   type DomainRuleWorkspaceAction,
@@ -118,6 +120,7 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly snapshotBusy = signal(false);
   readonly snapshotFeedback = signal<string | null>(null);
   readonly snapshotFeedbackError = signal(false);
+  readonly snapshotBlockers = signal<readonly DomainRuleSnapshotBlocker[]>([]);
   readonly executionSummary = signal<DomainRuleExecutionSummary | null>(null);
   readonly executionSummaryLoading = signal(false);
   readonly executionSummaryError = signal<'authentication' | 'forbidden' | 'failed' | null>(null);
@@ -284,6 +287,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.operationalConfirmationOpen.set(false);
     this.snapshotFeedback.set(null);
     this.snapshotFeedbackError.set(false);
+    this.snapshotBlockers.set([]);
     this.loadTimeline(selectionRevision);
     this.loadLifecycle(selectionRevision);
     this.loadScenarios(selectionRevision);
@@ -1048,6 +1052,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.snapshotBusy.set(true);
     this.snapshotFeedback.set(null);
     this.snapshotFeedbackError.set(false);
+    this.snapshotBlockers.set([]);
     this.catalog.operateSnapshot(version, headEtag, state.config).subscribe({
       next: () => {
         this.snapshotBusy.set(false);
@@ -1183,8 +1188,15 @@ export class CatalogWorkspaceComponent implements OnInit {
   private failSnapshotOperation(error: unknown): void {
     this.snapshotBusy.set(false);
     this.snapshotFeedbackError.set(true);
+    const problem = error instanceof HttpErrorResponse
+      && isDomainRuleSnapshotProblemResponse(error.error)
+      ? error.error
+      : null;
+    this.snapshotBlockers.set(problem?.code === 'TEST_EVIDENCE_BLOCKED' ? problem.blockers : []);
     const key = error instanceof HttpErrorResponse && error.status === 403
       ? 'governedCommandForbidden'
+      : problem?.code === 'TEST_EVIDENCE_BLOCKED'
+        ? 'snapshotEvidenceBlocked'
       : error instanceof HttpErrorResponse && (error.status === 409 || error.status === 412)
         ? 'governedCommandConflict'
         : 'governedCommandFailed';

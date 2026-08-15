@@ -84,4 +84,13 @@ describe('SnapshotCockpitComponent', () => {
     expect(component.canCreateRollout({ ...version, active: true })).toBe(false);
   });
 
+  it('projects stable snapshot blocker codes through localized product copy', () => {
+    const component = TestBed.runInInjectionContext(() => new SnapshotCockpitComponent());
+
+    expect(component.blockerLabel('OPERATION_DECISION_MATRIX_INCOMPLETE'))
+      .toContain('CREATE e UPDATE');
+    expect(component.blockerLabel('FUTURE_SERVER_BLOCKER'))
+      .toContain('ainda não reconhece');
+  });
+
 });
