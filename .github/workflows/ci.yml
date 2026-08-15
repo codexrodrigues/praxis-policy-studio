@@ -25,6 +25,8 @@ jobs:
       - run: npm test
       - run: npm run check:projections
       - run: npm run check:local-runtime
-      - run: npm run build
+      - run: npm run build:static
+        env:
+          POLICY_STUDIO_CONFIG_API_BASE_URL: https://quickstart.example
       - run: npx playwright install --with-deps chromium
       - run: npm run e2e

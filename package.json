@@ -5,6 +5,7 @@
   "scripts": {
     "start": "ng serve --host 0.0.0.0 --port 4302 --proxy-config proxy.conf.json",
     "build": "ng build",
+    "build:static": "ng build && node tools/prepare-static-deployment.mjs",
     "check:projections": "node tools/check-projections.mjs",
     "check:local-runtime": "node tools/check-local-runtime.mjs",
     "generate:ergonx-projection": "node tools/generate-ergonx-projection.mjs",
