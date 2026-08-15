@@ -74,13 +74,19 @@ positivas, negativas `403`, auditor read-only e Origin/CORS para a porta oficial
 `enterprise-proof-homolog`; o Config continuou no datasource Neon versionado já
 existente.
 
-A execução Playwright live do Studio ainda não é reivindicada: este sandbox não
-permite abrir os listeners `4302`/`8088` e não existe, neste corte, um deployment
-estático publicado do Studio para substituir o listener local. O gate visual só
-muda de “preparado” para “comprovado” depois que os sete testes rodarem contra o
-host publicado e registrarem SHAs, versões e configuração sanitizada de
-tenant/environment. A prova HTTP do backend não deve ser renomeada como prova de
-navegador.
+A homologação estática posterior foi publicada em
+`https://praxis-policy-studio-homolog.onrender.com` pelo PR `#29`. O site abriu a
+rota SPA diretamente, criou uma sessão real de author e carregou as dez decisões
+do Quickstart publicado. CORS, filtro de Origin, auditor read-only `200` e recusa
+operacional `403` foram repetidos no container que serve essa origin.
+
+Essa é uma prova browser integrada de sessão e catálogo para a persona author,
+com segregação do auditor comprovada pela mesma cadeia publicada. A execução
+automatizada dos sete testes Playwright com as seis personas ainda não é
+reivindicada. O gate multi-persona só muda de “preparado” para “comprovado” quando
+a suíte inteira rodar contra o site e o host publicados. A condição governada da
+decisão focal também chegou ausente; por isso esta prova não é apresentada como
+authoring completo.
 
 ## Dívida visual observada
 
