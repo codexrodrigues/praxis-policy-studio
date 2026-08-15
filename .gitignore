@@ -2,6 +2,8 @@
 /dist/
 /node_modules/
 /coverage/
+/playwright-report/
+/test-results/
 /.dev-server.*
 /.policy-studio-dev.log
 /.idea/
