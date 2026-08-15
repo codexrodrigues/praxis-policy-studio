@@ -46,8 +46,11 @@ O complemento operacional corrente está no
 [handoff V61](docs/ergon-handoff-v61.md): ele registra a cadeia de discovery
 cross-resource consumida pelo Studio e preserva a prova Neon do V60 sem a
 confundir com evidência Oracle.
-O beta.9 usa a cadeia publicada Contracts beta.4, Config rc.114,
+O beta.10 usa a cadeia publicada Contracts beta.4, Config rc.114,
 Metadata rc.127, Quickstart rc.35 e `@praxisui/core` rc.25.
+O corte acrescenta uma prova de navegador desktop/narrow, teclado e axe com
+backend hermético; ela não substitui a prova integrada com Quickstart/Neon e
+personas reais.
 O handoff referencia o corpus portátil executável mantido pelo Quickstart, que
 exercita riscos de migração sem transformar evidência sintética em prova Oracle.
 O percentual auditado, os bloqueadores e a sequência de cortes estão em
@@ -61,8 +64,9 @@ do que ainda depende de Neon, Oracle/HADES, UX corporativa ou releases coordenad
 
 `public/app-config.json` é carregado no início e seleciona uma projeção local
 versionada por `projectionPath`. A configuração versionada usa o caso Quickstart,
-modo `remote` e URLs same-origin. `npm start` encaminha `/auth` e `/api` para o
-Quickstart oficial em `http://127.0.0.1:8088`; assim o `DomainRuleService`
+modo `remote` e URLs same-origin. `npm start` encaminha `/auth`, `/api` e
+`/schemas` para o Quickstart oficial em `http://127.0.0.1:8088`; assim actions
+Metadata, o `DomainRuleService`
 público e a sessão cookie não dependem de transporte cross-origin. Ela não
 contém credenciais. O modo `remote` falha fechado quando `configApiBaseUrl` não
 é string, consulta definições e timeline por
@@ -108,12 +112,25 @@ a revisão do workspace e invalida a evidência anterior; o Studio recarrega o E
 do owner antes de oferecer os próximos comandos.
 
 O Quickstart V61 publica uma action operacional protegida para executar cenários
-`CREATE`/`UPDATE` descartáveis e registrar a evidência V58. O Studio beta.9 a
+`CREATE`/`UPDATE` descartáveis e registrar a evidência V58. O Studio beta.10 a
 descobre semanticamente pelo `resourceKey` da Definition e pelas tags canônicas,
 exige uma única action, seleção explícita de operação e confirmação de alto risco.
 URL, método, autorização, idempotência e o `If-Match` cross-resource do workspace
 vêm do catálogo Metadata; o browser falha fechado quando o protocolo está ausente
 ou ambíguo.
+
+## Validação de navegador
+
+```powershell
+npm run e2e
+```
+
+A suíte Playwright inicia o Studio na porta oficial `4302`, usa Chromium e valida
+desktop `1440×1000` e narrow `390×844`. Ela cobre sessão ausente, capability
+negada, confirmação de ação de alto risco, conflito `412`, teclado, ausência de
+overflow horizontal e axe. As respostas HTTP são herméticas para tornar o gate
+reprodutível no CI; a evidência integrada `4302 ↔ 8088` continua sendo um gate
+separado, dependente de Quickstart e Neon configurados.
 
 Workspaces expõem save, scenarios, Test Run, submit, review e promoção somente
 quando `GET /workspaces/{id}/capabilities` publica a ação correspondente. Os

@@ -1137,7 +1137,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.authoringError.set(true);
     const key = error instanceof HttpErrorResponse && error.status === 403
       ? 'governedCommandForbidden'
-      : error instanceof HttpErrorResponse && error.status === 409
+      : error instanceof HttpErrorResponse && (error.status === 409 || error.status === 412)
         ? 'governedCommandConflict'
         : 'governedCommandFailed';
     this.authoringFeedback.set(this.i18n.text(key));

@@ -8,7 +8,7 @@ if (!start.includes('--port 4302') || !start.includes('--proxy-config proxy.conf
   throw new Error('npm start must use the official port 4302 and the versioned same-origin proxy');
 }
 
-for (const route of ['/api', '/auth']) {
+for (const route of ['/api', '/auth', '/schemas']) {
   const entry = proxy[route];
   if (entry?.target !== 'http://127.0.0.1:8088' || entry.secure !== false || entry.changeOrigin !== false) {
     throw new Error(`${route} must target the official Quickstart origin without rewriting Origin`);

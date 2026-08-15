@@ -1,6 +1,6 @@
 {
   "name": "praxis-policy-studio",
-  "version": "0.1.0-beta.9",
+  "version": "0.1.0-beta.10",
   "private": true,
   "scripts": {
     "start": "ng serve --host 0.0.0.0 --port 4302 --proxy-config proxy.conf.json",
@@ -10,7 +10,8 @@
     "generate:ergonx-projection": "node tools/generate-ergonx-projection.mjs",
     "sync:quickstart-projection": "node tools/sync-quickstart-projection.mjs",
     "lint": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.spec.json --noEmit",
-    "test": "vitest run --environment jsdom"
+    "test": "vitest run --environment jsdom --exclude e2e/**",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@angular/animations": "21.2.20",
@@ -34,6 +35,8 @@
     "@angular/build": "21.2.21",
     "@angular/cli": "21.2.21",
     "@angular/compiler-cli": "21.2.20",
+    "@axe-core/playwright": "^4.10.2",
+    "@playwright/test": "^1.62.1",
     "@types/jasmine": "~5.1.9",
     "jasmine-core": "~5.10.0",
     "jsdom": "^26.1.0",
