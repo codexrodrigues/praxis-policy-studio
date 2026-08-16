@@ -356,12 +356,16 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     try {
       vi.setSystemTime(new Date('2026-08-14T12:00:00.000Z'));
       component.select(decision('A'));
-      scenarios.A[0].next([{ id: 'scenario-A' }]);
+      scenarios.A[0].next([
+        { id: 'scenario-A', status: 'ACTIVE' },
+        { id: 'scenario-disabled', status: 'DISABLED' }
+      ]);
       capabilities.A[0].next({
         workspaceId: 'workspace-A', availableActions: ['VIEW', 'RECORD_TEST_RUN'], blockers: []
       });
 
       component.runGovernedSandbox();
+      expect(runSandbox.mock.calls[0][1]).toEqual(['scenario-A']);
       const firstKey = runSandbox.mock.calls[0][2];
       const firstEvaluatedAt = runSandbox.mock.calls[0][3];
       sandboxRuns[0].error(new Error('response lost after dispatch'));

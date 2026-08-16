@@ -120,7 +120,8 @@ chave, nome, facts, decision esperada, status, output, reason codes e effect int
 usando o ETag canônico do cenário. A alteração rotaciona também a revisão do workspace,
 limpa o resultado de sandbox obsoleto e exige um novo Test Run. As asserções são distintas
 dos facts de entrada e tornam explícito o contrato que o Test Run precisa comprovar.
-Output é JSON opcional; códigos e intenções são listas normalizadas.
+Output é JSON opcional; códigos e intenções são listas normalizadas. Apenas cenários
+`ACTIVE` compõem uma execução; cenários `DISABLED` preservam histórico sem contaminar o gate.
 
 O Quickstart V61 publica uma action operacional protegida para executar cenários
 `CREATE`/`UPDATE` descartáveis e registrar a evidência V58. O Studio beta.10 a
