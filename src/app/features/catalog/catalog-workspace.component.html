@@ -5,8 +5,19 @@
         <p class="eyebrow">{{ selected()?.domain ?? i18n.text('product') }}</p>
         <h1 id="catalog-title">{{ i18n.text('catalog') }}</h1>
       </div>
-      <span class="count">{{ decisions().length }} {{ i18n.text('decisions') }}</span>
+      <div class="pane-actions">
+        <span class="count">{{ decisions().length }} {{ i18n.text('decisions') }}</span>
+        @if (sessionActive()) {
+          <button type="button" class="quiet-button session-logout" [disabled]="signingOut()" (click)="logout()">
+            {{ i18n.text(signingOut() ? 'signingOut' : 'logout') }}
+          </button>
+        }
+      </div>
     </header>
+
+    @if (logoutFailed()) {
+      <p class="session-error" role="alert">{{ i18n.text('logoutFailed') }}</p>
+    }
 
     <label class="search">
       <span class="search-glyph" aria-hidden="true">⌕</span>

@@ -18,7 +18,9 @@ principal-specific de publicação e rollout; o corte V61 fecha o discovery
 operacional cross-resource e o corte V58 fecha o transporte,
 parte dos gates de evidência e a execução idempotente no Neon. O corte publicado
 também separa seis identidades de laboratório e prova a matriz positiva/negativa por
-login, JWT, cookie, troca de sessão e matchers HTTP reais. Ainda não é uma beta corporativa segura para uso autônomo
+login, JWT, cookie, troca de sessão e matchers HTTP reais. O Studio agora também
+materializa o logout canônico e invalida o estado governado local ao encerrar a
+sessão; não transforma o laboratório em seletor de personas. Ainda não é uma beta corporativa segura para uso autônomo
 pelo Ergon.
 
 Marcos diferentes têm distâncias diferentes:

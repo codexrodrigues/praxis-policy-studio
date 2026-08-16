@@ -80,6 +80,9 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly permissionLimited = signal(false);
   readonly authenticating = signal(false);
   readonly authenticationFailed = signal(false);
+  readonly sessionActive = signal(false);
+  readonly signingOut = signal(false);
+  readonly logoutFailed = signal(false);
   readonly timeline = signal<readonly DecisionTimelineEvent[]>([]);
   readonly timelineLoading = signal(false);
   readonly timelineError = signal(false);
@@ -211,6 +214,8 @@ export class CatalogWorkspaceComponent implements OnInit {
       next: decisions => {
         if (loadRevision !== this.catalogLoadRevision) return;
         this.authenticationFailed.set(false);
+        this.sessionActive.set(state.config.mode === 'remote');
+        this.logoutFailed.set(false);
         this.allDecisions.set(decisions);
         const initial = decisions.find(item => item.key === state.config.initialDecisionKey) ?? decisions[0] ?? null;
         if (initial) this.select(initial, true);
@@ -224,6 +229,7 @@ export class CatalogWorkspaceComponent implements OnInit {
         this.clearSelection();
         this.loadError.set(error instanceof Error ? error.message : 'PROJECTION_LOAD_FAILED');
         if (error instanceof HttpErrorResponse && error.status === 401) {
+          this.sessionActive.set(false);
           this.authenticationRequired.set(true);
         } else if (error instanceof HttpErrorResponse && error.status === 403) {
           this.resolveForbiddenResponse(state.config, loadRevision);
@@ -236,6 +242,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.auth.hasSession(config).subscribe({
       next: active => {
         if (catalogRevision !== this.catalogLoadRevision) return;
+        this.sessionActive.set(active);
         active ? this.permissionLimited.set(true) : this.authenticationRequired.set(true);
       },
       error: () => {
@@ -260,6 +267,31 @@ export class CatalogWorkspaceComponent implements OnInit {
         form.reset();
         this.authenticating.set(false);
         this.authenticationFailed.set(true);
+      }
+    });
+  }
+
+  logout(): void {
+    const state = this.runtime.state();
+    if (state.kind !== 'ready' || !this.sessionActive() || this.signingOut()) return;
+    this.signingOut.set(true);
+    this.logoutFailed.set(false);
+    this.auth.logout(state.config).subscribe({
+      next: () => {
+        ++this.catalogLoadRevision;
+        this.signingOut.set(false);
+        this.sessionActive.set(false);
+        this.allDecisions.set([]);
+        this.clearSelection();
+        this.loading.set(false);
+        this.permissionLimited.set(false);
+        this.authenticationFailed.set(false);
+        this.authenticationRequired.set(true);
+        this.loadError.set('AUTHENTICATION_REQUIRED');
+      },
+      error: () => {
+        this.signingOut.set(false);
+        this.logoutFailed.set(true);
       }
     });
   }

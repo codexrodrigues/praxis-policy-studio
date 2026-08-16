@@ -35,7 +35,7 @@ npm ci
 npm start
 ```
 
-No modo remoto, uma sessão ausente exibe o login explícito do ambiente de desenvolvimento. O formulário chama o endpoint canônico `/auth/login`, recebe apenas o cookie `HttpOnly` do host e descarta os campos após a tentativa; o Policy Studio não persiste senha ou token.
+No modo remoto, uma sessão ausente exibe o login explícito do ambiente de desenvolvimento. O formulário chama o endpoint canônico `/auth/login`, recebe apenas o cookie `HttpOnly` do host e descarta os campos após a tentativa; o Policy Studio não persiste senha ou token. Uma sessão reconhecida pode ser encerrada por `/auth/logout`; após a resposta do host, o Studio invalida catálogo, seleção e evidências governadas mantidas em memória antes de voltar ao login.
 
 Abra `http://localhost:4302/catalog`.
 

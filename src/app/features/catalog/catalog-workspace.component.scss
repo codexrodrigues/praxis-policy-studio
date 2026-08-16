@@ -2,6 +2,9 @@
 .workspace { display: grid; grid-template-columns: minmax(19rem, 26rem) minmax(0, 1fr); min-height: calc(100vh - 4.5rem); }
 .catalog-pane { position: sticky; top: 4.5rem; align-self: start; max-height: calc(100vh - 4.5rem); overflow: auto; background: var(--pax-color-surface-container-low, #f3f6f7); padding: 1.5rem 1rem; border-right: 1px solid var(--pax-color-outline-variant, #c5d0d5); }
 .pane-heading, .decision-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+.pane-actions { display: grid; justify-items: end; gap: .45rem; }
+.session-logout { white-space: nowrap; }
+.session-error { margin-top: .75rem; color: var(--pax-color-error, #ba1a1a); font-size: .8rem; }
 .decision-header > div { min-width: 0; }
 h1, h2, p { margin: 0; }
 h1 { font-size: 1.35rem; letter-spacing: -.02em; }

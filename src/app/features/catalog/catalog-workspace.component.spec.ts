@@ -49,6 +49,8 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
   let runSandbox: ReturnType<typeof vi.fn>;
   const operationalTestAction = vi.fn();
   const runOperationalTest = vi.fn();
+  const logoutSession = vi.fn();
+  let logoutResult: Subject<void>;
   let component: CatalogWorkspaceComponent;
 
   const stream = (streams: Record<'A' | 'B', Subject<any>[]>, id: string) => {
@@ -74,6 +76,9 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     updateScenario.mockReset();
     operationalTestAction.mockReset();
     runOperationalTest.mockReset();
+    logoutSession.mockReset();
+    logoutResult = new Subject<void>();
+    logoutSession.mockReturnValue(logoutResult.asObservable());
     operationalTestAction.mockReturnValue(of(null));
     createWorkspace.mockReturnValue(of({
       id: 'workspace-A', ruleKey: 'A', status: 'OPEN', etag: 'etag-new', revision: 1,
@@ -86,7 +91,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     TestBed.configureTestingModule({ providers: [
       PolicyStudioI18n,
       { provide: ElementRef, useValue: new ElementRef(document.createElement('div')) },
-      { provide: AuthSessionService, useValue: {} },
+      { provide: AuthSessionService, useValue: { logout: logoutSession } },
       { provide: RuntimeConfigService, useValue: { state: () => ({ kind: 'ready', config }), mode: () => 'fixture' } },
       { provide: ProjectionCatalogService, useValue: {
         timeline: (id: string) => stream(timelines, id),
@@ -139,6 +144,26 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(component.sandboxRun()).toBeNull();
     expect(component.publicationReadiness()).toBeNull();
     expect(component.publicationResult()).toBeNull();
+  });
+
+  it('invalidates governed in-memory state after the host closes the session', () => {
+    const current = decision('A');
+    component.allDecisions.set([current]);
+    component.select(current);
+    component.sessionActive.set(true);
+
+    component.logout();
+    expect(logoutSession).toHaveBeenCalledWith(config);
+    expect(component.signingOut()).toBe(true);
+
+    logoutResult.next();
+    logoutResult.complete();
+
+    expect(component.sessionActive()).toBe(false);
+    expect(component.selected()).toBeNull();
+    expect(component.allDecisions()).toEqual([]);
+    expect(component.authenticationRequired()).toBe(true);
+    expect(component.signingOut()).toBe(false);
   });
 
   it('creates a workspace only when Config publishes CREATE_NEW_VERSION for the exact definition', () => {
