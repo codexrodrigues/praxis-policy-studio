@@ -10,9 +10,9 @@ const quickstartRoot = path.resolve(
 );
 const sourcePath = path.join(
   quickstartRoot,
-  'src/test/resources/policy-studio/extraordinary-benefit-policy-studio-projection.v1.json'
+  'src/test/resources/policy-studio/payroll-reactive-determinations-policy-studio-projection.v1.json'
 );
-const outputPath = path.join(studioRoot, 'public/projections/quickstart-benefit-eligibility.v1.json');
+const outputPath = path.join(studioRoot, 'public/projections/quickstart-payroll-reactive-determinations.v1.json');
 
 const projection = JSON.parse(await readFile(sourcePath, 'utf8'));
 const errors = validateProjection(projection);

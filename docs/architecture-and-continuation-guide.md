@@ -173,7 +173,8 @@ Config publicar a capability correta.
 | i18n | parcial | catálogo usa resources, mas ainda existem literais pt/en no chrome |
 | contrato de projeção | implementado | `domain-projection.ts` e checker Node |
 | pacote RN-013 | 14 decisões versionadas | `public/projections/ergonx-rn013.v1.json` |
-| fixture neutra | valida contrato do segundo consumidor | `quickstart-benefit-eligibility.v1.json` |
+| corpus neutro amplo | valida composição e variedade semântica | `quickstart-benefit-eligibility.v1.json` |
+| caso neutro publicado | valida snapshot, Neon e cadeia operacional | `quickstart-payroll-reactive-determinations.v1.json` |
 | leitura Config | implementada no slice | service, detalhe, testes e prova live documentada |
 | sessão de desenvolvimento | implementada | `auth-session.service.ts` |
 | capabilities | parciais | workspace, snapshots e staged rollout possuem ações server-owned; publicação, criação de rollout e rollout-policy ainda requerem catálogos próprios |

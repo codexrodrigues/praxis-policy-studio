@@ -42,6 +42,8 @@ Abra `http://localhost:4302/catalog`.
 Para integrar o primeiro consumidor, consulte o histórico no
 [handoff do Ergon beta.7](docs/ergon-handoff-beta7.md) e o corte V58 no
 [handoff Ergon beta.8](docs/ergon-handoff-beta8.md).
+O caso neutro publicado mais recente e a cadeia atual para a issue #300 estão no
+[handoff de folha de 2026-08-16](docs/ergon-handoff-published-payroll-2026-08-16.md).
 O complemento operacional corrente está no
 [handoff V61](docs/ergon-handoff-v61.md): ele registra a cadeia de discovery
 cross-resource consumida pelo Studio e preserva a prova Neon do V60 sem a
@@ -218,6 +220,12 @@ npm run check:projections
 A projeção Quickstart é derivada e tem gatilho explícito de remoção: ela deixa
 de existir quando Config/Metadata fornecerem discovery governado equivalente.
 Consulte `docs/rfc/0001-quickstart-reference-case.md`.
+
+O shell inicia pela cadeia publicada de folha
+`human-resources.payroll.reactive-determinations`. Esse caso prova integração
+Config/host/Neon, snapshots v1/v2 e execução create/update. O corpus de auxílio
+extraordinário permanece disponível como caso de amplitude de regras, mas não é
+tratado como evidência de publicação nem como paridade Oracle do Ergon.
 
 ## Policy Assistant
 

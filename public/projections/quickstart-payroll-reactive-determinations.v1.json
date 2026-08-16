@@ -1,0 +1,194 @@
+{
+  "kind": "POLICY_STUDIO_PROJECTION_V1",
+  "projectionId": "quickstart.human-resources.payroll.reactive-determinations",
+  "projectionVersion": 1,
+  "sourceArtifacts": [
+    {
+      "path": "src/main/java/com/example/praxis/apiquickstart/config/PayrollReactiveDeterminationRuleSet.java",
+      "kind": "RULESET_DEFINITION",
+      "sha256": "AD1F6FC0166480CDD75F0B1228EE5336EE2451A0177B50B5B1E4880E7216AFEA"
+    },
+    {
+      "path": "src/main/java/com/example/praxis/apiquickstart/config/ReactiveDeterminationPilotConfiguration.java",
+      "kind": "REACTIVE_BINDING_DEFINITION",
+      "sha256": "DD2E12202679175C4DEF8565DA5203CEBD6B3A22CCB9C8356EA3FD2D12905ECD"
+    },
+    {
+      "path": "docs/REACTIVE-DETERMINATION-PILOT.md",
+      "kind": "OPERATIONAL_BOUNDARY",
+      "sha256": "9923A3DD44CAB374CF9B852BCCAD53981D25CE6558B01B8AC1FE8E3C05A65007"
+    },
+    {
+      "path": "scripts/verify-reactive-determinations-published-runtime.sh",
+      "kind": "PUBLISHED_RUNTIME_PROOF",
+      "sha256": "C8AA67D67CF83EE0F5C2B437CF0A6102B3A754495ACD6F6F5A2A387913DA2D1F"
+    }
+  ],
+  "ruleSetRef": {
+    "domainKey": "human-resources",
+    "boundedContextKey": "human-resources.payroll",
+    "ruleSetKey": "human-resources.payroll.reactive-determinations",
+    "operationalResourceKey": "human-resources.folhas-pagamento",
+    "hostContractVersion": "quickstart/1.0",
+    "operationKeys": [
+      "determinePayrollNetSalary",
+      "determinePayrollPaymentDate"
+    ]
+  },
+  "decisionRefs": [
+    {
+      "order": 1,
+      "decisionKey": "human-resources.payroll.net-salary",
+      "reasonCode": "PAYROLL_NET_SALARY_UNAVAILABLE",
+      "presentationLabel": "Determinar o salario liquido a partir do salario bruto e dos descontos.",
+      "semanticStatus": "REFERENCE_IMPLEMENTED",
+      "reviewStatus": "PUBLISHED_REFERENCE_CASE",
+      "semanticSourceRef": "PayrollReactiveDeterminationRuleSet#human-resources.payroll.net-salary",
+      "targetPlanRef": "REACTIVE-DETERMINATION-PILOT.md#cadeia-financeira",
+      "editable": true,
+      "stage": "DOMAIN_DECISION",
+      "cardinality": "SINGLE",
+      "overridePolicy": "FORBIDDEN",
+      "factPaths": [
+        "payroll.salarioBruto",
+        "payroll.totalDescontos"
+      ],
+      "bindingRefs": [
+        {
+          "bindingKey": "human-resources.payroll.net-salary",
+          "source": "PRODUCT",
+          "executorType": "JSON_LOGIC",
+          "order": 10
+        }
+      ]
+    },
+    {
+      "order": 2,
+      "decisionKey": "human-resources.payroll.payment-date",
+      "reasonCode": "PAYROLL_PAYMENT_DATE_UNAVAILABLE",
+      "presentationLabel": "Determinar a data de pagamento depois do calculo do salario liquido.",
+      "semanticStatus": "REFERENCE_IMPLEMENTED",
+      "reviewStatus": "PUBLISHED_REFERENCE_CASE",
+      "semanticSourceRef": "PayrollReactiveDeterminationRuleSet#human-resources.payroll.payment-date",
+      "targetPlanRef": "REACTIVE-DETERMINATION-PILOT.md#cadeia-financeira",
+      "editable": true,
+      "stage": "DOMAIN_DECISION",
+      "cardinality": "SINGLE",
+      "overridePolicy": "FORBIDDEN",
+      "factPaths": [
+        "payroll.ano",
+        "payroll.mes",
+        "payroll.salarioLiquido"
+      ],
+      "bindingRefs": [
+        {
+          "bindingKey": "human-resources.payroll.payment-date",
+          "source": "PRODUCT",
+          "executorType": "JSON_LOGIC",
+          "order": 20
+        }
+      ]
+    }
+  ],
+  "factSchemas": [
+    {
+      "path": "payroll.salarioBruto",
+      "valueType": "number",
+      "nullable": false,
+      "presentationLabel": "Salario bruto",
+      "description": "Valor bruto usado como base da determinacao do salario liquido.",
+      "locale": "pt-BR",
+      "providerRef": "FolhasPagamentoController",
+      "evidenceRefs": [
+        "determinePayrollNetSalary"
+      ]
+    },
+    {
+      "path": "payroll.totalDescontos",
+      "valueType": "number",
+      "nullable": false,
+      "presentationLabel": "Total de descontos",
+      "description": "Soma dos descontos aplicada ao salario bruto.",
+      "locale": "pt-BR",
+      "providerRef": "FolhasPagamentoController",
+      "evidenceRefs": [
+        "determinePayrollNetSalary"
+      ]
+    },
+    {
+      "path": "payroll.ano",
+      "valueType": "number",
+      "nullable": false,
+      "presentationLabel": "Ano da competencia",
+      "description": "Ano da competencia usado para determinar a data de pagamento.",
+      "locale": "pt-BR",
+      "providerRef": "FolhasPagamentoController",
+      "evidenceRefs": [
+        "determinePayrollPaymentDate"
+      ]
+    },
+    {
+      "path": "payroll.mes",
+      "valueType": "number",
+      "nullable": false,
+      "presentationLabel": "Mes da competencia",
+      "description": "Mes da competencia usado para determinar a data de pagamento.",
+      "locale": "pt-BR",
+      "providerRef": "FolhasPagamentoController",
+      "evidenceRefs": [
+        "determinePayrollPaymentDate"
+      ]
+    },
+    {
+      "path": "payroll.salarioLiquido",
+      "valueType": "number",
+      "nullable": false,
+      "presentationLabel": "Salario liquido determinado",
+      "description": "Resultado da primeira decisao e dependencia explicita da data de pagamento.",
+      "locale": "pt-BR",
+      "providerRef": "PayrollReactiveDeterminationRuleSet",
+      "evidenceRefs": [
+        "human-resources.payroll.net-salary"
+      ]
+    }
+  ],
+  "configDefinitionRefs": {
+    "status": "RESOLVED_BY_GOVERNED_DISCOVERY",
+    "definitionIds": []
+  },
+  "presentationLabels": {
+    "domain": {
+      "pt-BR": "Recursos humanos",
+      "en-US": "Human resources"
+    },
+    "ruleSet": {
+      "pt-BR": "Determinacoes reativas da folha",
+      "en-US": "Payroll reactive determinations"
+    }
+  },
+  "evidenceBoundaries": [
+    {
+      "boundary": "PUBLISHED_QUICKSTART_NEON_HOMOLOG",
+      "operations": [
+        "determinePayrollNetSalary",
+        "determinePayrollPaymentDate",
+        "createPayroll",
+        "updatePayroll"
+      ],
+      "status": "PROVED"
+    },
+    {
+      "boundary": "ERGON_ORACLE_PARITY",
+      "operations": [
+        "CREATE",
+        "UPDATE"
+      ],
+      "status": "NOT_CLAIMED"
+    }
+  ],
+  "authorityEvidence": {
+    "currentAuthority": "CONFIG_PUBLISHED_SNAPSHOT",
+    "baselineAuthority": "QUICKSTART_HOST_PROVIDERS",
+    "productionAuthorityChanged": false
+  }
+}
