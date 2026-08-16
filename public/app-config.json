@@ -2,6 +2,6 @@
   "mode": "remote",
   "configApiBaseUrl": "",
   "locale": "pt-BR",
-  "projectionPath": "/projections/quickstart-benefit-eligibility.v1.json",
-  "initialDecisionKey": "grant.amount-parameters"
+  "projectionPath": "/projections/quickstart-payroll-reactive-determinations.v1.json",
+  "initialDecisionKey": "human-resources.payroll.net-salary"
 }

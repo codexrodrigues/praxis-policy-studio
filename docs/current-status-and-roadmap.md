@@ -1,10 +1,10 @@
 # Estado e roadmap do Praxis Policy Studio
 
-- Baseline validada: Studio `0.1.0-beta.14` e Quickstart `v2.0.0-rc.40`
-  no commit publicado `608584c`, com transporte, governance V58 e prova
-  host-owned em dois datasources Neon
-- Data da auditoria: 2026-08-15
-- Escopo: Studio beta.14, Metadata rc.127, Config rc.119, Quickstart rc.40,
+- Baseline validada: Studio `0.1.0-beta.14`, Config `0.1.0-rc.122` e
+  Quickstart no commit publicado `50cb09e`, com transporte, governance V58,
+  snapshot v1/v2 e cadeia de folha host-owned no Neon homologado
+- Data da auditoria: 2026-08-16
+- Escopo: Studio beta.14, Metadata rc.127, Config rc.122, Quickstart rc.42,
   Contracts beta.4, `@praxisui/*` rc.27 e handoff Ergon #300
 
 ## Leitura executiva
@@ -40,7 +40,7 @@ multi-consumidor.
 | Capability | % | Aderência | Diagnóstico |
 | --- | ---: | --- | --- |
 | fronteiras canônicas e neutralidade | 85 | `ja-suportado-mal-nomeado-ou-mal-materializado` | owners corretos; ainda existe normalização Ergon no core |
-| catálogo/discovery multi-domínio | 40 | `suportado-parcialmente` | carrega uma projeção configurada; não há registry governado |
+| catálogo/discovery multi-domínio | 45 | `suportado-parcialmente` | casos Ergon, Rule Lab amplo e folha publicada são projeções derivadas selecionáveis por configuração; não há registry governado |
 | inspeção e explicação humana/IA | 72 | `suportado-parcialmente` | facts, precedência, expressão e explicação grounded da definição; falta correlação causal com execução |
 | editar regra existente | 50 | `suportado-parcialmente` | condição focal carregada e round-trip visual aberto sobre workspace real; parâmetros, outcomes e RuleSet completo não são authorados |
 | criar regra nova | 20 | `suportado-parcialmente` | Config possui intake; Studio apenas cria workspace de definição existente |
@@ -48,7 +48,7 @@ multi-consumidor.
 | review/maker-checker | 70 | `suportado-parcialmente` | workspace, ETag, blockers, run submetido e segregação existem; política cobre SUBMIT/PROMOTE, não estágios posteriores |
 | publicação/materialização | 58 | `suportado-parcialmente` | readiness e action `PUBLISH` são server-owned; o gate de evidência ainda não alcança publicação |
 | snapshot, rollback e staged rollout | 72 | `suportado-parcialmente` | blockers de evidência são server-owned, tipados e explicados pelo Studio; create/cancel/activate rollout e lifecycle de rollout-policy são principal-specific; falta prova multi-persona integrada |
-| evidência V58/V60/Ergon | 86 | `suportado-parcialmente` | contrato leve, action dedicada, reserva pré-DML e quatro quadrantes foram provados em dois datasources Neon preservando o ledger append-only; faltam adapter Ergon e Oracle/HADES |
+| evidência V58/V60/Ergon | 89 | `suportado-parcialmente` | contrato leve, action dedicada, reserva pré-DML e quatro quadrantes foram provados; a cadeia publicada de folha confirmou snapshots v1/v2 e execução no Neon sem duplicação; faltam adapter Ergon e Oracle/HADES |
 | segurança, multitenancy e capabilities | 85 | `suportado-parcialmente` | publicação e rollout não são mais inferidos no browser; seis sujeitos separados passaram pela cadeia HTTP publicada; author abriu o catálogo no site homologado e auditor permaneceu read-only; faltam Neon cross-tenant e matriz visual multi-persona completa |
 | UX, i18n e acessibilidade | 50 | `ja-suportado-mal-nomeado-ou-mal-materializado` | Playwright desktop/narrow, teclado e axe cobrem estados corporativos focais; o site homologado prova shell, sessão e catálogo reais; faltam i18n integral, seis personas no browser e decomposição da página |
 | testes, release e documentação | 95 | `suportado-parcialmente` | cadeia V61, prova HTTP/PostgreSQL/Neon V60, E2E hermético V62, matriz de segurança multi-persona e deployment estático publicados; falta executar a suíte browser live completa |

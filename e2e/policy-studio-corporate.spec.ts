@@ -16,6 +16,17 @@ const workspace = {
 };
 
 async function mockGovernedBackend(page: Page, operationalAllowed: boolean): Promise<void> {
+  await page.route('**/app-config.json', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      mode: 'remote',
+      configApiBaseUrl: '',
+      locale: 'pt-BR',
+      projectionPath: '/projections/quickstart-benefit-eligibility.v1.json',
+      initialDecisionKey: definition.ruleKey
+    })
+  }));
   await page.route('**/api/**', async route => governedResponse(route, operationalAllowed));
   await page.route('**/schemas/**', async route => governedResponse(route, operationalAllowed));
   await page.route('**/auth/session', route => route.fulfill({ status: 204 }));

@@ -11,7 +11,7 @@ de evolução do Policy Studio. O checkout local não possui o Oracle nem toda a
 infraestrutura do cliente. Uma fixture simplificada também não prova composição,
 precedência, `null`, outcomes, shadow, ativação atômica ou efeitos.
 
-## Decisão
+## Decisão original
 
 O caso neutro de referência será o Rule Lab de auxílio extraordinário do
 `praxis-api-quickstart`, identificado por:
@@ -71,6 +71,33 @@ Nenhum desses gates deve ser contornado pelo login de desenvolvimento.
 
 Scenario e Test Run já possuem owner canônico no Config. O JSON da projeção
 continua derivado e não deve ser promovido a contrato paralelo.
+
+## Caso publicado de integração corporativa
+
+O Rule Lab de auxílio extraordinário continua sendo o caso de amplitude semântica:
+dez slots, cinco outcomes, guards, composição e efeitos. Ele não deve, porém, ser
+confundido com prova de persistência e ativação publicada.
+
+O caso padrão do Studio passa a ser a cadeia neutra de folha do Quickstart:
+
+- ruleset `human-resources.payroll.reactive-determinations`;
+- decisão `human-resources.payroll.net-salary` seguida de
+  `human-resources.payroll.payment-date`;
+- snapshots imutáveis v1/v2, head, ETag e rollback governados pelo Config;
+- execução host-owned em create/update, com rejeição de derivados adulterados;
+- prova publicada no Render usando o banco Neon `enterprise-proof-homolog`.
+
+Em 16 de agosto de 2026, a matriz publicada confirmou uma única cadeia coerente
+por requisição, três casos positivos e dois casos negativos governados, com duas
+decisões Config aplicadas. O provisionamento idempotente encontrou as versões 1 e
+2 já existentes e não criou snapshot duplicado no retry. Essa evidência prova o
+contrato Quickstart/Config/Neon; não prova paridade com Oracle, HADES ou regras
+específicas do Ergon.
+
+A projeção `quickstart-payroll-reactive-determinations.v1.json` é derivada do
+RuleSet e dos bindings host-owned. O teste no Quickstart confere identidade,
+ordem, fatos, bindings e hashes das fontes. O Studio a sincroniza sem copiar a
+condição executável nem persistir IDs de definição.
 
 ## Corte de integração 2026-08-13
 
