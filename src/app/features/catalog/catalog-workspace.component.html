@@ -340,7 +340,7 @@
           } @empty { <p class="empty">{{ i18n.text('noScenarios') }}</p> }
         </div>
         <div class="governed-actions">
-          <button type="button" [disabled]="authoringBusy() || !hasWorkspaceAction('RECORD_TEST_RUN') || !scenarios().length || draftChanged()" (click)="runGovernedSandbox()">
+          <button type="button" [disabled]="authoringBusy() || !hasWorkspaceAction('RECORD_TEST_RUN') || !activeScenarios().length || draftChanged()" (click)="runGovernedSandbox()">
             {{ i18n.text('runSandbox') }}
           </button>
           <button type="button" [disabled]="authoringBusy() || !hasWorkspaceAction('SUBMIT') || draftChanged()" (click)="submitGovernedWorkspace()">

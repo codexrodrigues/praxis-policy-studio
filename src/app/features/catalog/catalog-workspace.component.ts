@@ -98,6 +98,7 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly authoringError = signal(false);
   readonly authoringFeedback = signal<string | null>(null);
   readonly scenarios = signal<readonly DomainRuleTestScenario[]>([]);
+  readonly activeScenarios = computed(() => this.scenarios().filter(item => item.status === 'ACTIVE'));
   readonly editingScenarioId = signal<string | null>(null);
   readonly reviews = signal<readonly DomainRuleWorkspaceReview[]>([]);
   readonly workspaceCapabilities = signal<DomainRuleWorkspaceCapabilities | null>(null);
@@ -949,8 +950,9 @@ export class CatalogWorkspaceComponent implements OnInit {
   runGovernedSandbox(): void {
     const state = this.runtime.state();
     const workspaceId = this.selected()?.workspaceId;
+    const scenarioIds = this.activeScenarios().map(item => item.id);
     if (state.kind !== 'ready' || !workspaceId
-      || !this.hasWorkspaceAction('RECORD_TEST_RUN') || this.authoringBusy()) return;
+      || !scenarioIds.length || !this.hasWorkspaceAction('RECORD_TEST_RUN') || this.authoringBusy()) return;
     this.authoringBusy.set(true);
     this.clearAuthoringMessage();
     const idempotencyKey = this.sandboxIdempotencyKey
@@ -958,7 +960,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     const evaluatedAtUtc = this.sandboxEvaluatedAtUtc ??= new Date().toISOString();
     this.catalog.runSandbox(
       workspaceId,
-      this.scenarios().map(item => item.id),
+      scenarioIds,
       idempotencyKey,
       evaluatedAtUtc,
       state.config
