@@ -849,8 +849,13 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.editingScenarioId.set(null);
   }
 
-  updateScenarioAssertions(
+  updateScenario(
     scenario: DomainRuleTestScenario,
+    key: string,
+    name: string,
+    factsJson: string,
+    expectedDecision: string,
+    status: string,
     expectedOutputJson: string,
     expectedReasonCodes: string,
     expectedEffectIntents: string
@@ -859,6 +864,23 @@ export class CatalogWorkspaceComponent implements OnInit {
     const workspaceId = this.selected()?.workspaceId;
     if (state.kind !== 'ready' || !workspaceId || !scenario.etag
       || !this.hasWorkspaceAction('MANAGE_SCENARIOS') || this.authoringBusy()) return;
+    const scenarioKey = key.trim();
+    const scenarioName = name.trim();
+    if (!scenarioKey || !scenarioName) {
+      this.authoringError.set(true);
+      this.authoringFeedback.set(this.i18n.text('scenarioIdentityRequired'));
+      return;
+    }
+    let facts: Record<string, unknown>;
+    try {
+      const parsed: unknown = JSON.parse(factsJson);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error();
+      facts = parsed as Record<string, unknown>;
+    } catch {
+      this.authoringError.set(true);
+      this.authoringFeedback.set(this.i18n.text('invalidFacts'));
+      return;
+    }
     let expectedOutput: unknown;
     try {
       expectedOutput = this.optionalJson(expectedOutputJson);
@@ -870,14 +892,14 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.authoringBusy.set(true);
     this.clearAuthoringMessage();
     this.catalog.updateScenario(workspaceId, scenario.id, {
-      scenarioKey: scenario.scenarioKey,
-      name: scenario.name,
-      facts: scenario.facts,
-      expectedDecision: scenario.expectedDecision,
+      scenarioKey,
+      name: scenarioName,
+      facts,
+      expectedDecision: expectedDecision as DomainRuleDecision,
       expectedOutput,
       expectedReasonCodes: this.assertionList(expectedReasonCodes),
       expectedEffectIntents: this.assertionList(expectedEffectIntents),
-      status: scenario.status
+      status: status as 'ACTIVE' | 'DISABLED'
     }, scenario.etag, state.config).subscribe({
       next: receipt => {
         this.applyWorkspace(receipt.workspace);
@@ -896,6 +918,10 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   scenarioExpectedOutput(scenario: DomainRuleTestScenario): string {
     return scenario.expectedOutput == null ? '' : JSON.stringify(scenario.expectedOutput, null, 2);
+  }
+
+  formatScenarioFacts(scenario: DomainRuleTestScenario): string {
+    return JSON.stringify(scenario.facts, null, 2);
   }
 
   scenarioAssertions(values: readonly string[] | undefined): string {

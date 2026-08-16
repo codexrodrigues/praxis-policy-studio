@@ -183,7 +183,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(createWorkspace).toHaveBeenCalledWith('definition-A', 'A', config);
   });
 
-  it('persists complete scenario assertions and refreshes the rotated workspace ETag', () => {
+  it('persists complete scenario corrections and refreshes the rotated workspace ETag', () => {
     const baseScenario = {
       id: 'scenario-A', workspaceId: 'workspace-A', scenarioKey: 'allow-create', name: 'Allow create',
       facts: { requestedAmount: 500 }, expectedDecision: 'ALLOW', expectedReasonCodes: [],
@@ -226,16 +226,40 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
       workspaceId: 'workspace-A', availableActions: ['VIEW', 'MANAGE_SCENARIOS'], blockers: []
     });
 
-    component.updateScenarioAssertions(
+    component.updateScenario(
       { ...baseScenario, expectedEffectIntents: [] } as any,
+      'deny-update', 'Deny update', '{"requestedAmount":750}', 'DENY', 'DISABLED',
       '', '', 'REGISTER_EXTRAORDINARY_GRANT\nREGISTER_EXTRAORDINARY_GRANT'
     );
     expect(updateScenario).toHaveBeenCalledWith(
       'workspace-A', 'scenario-A', expect.objectContaining({
+        scenarioKey: 'deny-update',
+        name: 'Deny update',
+        facts: { requestedAmount: 750 },
+        expectedDecision: 'DENY',
+        status: 'DISABLED',
         expectedEffectIntents: ['REGISTER_EXTRAORDINARY_GRANT']
       }), 'scenario-etag-1', config
     );
     expect(component.selected()?.workspaceEtag).toBe('workspace-etag-3');
+    expect(component.sandboxRun()).toBeNull();
+  });
+
+  it('rejects invalid facts before updating a governed scenario', () => {
+    component.select(decision('A'));
+    capabilities.A[0].next({
+      workspaceId: 'workspace-A', availableActions: ['VIEW', 'MANAGE_SCENARIOS'], blockers: []
+    });
+
+    component.updateScenario({
+      id: 'scenario-A', workspaceId: 'workspace-A', scenarioKey: 'allow-create', name: 'Allow create',
+      facts: { requestedAmount: 500 }, expectedDecision: 'ALLOW', status: 'ACTIVE',
+      revision: 1, etag: 'scenario-etag-1'
+    } as any, 'allow-create', 'Allow create', '[]', 'ALLOW', 'ACTIVE', '', '', '');
+
+    expect(updateScenario).not.toHaveBeenCalled();
+    expect(component.authoringError()).toBe(true);
+    expect(component.authoringFeedback()).toBe('Facts JSON deve ser um objeto válido.');
   });
 
   it('fails locally when expected output is invalid JSON', () => {

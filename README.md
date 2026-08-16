@@ -115,10 +115,12 @@ por cenário, retry idempotente, vínculo imutável do run submetido e política
 server-owned opt-in para `SUBMIT` e `PROMOTE`. Publication/snapshot/activation
 ainda não reutilizam esse gate por estágio. Criar ou alterar um cenário rotaciona
 a revisão do workspace e invalida a evidência anterior; o Studio recarrega o ETag
-do owner antes de oferecer os próximos comandos. O editor de cenários preserva
-decision, output, reason codes e effect intents esperados; essas asserções são
-distintas dos facts de entrada e tornam explícito o contrato que o Test Run precisa
-comprovar. Output é JSON opcional; códigos e intenções são listas normalizadas.
+do owner antes de oferecer os próximos comandos. O editor de cenários permite corrigir
+chave, nome, facts, decision esperada, status, output, reason codes e effect intents
+usando o ETag canônico do cenário. A alteração rotaciona também a revisão do workspace,
+limpa o resultado de sandbox obsoleto e exige um novo Test Run. As asserções são distintas
+dos facts de entrada e tornam explícito o contrato que o Test Run precisa comprovar.
+Output é JSON opcional; códigos e intenções são listas normalizadas.
 
 O Quickstart V61 publica uma action operacional protegida para executar cenários
 `CREATE`/`UPDATE` descartáveis e registrar a evidência V58. O Studio beta.10 a
