@@ -9,7 +9,7 @@
 
 ## Leitura executiva
 
-O produto corporativo completo está estimado em **68%**, com margem de ±5 pontos
+O produto corporativo completo está estimado em **69%**, com margem de ±5 pontos
 percentuais. Essa estimativa mede capabilities comprovadas, não linhas de código.
 A beta.14 demonstra um vertical slice relevante, materializa no cockpit os
 blockers tipados do gate de snapshot e separa explicitamente a identidade do
@@ -26,7 +26,7 @@ Marcos diferentes têm distâncias diferentes:
 | Marco | Estimativa atual | Significado |
 | --- | ---: | --- |
 | beta integrada controlada com Quickstart | 99% | contratos, action discovery e matriz HTTP multi-persona foram comprovados no corte publicado; falta executar a suíte visual live do Studio contra esse host |
-| versão estável corporativa | 61% | isolamento estrutural, segregação publicada e sessão/catálogo no site homologado foram provados; faltam Neon cross-tenant, gates posteriores, matriz browser multi-persona e operação corporativa |
+| versão estável corporativa | 62% | isolamento estrutural, segregação, sessão/catálogo, workspace e sandbox candidate no site homologado foram provados; faltam Neon cross-tenant, snapshot ativo, gates posteriores, matriz browser multi-persona e operação corporativa |
 | produto maduro multi-cliente com authoring complexo e IA | 34% | RuleSet completo, discovery amplo, impacto, execução explicável e agente governado |
 
 Rubrica das estimativas: `0` ausente, `25` seam/contrato, `50` vertical slice com
@@ -40,9 +40,9 @@ multi-consumidor.
 | fronteiras canônicas e neutralidade | 85 | `ja-suportado-mal-nomeado-ou-mal-materializado` | owners corretos; ainda existe normalização Ergon no core |
 | catálogo/discovery multi-domínio | 40 | `suportado-parcialmente` | carrega uma projeção configurada; não há registry governado |
 | inspeção e explicação humana/IA | 72 | `suportado-parcialmente` | facts, precedência, expressão e explicação grounded da definição; falta correlação causal com execução |
-| editar regra existente | 45 | `suportado-parcialmente` | condição focal; parâmetros, outcomes e RuleSet completo não são authorados |
+| editar regra existente | 50 | `suportado-parcialmente` | condição focal carregada e round-trip visual aberto sobre workspace real; parâmetros, outcomes e RuleSet completo não são authorados |
 | criar regra nova | 20 | `suportado-parcialmente` | Config possui intake; Studio apenas cria workspace de definição existente |
-| cenários, sandbox e Test Run | 84 | `suportado-parcialmente` | candidate × active, baseline independente, retry e action host-owned consumida por discovery existem; facts ainda são JSON |
+| cenários, sandbox e Test Run | 86 | `suportado-parcialmente` | cenário e Test Run reais provaram candidate `ALLOW` e active fail-closed sem snapshot no site publicado; baseline independente, retry e action host-owned existem; facts ainda são JSON |
 | review/maker-checker | 70 | `suportado-parcialmente` | workspace, ETag, blockers, run submetido e segregação existem; política cobre SUBMIT/PROMOTE, não estágios posteriores |
 | publicação/materialização | 58 | `suportado-parcialmente` | readiness e action `PUBLISH` são server-owned; o gate de evidência ainda não alcança publicação |
 | snapshot, rollback e staged rollout | 72 | `suportado-parcialmente` | blockers de evidência são server-owned, tipados e explicados pelo Studio; create/cancel/activate rollout e lifecycle de rollout-policy são principal-specific; falta prova multi-persona integrada |
@@ -97,10 +97,15 @@ A prova sanitizada confirmou:
 O PR `#29` publicou depois o Studio em
 `https://praxis-policy-studio-homolog.onrender.com`. A origin exata passou por
 CORS e pelo filtro do Config; uma sessão de author carregou as dez decisões no
-browser e uma sessão de auditor preservou leitura `200` com escrita `403`. A
-condição governada da decisão focal permaneceu ausente, logo essa prova não fecha
-authoring. Ela também não executa a suíte Playwright completa de seis personas,
-não repete o workspace estrangeiro no Neon e não constitui paridade Oracle/HADES.
+browser e uma sessão de auditor preservou leitura `200` com escrita `403`.
+
+O Quickstart PR `#199` alinhou depois o seed ao escopo configurado do Rule Lab. Na
+homologação `default/prod`, o author carregou a condição, criou workspace e
+cenário e persistiu um Test Run: candidate `ALLOW`, active
+`TECHNICAL_ERROR/ACTIVE_SNAPSHOT_UNAVAILABLE`. Isso fecha o sandbox candidate e
+prova fail-closed sem snapshot, mas não fecha publicação/ativação. A prova também
+não executa a suíte Playwright completa de seis personas, não repete o workspace
+estrangeiro no Neon e não constitui paridade Oracle/HADES.
 
 ## Gate de evidência
 
