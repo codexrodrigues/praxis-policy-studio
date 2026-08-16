@@ -101,6 +101,7 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly activeScenarios = computed(() => this.scenarios().filter(item => item.status === 'ACTIVE'));
   readonly editingScenarioId = signal<string | null>(null);
   readonly reviews = signal<readonly DomainRuleWorkspaceReview[]>([]);
+  readonly reviewRationaleValue = signal('');
   readonly workspaceCapabilities = signal<DomainRuleWorkspaceCapabilities | null>(null);
   readonly workspaceCapabilitiesLoading = signal(false);
   readonly workspaceCapabilitiesError = signal(false);
@@ -315,6 +316,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.publicationResult.set(null);
     this.authoringFeedback.set(null);
     this.authoringError.set(false);
+    this.reviewRationaleValue.set('');
     this.operationalAction.set(null);
     this.operationalActionError.set(false);
     this.operationalScenarioModes.set({});
@@ -618,6 +620,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     const state = this.runtime.state();
     const workspaceId = this.selected()?.workspaceId;
     this.reviews.set([]);
+    this.reviewRationaleValue.set('');
     if (state.kind !== 'ready' || !workspaceId) return;
     this.catalog.reviews(workspaceId, state.config).subscribe({
       next: reviews => {
@@ -1003,15 +1006,17 @@ export class CatalogWorkspaceComponent implements OnInit {
   ): void {
     const state = this.runtime.state();
     const current = this.selected();
+    const normalizedRationale = rationale.trim();
     if (state.kind !== 'ready' || !current?.workspaceId || !current.workspaceEtag
-      || !this.hasWorkspaceAction('REVIEW') || this.authoringBusy()) return;
+      || !normalizedRationale || !this.hasWorkspaceAction('REVIEW') || this.authoringBusy()) return;
     this.authoringBusy.set(true);
     this.clearAuthoringMessage();
-    this.catalog.reviewWorkspace(current.workspaceId, current.workspaceEtag, decision, rationale.trim(), state.config).subscribe({
+    this.catalog.reviewWorkspace(current.workspaceId, current.workspaceEtag, decision, normalizedRationale, state.config).subscribe({
       next: workspace => {
         this.applyWorkspace(workspace);
         this.authoringBusy.set(false);
         this.authoringFeedback.set(this.i18n.text(decision === 'APPROVE' ? 'workspaceApproved' : 'workspaceRejected'));
+        this.reviewRationaleValue.set('');
         form.reset();
         this.loadReviews();
         this.loadLifecycle();

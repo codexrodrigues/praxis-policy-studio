@@ -418,13 +418,13 @@
           <form #reviewForm class="review-form" (submit)="$event.preventDefault()">
             <label>
               <span>{{ i18n.text('reviewRationale') }}</span>
-              <textarea #reviewRationale rows="3" required></textarea>
+              <textarea #reviewRationale rows="3" required [value]="reviewRationaleValue()" (input)="reviewRationaleValue.set(reviewRationale.value)"></textarea>
             </label>
             <div class="governed-actions">
-              <button type="button" class="quiet-button" [disabled]="authoringBusy() || !reviewRationale.value.trim()" (click)="reviewGovernedWorkspace('REJECT', reviewRationale.value, reviewForm)">
+              <button type="button" class="quiet-button" [disabled]="authoringBusy() || !reviewRationaleValue().trim()" (click)="reviewGovernedWorkspace('REJECT', reviewRationaleValue(), reviewForm)">
                 {{ i18n.text('rejectWorkspace') }}
               </button>
-              <button type="button" [disabled]="authoringBusy() || !reviewRationale.value.trim()" (click)="reviewGovernedWorkspace('APPROVE', reviewRationale.value, reviewForm)">
+              <button type="button" [disabled]="authoringBusy() || !reviewRationaleValue().trim()" (click)="reviewGovernedWorkspace('APPROVE', reviewRationaleValue(), reviewForm)">
                 {{ i18n.text('approveWorkspace') }}
               </button>
             </div>
