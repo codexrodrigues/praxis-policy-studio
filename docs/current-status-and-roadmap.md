@@ -4,7 +4,7 @@
   no commit publicado `608584c`, com transporte, governance V58 e prova
   host-owned em dois datasources Neon
 - Data da auditoria: 2026-08-15
-- Escopo: Studio beta.14, Metadata rc.127, Config rc.118, Quickstart rc.40,
+- Escopo: Studio beta.14, Metadata rc.127, Config rc.119, Quickstart rc.40,
   Contracts beta.4, `@praxisui/*` rc.27 e handoff Ergon #300
 
 ## Leitura executiva
@@ -42,7 +42,7 @@ multi-consumidor.
 | inspeção e explicação humana/IA | 72 | `suportado-parcialmente` | facts, precedência, expressão e explicação grounded da definição; falta correlação causal com execução |
 | editar regra existente | 50 | `suportado-parcialmente` | condição focal carregada e round-trip visual aberto sobre workspace real; parâmetros, outcomes e RuleSet completo não são authorados |
 | criar regra nova | 20 | `suportado-parcialmente` | Config possui intake; Studio apenas cria workspace de definição existente |
-| cenários, sandbox e Test Run | 86 | `suportado-parcialmente` | cenário e Test Run reais provaram candidate `ALLOW` e active fail-closed sem snapshot no site publicado; baseline independente, retry e action host-owned existem; facts ainda são JSON |
+| cenários, sandbox e Test Run | 88 | `suportado-parcialmente` | cenário e Test Run reais provaram candidate `ALLOW` e active fail-closed sem snapshot; baseline independente, retry, asserções de decision/output/reasons/effects e action host-owned existem; facts ainda são JSON |
 | review/maker-checker | 70 | `suportado-parcialmente` | workspace, ETag, blockers, run submetido e segregação existem; política cobre SUBMIT/PROMOTE, não estágios posteriores |
 | publicação/materialização | 58 | `suportado-parcialmente` | readiness e action `PUBLISH` são server-owned; o gate de evidência ainda não alcança publicação |
 | snapshot, rollback e staged rollout | 72 | `suportado-parcialmente` | blockers de evidência são server-owned, tipados e explicados pelo Studio; create/cancel/activate rollout e lifecycle de rollout-policy são principal-specific; falta prova multi-persona integrada |
@@ -58,7 +58,7 @@ multi-consumidor.
    lifecycle de rollout-policy. Config publica ações principal-specific e o Studio
    nunca reutiliza uma action para autorizar outra operação.
 2. **Evidência governada:** a V58 oferece baseline independente por cenário,
-   idempotência, vínculo do run submetido e política opt-in. O Config rc.118
+   idempotência, vínculo do run submetido e política opt-in. O Config rc.119
    revalida o receipt na composição de snapshot e devolve blockers tipados; o
    Studio beta.13 os explica sem interpretar mensagens humanas. Ainda falta
    provar essa cadeia no browser integrado multi-persona.

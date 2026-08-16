@@ -331,12 +331,34 @@ describe('ProjectionCatalogService', () => {
     expect(save.request.body.condition).toEqual({ '>': [{ var: 'amount' }, 0] });
     save.flush({ id: 'workspace-1', etag: 'etag-2', parameters: {} });
 
+    let currentWorkspaceEtag = '';
     service.createScenario('workspace-1', {
-      scenarioKey: 'positive', name: 'Positive amount', facts: { amount: 10 }, expectedDecision: 'ALLOW'
-    }, config).subscribe();
+      scenarioKey: 'positive', name: 'Positive amount', facts: { amount: 10 }, expectedDecision: 'ALLOW',
+      expectedReasonCodes: [], expectedEffectIntents: ['REGISTER_EXTRAORDINARY_GRANT']
+    }, config).subscribe(receipt => currentWorkspaceEtag = receipt.workspace.etag);
     const scenario = http.expectOne('/api/praxis/config/domain-rules/workspaces/workspace-1/scenarios');
     expect(scenario.request.method).toBe('POST');
-    scenario.flush({ id: 'scenario-1', expectedDecision: 'ALLOW' });
+    expect(scenario.request.body.expectedEffectIntents).toEqual(['REGISTER_EXTRAORDINARY_GRANT']);
+    scenario.flush({ id: 'scenario-1', expectedDecision: 'ALLOW', etag: 'scenario-etag-1' });
+    http.expectOne('/api/praxis/config/domain-rules/workspaces/workspace-1').flush({
+      id: 'workspace-1', ruleKey: 'grant.amount-parameters', etag: 'etag-3', parameters: {}
+    });
+    expect(currentWorkspaceEtag).toBe('etag-3');
+
+    service.updateScenario('workspace-1', 'scenario-1', {
+      scenarioKey: 'positive', name: 'Positive amount', facts: { amount: 10 }, expectedDecision: 'ALLOW',
+      expectedReasonCodes: [], expectedEffectIntents: ['REGISTER_EXTRAORDINARY_GRANT']
+    }, 'scenario-etag-1', config).subscribe(receipt => currentWorkspaceEtag = receipt.workspace.etag);
+    const scenarioUpdate = http.expectOne(
+      '/api/praxis/config/domain-rules/workspaces/workspace-1/scenarios/scenario-1'
+    );
+    expect(scenarioUpdate.request.method).toBe('PUT');
+    expect(scenarioUpdate.request.headers.get('If-Match')).toBe('"scenario-etag-1"');
+    scenarioUpdate.flush({ id: 'scenario-1', expectedDecision: 'ALLOW', etag: 'scenario-etag-2' });
+    http.expectOne('/api/praxis/config/domain-rules/workspaces/workspace-1').flush({
+      id: 'workspace-1', ruleKey: 'grant.amount-parameters', etag: 'etag-4', parameters: {}
+    });
+    expect(currentWorkspaceEtag).toBe('etag-4');
 
     service.runSandbox(
       'workspace-1', ['scenario-1'], 'policy-studio:workspace-1:command-1',
@@ -350,9 +372,9 @@ describe('ProjectionCatalogService', () => {
     }));
     sandbox.flush({ runId: 'run-1', workspaceId: 'workspace-1', results: [] });
 
-    service.submitWorkspace('workspace-1', 'etag-2', config).subscribe();
+    service.submitWorkspace('workspace-1', currentWorkspaceEtag, config).subscribe();
     const submit = http.expectOne('/api/praxis/config/domain-rules/workspaces/workspace-1/submit');
-    expect(submit.request.headers.get('If-Match')).toBe('"etag-2"');
+    expect(submit.request.headers.get('If-Match')).toBe('"etag-4"');
     submit.flush({ id: 'workspace-1', status: 'SUBMITTED' });
   });
 

@@ -173,8 +173,28 @@ export class ProjectionCatalogService {
     workspaceId: string,
     request: DomainRuleTestScenarioRequest,
     config: PolicyStudioRuntimeConfig
-  ): Observable<DomainRuleTestScenario> {
-    return this.domainRules.createTestScenario(workspaceId, request, this.requestOptions(config));
+  ): Observable<{ readonly scenario: DomainRuleTestScenario; readonly workspace: DomainRuleChangeWorkspace }> {
+    const options = this.requestOptions(config);
+    return this.domainRules.createTestScenario(workspaceId, request, options).pipe(
+      switchMap(scenario => this.domainRules.getChangeWorkspace(workspaceId, options).pipe(
+        map(workspace => ({ scenario, workspace }))
+      ))
+    );
+  }
+
+  updateScenario(
+    workspaceId: string,
+    scenarioId: string,
+    request: DomainRuleTestScenarioRequest,
+    scenarioEtag: string,
+    config: PolicyStudioRuntimeConfig
+  ): Observable<{ readonly scenario: DomainRuleTestScenario; readonly workspace: DomainRuleChangeWorkspace }> {
+    const options = this.requestOptions(config);
+    return this.domainRules.updateTestScenario(workspaceId, scenarioId, request, scenarioEtag, options).pipe(
+      switchMap(scenario => this.domainRules.getChangeWorkspace(workspaceId, options).pipe(
+        map(workspace => ({ scenario, workspace }))
+      ))
+    );
   }
 
   runSandbox(
