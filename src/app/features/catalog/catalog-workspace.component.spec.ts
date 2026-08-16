@@ -45,6 +45,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
   const createWorkspace = vi.fn();
   const createScenario = vi.fn();
   const updateScenario = vi.fn();
+  const reviewWorkspace = vi.fn();
   let sandboxRuns: Subject<any>[];
   let runSandbox: ReturnType<typeof vi.fn>;
   const operationalTestAction = vi.fn();
@@ -74,6 +75,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     createWorkspace.mockReset();
     createScenario.mockReset();
     updateScenario.mockReset();
+    reviewWorkspace.mockReset();
     operationalTestAction.mockReset();
     runOperationalTest.mockReset();
     logoutSession.mockReset();
@@ -104,6 +106,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
         createWorkspace,
         createScenario,
         updateScenario,
+        reviewWorkspace,
         runSandbox
       } }
     ] });
@@ -429,6 +432,29 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(component.hasWorkspaceAction('UPDATE_DRAFT')).toBe(false);
     expect(component.hasWorkspaceAction('SUBMIT')).toBe(false);
     expect(component.hasWorkspaceAction('PROMOTE')).toBe(false);
+  });
+
+  it('governs review rationale as reactive state and rejects blank review commands', () => {
+    component.select(decision('A'));
+    capabilities.A[0].next({
+      workspaceId: 'workspace-A', availableActions: ['VIEW', 'REVIEW'], blockers: []
+    });
+    const form = document.createElement('form');
+
+    component.reviewGovernedWorkspace('APPROVE', '   ', form);
+    expect(reviewWorkspace).not.toHaveBeenCalled();
+
+    reviewWorkspace.mockReturnValue(of({
+      id: 'workspace-A', ruleKey: 'A', status: 'APPROVED', etag: 'etag-reviewed', revision: 3,
+      parameters: {}
+    }));
+    component.reviewRationaleValue.set('  independent evidence accepted  ');
+    component.reviewGovernedWorkspace('APPROVE', component.reviewRationaleValue(), form);
+
+    expect(reviewWorkspace).toHaveBeenCalledWith(
+      'workspace-A', 'etag-A', 'APPROVE', 'independent evidence accepted', config
+    );
+    expect(component.reviewRationaleValue()).toBe('');
   });
 
   it('projects only sanitized operational evidence from the latest governed Test Run', () => {
