@@ -43,6 +43,8 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
   const reviews = { A: [] as Subject<any>[], B: [] as Subject<any>[] };
   const capabilities = { A: [] as Subject<any>[], B: [] as Subject<any>[] };
   const createWorkspace = vi.fn();
+  const createScenario = vi.fn();
+  const updateScenario = vi.fn();
   let sandboxRuns: Subject<any>[];
   let runSandbox: ReturnType<typeof vi.fn>;
   const operationalTestAction = vi.fn();
@@ -68,6 +70,8 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
       return subject.asObservable();
     });
     createWorkspace.mockReset();
+    createScenario.mockReset();
+    updateScenario.mockReset();
     operationalTestAction.mockReset();
     runOperationalTest.mockReset();
     operationalTestAction.mockReturnValue(of(null));
@@ -93,6 +97,8 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
         operationalTestAction,
         runOperationalTest,
         createWorkspace,
+        createScenario,
+        updateScenario,
         runSandbox
       } }
     ] });
@@ -150,6 +156,77 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     component.createWorkspace();
     expect(createWorkspace).toHaveBeenCalledOnce();
     expect(createWorkspace).toHaveBeenCalledWith('definition-A', 'A', config);
+  });
+
+  it('persists complete scenario assertions and refreshes the rotated workspace ETag', () => {
+    const baseScenario = {
+      id: 'scenario-A', workspaceId: 'workspace-A', scenarioKey: 'allow-create', name: 'Allow create',
+      facts: { requestedAmount: 500 }, expectedDecision: 'ALLOW', expectedReasonCodes: [],
+      expectedEffectIntents: [], status: 'ACTIVE', revision: 1, etag: 'scenario-etag-1'
+    };
+    createScenario.mockReturnValue(of({
+      scenario: { ...baseScenario, expectedEffectIntents: ['REGISTER_EXTRAORDINARY_GRANT'] },
+      workspace: {
+        id: 'workspace-A', ruleKey: 'A', status: 'OPEN', etag: 'workspace-etag-2', revision: 2,
+        condition: { '===': [1, 1] }, parameters: {}
+      }
+    }));
+    updateScenario.mockReturnValue(of({
+      scenario: {
+        ...baseScenario, revision: 2, etag: 'scenario-etag-2',
+        expectedEffectIntents: ['REGISTER_EXTRAORDINARY_GRANT']
+      },
+      workspace: {
+        id: 'workspace-A', ruleKey: 'A', status: 'OPEN', etag: 'workspace-etag-3', revision: 3,
+        condition: { '===': [1, 1] }, parameters: {}
+      }
+    }));
+
+    component.select(decision('A'));
+    capabilities.A[0].next({
+      workspaceId: 'workspace-A', availableActions: ['VIEW', 'MANAGE_SCENARIOS'], blockers: []
+    });
+    component.createScenario(
+      'allow-create', 'Allow create', '{"requestedAmount":500}', 'ALLOW', '', '',
+      'REGISTER_EXTRAORDINARY_GRANT', document.createElement('form')
+    );
+
+    expect(createScenario).toHaveBeenCalledWith('workspace-A', expect.objectContaining({
+      facts: { requestedAmount: 500 },
+      expectedReasonCodes: [],
+      expectedEffectIntents: ['REGISTER_EXTRAORDINARY_GRANT']
+    }), config);
+    expect(component.selected()?.workspaceEtag).toBe('workspace-etag-2');
+    capabilities.A[1].next({
+      workspaceId: 'workspace-A', availableActions: ['VIEW', 'MANAGE_SCENARIOS'], blockers: []
+    });
+
+    component.updateScenarioAssertions(
+      { ...baseScenario, expectedEffectIntents: [] } as any,
+      '', '', 'REGISTER_EXTRAORDINARY_GRANT\nREGISTER_EXTRAORDINARY_GRANT'
+    );
+    expect(updateScenario).toHaveBeenCalledWith(
+      'workspace-A', 'scenario-A', expect.objectContaining({
+        expectedEffectIntents: ['REGISTER_EXTRAORDINARY_GRANT']
+      }), 'scenario-etag-1', config
+    );
+    expect(component.selected()?.workspaceEtag).toBe('workspace-etag-3');
+  });
+
+  it('fails locally when expected output is invalid JSON', () => {
+    component.select(decision('A'));
+    capabilities.A[0].next({
+      workspaceId: 'workspace-A', availableActions: ['VIEW', 'MANAGE_SCENARIOS'], blockers: []
+    });
+
+    component.createScenario(
+      'invalid-output', 'Invalid output', '{}', 'ALLOW', '{broken', '', '',
+      document.createElement('form')
+    );
+
+    expect(createScenario).not.toHaveBeenCalled();
+    expect(component.authoringError()).toBe(true);
+    expect(component.authoringFeedback()).toBe('O output esperado deve ser um JSON válido ou ficar vazio.');
   });
 
   it('requires an explicit operation and confirmation before invoking the discovered host action', () => {

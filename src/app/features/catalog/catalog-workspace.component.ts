@@ -95,6 +95,7 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly authoringError = signal(false);
   readonly authoringFeedback = signal<string | null>(null);
   readonly scenarios = signal<readonly DomainRuleTestScenario[]>([]);
+  readonly editingScenarioId = signal<string | null>(null);
   readonly reviews = signal<readonly DomainRuleWorkspaceReview[]>([]);
   readonly workspaceCapabilities = signal<DomainRuleWorkspaceCapabilities | null>(null);
   readonly workspaceCapabilitiesLoading = signal(false);
@@ -284,6 +285,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.operationalAction.set(null);
     this.operationalActionError.set(false);
     this.operationalScenarioModes.set({});
+    this.editingScenarioId.set(null);
     this.operationalConfirmationOpen.set(false);
     this.snapshotFeedback.set(null);
     this.snapshotFeedbackError.set(false);
@@ -753,6 +755,9 @@ export class CatalogWorkspaceComponent implements OnInit {
     name: string,
     factsJson: string,
     expectedDecision: string,
+    expectedOutputJson: string,
+    expectedReasonCodes: string,
+    expectedEffectIntents: string,
     form: HTMLFormElement
   ): void {
     const state = this.runtime.state();
@@ -760,6 +765,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     if (state.kind !== 'ready' || !workspaceId
       || !this.hasWorkspaceAction('MANAGE_SCENARIOS') || this.authoringBusy()) return;
     let facts: Record<string, unknown>;
+    let expectedOutput: unknown;
     try {
       const parsed: unknown = JSON.parse(factsJson);
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error();
@@ -769,16 +775,27 @@ export class CatalogWorkspaceComponent implements OnInit {
       this.authoringFeedback.set(this.i18n.text('invalidFacts'));
       return;
     }
+    try {
+      expectedOutput = this.optionalJson(expectedOutputJson);
+    } catch {
+      this.authoringError.set(true);
+      this.authoringFeedback.set(this.i18n.text('invalidExpectedOutput'));
+      return;
+    }
     this.authoringBusy.set(true);
     this.clearAuthoringMessage();
     this.catalog.createScenario(workspaceId, {
       scenarioKey: key.trim(),
       name: name.trim(),
       facts,
-      expectedDecision: expectedDecision as DomainRuleDecision
+      expectedDecision: expectedDecision as DomainRuleDecision,
+      expectedOutput,
+      expectedReasonCodes: this.assertionList(expectedReasonCodes),
+      expectedEffectIntents: this.assertionList(expectedEffectIntents)
     }, state.config).subscribe({
-      next: scenario => {
-        this.scenarios.update(items => [...items, scenario]);
+      next: receipt => {
+        this.applyWorkspace(receipt.workspace);
+        this.scenarios.update(items => this.withScenario(items, receipt.scenario));
         this.sandboxIdempotencyKey = null;
         this.sandboxEvaluatedAtUtc = null;
         this.authoringBusy.set(false);
@@ -788,6 +805,87 @@ export class CatalogWorkspaceComponent implements OnInit {
       },
       error: error => this.failAuthoring(error)
     });
+  }
+
+  editScenario(scenarioId: string): void {
+    if (!this.hasWorkspaceAction('MANAGE_SCENARIOS') || this.authoringBusy()) return;
+    this.editingScenarioId.set(scenarioId);
+    this.clearAuthoringMessage();
+  }
+
+  cancelScenarioEdit(): void {
+    this.editingScenarioId.set(null);
+  }
+
+  updateScenarioAssertions(
+    scenario: DomainRuleTestScenario,
+    expectedOutputJson: string,
+    expectedReasonCodes: string,
+    expectedEffectIntents: string
+  ): void {
+    const state = this.runtime.state();
+    const workspaceId = this.selected()?.workspaceId;
+    if (state.kind !== 'ready' || !workspaceId || !scenario.etag
+      || !this.hasWorkspaceAction('MANAGE_SCENARIOS') || this.authoringBusy()) return;
+    let expectedOutput: unknown;
+    try {
+      expectedOutput = this.optionalJson(expectedOutputJson);
+    } catch {
+      this.authoringError.set(true);
+      this.authoringFeedback.set(this.i18n.text('invalidExpectedOutput'));
+      return;
+    }
+    this.authoringBusy.set(true);
+    this.clearAuthoringMessage();
+    this.catalog.updateScenario(workspaceId, scenario.id, {
+      scenarioKey: scenario.scenarioKey,
+      name: scenario.name,
+      facts: scenario.facts,
+      expectedDecision: scenario.expectedDecision,
+      expectedOutput,
+      expectedReasonCodes: this.assertionList(expectedReasonCodes),
+      expectedEffectIntents: this.assertionList(expectedEffectIntents),
+      status: scenario.status
+    }, scenario.etag, state.config).subscribe({
+      next: receipt => {
+        this.applyWorkspace(receipt.workspace);
+        this.scenarios.update(items => this.withScenario(items, receipt.scenario));
+        this.sandboxRun.set(null);
+        this.sandboxIdempotencyKey = null;
+        this.sandboxEvaluatedAtUtc = null;
+        this.editingScenarioId.set(null);
+        this.authoringBusy.set(false);
+        this.authoringFeedback.set(this.i18n.text('scenarioUpdated'));
+        this.loadLifecycle();
+      },
+      error: error => this.failAuthoring(error)
+    });
+  }
+
+  scenarioExpectedOutput(scenario: DomainRuleTestScenario): string {
+    return scenario.expectedOutput == null ? '' : JSON.stringify(scenario.expectedOutput, null, 2);
+  }
+
+  scenarioAssertions(values: readonly string[] | undefined): string {
+    return values?.join('\n') ?? '';
+  }
+
+  private optionalJson(value: string): unknown {
+    const normalized = value.trim();
+    return normalized ? JSON.parse(normalized) : undefined;
+  }
+
+  private assertionList(value: string): string[] {
+    return [...new Set(value.split(/[\n,]/).map(item => item.trim()).filter(Boolean))];
+  }
+
+  private withScenario(
+    scenarios: readonly DomainRuleTestScenario[],
+    updated: DomainRuleTestScenario
+  ): readonly DomainRuleTestScenario[] {
+    return scenarios.some(item => item.id === updated.id)
+      ? scenarios.map(item => item.id === updated.id ? updated : item)
+      : [...scenarios, updated];
   }
 
   runGovernedSandbox(): void {
@@ -1123,6 +1221,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.operationalActionLoading.set(false);
     this.operationalActionError.set(false);
     this.operationalScenarioModes.set({});
+    this.editingScenarioId.set(null);
     this.operationalConfirmationOpen.set(false);
     this.sandboxRun.set(null);
     this.sandboxIdempotencyKey = null;

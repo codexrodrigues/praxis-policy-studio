@@ -133,3 +133,53 @@ h2 { max-width: 48rem; font-size: clamp(1.6rem, 3vw, 2.45rem); line-height: 1.08
   border-radius: 0.5rem;
   padding: 0.55rem 0.85rem;
 }
+
+.scenario-assertions,
+.scenario-inline-editor {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  border: 1px solid var(--pax-color-outline-variant, #c5d0d5);
+  border-radius: 0.65rem;
+  background: var(--pax-color-surface-container-lowest, #fff);
+}
+
+.scenario-assertions summary {
+  cursor: pointer;
+  color: var(--pax-color-primary, #076487);
+  font-weight: 750;
+}
+
+.scenario-assertions p,
+.scenario-inline-editor small {
+  color: var(--pax-color-on-surface-variant, #52636a);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.scenario-inline-editor label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.scenario-inline-editor textarea {
+  width: 100%;
+  border: 1px solid var(--pax-color-outline, #697a82);
+  border-radius: 0.5rem;
+  padding: 0.65rem;
+  background: var(--pax-color-surface, #f9fbfc);
+  color: inherit;
+  font: inherit;
+}
+
+.scenario-list article > small,
+.scenario-list article > .quiet-button {
+  grid-column: 1 / -1;
+}
+
+.scenario-list article > .quiet-button {
+  justify-self: start;
+}

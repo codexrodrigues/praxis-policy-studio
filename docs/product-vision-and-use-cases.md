@@ -116,7 +116,7 @@ Cada caso de uso indica o resultado esperado do produto completo. A coluna
 | UC-04 | Comparar versões | entender diferenças entre baseline, draft e versão publicada | parcial: baseline versus draft |
 | UC-05 | Criar draft | salvar mudança concorrente sem ativar | parcial: change workspace focal com ETag |
 | UC-06 | Validar regra | verificar sintaxe, tipos, facts, contrato e invariantes | parcial: editor e projeção |
-| UC-07 | Simular decisão | executar casos positivos, negativos, fronteira, `null` e colisão | parcial: candidate × active e Test Run; facts ainda em JSON |
+| UC-07 | Simular decisão | executar casos positivos, negativos, fronteira, `null` e colisão | parcial: candidate × active, Test Run e asserções de output/reasons/effects; facts ainda em JSON |
 | UC-08 | Revisar mudança | produzir pacote de revisão com diff, testes e impactos | parcial: submit/review/promotion; impacto transitivo ausente |
 | UC-09 | Publicar versão | transicionar por lifecycle governado e segregação de papéis | parcial: readiness/publicação; action de publish incompleta |
 | UC-10 | Ativar e reverter | trocar snapshot atomicamente e restaurar last-known-good | parcial: snapshot/rollback e staged rollout; actions incompletas |
