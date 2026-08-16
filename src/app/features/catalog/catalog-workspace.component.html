@@ -298,16 +298,31 @@
                 <small>{{ i18n.text('expectedEffectIntents') }}: {{ scenario.expectedEffectIntents?.join(', ') }}</small>
               }
               <button type="button" class="quiet-button" [disabled]="authoringBusy() || !hasWorkspaceAction('MANAGE_SCENARIOS')" (click)="editScenario(scenario.id)">
-                {{ i18n.text('editScenarioAssertions') }}
+                {{ i18n.text('editScenario') }}
               </button>
               @if (editingScenarioId() === scenario.id) {
-                <section class="scenario-inline-editor" [attr.aria-label]="i18n.text('editScenarioAssertions')">
+                <section class="scenario-inline-editor" [attr.aria-label]="i18n.text('editScenario')">
+                  <label><span>{{ i18n.text('scenarioKey') }}</span><input #editScenarioKey required [value]="scenario.scenarioKey"></label>
+                  <label><span>{{ i18n.text('scenarioName') }}</span><input #editScenarioName required [value]="scenario.name"></label>
+                  <label class="scenario-facts"><span>{{ i18n.text('scenarioFacts') }}</span><textarea #editScenarioFacts rows="5" required [value]="formatScenarioFacts(scenario)"></textarea></label>
+                  <label><span>{{ i18n.text('expectedDecision') }}</span>
+                    <select #editExpectedDecision [value]="scenario.expectedDecision">
+                      <option>ALLOW</option><option>DENY</option><option>NOT_APPLICABLE</option>
+                      <option>INCONCLUSIVE</option><option>TECHNICAL_ERROR</option>
+                    </select>
+                  </label>
+                  <label><span>{{ i18n.text('scenarioStatus') }}</span>
+                    <select #editScenarioStatus [value]="scenario.status">
+                      <option value="ACTIVE">{{ i18n.text('scenarioActive') }}</option>
+                      <option value="DISABLED">{{ i18n.text('scenarioDisabled') }}</option>
+                    </select>
+                  </label>
                   <label><span>{{ i18n.text('expectedOutput') }}</span><textarea #editExpectedOutput rows="3" [value]="scenarioExpectedOutput(scenario)"></textarea></label>
                   <label><span>{{ i18n.text('expectedReasonCodes') }}</span><textarea #editReasonCodes rows="2" [value]="scenarioAssertions(scenario.expectedReasonCodes)"></textarea></label>
                   <label><span>{{ i18n.text('expectedEffectIntents') }}</span><textarea #editEffectIntents rows="2" [value]="scenarioAssertions(scenario.expectedEffectIntents)"></textarea></label>
                   <div class="authoring-actions">
                     <button type="button" class="quiet-button" (click)="cancelScenarioEdit()">{{ i18n.text('cancel') }}</button>
-                    <button type="button" [disabled]="authoringBusy()" (click)="updateScenarioAssertions(scenario, editExpectedOutput.value, editReasonCodes.value, editEffectIntents.value)">{{ i18n.text('saveScenarioAssertions') }}</button>
+                    <button type="button" [disabled]="authoringBusy()" (click)="updateScenario(scenario, editScenarioKey.value, editScenarioName.value, editScenarioFacts.value, editExpectedDecision.value, editScenarioStatus.value, editExpectedOutput.value, editReasonCodes.value, editEffectIntents.value)">{{ i18n.text('saveScenario') }}</button>
                   </div>
                 </section>
               }
