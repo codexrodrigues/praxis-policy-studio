@@ -321,6 +321,11 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
       expect(runSandbox.mock.calls[1][2]).toBe(firstKey);
       expect(runSandbox.mock.calls[1][3]).toBe(firstEvaluatedAt);
       sandboxRuns[1].next({ runId: 'run-A', workspaceId: 'workspace-A', results: [] });
+      expect(capabilities.A).toHaveLength(2);
+      capabilities.A[1].next({
+        workspaceId: 'workspace-A', availableActions: ['VIEW', 'RECORD_TEST_RUN', 'SUBMIT'], blockers: []
+      });
+      expect(component.hasWorkspaceAction('SUBMIT')).toBe(true);
 
       vi.advanceTimersByTime(1);
       component.runGovernedSandbox();
