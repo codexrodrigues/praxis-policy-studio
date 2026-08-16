@@ -48,7 +48,18 @@ referência. Em uma sessão separada de auditor, o backend publicou leitura `200
 e recusou a action operacional com `403`. Nenhuma Definition, workspace,
 publicação, snapshot ou autoridade foi alterada durante essa prova.
 
-O catálogo ainda mostrou `condition` ausente para a decisão focal, embora sua
-Definition estivesse projetada. Portanto a prova fecha deployment, sessão,
-catálogo e segregação read-only, mas não reivindica authoring completo nem a
-matriz Playwright live de seis personas.
+Uma primeira execução mostrou `condition` ausente porque o seed do Rule Lab
+estava desabilitado e, quando ativado, ainda usava um escopo fixo diferente do
+principal. O Quickstart PR `#199` removeu esse hardcode: o seed usa agora
+`praxis.rule-lab.snapshot.tenant-id/environment` e falha fechado para escopo
+vazio. A homologação habilitou explicitamente o seed em `default/prod`; não foi
+aberta leitura cross-tenant.
+
+Depois do novo deploy, o author carregou a condição
+`request.requestedAmount <= program.maxAmount`, criou um workspace governado e
+um cenário `amount-within-limit`, e executou o sandbox. O receipt persistido
+registrou `candidate=ALLOW`, `active=TECHNICAL_ERROR` e
+`ACTIVE_SNAPSHOT_UNAVAILABLE`. Isso prova o candidate authorado e o fail-closed
+da lane ativa sem snapshot; não prova publicação, ativação nem paridade com
+Oracle/HADES. A matriz Playwright live completa de seis personas também continua
+pendente.

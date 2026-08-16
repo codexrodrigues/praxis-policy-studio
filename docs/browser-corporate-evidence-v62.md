@@ -84,9 +84,15 @@ Essa é uma prova browser integrada de sessão e catálogo para a persona author
 com segregação do auditor comprovada pela mesma cadeia publicada. A execução
 automatizada dos sete testes Playwright com as seis personas ainda não é
 reivindicada. O gate multi-persona só muda de “preparado” para “comprovado” quando
-a suíte inteira rodar contra o site e o host publicados. A condição governada da
-decisão focal também chegou ausente; por isso esta prova não é apresentada como
-authoring completo.
+a suíte inteira rodar contra o site e o host publicados.
+
+O Quickstart PR `#199` corrigiu depois o seed que gravava em escopo fixo. Com o
+seed explicitamente habilitado no escopo server-owned `default/prod`, o mesmo
+site carregou a condição, criou workspace e cenário governados e persistiu um
+Test Run. O candidate retornou `ALLOW`; a lane active retornou
+`TECHNICAL_ERROR/ACTIVE_SNAPSHOT_UNAVAILABLE`, pois nenhum snapshot foi
+publicado. Esse resultado é a evidência correta de authoring/sandbox controlado,
+não um falso `MATCH` nem autorização para publicar.
 
 ## Dívida visual observada
 
