@@ -912,6 +912,7 @@ export class CatalogWorkspaceComponent implements OnInit {
         this.authoringBusy.set(false);
         this.authoringFeedback.set(this.i18n.text('sandboxCompleted'));
         this.loadLifecycle();
+        this.loadWorkspaceCapabilities();
       },
       error: error => this.failAuthoring(error)
     });
