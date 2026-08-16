@@ -42,6 +42,18 @@ describe('AuthSessionService', () => {
     })).toThrowError('AUTH_REMOTE_CONFIG_REQUIRED');
   });
 
+  it('closes the canonical remote cookie session', () => {
+    service.logout({
+      mode: 'remote', configApiBaseUrl: 'http://127.0.0.1:8088', locale: 'pt-BR',
+      projectionPath: '/projections/quickstart-benefit-eligibility.v1.json', initialDecisionKey: null
+    }).subscribe();
+    const request = http.expectOne('http://127.0.0.1:8088/auth/logout');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.withCredentials).toBe(true);
+    expect(request.request.body).toBeNull();
+    request.flush(null);
+  });
+
   it('distinguishes a missing session from an authenticated principal', () => {
     const config = {
       mode: 'remote' as const, configApiBaseUrl: 'http://127.0.0.1:8088', locale: 'pt-BR' as const,

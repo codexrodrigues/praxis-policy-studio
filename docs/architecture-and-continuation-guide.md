@@ -115,7 +115,9 @@ no browser.
 
 O login de desenvolvimento usa `/auth/login` e cookie `HttpOnly`. O Studio não
 armazena senha ou token. `401` significa sessão necessária; `403` é distinguido
-entre sessão ausente e sessão válida sem permissão.
+entre sessão ausente e sessão válida sem permissão. O logout consome
+`/auth/logout`, limpa toda projeção governada em memória e não oferece troca de
+persona: IAM e identidade continuam pertencendo ao host.
 
 ## 4. Fluxos implementados
 
