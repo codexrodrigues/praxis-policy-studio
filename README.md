@@ -69,14 +69,16 @@ do que ainda depende de Neon, Oracle/HADES, UX corporativa ou releases coordenad
 
 ## Configuração
 
-`public/app-config.json` é carregado no início e seleciona uma projeção local
-versionada por `projectionPath`. A configuração versionada usa o caso Quickstart,
+`public/app-config.json` é carregado no início. Em modo remoto, o catálogo governado
+do Config define quais decisões podem ser navegadas; `projectionPath` é opcional e
+apenas enriquece decisões conhecidas com facts, autoridade e evidência versionada.
+A configuração versionada usa o caso Quickstart como enriquecimento inicial,
 modo `remote` e URLs same-origin. `npm start` encaminha `/auth`, `/api` e
 `/schemas` para o Quickstart oficial em `http://127.0.0.1:8088`; assim actions
 Metadata, o `DomainRuleService`
 público e a sessão cookie não dependem de transporte cross-origin. Ela não
 contém credenciais. O modo `remote` falha fechado quando `configApiBaseUrl` não
-é string, consulta definições e timeline por
+é string, consulta o catálogo, detalhes exatos e timeline por
 `/api/praxis/config/domain-rules/**` e usa a sessão autenticada do host. O
 browser não envia tenant, ambiente ou authority. Isso é uma restrição do cliente,
 não uma garantia de isolamento. Ações de definition, workspace, snapshot e staged

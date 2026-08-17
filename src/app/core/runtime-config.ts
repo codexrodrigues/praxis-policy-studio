@@ -5,7 +5,7 @@ export interface PolicyStudioRuntimeConfig {
   readonly mode: PolicyStudioMode;
   readonly configApiBaseUrl: string | null;
   readonly locale: SupportedLocale;
-  readonly projectionPath: string;
+  readonly projectionPath: string | null;
   readonly initialDecisionKey: string | null;
 }
 
@@ -23,14 +23,18 @@ export function validateRuntimeConfig(value: unknown): PolicyStudioRuntimeConfig
   if (candidate.mode === 'remote' && typeof candidate.configApiBaseUrl !== 'string') {
     throw new Error('SETUP_REMOTE_ENDPOINT_REQUIRED');
   }
-  if (!candidate.projectionPath?.startsWith('/projections/') || !candidate.projectionPath.endsWith('.json')) {
+  if (candidate.projectionPath != null
+      && (!candidate.projectionPath.startsWith('/projections/') || !candidate.projectionPath.endsWith('.json'))) {
+    throw new Error('SETUP_PROJECTION_PATH_REQUIRED');
+  }
+  if (candidate.mode === 'fixture' && candidate.projectionPath == null) {
     throw new Error('SETUP_PROJECTION_PATH_REQUIRED');
   }
   return {
     mode: candidate.mode,
     configApiBaseUrl: candidate.configApiBaseUrl ?? null,
     locale: candidate.locale,
-    projectionPath: candidate.projectionPath,
+    projectionPath: candidate.projectionPath ?? null,
     initialDecisionKey: candidate.initialDecisionKey?.trim() || null
   };
 }

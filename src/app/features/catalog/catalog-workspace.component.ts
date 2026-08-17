@@ -219,7 +219,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.loadError.set(null);
     this.authenticationRequired.set(false);
     this.permissionLimited.set(false);
-    this.catalog.load(state.config.projectionPath, this.i18n.locale(), state.config).subscribe({
+    this.catalog.load(this.i18n.locale(), state.config).subscribe({
       next: decisions => {
         if (loadRevision !== this.catalogLoadRevision) return;
         this.authenticationFailed.set(false);

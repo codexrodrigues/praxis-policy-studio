@@ -1,8 +1,8 @@
 import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { catchError, forkJoin, map, Observable, of, switchMap, throwError } from 'rxjs';
+import { catchError, EMPTY, expand, forkJoin, map, Observable, of, reduce, switchMap, throwError } from 'rxjs';
 import { PolicyStudioRuntimeConfig, SupportedLocale } from './runtime-config';
-import { validateDomainProjection } from './domain-projection';
+import { DomainProjection, validateDomainProjection } from './domain-projection';
 import {
   DecisionLifecycleSummary,
   DecisionPublicationResult,
@@ -18,6 +18,7 @@ import {
   type ResourceActionCatalogItem,
   type RestApiResponse,
   type DomainRuleChangeWorkspace,
+  type DomainRuleCatalogCandidate,
   type DomainRuleDefinition,
   type DomainRuleDefinitionCapabilities,
   type DomainRuleRequestOptions,
@@ -46,10 +47,10 @@ export class ProjectionCatalogService {
   private readonly domainRules = inject(DomainRuleService);
   private readonly discovery = inject(ResourceDiscoveryService);
 
-  load(path: string, locale: SupportedLocale, config: PolicyStudioRuntimeConfig): Observable<readonly DecisionSummary[]> {
-    const definitions = config.mode === 'remote'
-      ? this.domainRules.listDefinitions({}, this.requestOptions(config))
-      : of([] as readonly DomainRuleDefinition[]);
+  load(locale: SupportedLocale, config: PolicyStudioRuntimeConfig): Observable<readonly DecisionSummary[]> {
+    const catalog = config.mode === 'remote'
+      ? this.loadCatalogPages(config)
+      : of([] as readonly DomainRuleCatalogCandidate[]);
     const workspaces = config.mode === 'remote'
       ? this.domainRules.listChangeWorkspaces(this.requestOptions(config))
       : of([] as readonly DomainRuleChangeWorkspace[]);
@@ -57,25 +58,37 @@ export class ProjectionCatalogService {
       ? this.domainRules.getDefinitionCapabilities(this.requestOptions(config))
       : of({ tenantId: '', environment: '', definitions: [] } satisfies DomainRuleDefinitionCapabilities);
     return forkJoin({
-      projection: this.http.get<unknown>(path).pipe(map(validateDomainProjection)),
-      definitions,
+      projection: config.projectionPath
+        ? this.http.get<unknown>(config.projectionPath).pipe(
+            map(validateDomainProjection),
+            catchError(error => config.mode === 'remote' ? of(null) : throwError(() => error)))
+        : of(null),
+      catalog,
       definitionCapabilities,
       workspaces
     }).pipe(
-      switchMap(({ projection, definitions, definitionCapabilities, workspaces }) => {
-        const selectedDefinitions = projection.decisionRefs.map(decision =>
-          this.latestDefinition(definitions, decision.decisionKey));
-        const detailReads = selectedDefinitions.map(definition => definition && config.mode === 'remote'
-          ? this.domainRules.getDefinition(definition.id, this.requestOptions(config))
-          : of(definition));
-        return (detailReads.length ? forkJoin(detailReads) : of([])).pipe(map(definitionDetails =>
-          projection.decisionRefs.map((decision, index) => {
-        const definition = definitionDetails[index];
+      switchMap(({ projection, catalog, definitionCapabilities, workspaces }) => {
+        if (config.mode === 'fixture') {
+          return of(this.fixtureSummaries(projection!, locale));
+        }
+        const projectedCandidates = catalog.filter(candidate =>
+          projection?.decisionRefs.some(decision => decision.decisionKey === candidate.ruleKey));
+        const detailReads = projectedCandidates.map(candidate =>
+          this.domainRules.getDefinition(candidate.definitionId, this.requestOptions(config)));
+        return (detailReads.length ? forkJoin(detailReads) : of([])).pipe(map(definitionDetails => {
+          const details = new Map(definitionDetails.map(definition => [definition.id, definition]));
+          return catalog.map((candidate, index) => {
+        const definition = details.get(candidate.definitionId);
+        const decision = projection?.decisionRefs.find(item => item.decisionKey === candidate.ruleKey);
         const definitionCapability = definitionCapabilities.definitions.find(capability =>
-          capability.definitionId === definition?.id
-          && capability.ruleKey === definition.ruleKey
-          && (definition.version == null || capability.version === definition.version));
-        const workspace = this.latestWorkspace(workspaces, decision.decisionKey);
+          capability.definitionId === candidate.definitionId
+          && capability.ruleKey === candidate.ruleKey
+          && capability.version === candidate.version);
+        const workspace = this.latestWorkspace(workspaces, candidate.ruleKey);
+        if (!projection || !decision) {
+          return this.catalogSummary(candidate, index, catalog.length, locale,
+            definitionCapability?.availableActions ?? []);
+        }
         const conditionFactPaths = collectFactPaths(definition?.condition);
         if (conditionFactPaths.some(factPath => !decision.factPaths.includes(factPath))) {
           throw new Error(`CONFIG_FACT_OUTSIDE_GOVERNED_PROJECTION ${decision.decisionKey}`);
@@ -94,7 +107,7 @@ export class ProjectionCatalogService {
         });
         return {
           order: decision.order,
-          totalDecisions: projection.decisionRefs.length,
+          totalDecisions: catalog.length,
           key: decision.decisionKey,
           code: decision.reasonCode ?? decision.decisionKey,
           name: decision.presentationLabel,
@@ -112,9 +125,9 @@ export class ProjectionCatalogService {
           authoringSupported: decision.editable,
           availableDefinitionActions: definitionCapability?.availableActions ?? [],
           reviewStatus: decision.reviewStatus,
-          configDefinitionId: definition?.id,
-          configVersion: definition?.version ?? undefined,
-          configStatus: definition?.status ?? undefined,
+          configDefinitionId: candidate.definitionId,
+          configVersion: candidate.version,
+          configStatus: candidate.status,
           workspaceId: workspace?.id,
           workspaceStatus: workspace?.status,
           workspaceEtag: workspace?.etag,
@@ -133,9 +146,112 @@ export class ProjectionCatalogService {
           evidence: projection.sourceArtifacts,
           draftLifecycle: this.stringValue(definition?.governance, 'lifecycleBoundary')
         };
-      })));
+      });
+        }));
       })
     );
+  }
+
+  private loadCatalogPages(config: PolicyStudioRuntimeConfig): Observable<readonly DomainRuleCatalogCandidate[]> {
+    const options = this.requestOptions(config);
+    return this.domainRules.browseDefinitionCatalog({ page: 0, limit: 12 }, options).pipe(
+      expand(page => page.hasMore
+        ? this.domainRules.browseDefinitionCatalog({ page: page.page + 1, limit: page.limit }, options)
+        : EMPTY),
+      reduce((candidates, page) => [...candidates, ...page.candidates], [] as DomainRuleCatalogCandidate[]),
+      map(candidates => this.latestCatalogCandidates(candidates))
+    );
+  }
+
+  private latestCatalogCandidates(
+    candidates: readonly DomainRuleCatalogCandidate[]
+  ): readonly DomainRuleCatalogCandidate[] {
+    const latest = new Map<string, DomainRuleCatalogCandidate>();
+    candidates.forEach(candidate => {
+      const current = latest.get(candidate.ruleKey);
+      if (!current || candidate.version > current.version) latest.set(candidate.ruleKey, candidate);
+    });
+    return [...latest.values()];
+  }
+
+  private catalogSummary(
+    candidate: DomainRuleCatalogCandidate,
+    index: number,
+    total: number,
+    locale: SupportedLocale,
+    availableDefinitionActions: DecisionSummary['availableDefinitionActions']
+  ): DecisionSummary {
+    const context = candidate.contextKey?.trim() || candidate.resourceKey?.trim() || 'domain-decisions';
+    return {
+      order: index + 1,
+      totalDecisions: total,
+      key: candidate.ruleKey,
+      code: candidate.ruleKey,
+      name: candidate.ruleKey,
+      domain: context,
+      ruleSet: candidate.resourceKey?.trim() || candidate.serviceKey?.trim() || context,
+      ruleSetKey: candidate.resourceKey?.trim() || context,
+      resourceKey: candidate.resourceKey,
+      serviceKey: candidate.serviceKey,
+      state: ['approved', 'active'].includes(candidate.status) ? 'verified' : 'technical-draft',
+      meaning: candidate.ruleKey,
+      authority: locale === 'pt-BR' ? 'Config · definição governada' : 'Config · governed definition',
+      baselineAuthority: locale === 'pt-BR' ? 'Não declarada no catálogo' : 'Not declared by the catalog',
+      source: `definition:${candidate.definitionId}`,
+      evidenceCount: 0,
+      authoringSupported: false,
+      availableDefinitionActions,
+      reviewStatus: 'CATALOG_IDENTITY_ONLY',
+      configDefinitionId: candidate.definitionId,
+      configVersion: candidate.version,
+      configStatus: candidate.status,
+      expression: null,
+      condition: null,
+      factPaths: [],
+      facts: [],
+      nullSemantics: null,
+      operationKeys: [],
+      hostContractVersion: null,
+      evidence: [],
+      draftLifecycle: null
+    };
+  }
+
+  private fixtureSummaries(projection: DomainProjection, locale: SupportedLocale): readonly DecisionSummary[] {
+    return projection.decisionRefs.map((decision, index) => ({
+      order: decision.order,
+      totalDecisions: projection.decisionRefs.length,
+      key: decision.decisionKey,
+      code: decision.reasonCode ?? decision.decisionKey,
+      name: decision.presentationLabel,
+      domain: projection.presentationLabels.domain[locale] ?? projection.ruleSetRef.boundedContextKey,
+      ruleSet: projection.presentationLabels.ruleSet[locale] ?? projection.ruleSetRef.ruleSetKey,
+      ruleSetKey: projection.ruleSetRef.ruleSetKey,
+      resourceKey: projection.ruleSetRef.operationalResourceKey?.trim() || null,
+      serviceKey: null,
+      state: decision.semanticStatus === 'REFERENCE_IMPLEMENTED' ? 'verified' : 'technical-draft',
+      meaning: decision.presentationLabel,
+      authority: `${projection.authorityEvidence.currentAuthority} · ${projection.authorityEvidence.baselineAuthority}`,
+      baselineAuthority: projection.authorityEvidence.baselineAuthority,
+      source: decision.semanticSourceRef,
+      evidenceCount: projection.sourceArtifacts.length,
+      authoringSupported: false,
+      availableDefinitionActions: [],
+      reviewStatus: decision.reviewStatus,
+      expression: null,
+      condition: null,
+      factPaths: decision.factPaths,
+      facts: decision.factPaths.map(factPath => {
+        const schema = projection.factSchemas.find(item => item.path === factPath)!;
+        return { path: schema.path, valueType: schema.valueType, nullable: schema.nullable,
+          label: schema.presentationLabel, description: schema.description, providerRef: schema.providerRef };
+      }),
+      nullSemantics: null,
+      operationKeys: projection.ruleSetRef.operationKeys,
+      hostContractVersion: projection.ruleSetRef.hostContractVersion ?? null,
+      evidence: projection.sourceArtifacts,
+      draftLifecycle: null
+    }));
   }
 
   createWorkspace(
