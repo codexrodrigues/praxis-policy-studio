@@ -132,7 +132,7 @@ Ordem incremental:
 | --- | --- | --- |
 | provider, streaming, conversa e clarificação | `ja-suportado-so-ux` | reutilizar Config e `@praxisui/ai` |
 | reconhecimento de shared rules | `ja-suportado-mal-nomeado-ou-mal-materializado` | transformar handoff consultivo em domínio `domain_decision` |
-| busca de definitions | `suportado-parcialmente` | criar read model paginado sobre identidade canônica existente |
+| busca de definitions | `suportado-parcialmente` | read model paginado, tool semântica e projeção segura concluídos; falta catálogo selecionável além da projeção ativa |
 | explicação da definição com evidência | `suportado-parcialmente` | projeção sanitizada e tool concluídas; falta correlação causal com execução |
 | create/edit/test humano | `suportado-parcialmente` | expor os mesmos comandos como tools, sem executor paralelo |
 | publish/rollout pela IA | `suportado-parcialmente` | só após actions completas, confirmação e SoD comprovados |

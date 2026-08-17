@@ -1,0 +1,83 @@
+@if (available()) {
+  <section class="discovery" aria-labelledby="decision-discovery-title" [attr.aria-busy]="state().kind === 'progress'">
+    <div class="discovery-heading">
+      <p class="section-label" id="decision-discovery-title">{{ i18n.text('aiDiscovery') }}</p>
+      <p>{{ i18n.text('aiDiscoveryBoundary') }}</p>
+    </div>
+
+    <form class="discovery-form" (submit)="$event.preventDefault(); discover(discoveryPrompt.value)">
+      <label for="decision-discovery-prompt">{{ i18n.text('aiDiscoveryPrompt') }}</label>
+      <div class="discovery-command">
+        <input
+          #discoveryPrompt
+          id="decision-discovery-prompt"
+          name="decisionDiscoveryPrompt"
+          autocomplete="off"
+          [placeholder]="i18n.text('aiDiscoveryHint')"
+          [attr.aria-invalid]="inputInvalid()"
+          [attr.aria-describedby]="inputInvalid() ? 'decision-discovery-error' : 'decision-discovery-help'" />
+        <button type="submit" [disabled]="state().kind === 'progress'">{{ i18n.text('discoverDecisions') }}</button>
+      </div>
+      <small id="decision-discovery-help">{{ i18n.text('aiDiscoveryHelp') }}</small>
+      @if (inputInvalid()) {
+        <small id="decision-discovery-error" class="input-error" role="alert">{{ i18n.text('aiDiscoveryPromptRequired') }}</small>
+      }
+    </form>
+
+    @switch (state().kind) {
+      @case ('progress') {
+        <p class="discovery-state" role="status" aria-live="polite">{{ i18n.text('discoveringDecisions') }}</p>
+      }
+      @case ('completed') {
+        @if (state(); as completed) {
+          @if (completed.kind === 'completed') {
+            <div class="discovery-results" aria-live="polite">
+              <p>{{ completed.message }}</p>
+              @if (completed.candidates.length) {
+                <ul>
+                  @for (candidate of completed.candidates; track candidate.definitionId + ':' + candidate.version) {
+                    <li>
+                      @if (matchingDecision(candidate)) {
+                        <button type="button" class="candidate" (click)="select(candidate)">
+                          <span>
+                            <strong>{{ candidate.ruleKey }}</strong>
+                            <small>{{ candidate.semanticOwner || candidate.resourceKey || candidate.contextKey }}</small>
+                          </span>
+                          <span class="candidate-meta">
+                            v{{ candidate.version }} · {{ candidate.status || candidate.ruleType }} · {{ i18n.text('selectDiscoveredDecision') }}
+                          </span>
+                        </button>
+                      } @else {
+                        <div class="candidate unavailable">
+                          <span>
+                            <strong>{{ candidate.ruleKey }}</strong>
+                            <small>{{ candidate.semanticOwner || candidate.resourceKey || candidate.contextKey }}</small>
+                          </span>
+                          <span class="candidate-meta">{{ i18n.text('outsideCurrentProjection') }}</span>
+                        </div>
+                      }
+                    </li>
+                  }
+                </ul>
+              }
+              @if (completed.hasMore) {
+                <small>{{ i18n.text('moreGovernedCandidates') }}</small>
+              }
+              <small class="read-only-boundary">{{ i18n.text('aiDiscoveryNoApply') }}</small>
+            </div>
+          }
+        }
+      }
+      @case ('failed') {
+        @if (state(); as failed) {
+          @if (failed.kind === 'failed') {
+            <div class="discovery-failure" role="alert">
+              <p>{{ failureMessage(failed.reason) }}</p>
+              <button type="button" class="quiet-button" (click)="retry()">{{ i18n.text('retryAiDiscovery') }}</button>
+            </div>
+          }
+        }
+      }
+    }
+  </section>
+}

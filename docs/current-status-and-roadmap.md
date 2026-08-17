@@ -4,8 +4,8 @@
   Quickstart no commit publicado `50cb09e`, com transporte, governance V58,
   snapshot v1/v2 e cadeia de folha host-owned no Neon homologado
 - Data da auditoria: 2026-08-16
-- Escopo: Studio beta.14, Metadata rc.127, Config rc.122, Quickstart rc.42,
-  Contracts beta.4, `@praxisui/*` rc.27 e handoff Ergon #300
+- Escopo: Studio beta.14, Metadata rc.127, Config rc.124, Quickstart rc.42,
+  Contracts beta.4, `@praxisui/*` rc.29 e handoff Ergon #300
 
 ## Leitura executiva
 
@@ -40,8 +40,8 @@ multi-consumidor.
 | Capability | % | Aderência | Diagnóstico |
 | --- | ---: | --- | --- |
 | fronteiras canônicas e neutralidade | 85 | `ja-suportado-mal-nomeado-ou-mal-materializado` | owners corretos; ainda existe normalização Ergon no core |
-| catálogo/discovery multi-domínio | 45 | `suportado-parcialmente` | casos Ergon, Rule Lab amplo e folha publicada são projeções derivadas selecionáveis por configuração; não há registry governado |
-| inspeção e explicação humana/IA | 72 | `suportado-parcialmente` | facts, precedência, expressão e explicação grounded da definição; falta correlação causal com execução |
+| catálogo/discovery multi-domínio | 55 | `suportado-parcialmente` | o assistente descobre identidades governadas no escopo server-owned, mas o detalhe selecionável ainda depende da projeção ativa; falta catálogo canônico multi-domínio |
+| inspeção e explicação humana/IA | 74 | `suportado-parcialmente` | facts, precedência, expressão e explicação grounded da definição; falta correlação causal com execução |
 | editar regra existente | 50 | `suportado-parcialmente` | condição focal carregada e round-trip visual aberto sobre workspace real; parâmetros, outcomes e RuleSet completo não são authorados |
 | criar regra nova | 20 | `suportado-parcialmente` | Config possui intake; Studio apenas cria workspace de definição existente |
 | cenários, sandbox e Test Run | 88 | `suportado-parcialmente` | cenário e Test Run reais provaram candidate `ALLOW` e active fail-closed sem snapshot; baseline independente, retry, asserções de decision/output/reasons/effects e action host-owned existem; facts ainda são JSON |
@@ -51,8 +51,8 @@ multi-consumidor.
 | evidência V58/V60/Ergon | 89 | `suportado-parcialmente` | contrato leve, action dedicada, reserva pré-DML e quatro quadrantes foram provados; a cadeia publicada de folha confirmou snapshots v1/v2 e execução no Neon sem duplicação; faltam adapter Ergon e Oracle/HADES |
 | segurança, multitenancy e capabilities | 85 | `suportado-parcialmente` | publicação e rollout não são mais inferidos no browser; seis sujeitos separados passaram pela cadeia HTTP publicada; author abriu o catálogo no site homologado e auditor permaneceu read-only; faltam Neon cross-tenant e matriz visual multi-persona completa |
 | UX, i18n e acessibilidade | 50 | `ja-suportado-mal-nomeado-ou-mal-materializado` | Playwright desktop/narrow, teclado e axe cobrem estados corporativos focais; o site homologado prova shell, sessão e catálogo reais; faltam i18n integral, seis personas no browser e decomposição da página |
-| testes, release e documentação | 95 | `suportado-parcialmente` | cadeia V61, prova HTTP/PostgreSQL/Neon V60, E2E hermético V62, matriz de segurança multi-persona e deployment estático publicados; falta executar a suíte browser live completa |
-| assistente de decisões | 48 | `suportado-parcialmente` | explicação da definição passou pelo browser e fluxo HTTP real com atestação e sem candidate API; busca, execução explicada e comandos delegados ainda faltam |
+| testes, release e documentação | 95 | `suportado-parcialmente` | cadeia V61, prova HTTP/PostgreSQL/Neon V60, E2E hermético V62, discovery/explanation desktop+narrow, matriz de segurança multi-persona e deployment estático publicados; falta executar a suíte browser live completa |
+| assistente de decisões | 58 | `suportado-parcialmente` | discovery semântico e explicação usam o runtime horizontal, terminais read-only e evidência atestada; faltam seleção fora da projeção ativa, execução explicada e comandos delegados |
 
 ## Bloqueadores do próximo corte corporativo
 
@@ -62,7 +62,7 @@ multi-consumidor.
 2. **Evidência governada:** a V58 oferece baseline independente por cenário,
    idempotência, vínculo do run submetido e política opt-in. O Config rc.119
    revalida o receipt na composição de snapshot e devolve blockers tipados; o
-   Studio beta.13 os explica sem interpretar mensagens humanas. Ainda falta
+   Studio beta.14 os explica sem interpretar mensagens humanas. Ainda falta
    provar essa cadeia no browser integrado multi-persona.
 3. **Consumo operacional governado:** concluído no V61. Metadata representa o
    `If-Match` cross-resource e Core/Studio descobrem e executam a action sem URL local.
@@ -185,8 +185,9 @@ não devem ser inferidas da migração de banco.
 
 ### P5 — Policy Assistant
 
-- reutilizar runtime de IA do Config e `@praxisui/ai` — concluído para explicação;
-- explicação read-only com evidência sanitizada — concluída; busca/discovery permanece pendente;
+- reutilizar runtime de IA do Config e `@praxisui/ai` — concluído para discovery e explicação;
+- discovery read-only por intenção e explicação com evidência sanitizada — concluídos no escopo da projeção ativa;
+- substituir `projectionPath` como limite de navegação por catálogo canônico multi-domínio;
 - depois propor cenários e diffs, criar/editar e submeter pela mesma API humana;
 - permitir publicação/operação apenas como comando delegado, com capability,
   confirmação, ETag e revalidação; o agente nunca se autoaprova nem contorna SoD.

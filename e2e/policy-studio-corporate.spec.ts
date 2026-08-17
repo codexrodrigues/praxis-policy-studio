@@ -2,7 +2,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page, type Route } from '@playwright/test';
 
 const definition = {
-  id: 'definition-1', ruleKey: 'grant.amount-parameters', version: 1, status: 'approved',
+  id: '7b0fca89-cb64-40bf-8eea-d3467083bbf4', ruleKey: 'grant.amount-parameters', version: 1, status: 'approved',
   resourceKey: 'human-resources.extraordinary-benefit-requests',
   serviceKey: 'extraordinary-benefit-request-service',
   condition: { '<=': [{ var: 'request.requestedAmount' }, 3000] },
@@ -16,6 +16,7 @@ const workspace = {
 };
 
 async function mockGovernedBackend(page: Page, operationalAllowed: boolean): Promise<void> {
+  const authoringStreams = { sequence: 0, components: new Map<string, string>() };
   await page.route('**/app-config.json', route => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -27,17 +28,86 @@ async function mockGovernedBackend(page: Page, operationalAllowed: boolean): Pro
       initialDecisionKey: definition.ruleKey
     })
   }));
-  await page.route('**/api/**', async route => governedResponse(route, operationalAllowed));
+  await page.route('**/api/**', async route => governedResponse(route, operationalAllowed, authoringStreams));
   await page.route('**/schemas/**', async route => governedResponse(route, operationalAllowed));
   await page.route('**/auth/session', route => route.fulfill({ status: 204 }));
 }
 
-async function governedResponse(route: Route, operationalAllowed: boolean): Promise<void> {
+async function governedResponse(
+  route: Route,
+  operationalAllowed: boolean,
+  authoringStreams: { sequence: number; components: Map<string, string> }
+): Promise<void> {
   const request = route.request();
   const url = new URL(request.url());
   const path = url.pathname;
   const json = (value: unknown, status = 200, headers?: Record<string, string>) =>
     route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value), headers });
+
+  if (path.endsWith('/ai/authoring/turn/stream/start') && request.method() === 'POST') {
+    const body = request.postDataJSON() as { targetComponentId?: string };
+    const streamId = `policy-stream-${++authoringStreams.sequence}`;
+    authoringStreams.components.set(streamId, body.targetComponentId ?? '');
+    return json({
+      streamId, threadId: 'policy-thread', turnId: `turn-${authoringStreams.sequence}`,
+      eventSchemaVersion: 'v1', streamAuthMode: 'cookie',
+      expiresAt: '2026-08-17T12:00:00Z', fallbackAuthoringUrl: '/unused'
+    });
+  }
+  if (path.includes('/ai/authoring/turn/stream/') && path.endsWith('/probe')) {
+    return route.fulfill({ status: 204 });
+  }
+  if (path.includes('/ai/authoring/turn/stream/') && request.method() === 'GET') {
+    const streamId = path.split('/').at(-1) ?? '';
+    const component = authoringStreams.components.get(streamId);
+    const payload = component === 'policy-decision-explanation'
+      ? {
+          assistantMessage: 'A decisão limita o valor solicitado ao teto governado e falha fechada quando o valor está ausente.',
+          canApply: false,
+          evidenceBundle: {
+            source: 'inspectDomainDecision',
+            domainDecision: {
+              schemaVersion: 'praxis-domain-decision-explanation-evidence.v1',
+              decisionRef: {
+                definitionId: definition.id, ruleKey: definition.ruleKey, version: definition.version,
+                definitionHash: 'definition-hash', conditionHash: 'condition-hash'
+              },
+              conditionEvidence: { exposureMode: 'summary_only' },
+              redaction: { mode: 'summary_only' },
+              sourceRefs: ['config://definition/1'],
+              versionAttestation: { requestedVersion: 1, resolvedVersion: 1, exactMatch: true }
+            }
+          }
+        }
+      : {
+          assistantMessage: 'Encontrei uma decisão governada candidata no escopo autorizado.',
+          canApply: false,
+          evidenceBundle: {
+            source: 'searchDomainRules',
+            domainRuleSearch: {
+              schemaVersion: 'praxis-domain-rule-search.v1',
+              candidates: [{
+                definitionId: definition.id, ruleKey: definition.ruleKey, version: definition.version,
+                ruleType: 'JSON_LOGIC_DECISION', status: definition.status,
+                contextKey: 'benefits', resourceKey: definition.resourceKey,
+                serviceKey: definition.serviceKey, semanticOwner: 'benefits-policy',
+                updatedAt: '2026-08-16T12:00:00Z'
+              }],
+              page: 0, limit: 6, hasMore: false
+            }
+          }
+        };
+    const envelope = {
+      eventId: '1', streamId, threadId: 'policy-thread', turnId: `turn-${authoringStreams.sequence}`,
+      seq: 1, eventSchemaVersion: 'v1', timestamp: '2026-08-17T02:00:00Z',
+      type: 'result', payload
+    };
+    return route.fulfill({
+      status: 200,
+      headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' },
+      body: `id: 1\nevent: result\ndata: ${JSON.stringify(envelope)}\n\n`
+    });
+  }
 
   if (path.endsWith('/definitions/capabilities')) return json({
     tenantId: 'default', environment: 'dev',
@@ -126,4 +196,31 @@ test('confirms the operation and explains a stale workspace ETag', async ({ page
   await page.screenshot({ path: testInfo.outputPath('operational-confirmation.png') });
   await page.getByRole('button', { name: 'Executar prova' }).click();
   await expect(page.getByText('A ação conflita com a revisão atual, o ETag ou um gate de lifecycle. Recarregue as evidências antes de tentar novamente.')).toBeVisible();
+});
+
+test('discovers, selects, and explains an exact governed decision', async ({ page }, testInfo) => {
+  await mockGovernedBackend(page, false);
+  await page.goto('/catalog');
+
+  await page.getByLabel('O que você precisa encontrar?').fill('regras que limitam o valor do auxílio');
+  await page.getByRole('button', { name: 'Descobrir', exact: true }).click();
+  const candidate = page.getByRole('button', { name: /grant\.amount-parameters/ });
+  await expect(candidate).toBeVisible();
+  await candidate.click();
+  await page.getByRole('button', { name: 'Explicar esta decisão' }).click();
+  await expect(page.getByText('A decisão limita o valor solicitado ao teto governado')).toBeVisible();
+
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+  expect(overflow).toBe(false);
+  const violations = await new AxeBuilder({ page }).analyze();
+  expect(violations.violations).toEqual([]);
+  await page.evaluate(() => {
+    (document.activeElement as HTMLElement | null)?.blur();
+    window.scrollTo(0, 0);
+  });
+  await page.screenshot({
+    path: testInfo.outputPath(testInfo.project.name === 'narrow'
+      ? 'ai-discovery-narrow.png'
+      : 'ai-discovery-desktop.png')
+  });
 });

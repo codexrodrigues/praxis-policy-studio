@@ -48,8 +48,8 @@ O complemento operacional corrente está no
 [handoff V61](docs/ergon-handoff-v61.md): ele registra a cadeia de discovery
 cross-resource consumida pelo Studio e preserva a prova Neon do V60 sem a
 confundir com evidência Oracle.
-O beta.13 usa a cadeia Contracts beta.4, Config rc.118,
-Metadata rc.127, Quickstart rc.39 e `@praxisui/*` rc.27.
+O beta.14 usa a cadeia Contracts beta.4, Config rc.124,
+Metadata rc.127, Quickstart rc.42 e `@praxisui/*` rc.29.
 O corte acrescenta uma prova de navegador desktop/narrow, teclado e axe com
 backend hermético; ela não substitui a prova integrada com Quickstart/Neon e
 personas reais.
@@ -62,6 +62,8 @@ O percentual auditado, os bloqueadores e a sequência de cortes estão em
 [Estado e roadmap](docs/current-status-and-roadmap.md). A fronteira para busca,
 explicação e authoring por agente está em
 [ADR 0002 — Policy Assistant](docs/adr/0002-policy-assistant-boundary.md).
+A prova controlada desktop/narrow da jornada discovery → seleção → explicação está
+em [Evidência de navegador do Policy Assistant](docs/browser-ai-discovery-evidence-2026-08-16.md).
 O [Estado e roadmap](docs/current-status-and-roadmap.md) separa o que já foi provado
 do que ainda depende de Neon, Oracle/HADES, UX corporativa ou releases coordenados.
 
@@ -236,7 +238,16 @@ O Studio não possui motor LLM próprio. Providers, resolução semântica de
 intenção, conversas, streaming, clarificação, identidade e registry de tools
 são reutilizados do Praxis Config e de `@praxisui/ai`.
 
-O primeiro slice read-only já explica a definição selecionada. O browser envia
+O primeiro slice read-only já descobre decisões por intenção de negócio e explica
+a definição selecionada. Na descoberta, o browser envia somente o pedido em
+linguagem natural e o locale; o LLM escolhe semanticamente a tool
+`searchDomainRules`, e o Config devolve apenas identidades seguras no escopo e na
+autoridade resolvidos pelo servidor. O Studio rejeita terminais aplicáveis ou sem
+o envelope `praxis-domain-rule-search.v1`. Candidatos que não pertencem à projeção
+ativa permanecem visíveis, mas não podem ser selecionados até que o catálogo
+canônico multi-domínio os materialize.
+
+Na explicação, o browser envia
 somente `selectedDomainDecisionRef` com ID, rule key e versão. Em corporate mode,
 o Config exige `RULE_DEFINITION_READER` antes de enfileirar o turno, relê a
 definição no escopo do principal, aplica `governance.aiUsage` e devolve uma
@@ -246,7 +257,7 @@ fingerprints e declara `canApply=false`; uma resposta divergente, incompleta ou
 aplicável é rejeitada. Facts runtime, tenant, atores, rationale e payloads
 materializados não são enviados ao provider nem exibidos nessa superfície.
 
-Busca/discovery, proposição de cenários e diff vêm nos próximos incrementos.
+Catálogo multi-domínio canônico, proposição de cenários e diff vêm nos próximos incrementos.
 Create, edit, test, submit e, depois, publish/rollout poderão ser executados por
 um agente delegado somente pelas mesmas actions, capabilities, ETag,
 confirmação, evidência e segregação de funções usadas por pessoas. Não haverá
