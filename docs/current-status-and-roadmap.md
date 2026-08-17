@@ -186,8 +186,9 @@ não devem ser inferidas da migração de banco.
 ### P5 — Policy Assistant
 
 - reutilizar runtime de IA do Config e `@praxisui/ai` — concluído para discovery e explicação;
-- discovery read-only por intenção e explicação com evidência sanitizada — concluídos no escopo da projeção ativa;
-- substituir `projectionPath` como limite de navegação por catálogo canônico multi-domínio;
+- discovery read-only por intenção e explicação com evidência sanitizada — concluídos;
+- catálogo canônico multi-domínio — implementado no corte beta seguinte; `projectionPath` ficou como enriquecimento opcional;
+- materializar facts, labels e evidência do catálogo semântico para eliminar o enriquecimento estático também no authoring;
 - depois propor cenários e diffs, criar/editar e submeter pela mesma API humana;
 - permitir publicação/operação apenas como comando delegado, com capability,
   confirmação, ETag e revalidação; o agente nunca se autoaprova nem contorna SoD.

@@ -202,9 +202,10 @@ testes. Não requer backend, Ergon ou Oracle.
 4. execute `npm run lint`, `npm test` e `npm run check:projections`;
 5. inicie com `npm start` e abra a porta `4302`.
 
-Limite atual: a rota carrega uma única projeção definida por `projectionPath`.
-O arquivo versionado padrão é o caso Quickstart; RN-013 também está versionado,
-mas não há discovery/registry governado nem seleção multi-pacote na UI.
+Em modo remoto, a navegação vem do catálogo paginado e server-scoped do Config.
+Uma projeção definida por `projectionPath` pode enriquecer um pacote conhecido,
+mas não limita a seleção multi-domínio. Em modo fixture, a projeção local continua
+obrigatória para manter o laboratório hermético sem backend.
 
 ### Caminho B — integração com o host de referência
 

@@ -113,6 +113,16 @@ async function governedResponse(
     tenantId: 'default', environment: 'dev',
     definitions: [{ definitionId: definition.id, ruleKey: definition.ruleKey, version: 1, availableActions: [] }]
   });
+  if (path.endsWith('/definitions/catalog')) return json({
+    schemaVersion: 'praxis-domain-rule-catalog.v1', page: 0, limit: 12, hasMore: false,
+    candidates: [{
+      definitionId: definition.id, ruleKey: definition.ruleKey, version: definition.version,
+      ruleType: 'JSON_LOGIC_DECISION', status: definition.status,
+      resourceKey: definition.resourceKey, serviceKey: definition.serviceKey,
+      contextKey: 'benefits', semanticOwner: 'benefits-policy',
+      updatedAt: '2026-08-16T12:00:00Z'
+    }]
+  });
   if (path.endsWith('/definitions')) return json([definition]);
   if (path.endsWith(`/definitions/${definition.id}`)) return json(definition);
   if (path.endsWith(`/definitions/${definition.id}/timeline`)) return json([]);

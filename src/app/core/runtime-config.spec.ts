@@ -20,6 +20,12 @@ describe('validateRuntimeConfig', () => {
       .toThrowError('SETUP_REMOTE_ENDPOINT_REQUIRED');
   });
 
+  it('allows remote catalog navigation without a static projection', () => {
+    expect(validateRuntimeConfig({
+      mode: 'remote', configApiBaseUrl: '', locale: 'pt-BR', initialDecisionKey: null
+    }).projectionPath).toBeNull();
+  });
+
   it('rejects a projection outside the versioned local catalog', () => {
     expect(() => validateRuntimeConfig({
       mode: 'fixture', configApiBaseUrl: null, locale: 'pt-BR', projectionPath: 'https://example.invalid/policy.json'

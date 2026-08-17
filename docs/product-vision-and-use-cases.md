@@ -122,7 +122,7 @@ Cada caso de uso indica o resultado esperado do produto completo. A coluna
 | UC-10 | Ativar e reverter | trocar snapshot atomicamente e restaurar last-known-good | parcial: snapshot/rollback e staged rollout; actions incompletas |
 | UC-11 | Explicar execução | correlacionar resultado, versão, facts redigidos e reason code | parcial: resumo agregado; falta explicação causal por decisão |
 | UC-12 | Administrar portfólio | acompanhar cobertura, risco, dívida e progresso de RuleSets | planejado |
-| UC-13 | Integrar novo produto | adicionar pacote por contratos públicos, sem fork do Studio | parcial: dois pacotes; seleção ainda vem de `projectionPath` |
+| UC-13 | Integrar novo produto | adicionar pacote por contratos públicos, sem fork do Studio | parcial: catálogo multi-domínio navega qualquer definição autorizada; authoring rico ainda requer grounding/facts materializados ou projeção de enriquecimento |
 | UC-14 | Trabalhar sem legado | evoluir UI/core com projeções e fixtures versionadas | implementado |
 | UC-15 | Explicar com IA | responder com grounding, versão, authority, evidência e incerteza | parcial: discovery e explicação da definição são read-only e atestados; falta causalidade da execução |
 | UC-16 | Operar por agente | criar, editar, testar, submeter e operar por delegação governada | planejado; deve usar a mesma API e SoD da pessoa |

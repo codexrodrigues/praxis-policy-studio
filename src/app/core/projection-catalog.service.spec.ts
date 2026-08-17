@@ -59,15 +59,18 @@ describe('ProjectionCatalogService', () => {
     TestBed.resetTestingModule();
   });
 
-  it('uses the public same-origin client and selects the highest governed version', () => {
+  it('uses the bounded catalog and selects the highest governed version', () => {
     let decisions: readonly import('../features/catalog/catalog.fixture').DecisionSummary[] = [];
-    service.load('/projections/reference.json', 'en-US', {
+    service.load('en-US', {
       mode: 'remote', configApiBaseUrl: '', locale: 'en-US',
       projectionPath: '/projections/reference.json', initialDecisionKey: null
     }).subscribe(value => decisions = value);
 
     http.expectOne('/projections/reference.json').flush(projection);
-    const definitions = http.expectOne('/api/praxis/config/domain-rules/definitions');
+    const definitions = http.expectOne(request =>
+      request.url === '/api/praxis/config/domain-rules/definitions/catalog'
+      && request.params.get('page') === '0'
+      && request.params.get('limit') === '12');
     expect(definitions.request.withCredentials).toBe(false);
     http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([{
       id: 'workspace-1', ruleKey: 'grant.amount-parameters', status: 'APPROVED', updatedAt: '2026-08-13T10:00:00Z'
@@ -78,17 +81,12 @@ describe('ProjectionCatalogService', () => {
         availableActions: ['CREATE_NEW_VERSION']
       }]
     });
-    definitions.flush([
-      { id: 'v1', ruleKey: 'grant.amount-parameters', version: 1, status: 'draft', condition: { '===': [1, 1] } },
-      {
-        id: 'v2', ruleKey: 'grant.amount-parameters', version: 2, status: 'approved',
-        resourceKey: 'extraordinary-grant-eligibility',
-        serviceKey: 'extraordinary-benefit-request-service',
-        condition: { '<=': [{ var: 'request.requestedAmount' }, 3000] },
-        parameters: { nullSemantics: 'FAIL_CLOSED', operationKeys: ['evaluate-extraordinary-grant'] },
-        governance: { lifecycleBoundary: 'REFERENCE_DRAFT_ONLY' }
-      }
-    ]);
+    definitions.flush({ schemaVersion: 'praxis-domain-rule-catalog.v1', page: 0, limit: 12, hasMore: false,
+      candidates: [
+        { definitionId: 'v1', ruleKey: 'grant.amount-parameters', version: 1, ruleType: 'eligibility', status: 'draft' },
+        { definitionId: 'v2', ruleKey: 'grant.amount-parameters', version: 2, ruleType: 'eligibility', status: 'approved',
+          resourceKey: 'extraordinary-grant-eligibility', serviceKey: 'extraordinary-benefit-request-service' }
+      ] });
     http.expectOne('/api/praxis/config/domain-rules/definitions/v2').flush({
       id: 'v2', ruleKey: 'grant.amount-parameters', version: 2, status: 'approved',
       resourceKey: 'extraordinary-grant-eligibility',
@@ -109,6 +107,53 @@ describe('ProjectionCatalogService', () => {
     expect(decisions[0]?.authoringSupported).toBe(true);
     expect(decisions[0]?.availableDefinitionActions).toEqual(['CREATE_NEW_VERSION']);
     expect(decisions[0]?.condition).toEqual({ '<=': [{ var: 'request.requestedAmount' }, 3000] });
+  });
+
+  it('navigates multiple governed domains without making a projection authoritative', () => {
+    let decisions: readonly import('../features/catalog/catalog.fixture').DecisionSummary[] = [];
+    service.load('en-US', {
+      mode: 'remote', configApiBaseUrl: '', locale: 'en-US', projectionPath: null, initialDecisionKey: null
+    }).subscribe(value => decisions = value);
+
+    http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([]);
+    http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities').flush({
+      tenantId: 'default', environment: 'dev', definitions: []
+    });
+    http.expectOne(request => request.url.endsWith('/definitions/catalog') && request.params.get('page') === '0')
+      .flush({ schemaVersion: 'praxis-domain-rule-catalog.v1', page: 0, limit: 12, hasMore: true,
+        candidates: [{ definitionId: 'hr-v1', ruleKey: 'hr.payroll.net-salary', version: 1,
+          ruleType: 'calculation', status: 'approved', contextKey: 'hr.payroll', resourceKey: 'hr.payrolls' }] });
+    http.expectOne(request => request.url.endsWith('/definitions/catalog') && request.params.get('page') === '1')
+      .flush({ schemaVersion: 'praxis-domain-rule-catalog.v1', page: 1, limit: 12, hasMore: false,
+        candidates: [{ definitionId: 'proc-v2', ruleKey: 'procurement.suppliers.eligibility', version: 2,
+          ruleType: 'selection_eligibility', status: 'draft', contextKey: 'procurement',
+          resourceKey: 'procurement.suppliers' }] });
+
+    expect(decisions.map(decision => decision.domain)).toEqual(['hr.payroll', 'procurement']);
+    expect(decisions.map(decision => decision.configDefinitionId)).toEqual(['hr-v1', 'proc-v2']);
+    expect(decisions.every(decision => decision.authoringSupported === false)).toBe(true);
+  });
+
+  it('keeps the remote catalog available when optional projection enrichment fails', () => {
+    let decisions: readonly import('../features/catalog/catalog.fixture').DecisionSummary[] = [];
+    service.load('en-US', {
+      mode: 'remote', configApiBaseUrl: '', locale: 'en-US',
+      projectionPath: '/projections/missing.json', initialDecisionKey: null
+    }).subscribe(value => decisions = value);
+
+    http.expectOne('/projections/missing.json').flush({}, { status: 404, statusText: 'Not Found' });
+    http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([]);
+    http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities').flush({
+      tenantId: 'default', environment: 'dev', definitions: []
+    });
+    http.expectOne(request => request.url.endsWith('/definitions/catalog')).flush({
+      schemaVersion: 'praxis-domain-rule-catalog.v1', page: 0, limit: 12, hasMore: false,
+      candidates: [{ definitionId: 'rule-1', ruleKey: 'hr.leave.eligibility', version: 1,
+        ruleType: 'selection_eligibility', status: 'active', contextKey: 'hr.leave' }]
+    });
+
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0]?.configDefinitionId).toBe('rule-1');
   });
 
   it('discovers one operational command semantically and executes its published protocol', () => {

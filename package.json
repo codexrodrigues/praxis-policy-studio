@@ -26,7 +26,7 @@
     "@angular/platform-browser": "21.2.20",
     "@angular/router": "21.2.20",
     "@praxisui/ai": "9.0.5-rc.29",
-    "@praxisui/core": "9.0.5-rc.29",
+    "@praxisui/core": "9.0.5-rc.31",
     "@praxisui/metadata-editor": "9.0.5-rc.29",
     "@praxisui/settings-panel": "9.0.5-rc.29",
     "@praxisui/visual-builder": "9.0.5-rc.29",
