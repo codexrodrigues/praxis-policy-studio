@@ -41,6 +41,7 @@ import { semanticDecisionDiff } from '../../core/semantic-decision-diff';
 import { SnapshotCockpitComponent } from './snapshot-cockpit.component';
 import { forkJoin } from 'rxjs';
 import { DecisionExplanationComponent } from './decision-explanation.component';
+import { DecisionDiscoveryComponent } from './decision-discovery.component';
 
 interface PendingOperationalCommand {
   readonly workspaceId: string;
@@ -51,7 +52,13 @@ interface PendingOperationalCommand {
 
 @Component({
   selector: 'pax-catalog-workspace',
-  imports: [FormsModule, LocalDraftWorkspaceComponent, SnapshotCockpitComponent, DecisionExplanationComponent],
+  imports: [
+    FormsModule,
+    LocalDraftWorkspaceComponent,
+    SnapshotCockpitComponent,
+    DecisionExplanationComponent,
+    DecisionDiscoveryComponent
+  ],
   providers: [
     ProjectionCatalogService,
     DomainRuleService,

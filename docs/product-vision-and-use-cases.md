@@ -110,7 +110,7 @@ Cada caso de uso indica o resultado esperado do produto completo. A coluna
 
 | ID | Caso de uso | Resultado esperado | Situação |
 | --- | --- | --- | --- |
-| UC-01 | Descobrir decisões | localizar domínio, RuleSet, decisão, reason code e estado | parcial: uma projeção configurada por vez |
+| UC-01 | Descobrir decisões | localizar domínio, RuleSet, decisão, reason code e estado | parcial: discovery semântico encontra identidades autorizadas, mas o detalhe selecionável ainda depende da projeção ativa |
 | UC-02 | Inspecionar significado | ver descrição, facts, `null`, operações, ordem e evidências | parcial: inspeção estrutural, sem causalidade runtime |
 | UC-03 | Ver autoridade | distinguir legado, Java, draft e runtime ativo | parcial: authority projetada, snapshots e resumos runtime |
 | UC-04 | Comparar versões | entender diferenças entre baseline, draft e versão publicada | parcial: baseline versus draft |
@@ -124,7 +124,7 @@ Cada caso de uso indica o resultado esperado do produto completo. A coluna
 | UC-12 | Administrar portfólio | acompanhar cobertura, risco, dívida e progresso de RuleSets | planejado |
 | UC-13 | Integrar novo produto | adicionar pacote por contratos públicos, sem fork do Studio | parcial: dois pacotes; seleção ainda vem de `projectionPath` |
 | UC-14 | Trabalhar sem legado | evoluir UI/core com projeções e fixtures versionadas | implementado |
-| UC-15 | Explicar com IA | responder com grounding, versão, authority, evidência e incerteza | planejado; runtime horizontal existente, tools de decisão ausentes |
+| UC-15 | Explicar com IA | responder com grounding, versão, authority, evidência e incerteza | parcial: discovery e explicação da definição são read-only e atestados; falta causalidade da execução |
 | UC-16 | Operar por agente | criar, editar, testar, submeter e operar por delegação governada | planejado; deve usar a mesma API e SoD da pessoa |
 
 ## 7. Cenários detalhados

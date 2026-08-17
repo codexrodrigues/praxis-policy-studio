@@ -183,7 +183,7 @@ Config publicar a capability correta.
 | persistência | workspace concorrente com ETag | `ProjectionCatalogService` e testes de integração |
 | simulação | candidate × active, transporte V58 e action host V60 implementados; consumo UI parcial | cenários/Test Runs do Config, sandbox host-owned, baseline independente, reserva idempotente e quatro resultados comprovados no Neon; ainda faltam precondition metadata-driven, Studio, Oracle e gates posteriores |
 | publicação/ativação/rollback | parcialmente implementados | readiness/materializações, snapshot e staged rollout; actions de publicação, criação de rollout e rollout-policy precisam ser server-owned |
-| assistente de decisões | planejado sobre runtime existente | Config/`@praxisui/ai` fornecem a base horizontal; faltam tools e projeção de evidência de domínio |
+| assistente de decisões | discovery e explicação read-only implementados sobre runtime existente | Config/`@praxisui/ai` resolvem intenção, projetam identidades seguras e atestam a versão explicada; falta catálogo multi-domínio e causalidade runtime |
 | autoridade Java/produção | não alterada pelo Studio | projeção e docs de evidência |
 
 O termo “implementado” acima significa código e prova no escopo indicado. Não

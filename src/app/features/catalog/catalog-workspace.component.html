@@ -19,10 +19,17 @@
       <p class="session-error" role="alert">{{ i18n.text('logoutFailed') }}</p>
     }
 
+    @if (policyConfig(); as discoveryConfig) {
+      <pax-decision-discovery
+        [config]="discoveryConfig"
+        [decisions]="allDecisions()"
+        (decisionSelected)="select($event)" />
+    }
+
     <label class="search">
       <span class="search-glyph" aria-hidden="true">⌕</span>
-      <span class="visually-hidden">{{ i18n.text('search') }}</span>
-      <input [value]="query()" (input)="updateQuery($any($event.target).value)" [placeholder]="i18n.text('searchHint')">
+      <span class="visually-hidden">{{ i18n.text('localCatalogFilter') }}</span>
+      <input [value]="query()" (input)="updateQuery($any($event.target).value)" [placeholder]="i18n.text('localCatalogFilterHint')">
       @if (query()) {
         <button type="button" (click)="updateQuery('')" [attr.aria-label]="i18n.text('clearSearch')">×</button>
       }
