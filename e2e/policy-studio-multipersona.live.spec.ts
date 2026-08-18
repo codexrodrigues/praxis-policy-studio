@@ -113,6 +113,10 @@ test.describe('Policy Studio live multi-persona governance', () => {
 
       await page.goto('/catalog');
       await expect(page.locator('.decision-list')).toBeVisible();
+      await expect(
+        page.locator('.decision-list .decision-row'),
+        `${persona.key} must receive at least one governed decision, not only the empty catalog shell`
+      ).not.toHaveCount(0);
       await expect(page.locator('.development-login')).toHaveCount(0);
 
       const definitionsResponse = await governedRequest(page.request, { method: 'GET', path: definitions });
