@@ -40,6 +40,19 @@ const projection = {
   }
 };
 
+const requestedAmountFact = {
+  path: 'request.requestedAmount', valueType: 'number', nullable: false,
+  labels: { 'pt-BR': 'Valor solicitado', 'en-US': 'Amount' },
+  descriptions: { 'pt-BR': 'Valor solicitado.', 'en-US': 'Requested amount.' },
+  providerRef: 'request.amount', evidenceRefs: ['rule-set.java'],
+  sensitivity: 'SENSITIVE', redaction: 'MASK'
+};
+
+function factCatalog(definitionId: string, ruleKey: string, facts: readonly unknown[] = []) {
+  return { definitionId, ruleKey, definitionVersion: 1,
+    schemaVersion: 'praxis.domain-rule-fact-catalog.v1', facts };
+}
+
 describe('ProjectionCatalogService', () => {
   let service: ProjectionCatalogService;
   let http: HttpTestingController;
@@ -95,6 +108,8 @@ describe('ProjectionCatalogService', () => {
       parameters: { nullSemantics: 'FAIL_CLOSED', operationKeys: ['evaluate-extraordinary-grant'] },
       governance: { lifecycleBoundary: 'REFERENCE_DRAFT_ONLY' }
     });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/v2/facts')
+      .flush(factCatalog('v2', 'grant.amount-parameters', [requestedAmountFact]));
 
     expect(decisions).toHaveLength(1);
     expect(decisions[0]?.configDefinitionId).toBe('v2');
@@ -128,6 +143,16 @@ describe('ProjectionCatalogService', () => {
         candidates: [{ definitionId: 'proc-v2', ruleKey: 'procurement.suppliers.eligibility', version: 2,
           ruleType: 'selection_eligibility', status: 'draft', contextKey: 'procurement',
           resourceKey: 'procurement.suppliers' }] });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/hr-v1').flush({
+      id: 'hr-v1', ruleKey: 'hr.payroll.net-salary', version: 1, status: 'approved'
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/hr-v1/facts')
+      .flush(factCatalog('hr-v1', 'hr.payroll.net-salary'));
+    http.expectOne('/api/praxis/config/domain-rules/definitions/proc-v2').flush({
+      id: 'proc-v2', ruleKey: 'procurement.suppliers.eligibility', version: 2, status: 'draft'
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/proc-v2/facts')
+      .flush(factCatalog('proc-v2', 'procurement.suppliers.eligibility'));
 
     expect(decisions.map(decision => decision.domain)).toEqual(['hr.payroll', 'procurement']);
     expect(decisions.map(decision => decision.configDefinitionId)).toEqual(['hr-v1', 'proc-v2']);
@@ -151,6 +176,11 @@ describe('ProjectionCatalogService', () => {
       candidates: [{ definitionId: 'rule-1', ruleKey: 'hr.leave.eligibility', version: 1,
         ruleType: 'selection_eligibility', status: 'active', contextKey: 'hr.leave' }]
     });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/rule-1').flush({
+      id: 'rule-1', ruleKey: 'hr.leave.eligibility', version: 1, status: 'active'
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/rule-1/facts')
+      .flush(factCatalog('rule-1', 'hr.leave.eligibility'));
 
     expect(decisions).toHaveLength(1);
     expect(decisions[0]?.configDefinitionId).toBe('rule-1');

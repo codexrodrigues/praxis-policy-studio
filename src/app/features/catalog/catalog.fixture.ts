@@ -50,6 +50,9 @@ export interface DecisionFact {
   readonly label: string;
   readonly description: string;
   readonly providerRef: string;
+  readonly evidenceRefs: readonly string[];
+  readonly sensitivity: 'NON_SENSITIVE' | 'PERSONAL' | 'SENSITIVE' | 'SECRET';
+  readonly redaction: 'NONE' | 'MASK' | 'HASH' | 'OMIT';
 }
 
 export interface DecisionEvidence {

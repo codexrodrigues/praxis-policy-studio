@@ -24,6 +24,7 @@ import {
   type DomainRuleRequestOptions,
   type DomainRuleSnapshotActivation,
   type DomainRuleExecutionSummary,
+  type DomainRuleFactCatalog,
   type DomainRuleHostStatusSummary,
   type DomainRuleRolloutPolicy,
   type DomainRuleRolloutPolicyCatalog,
@@ -71,14 +72,16 @@ export class ProjectionCatalogService {
         if (config.mode === 'fixture') {
           return of(this.fixtureSummaries(projection!, locale));
         }
-        const projectedCandidates = catalog.filter(candidate =>
-          projection?.decisionRefs.some(decision => decision.decisionKey === candidate.ruleKey));
-        const detailReads = projectedCandidates.map(candidate =>
-          this.domainRules.getDefinition(candidate.definitionId, this.requestOptions(config)));
+        const detailReads = catalog.map(candidate => forkJoin({
+          definition: this.domainRules.getDefinition(candidate.definitionId, this.requestOptions(config)),
+          factCatalog: this.domainRules.getDefinitionFacts(candidate.definitionId, this.requestOptions(config))
+        }));
         return (detailReads.length ? forkJoin(detailReads) : of([])).pipe(map(definitionDetails => {
-          const details = new Map(definitionDetails.map(definition => [definition.id, definition]));
+          const details = new Map(definitionDetails.map(detail => [detail.definition.id, detail]));
           return catalog.map((candidate, index) => {
-        const definition = details.get(candidate.definitionId);
+        const detail = details.get(candidate.definitionId);
+        const definition = detail?.definition;
+        const factCatalog = detail?.factCatalog;
         const decision = projection?.decisionRefs.find(item => item.decisionKey === candidate.ruleKey);
         const definitionCapability = definitionCapabilities.definitions.find(capability =>
           capability.definitionId === candidate.definitionId
@@ -87,24 +90,16 @@ export class ProjectionCatalogService {
         const workspace = this.latestWorkspace(workspaces, candidate.ruleKey);
         if (!projection || !decision) {
           return this.catalogSummary(candidate, index, catalog.length, locale,
-            definitionCapability?.availableActions ?? []);
+            definitionCapability?.availableActions ?? [], factCatalog);
         }
         const conditionFactPaths = collectFactPaths(definition?.condition);
         if (conditionFactPaths.some(factPath => !decision.factPaths.includes(factPath))) {
           throw new Error(`CONFIG_FACT_OUTSIDE_GOVERNED_PROJECTION ${decision.decisionKey}`);
         }
-        const facts = decision.factPaths.map(factPath => {
-          const schema = projection.factSchemas.find(item => item.path === factPath);
-          if (!schema) throw new Error(`PROJECTION_FACT_SCHEMA_MISSING ${factPath}`);
-          return {
-            path: schema.path,
-            valueType: schema.valueType,
-            nullable: schema.nullable,
-            label: schema.presentationLabel,
-            description: schema.description,
-            providerRef: schema.providerRef
-          };
-        });
+        const facts = this.decisionFacts(factCatalog, locale);
+        if (conditionFactPaths.some(factPath => !facts.some(fact => fact.path === factPath))) {
+          throw new Error(`CONFIG_FACT_CATALOG_INCOMPLETE ${decision.decisionKey}`);
+        }
         return {
           order: decision.order,
           totalDecisions: catalog.length,
@@ -179,7 +174,8 @@ export class ProjectionCatalogService {
     index: number,
     total: number,
     locale: SupportedLocale,
-    availableDefinitionActions: DecisionSummary['availableDefinitionActions']
+    availableDefinitionActions: DecisionSummary['availableDefinitionActions'],
+    factCatalog?: DomainRuleFactCatalog
   ): DecisionSummary {
     const context = candidate.contextKey?.trim() || candidate.resourceKey?.trim() || 'domain-decisions';
     return {
@@ -207,14 +203,28 @@ export class ProjectionCatalogService {
       configStatus: candidate.status,
       expression: null,
       condition: null,
-      factPaths: [],
-      facts: [],
+      factPaths: factCatalog?.facts.map(fact => fact.path) ?? [],
+      facts: this.decisionFacts(factCatalog, locale),
       nullSemantics: null,
       operationKeys: [],
       hostContractVersion: null,
       evidence: [],
       draftLifecycle: null
     };
+  }
+
+  private decisionFacts(factCatalog: DomainRuleFactCatalog | undefined, locale: SupportedLocale): DecisionSummary['facts'] {
+    return factCatalog?.facts.map(fact => ({
+      path: fact.path,
+      valueType: fact.valueType,
+      nullable: fact.nullable,
+      label: fact.labels[locale] ?? fact.labels['en-US'] ?? fact.path,
+      description: fact.descriptions[locale] ?? fact.descriptions['en-US'] ?? '',
+      providerRef: fact.providerRef,
+      evidenceRefs: fact.evidenceRefs,
+      sensitivity: fact.sensitivity,
+      redaction: fact.redaction
+    })) ?? [];
   }
 
   private fixtureSummaries(projection: DomainProjection, locale: SupportedLocale): readonly DecisionSummary[] {
@@ -244,7 +254,8 @@ export class ProjectionCatalogService {
       facts: decision.factPaths.map(factPath => {
         const schema = projection.factSchemas.find(item => item.path === factPath)!;
         return { path: schema.path, valueType: schema.valueType, nullable: schema.nullable,
-          label: schema.presentationLabel, description: schema.description, providerRef: schema.providerRef };
+          label: schema.presentationLabel, description: schema.description, providerRef: schema.providerRef,
+          evidenceRefs: schema.evidenceRefs, sensitivity: 'NON_SENSITIVE' as const, redaction: 'NONE' as const };
       }),
       nullSemantics: null,
       operationKeys: projection.ruleSetRef.operationKeys,

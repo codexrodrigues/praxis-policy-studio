@@ -49,6 +49,17 @@ button, input { font: inherit; }
 .scenario-form label { display: grid; gap: .3rem; font-size: .78rem; font-weight: 700; }
 .scenario-form input, .scenario-form textarea, .scenario-form select { min-width: 0; border: 1px solid var(--pax-color-outline-variant); border-radius: .5rem; padding: .65rem; background: var(--pax-color-surface); color: inherit; font: inherit; }
 .scenario-facts { grid-column: 1 / -1; }
+.scenario-fact-editor { grid-column: 1 / -1; min-width: 0; margin: 0; padding: 1rem; border: 1px solid var(--pax-color-outline-variant); border-radius: .65rem; }
+.scenario-fact-editor legend { padding-inline: .35rem; color: var(--pax-color-primary); font-size: .78rem; font-weight: 750; }
+.scenario-fact-grid, .scenario-fact-field { display: grid; gap: 1rem; }
+.scenario-fact-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.scenario-fact-field { align-content: start; gap: .4rem; min-width: 0; }
+.scenario-fact-field > small { color: var(--pax-color-on-surface-variant); font-size: .72rem; line-height: 1.4; }
+.scenario-form .scenario-fact-null { display: flex; align-items: center; justify-content: start; font-weight: 500; }
+.scenario-fact-null input { min-width: auto; }
+.scenario-facts-preview { margin-top: 1rem; }
+.scenario-facts-preview summary { cursor: pointer; color: var(--pax-color-primary); font-weight: 700; }
+.scenario-facts-preview pre { max-height: 14rem; overflow: auto; padding: .75rem; background: var(--pax-color-surface-container-low); }
 .scenario-list, .sandbox-results { display: grid; gap: .5rem; }
 .scenario-list article, .sandbox-results article { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 1rem; padding: .75rem; background: var(--pax-color-surface-container-low); }
 .sandbox-results article { border-inline-start: .25rem solid var(--pax-color-error); }
@@ -56,6 +67,7 @@ button, input { font: inherit; }
 @media (max-width: 760px) {
   .scenario-form { grid-template-columns: 1fr; }
   .scenario-facts { grid-column: auto; }
+  .scenario-fact-grid { grid-template-columns: 1fr; }
   .scenario-list article, .sandbox-results article { grid-template-columns: 1fr; gap: .3rem; }
 }
 .semantic-diff, .review-workspace, .publication-workspace { display: grid; gap: .8rem; max-width: 68rem; margin-top: 1rem; padding: 1rem; border: 1px solid var(--pax-color-outline-variant); border-radius: .7rem; background: var(--pax-color-surface-container-lowest); }

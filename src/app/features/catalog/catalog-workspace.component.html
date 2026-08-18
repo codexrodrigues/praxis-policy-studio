@@ -271,10 +271,69 @@
           </div>
           <strong>{{ scenarios().length }}</strong>
         </header>
-        <form #scenarioForm class="scenario-form" (submit)="$event.preventDefault(); createScenario(scenarioKey.value, scenarioName.value, scenarioFacts.value, expectedDecision.value, scenarioExpectedOutputField.value, scenarioReasonCodes.value, scenarioEffectIntents.value, scenarioForm)">
+        <form #scenarioForm class="scenario-form" (submit)="$event.preventDefault(); createScenario(scenarioKey.value, scenarioName.value, scenarioFactsForSubmit(), expectedDecision.value, scenarioExpectedOutputField.value, scenarioReasonCodes.value, scenarioEffectIntents.value, scenarioForm)">
           <label><span>{{ i18n.text('scenarioKey') }}</span><input #scenarioKey required></label>
           <label><span>{{ i18n.text('scenarioName') }}</span><input #scenarioName required></label>
-          <label class="scenario-facts"><span>{{ i18n.text('scenarioFacts') }}</span><textarea #scenarioFacts rows="4" required>{}</textarea></label>
+          <fieldset class="scenario-fact-editor">
+            <legend>{{ i18n.text('scenarioFacts') }}</legend>
+            @if (current.facts.length) {
+              <div class="scenario-fact-grid">
+                @for (fact of current.facts; track fact.path) {
+                  <div class="scenario-fact-field">
+                    <label>
+                      <span>{{ fact.label }}</span>
+                      @switch (fact.valueType) {
+                        @case ('boolean') {
+                          <select
+                            [disabled]="scenarioFactIsNull(fact.path)"
+                            [value]="scenarioFactDisplayValue(fact.path)"
+                            (change)="setScenarioFactValue(fact, $any($event.target).value === 'true')">
+                            <option value="false">false</option>
+                            <option value="true">true</option>
+                          </select>
+                        }
+                        @case ('number') {
+                          <input type="number" inputmode="decimal"
+                            [required]="!fact.nullable" [disabled]="scenarioFactIsNull(fact.path)"
+                            [value]="scenarioFactDisplayValue(fact.path)"
+                            (input)="setScenarioFactValue(fact, $any($event.target).value)">
+                        }
+                        @case ('date') {
+                          <input type="date"
+                            [required]="!fact.nullable" [disabled]="scenarioFactIsNull(fact.path)"
+                            [value]="scenarioFactDisplayValue(fact.path)"
+                            (input)="setScenarioFactValue(fact, $any($event.target).value)">
+                        }
+                        @default {
+                          <input type="text"
+                            [required]="!fact.nullable" [disabled]="scenarioFactIsNull(fact.path)"
+                            [value]="scenarioFactDisplayValue(fact.path)"
+                            (input)="setScenarioFactValue(fact, $any($event.target).value)">
+                        }
+                      }
+                    </label>
+                    <small>{{ fact.description }} · <code>{{ fact.path }}</code></small>
+                    @if (fact.nullable) {
+                      <label class="scenario-fact-null">
+                        <input type="checkbox" [checked]="scenarioFactIsNull(fact.path)"
+                          (change)="setScenarioFactNull(fact, $any($event.target).checked)">
+                        <span>{{ i18n.text('scenarioFactNull') }}</span>
+                      </label>
+                    }
+                  </div>
+                }
+              </div>
+              <details class="scenario-facts-preview">
+                <summary>{{ i18n.text('scenarioFactsPreview') }}</summary>
+                <pre><code>{{ scenarioFactsJson() }}</code></pre>
+              </details>
+            } @else {
+              <p>{{ i18n.text('scenarioFactsFallback') }}</p>
+              <textarea name="scenarioFactsFallback" rows="4" required
+                [ngModel]="scenarioFactsFallback()"
+                (ngModelChange)="scenarioFactsFallback.set($event)"></textarea>
+            }
+          </fieldset>
           <label><span>{{ i18n.text('expectedDecision') }}</span>
             <select #expectedDecision>
               <option>ALLOW</option><option>DENY</option><option>NOT_APPLICABLE</option>

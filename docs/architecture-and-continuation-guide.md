@@ -180,6 +180,7 @@ Config publicar a capability correta.
 | capabilities | parciais | workspace, snapshots e staged rollout possuem ações server-owned; publicação, criação de rollout e rollout-policy ainda requerem catálogos próprios |
 | inspeção | parcial | catálogo e `decision-inspection.ts`; falta causalidade runtime |
 | editor | implementado para condição focal | Visual Builder; parâmetros/outcomes/RuleSet completo ausentes |
+| catálogo de facts | implementado no próximo corte, aguardando release do owner | Config valida e projeta tipos, nulabilidade, i18n, sensibilidade e redaction; `@praxisui/core` é o cliente público e o Studio deriva o formulário de cenário sem duplicar o contrato |
 | persistência | workspace concorrente com ETag | `ProjectionCatalogService` e testes de integração |
 | simulação | candidate × active, transporte V58 e action host V60 implementados; consumo UI parcial | cenários/Test Runs do Config, sandbox host-owned, baseline independente, reserva idempotente e quatro resultados comprovados no Neon; ainda faltam precondition metadata-driven, Studio, Oracle e gates posteriores |
 | publicação/ativação/rollback | parcialmente implementados | readiness/materializações, snapshot e staged rollout; actions de publicação, criação de rollout e rollout-policy precisam ser server-owned |
