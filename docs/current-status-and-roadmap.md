@@ -44,7 +44,7 @@ multi-consumidor.
 | inspeção e explicação humana/IA | 74 | `suportado-parcialmente` | facts, precedência, expressão e explicação grounded da definição; falta correlação causal com execução |
 | editar regra existente | 50 | `suportado-parcialmente` | condição focal carregada e round-trip visual aberto sobre workspace real; parâmetros, outcomes e RuleSet completo não são authorados |
 | criar regra nova | 20 | `suportado-parcialmente` | Config possui intake; Studio apenas cria workspace de definição existente |
-| cenários, sandbox e Test Run | 88 | `suportado-parcialmente` | cenário e Test Run reais provaram candidate `ALLOW` e active fail-closed sem snapshot; baseline independente, retry, asserções de decision/output/reasons/effects e action host-owned existem; facts ainda são JSON |
+| cenários, sandbox e Test Run | 90 | `suportado-parcialmente` | cenário e Test Run reais provaram candidate `ALLOW` e active fail-closed sem snapshot; o próximo corte já deriva inputs tipados do catálogo canônico de facts e mantém JSON apenas como preview/fallback; baseline independente, retry, asserções e action host-owned existem |
 | review/maker-checker | 70 | `suportado-parcialmente` | workspace, ETag, blockers, run submetido e segregação existem; política cobre SUBMIT/PROMOTE, não estágios posteriores |
 | publicação/materialização | 58 | `suportado-parcialmente` | readiness e action `PUBLISH` são server-owned; o gate de evidência ainda não alcança publicação |
 | snapshot, rollback e staged rollout | 72 | `suportado-parcialmente` | blockers de evidência são server-owned, tipados e explicados pelo Studio; create/cancel/activate rollout e lifecycle de rollout-policy são principal-specific; falta prova multi-persona integrada |
@@ -189,7 +189,8 @@ não devem ser inferidas da migração de banco.
   Playwright live completa continua pendente;
 - decompor o workspace em catálogo, inspeção, authoring, testes, review/publicação
   e operação, sob uma facade/store;
-- substituir Facts JSON por editor derivado do fact schema;
+- publicar o catálogo canônico de facts no Config/Core e ativar o editor tipado já
+  implementado no Studio; JSON permanece apenas como preview ou fallback legado;
 - manter E2E desktop/narrow, teclado, axe e regressão visual focal como gate — concluído no V62;
 - provar personas author, reviewer, operator e unauthorized.
 

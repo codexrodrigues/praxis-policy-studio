@@ -265,6 +265,33 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(component.authoringFeedback()).toBe('Facts JSON deve ser um objeto válido.');
   });
 
+  it('builds the canonical nested scenario payload from governed fact descriptors', () => {
+    component.select({
+      ...decision('A'),
+      facts: [
+        { path: 'request.requestedAmount', valueType: 'number', nullable: false,
+          label: 'Valor solicitado', description: 'Valor monetário.', providerRef: 'host:request',
+          evidenceRefs: ['ruleset:A'], sensitivity: 'SENSITIVE', redaction: 'MASK' },
+        { path: 'actor.permissions', valueType: 'string-array', nullable: false,
+          label: 'Permissões', description: 'Permissões efetivas.', providerRef: 'host:principal',
+          evidenceRefs: ['iam:A'], sensitivity: 'SECRET', redaction: 'OMIT' },
+        { path: 'customer.additionalEligible', valueType: 'boolean', nullable: true,
+          label: 'Elegibilidade adicional', description: 'Restrição opcional.', providerRef: 'host:customer',
+          evidenceRefs: ['customer:A'], sensitivity: 'PERSONAL', redaction: 'MASK' }
+      ]
+    });
+
+    component.setScenarioFactValue(component.selected()!.facts[0], '2500.50');
+    component.setScenarioFactValue(component.selected()!.facts[1], 'benefit:request, benefit:review');
+    component.setScenarioFactNull(component.selected()!.facts[2], true);
+
+    expect(JSON.parse(component.scenarioFactsForSubmit())).toEqual({
+      request: { requestedAmount: 2500.5 },
+      actor: { permissions: ['benefit:request', 'benefit:review'] },
+      customer: { additionalEligible: null }
+    });
+  });
+
   it('fails locally when expected output is invalid JSON', () => {
     component.select(decision('A'));
     capabilities.A[0].next({

@@ -124,6 +124,20 @@ async function governedResponse(
     }]
   });
   if (path.endsWith('/definitions')) return json([definition]);
+  if (path.endsWith(`/definitions/${definition.id}/facts`)) return json({
+    definitionId: definition.id,
+    ruleKey: definition.ruleKey,
+    definitionVersion: definition.version,
+    schemaVersion: 'praxis.domain-rule-fact-catalog.v1',
+    facts: [{
+      path: 'request.requestedAmount', valueType: 'number', nullable: false,
+      labels: { 'pt-BR': 'Valor solicitado', 'en-US': 'Requested amount' },
+      descriptions: { 'pt-BR': 'Valor informado na solicitação.', 'en-US': 'Amount supplied by the request.' },
+      providerRef: 'quickstart.extraordinary-benefit-request',
+      evidenceRefs: ['quickstart://extraordinary-benefit/requested-amount'],
+      sensitivity: 'SENSITIVE', redaction: 'MASK'
+    }]
+  });
   if (path.endsWith(`/definitions/${definition.id}`)) return json(definition);
   if (path.endsWith(`/definitions/${definition.id}/timeline`)) return json([]);
   if (path.endsWith('/workspaces')) return json([workspace]);

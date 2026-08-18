@@ -259,7 +259,13 @@ fingerprints e declara `canApply=false`; uma resposta divergente, incompleta ou
 aplicável é rejeitada. Facts runtime, tenant, atores, rationale e payloads
 materializados não são enviados ao provider nem exibidos nessa superfície.
 
-Catálogo multi-domínio canônico, proposição de cenários e diff vêm nos próximos incrementos.
+O próximo corte consome o catálogo canônico de facts por definição publicado pelo
+Config através de `@praxisui/core`. O formulário de cenário passa a ser tipado e
+grounded (tipo, nulabilidade, descrição, sensibilidade e redaction), mantendo o
+JSON canônico apenas como preview e fallback para definições legadas. A publicação
+do Studio deve ocorrer depois das releases do Config e do Core que carregam esse
+contrato. Catálogo multi-domínio canônico, proposição de cenários e diff vêm nos
+próximos incrementos.
 Create, edit, test, submit e, depois, publish/rollout poderão ser executados por
 um agente delegado somente pelas mesmas actions, capabilities, ETag,
 confirmação, evidência e segregação de funções usadas por pessoas. Não haverá

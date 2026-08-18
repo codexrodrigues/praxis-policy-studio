@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, ElementRef, HostListener, OnInit, c
 import { FormsModule } from '@angular/forms';
 import { PolicyStudioI18n } from '../../core/i18n';
 import { ProjectionCatalogService } from '../../core/projection-catalog.service';
-import { DecisionLifecycleSummary, DecisionPublicationResult, DecisionSummary, PolicySandboxRun, PublicationReadiness } from './catalog.fixture';
+import { DecisionFact, DecisionLifecycleSummary, DecisionPublicationResult, DecisionSummary, PolicySandboxRun, PublicationReadiness } from './catalog.fixture';
 import { DecisionTimelineEvent } from './catalog.fixture';
 import { RuntimeConfigService } from '../../core/runtime-config.service';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -105,6 +105,9 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly authoringError = signal(false);
   readonly authoringFeedback = signal<string | null>(null);
   readonly scenarios = signal<readonly DomainRuleTestScenario[]>([]);
+  readonly scenarioFactDraft = signal<Readonly<Record<string, unknown>>>({});
+  readonly scenarioFactsFallback = signal('{}');
+  readonly scenarioFactsJson = computed(() => JSON.stringify(this.scenarioFactsPayload(), null, 2));
   readonly activeScenarios = computed(() => this.scenarios().filter(item => item.status === 'ACTIVE'));
   readonly editingScenarioId = signal<string | null>(null);
   readonly reviews = signal<readonly DomainRuleWorkspaceReview[]>([]);
@@ -843,11 +846,68 @@ export class CatalogWorkspaceComponent implements OnInit {
         this.sandboxEvaluatedAtUtc = null;
         this.authoringBusy.set(false);
         this.authoringFeedback.set(this.i18n.text('scenarioCreated'));
+        this.scenarioFactDraft.set({});
+        this.scenarioFactsFallback.set('{}');
         form.reset();
         this.loadLifecycle();
       },
       error: error => this.failAuthoring(error)
     });
+  }
+
+  setScenarioFactValue(fact: DecisionFact, rawValue: string | boolean): void {
+    const value = this.parseScenarioFactValue(fact, rawValue);
+    this.scenarioFactDraft.update(current => ({ ...current, [fact.path]: value }));
+  }
+
+  setScenarioFactNull(fact: DecisionFact, useNull: boolean): void {
+    this.scenarioFactDraft.update(current => {
+      const next = { ...current };
+      if (useNull) next[fact.path] = null;
+      else delete next[fact.path];
+      return next;
+    });
+  }
+
+  scenarioFactIsNull(path: string): boolean {
+    return this.scenarioFactDraft()[path] === null;
+  }
+
+  scenarioFactDisplayValue(path: string): string {
+    const value = this.scenarioFactDraft()[path];
+    return Array.isArray(value) ? value.join(', ') : value == null ? '' : String(value);
+  }
+
+  scenarioFactsForSubmit(): string {
+    return this.selected()?.facts.length ? this.scenarioFactsJson() : this.scenarioFactsFallback();
+  }
+
+  private parseScenarioFactValue(fact: DecisionFact, rawValue: string | boolean): unknown {
+    if (fact.valueType === 'boolean') return Boolean(rawValue);
+    const text = String(rawValue).trim();
+    if (fact.valueType === 'number') return text === '' ? null : Number(text);
+    if (fact.valueType === 'string-array' || fact.valueType === 'date-array') {
+      return text.split(/[\n,]/).map(item => item.trim()).filter(Boolean);
+    }
+    return text;
+  }
+
+  private scenarioFactsPayload(): Record<string, unknown> {
+    const payload: Record<string, unknown> = {};
+    Object.entries(this.scenarioFactDraft()).forEach(([path, value]) => {
+      const segments = path.split('.');
+      let target = payload;
+      segments.forEach((segment, index) => {
+        if (index === segments.length - 1) {
+          target[segment] = value;
+          return;
+        }
+        const nested = target[segment];
+        if (!nested || typeof nested !== 'object' || Array.isArray(nested)) target[segment] = {};
+        target = target[segment] as Record<string, unknown>;
+      });
+    });
+    return payload;
   }
 
   editScenario(scenarioId: string): void {
