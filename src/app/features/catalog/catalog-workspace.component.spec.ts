@@ -169,6 +169,21 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(component.signingOut()).toBe(false);
   });
 
+  it('offers a new sign-in after an unavailable catalog or a permission-limited session', () => {
+    component.sessionActive.set(true);
+    component.permissionLimited.set(true);
+    component.loadError.set('PROJECTION_LOAD_FAILED');
+    component.authenticationFailed.set(true);
+
+    component.requestAuthentication();
+
+    expect(component.authenticationRequired()).toBe(true);
+    expect(component.sessionActive()).toBe(false);
+    expect(component.permissionLimited()).toBe(false);
+    expect(component.loadError()).toBeNull();
+    expect(component.authenticationFailed()).toBe(false);
+  });
+
   it('creates a workspace only when Config publishes CREATE_NEW_VERSION for the exact definition', () => {
     component.select({
       ...decision('A'), workspaceId: undefined, workspaceEtag: undefined,

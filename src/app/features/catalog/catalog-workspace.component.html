@@ -50,10 +50,16 @@
         </form>
       } @else if (permissionLimited()) {
         <p class="empty state-message" role="alert">{{ i18n.text('permissionLimited') }}</p>
+        <button type="button" class="quiet-button state-retry" (click)="requestAuthentication()">
+          {{ i18n.text('reauthenticate') }}
+        </button>
       } @else if (loadError()) {
         <p class="empty state-message" role="alert">{{ i18n.text('remoteError') }}</p>
         <button type="button" class="quiet-button state-retry" (click)="loadCatalog()">
           {{ i18n.text('retryCatalog') }}
+        </button>
+        <button type="button" class="quiet-button state-retry" (click)="requestAuthentication()">
+          {{ i18n.text('reauthenticate') }}
         </button>
       } @else {
         @for (decision of decisions(); track decision.key) {

@@ -332,6 +332,21 @@ export class CatalogWorkspaceComponent implements OnInit {
     });
   }
 
+  /**
+   * Makes the authentication form available without assuming that an opaque
+   * catalog failure was caused by credentials. A successful sign-in replaces
+   * the browser's prior local development session.
+   */
+  requestAuthentication(): void {
+    ++this.catalogLoadRevision;
+    this.loading.set(false);
+    this.loadError.set(null);
+    this.permissionLimited.set(false);
+    this.authenticationFailed.set(false);
+    this.sessionActive.set(false);
+    this.authenticationRequired.set(true);
+  }
+
   updateQuery(value: string): void { this.query.set(value); }
   select(decision: DecisionSummary, forceReload = false): void {
     if (decision.key === this.selected()?.key && !forceReload) return;
