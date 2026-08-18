@@ -48,11 +48,12 @@ O complemento operacional corrente está no
 [handoff V61](docs/ergon-handoff-v61.md): ele registra a cadeia de discovery
 cross-resource consumida pelo Studio e preserva a prova Neon do V60 sem a
 confundir com evidência Oracle.
-O beta.14 usa a cadeia Contracts beta.4, Config rc.124,
-Metadata rc.127, Quickstart rc.42 e `@praxisui/*` rc.29.
-O corte acrescenta uma prova de navegador desktop/narrow, teclado e axe com
-backend hermético; ela não substitui a prova integrada com Quickstart/Neon e
-personas reais.
+O beta.15 usa a cadeia Contracts beta.4, Config rc.127,
+Metadata rc.127, Quickstart rc.43 e `@praxisui/*` rc.35. O corte consome o
+catálogo canônico de facts por definição e deriva inputs tipados de cenário,
+mantendo JSON somente como preview/fallback legado. A prova de navegador
+desktop/narrow, teclado e axe usa backend hermético; ela não substitui a prova
+integrada com Quickstart/Neon e personas reais.
 Na composição de snapshot, o Config devolve blockers governados tipados e o
 Studio os apresenta por códigos estáveis em pt-BR/en-US. A UI não interpreta nem
 expõe a mensagem técnica do backend como contrato de produto.
@@ -259,13 +260,11 @@ fingerprints e declara `canApply=false`; uma resposta divergente, incompleta ou
 aplicável é rejeitada. Facts runtime, tenant, atores, rationale e payloads
 materializados não são enviados ao provider nem exibidos nessa superfície.
 
-O próximo corte consome o catálogo canônico de facts por definição publicado pelo
+O beta.15 consome o catálogo canônico de facts por definição publicado pelo
 Config através de `@praxisui/core`. O formulário de cenário passa a ser tipado e
 grounded (tipo, nulabilidade, descrição, sensibilidade e redaction), mantendo o
-JSON canônico apenas como preview e fallback para definições legadas. A publicação
-do Studio deve ocorrer depois das releases do Config e do Core que carregam esse
-contrato. Catálogo multi-domínio canônico, proposição de cenários e diff vêm nos
-próximos incrementos.
+JSON canônico apenas como preview e fallback para definições legadas. Catálogo
+multi-domínio canônico, proposição de cenários e diff vêm nos próximos incrementos.
 Create, edit, test, submit e, depois, publish/rollout poderão ser executados por
 um agente delegado somente pelas mesmas actions, capabilities, ETag,
 confirmação, evidência e segregação de funções usadas por pessoas. Não haverá
