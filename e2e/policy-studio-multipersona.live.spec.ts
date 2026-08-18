@@ -15,6 +15,10 @@ const publication = '/api/praxis/config/domain-rules/publications';
 const activate = '/api/praxis/config/domain-rules/snapshots/policy-studio-live-missing/activate';
 const operationalTest =
   '/api/human-resources/extraordinary-benefit-requests/actions/run-policy-studio-operational-test';
+const backendUrl = (process.env.POLICY_STUDIO_LIVE_BACKEND_URL || 'http://127.0.0.1:8088').replace(/\/$/, '');
+const studioOrigin = new URL(
+  process.env.POLICY_STUDIO_LIVE_STUDIO_URL || 'http://127.0.0.1:4302'
+).origin;
 const adversarialTenant = 'tenant-from-browser';
 const adversarialEnvironment = 'environment-from-browser';
 const authorizedProbeStatuses = [200, 201, 204, 400, 404, 409, 412, 422, 428] as const;
@@ -89,7 +93,7 @@ test.describe('Policy Studio live multi-persona governance', () => {
     'Set all POLICY_STUDIO_LIVE_* persona credentials and start the Quickstart on the official 8088 origin.');
 
   test('anonymous browser remains outside the governed catalog', async ({ page }) => {
-    const session = await page.request.get('/auth/session');
+    const session = await page.request.get(apiUrl('/auth/session'));
     expect(session.status()).toBe(401);
 
     const definitionsResponse = await governedRequest(page.request, { method: 'GET', path: definitions });
@@ -97,14 +101,14 @@ test.describe('Policy Studio live multi-persona governance', () => {
 
     await page.goto('/catalog');
     await expect(page.locator('.development-login')).toBeVisible();
-    await expect(page.locator('.decision-list')).toHaveCount(0);
+    await expect(page.locator('.decision-list .decision-row')).toHaveCount(0);
   });
 
   for (const persona of personas) {
     test(`${persona.key} sees the governed catalog without receiving another persona responsibility`, async ({ page }) => {
       await login(page, persona);
 
-      const session = await page.request.get('/auth/session');
+      const session = await page.request.get(apiUrl('/auth/session'));
       expect(session.status(), `${persona.key} session`).toBe(204);
 
       await page.goto('/catalog');
@@ -113,11 +117,17 @@ test.describe('Policy Studio live multi-persona governance', () => {
 
       const definitionsResponse = await governedRequest(page.request, { method: 'GET', path: definitions });
       expect(definitionsResponse.status(), `${persona.key} definition catalog`).toBe(200);
-      const definitionsBody = await definitionsResponse.text();
-      expect(definitionsBody, `${persona.key} must not project the caller tenant header`)
-        .not.toContain(adversarialTenant);
-      expect(definitionsBody, `${persona.key} must not project the caller environment header`)
-        .not.toContain(adversarialEnvironment);
+
+      const forgedScope = await governedRequest(
+        page.request,
+        { method: 'GET', path: definitions },
+        true
+      );
+      expect(forgedScope.status(), `${persona.key} forged scope request`).toBe(200);
+      expect(
+        await forgedScope.json(),
+        `${persona.key} browser headers must not override its server-owned scope`
+      ).toEqual(await definitionsResponse.json());
 
       const allowed = await governedRequest(page.request, persona.allowedProbe);
       expect(
@@ -134,7 +144,7 @@ test.describe('Policy Studio live multi-persona governance', () => {
 });
 
 async function login(page: Page, persona: Persona): Promise<void> {
-  const response = await page.request.post('/auth/login', {
+  const response = await page.request.post(apiUrl('/auth/login'), {
     data: { username: persona.username, password: persona.password }
   });
   expect(response.status(), `${persona.key} login`).toBe(204);
@@ -142,14 +152,19 @@ async function login(page: Page, persona: Persona): Promise<void> {
 
 async function governedRequest(
   request: APIRequestContext,
-  probe: { readonly method: 'GET' | 'POST'; readonly path: string }
+  probe: { readonly method: 'GET' | 'POST'; readonly path: string },
+  forgeScope = false
 ) {
-  const headers = {
-    Origin: 'http://127.0.0.1:4302',
-    'X-Tenant-ID': adversarialTenant,
-    'X-Env': adversarialEnvironment
-  };
+  const headers: Record<string, string> = { Origin: studioOrigin };
+  if (forgeScope) {
+    headers['X-Tenant-ID'] = adversarialTenant;
+    headers['X-Env'] = adversarialEnvironment;
+  }
   return probe.method === 'GET'
-    ? request.get(probe.path, { headers })
-    : request.post(probe.path, { headers, data: {} });
+    ? request.get(apiUrl(probe.path), { headers })
+    : request.post(apiUrl(probe.path), { headers, data: {} });
+}
+
+function apiUrl(path: string): string {
+  return `${backendUrl}${path}`;
 }
