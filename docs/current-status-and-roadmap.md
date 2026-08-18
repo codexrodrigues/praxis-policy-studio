@@ -1,10 +1,10 @@
 # Estado e roadmap do Praxis Policy Studio
 
-- Baseline validada: Studio `0.1.0-beta.14`, Config `0.1.0-rc.122` e
-  Quickstart no commit publicado `50cb09e`, com transporte, governance V58,
+- Baseline validada: Studio `0.1.0-beta.14`, Config `0.1.0-rc.127` e
+  Quickstart no commit publicado `482cdf9`, com transporte, governance V58,
   snapshot v1/v2 e cadeia de folha host-owned no Neon homologado
-- Data da auditoria: 2026-08-16
-- Escopo: Studio beta.14, Metadata rc.127, Config rc.124, Quickstart rc.42,
+- Data da auditoria: 2026-08-18
+- Escopo: Studio beta.14, Metadata rc.127, Config rc.127, Quickstart rc.43,
   Contracts beta.4, `@praxisui/*` rc.29 e handoff Ergon #300
 
 ## Leitura executiva
@@ -27,7 +27,7 @@ Marcos diferentes têm distâncias diferentes:
 
 | Marco | Estimativa atual | Significado |
 | --- | ---: | --- |
-| beta integrada controlada com Quickstart | 99% | contratos, action discovery e matriz HTTP multi-persona foram comprovados no corte publicado; falta executar a suíte visual live do Studio contra esse host |
+| beta integrada controlada com Quickstart | 99% | contratos, action discovery, catálogo não vazio no Neon e matriz browser multi-persona foram comprovados; falta repetir no corte publicado a asserção nova de catálogo não vazio |
 | versão estável corporativa | 62% | isolamento estrutural, segregação, sessão/catálogo, workspace e sandbox candidate no site homologado foram provados; faltam Neon cross-tenant, snapshot ativo, gates posteriores, matriz browser multi-persona e operação corporativa |
 | produto maduro multi-cliente com authoring complexo e IA | 34% | RuleSet completo, discovery amplo, impacto, execução explicável e agente governado |
 
@@ -40,7 +40,7 @@ multi-consumidor.
 | Capability | % | Aderência | Diagnóstico |
 | --- | ---: | --- | --- |
 | fronteiras canônicas e neutralidade | 85 | `ja-suportado-mal-nomeado-ou-mal-materializado` | owners corretos; ainda existe normalização Ergon no core |
-| catálogo/discovery multi-domínio | 55 | `suportado-parcialmente` | o assistente descobre identidades governadas no escopo server-owned, mas o detalhe selecionável ainda depende da projeção ativa; falta catálogo canônico multi-domínio |
+| catálogo/discovery multi-domínio | 65 | `suportado-parcialmente` | o catálogo canônico paginado materializou sete decisões neutras persistidas no Neon e o assistente descobre identidades governadas no escopo server-owned; o enriquecimento detalhado ainda depende da projeção ativa |
 | inspeção e explicação humana/IA | 74 | `suportado-parcialmente` | facts, precedência, expressão e explicação grounded da definição; falta correlação causal com execução |
 | editar regra existente | 50 | `suportado-parcialmente` | condição focal carregada e round-trip visual aberto sobre workspace real; parâmetros, outcomes e RuleSet completo não são authorados |
 | criar regra nova | 20 | `suportado-parcialmente` | Config possui intake; Studio apenas cria workspace de definição existente |
@@ -51,7 +51,7 @@ multi-consumidor.
 | evidência V58/V60/Ergon | 89 | `suportado-parcialmente` | contrato leve, action dedicada, reserva pré-DML e quatro quadrantes foram provados; a cadeia publicada de folha confirmou snapshots v1/v2 e execução no Neon sem duplicação; faltam adapter Ergon e Oracle/HADES |
 | segurança, multitenancy e capabilities | 85 | `suportado-parcialmente` | publicação e rollout não são mais inferidos no browser; seis sujeitos separados passaram pela cadeia HTTP publicada; author abriu o catálogo no site homologado e auditor permaneceu read-only; faltam Neon cross-tenant e matriz visual multi-persona completa |
 | UX, i18n e acessibilidade | 50 | `ja-suportado-mal-nomeado-ou-mal-materializado` | Playwright desktop/narrow, teclado e axe cobrem estados corporativos focais; o site homologado prova shell, sessão e catálogo reais; faltam i18n integral, seis personas no browser e decomposição da página |
-| testes, release e documentação | 95 | `suportado-parcialmente` | cadeia V61, prova HTTP/PostgreSQL/Neon V60, E2E hermético V62, discovery/explanation desktop+narrow, matriz de segurança multi-persona e deployment estático publicados; falta executar a suíte browser live completa |
+| testes, release e documentação | 97 | `suportado-parcialmente` | cadeia V61, prova HTTP/PostgreSQL/Neon V60, E2E hermético V62, discovery/explanation desktop+narrow e matriz de segurança multi-persona publicados; o teste agora recusa catálogo vazio, mas essa asserção nova ainda precisa ser repetida no site publicado |
 | assistente de decisões | 58 | `suportado-parcialmente` | discovery semântico e explicação usam o runtime horizontal, terminais read-only e evidência atestada; faltam seleção fora da projeção ativa, execução explicada e comandos delegados |
 
 ## Bloqueadores do próximo corte corporativo
@@ -115,6 +115,17 @@ personas. Cada persona leu o mesmo catálogo com e sem headers adversariais de
 tenant/environment, e os resultados permaneceram idênticos porque o escopo é
 resolvido no servidor. O corte ainda não repete workspace estrangeiro no Neon e
 não constitui paridade Oracle/HADES.
+
+Em 2026-08-18, o Config `rc.127` corrigiu a busca do catálogo em PostgreSQL e o
+Quickstart `482cdf9` passou a materializar, depois da auto-configuração do Config,
+o seed idempotente de sete decisões JSON Logic do caso neutro. A prova local
+corporativa usou o mesmo Neon `enterprise-proof-homolog` e passou `7/7`, agora
+exigindo pelo menos uma decisão governada na lista — um shell vazio não conta mais
+como sucesso. Headers adversariais continuaram sem alterar o escopo server-owned.
+O Render publicou o backend no deploy `dep-da1t4s142hec73f572hg` e o Studio no
+deploy `dep-da1t7bnqj5pc73d4csf0`, ambos `live`; health e recusa anônima `403`
+foram repetidos. As credenciais do ambiente não foram extraídas do Render, por
+isso a asserção nova de lista não vazia permanece pendente de repetição publicada.
 
 ## Gate de evidência
 

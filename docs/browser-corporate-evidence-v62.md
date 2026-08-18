@@ -101,6 +101,30 @@ Test Run. O candidate retornou `ALLOW`; a lane active retornou
 publicado. Esse resultado é a evidência correta de authoring/sandbox controlado,
 não um falso `MATCH` nem autorização para publicar.
 
+## Revalidação do catálogo neutro em 2026-08-18
+
+O Config `0.1.0-rc.127` removeu a incompatibilidade PostgreSQL da consulta
+paginada e o Quickstart PR `#219` corrigiu a ordem de materialização do seed: a
+configuração do host não depende mais de um `@ConditionalOnBean` avaliado antes
+da auto-configuração do Config. Sete Definitions JSON Logic foram persistidas no
+Neon `enterprise-proof-homolog` sem criar banco ou schema paralelo.
+
+A suíte live passou `7/7` localmente em corporate mode contra esse Neon e passou a
+exigir `.decision-list .decision-row > 0` para todas as personas autenticadas.
+Também repetiu igualdade com headers adversariais, responsabilidades positivas e
+negativas e anonimato fail-closed. O limite de bulk actions foi isolado nessa
+execução para que `429` não mascarasse a asserção de autorização `403`; autenticação,
+roles e Origin permaneceram habilitados.
+
+O backend `482cdf9` foi publicado no Render como
+`dep-da1t4s142hec73f572hg` e o Studio `b8231bc` como
+`dep-da1t7bnqj5pc73d4csf0`. Os dois deploys ficaram `live`; o health publicado
+retornou `UP`, o artefato estático apontou para a projeção neutra
+`quickstart-benefit-eligibility.v1.json` e o catálogo anônimo retornou `403`.
+Esta revalidação não extraiu secrets do Render. Portanto, preserva como evidência
+anterior a matriz publicada de 2026-08-17, mas não afirma que a nova asserção de
+lista não vazia já foi repetida no browser publicado.
+
 ## Dívida visual observada
 
 O catálogo mantém a decisão selecionada e as ações são operáveis nos dois

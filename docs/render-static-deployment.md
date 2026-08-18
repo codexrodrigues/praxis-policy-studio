@@ -61,5 +61,11 @@ um cenário `amount-within-limit`, e executou o sandbox. O receipt persistido
 registrou `candidate=ALLOW`, `active=TECHNICAL_ERROR` e
 `ACTIVE_SNAPSHOT_UNAVAILABLE`. Isso prova o candidate authorado e o fail-closed
 da lane ativa sem snapshot; não prova publicação, ativação nem paridade com
-Oracle/HADES. A matriz Playwright live completa de seis personas também continua
-pendente.
+Oracle/HADES.
+
+Em 2026-08-17, a matriz Playwright live passou no ambiente publicado com anonymous
+e seis personas. Em 2026-08-18, o deploy `dep-da1t7bnqj5pc73d4csf0` publicou o
+caso neutro e o deploy backend `dep-da1t4s142hec73f572hg` publicou o seed corrigido
+e o Config `rc.127`. Health, artefato estático e recusa anônima foram revalidados;
+a nova asserção de catálogo não vazio passou localmente contra o mesmo Neon, mas
+não foi repetida no site publicado porque os secrets não foram extraídos do Render.
