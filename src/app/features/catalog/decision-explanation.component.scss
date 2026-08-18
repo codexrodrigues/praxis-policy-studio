@@ -24,7 +24,7 @@ p { margin: 0; }
 button:focus-visible { outline: 3px solid color-mix(in srgb, var(--pax-color-primary, #076487) 35%, transparent); outline-offset: 2px; }
 button:disabled { cursor: wait; opacity: .65; }
 .progress, .failure { padding: .85rem 1rem; background: var(--pax-color-surface-container-low, #f3f6f7); }
-.progress { border-inline-start: .25rem solid var(--pax-color-primary, #076487); }
+.progress { display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-inline-start: .25rem solid var(--pax-color-primary, #076487); }
 .failure { display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-inline-start: .25rem solid var(--pax-color-error, #ba1a1a); }
 .answer { display: grid; gap: 1rem; padding-inline-start: 1rem; border-inline-start: .25rem solid var(--pax-color-tertiary, #187457); }
 .answer > p { max-width: 70ch; line-height: 1.65; white-space: pre-line; }
@@ -33,7 +33,7 @@ button:disabled { cursor: wait; opacity: .65; }
 .answer dd { margin: .25rem 0 0; overflow-wrap: anywhere; }
 .answer small { color: var(--pax-color-on-surface-variant, #52636a); }
 @media (max-width: 760px) {
-  header, .failure { align-items: stretch; flex-direction: column; }
+  header, .failure, .progress { align-items: stretch; flex-direction: column; }
   .explain-button { align-self: stretch; }
   .answer dl { grid-template-columns: 1fr 1fr; }
 }

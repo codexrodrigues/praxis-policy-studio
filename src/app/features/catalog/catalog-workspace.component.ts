@@ -42,6 +42,7 @@ import { SnapshotCockpitComponent } from './snapshot-cockpit.component';
 import { forkJoin } from 'rxjs';
 import { DecisionExplanationComponent } from './decision-explanation.component';
 import { DecisionDiscoveryComponent } from './decision-discovery.component';
+import { createClientRequestId } from '../../core/client-request-id';
 
 interface PendingOperationalCommand {
   readonly workspaceId: string;
@@ -74,6 +75,29 @@ export class CatalogWorkspaceComponent implements OnInit {
   private readonly auth = inject(AuthSessionService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   readonly runtime = inject(RuntimeConfigService);
+
+  meaningText(decision: DecisionSummary): string {
+    if (decision.meaning.trim() && decision.meaning.trim() !== decision.name.trim()) return decision.meaning;
+    return `${this.i18n.text('decisionInRuleSet')} ${decision.ruleSet}. ${this.i18n.text('decisionOrderPrefix')} ${decision.order} ${this.i18n.text('decisionOrderConnector')} ${decision.totalDecisions}.`;
+  }
+
+  authorityLabel(authority: string): string {
+    if (authority.includes('LEGACY_AUTHORITATIVE')) return this.i18n.text('legacyOperationalAuthority');
+    if (authority.includes('CONFIG')) return this.i18n.text('configOperationalAuthority');
+    return this.i18n.text('authorityNotDescribed');
+  }
+
+  persistenceLabel(authority: string): string {
+    return authority.includes('KEEP_DB_BACKED')
+      ? this.i18n.text('databaseBackedStrategy')
+      : this.i18n.text('strategyNotDescribed');
+  }
+
+  configStatusLabel(status: string): string {
+    return status.toUpperCase().includes('DRAFT')
+      ? this.i18n.text('configDraftLabel')
+      : status;
+  }
   readonly query = signal('');
   readonly allDecisions = signal<readonly DecisionSummary[]>([]);
   readonly selected = signal<DecisionSummary | null>(null);
@@ -789,7 +813,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     const created = {
       workspaceId,
       selectionFingerprint,
-      idempotencyKey: `policy-studio:operational:${workspaceId}:${crypto.randomUUID()}`,
+      idempotencyKey: `policy-studio:operational:${workspaceId}:${createClientRequestId()}`,
       evaluatedAtUtc: new Date().toISOString()
     } satisfies PendingOperationalCommand;
     this.pendingOperationalCommand = created;
@@ -1026,7 +1050,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.authoringBusy.set(true);
     this.clearAuthoringMessage();
     const idempotencyKey = this.sandboxIdempotencyKey
-      ??= `policy-studio:${workspaceId}:${crypto.randomUUID()}`;
+      ??= `policy-studio:${workspaceId}:${createClientRequestId()}`;
     const evaluatedAtUtc = this.sandboxEvaluatedAtUtc ??= new Date().toISOString();
     this.catalog.runSandbox(
       workspaceId,

@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, Input, OnChanges, OnDestroy, inject, signal } from '@angular/core';
-import { Subscription } from 'rxjs';
+import { Subscription, map, merge, takeWhile, timer } from 'rxjs';
 import { DecisionExplanationService, type DecisionExplanationEvent } from '../../core/decision-explanation.service';
 import { PolicyStudioI18n } from '../../core/i18n';
 import type { PolicyStudioRuntimeConfig } from '../../core/runtime-config';
@@ -12,6 +12,7 @@ import type { DecisionSummary } from './catalog.fixture';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class DecisionExplanationComponent implements OnChanges, OnDestroy {
+  private static readonly REQUEST_TIMEOUT_MS = 90_000;
   @Input({ required: true }) decision!: DecisionSummary;
   @Input({ required: true }) config!: PolicyStudioRuntimeConfig;
 
@@ -45,16 +46,31 @@ export class DecisionExplanationComponent implements OnChanges, OnDestroy {
     this.subscription?.unsubscribe();
     this.activeRequestKey = requestKey;
     this.state.set({ kind: 'progress' });
-    this.subscription = this.explanations.explain({
+    const terminalTimeout: DecisionExplanationEvent = { kind: 'failed', reason: 'failed' };
+    const explanationEvents = this.explanations.explain({
       definitionId,
       ruleKey: this.decision.key,
       version,
       locale: this.i18n.locale(),
       config: this.config
-    }).subscribe(event => {
+    });
+    this.subscription = merge(
+      explanationEvents,
+      timer(DecisionExplanationComponent.REQUEST_TIMEOUT_MS).pipe(map(() => terminalTimeout))
+    ).pipe(
+      takeWhile(event => event.kind !== 'completed' && event.kind !== 'failed', true)
+    ).subscribe(event => {
       if (this.activeRequestKey !== requestKey) return;
       this.state.set(event);
     });
+  }
+
+  cancel(): void {
+    if (this.state().kind !== 'progress') return;
+    this.subscription?.unsubscribe();
+    this.subscription = null;
+    this.activeRequestKey = null;
+    this.state.set({ kind: 'failed', reason: 'cancelled' });
   }
 
   retry(): void {
@@ -79,7 +95,9 @@ export class DecisionExplanationComponent implements OnChanges, OnDestroy {
       ? 'aiExplanationAuthenticationRequired'
       : reason === 'forbidden'
         ? 'aiExplanationPermissionLimited'
-        : reason === 'evidence-mismatch' || reason === 'unsafe-terminal'
+        : reason === 'cancelled'
+          ? 'aiExplanationCancelled'
+          : reason === 'evidence-mismatch' || reason === 'unsafe-terminal'
           ? 'aiExplanationEvidenceRejected'
           : 'aiExplanationFailed';
     return this.i18n.text(key);

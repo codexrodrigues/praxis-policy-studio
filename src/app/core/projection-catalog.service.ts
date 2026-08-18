@@ -2,6 +2,7 @@ import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http
 import { Injectable, inject } from '@angular/core';
 import { catchError, EMPTY, expand, forkJoin, map, Observable, of, reduce, switchMap, throwError } from 'rxjs';
 import { PolicyStudioRuntimeConfig, SupportedLocale } from './runtime-config';
+import { createClientRequestId } from './client-request-id';
 import { DomainProjection, validateDomainProjection } from './domain-projection';
 import {
   DecisionLifecycleSummary,
@@ -380,7 +381,7 @@ export class ProjectionCatalogService {
     const headers = new HttpHeaders()
       .set('If-Match', workspaceEtag)
       .set('Idempotency-Key', idempotencyKey)
-      .set('X-Correlation-ID', crypto.randomUUID());
+      .set('X-Correlation-ID', createClientRequestId());
     const body: Record<string, unknown> = {
       [targetIdField]: workspaceId,
       scenarios,

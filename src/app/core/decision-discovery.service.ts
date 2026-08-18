@@ -8,6 +8,7 @@ import {
 } from '@praxisui/ai';
 import { Observable, catchError, filter, map, of, takeWhile } from 'rxjs';
 import type { PolicyStudioRuntimeConfig, SupportedLocale } from './runtime-config';
+import { createClientRequestId } from './client-request-id';
 
 export interface DecisionDiscoveryRequest {
   readonly prompt: string;
@@ -56,7 +57,7 @@ export class DecisionDiscoveryService {
 
   discover(request: DecisionDiscoveryRequest): Observable<DecisionDiscoveryEvent> {
     const turnRequest: AgenticAuthoringTurnStreamRequest = {
-      clientTurnId: crypto.randomUUID(),
+      clientTurnId: createClientRequestId(),
       userPrompt: request.prompt.trim(),
       targetApp: 'praxis-policy-studio',
       targetComponentId: 'policy-decision-discovery',

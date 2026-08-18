@@ -92,28 +92,55 @@
       </span>
     </header>
 
-    <div class="decision-trail" aria-label="Trilha da decisão">
-      <div class="trail-step active"><span>1</span><strong>{{ i18n.text('meaning') }}</strong><small>Contrato legível</small></div>
-      <div class="trail-line"></div>
-      <div class="trail-step"><span>2</span><strong>{{ i18n.text('evidence') }}</strong><small>{{ current.evidenceCount }} referências</small></div>
-      <div class="trail-line"></div>
-      <div class="trail-step"><span>3</span><strong>{{ i18n.text('execution') }}</strong><small>Host consumidor</small></div>
-    </div>
+    <nav class="decision-navigation" [attr.aria-label]="i18n.text('decisionNavigation')">
+      <a href="#decision-overview">
+        <span aria-hidden="true">01</span>
+        <strong>{{ i18n.text('overview') }}</strong>
+        <small>{{ i18n.text('overviewHint') }}</small>
+      </a>
+      <a href="#decision-evidence">
+        <span aria-hidden="true">02</span>
+        <strong>{{ i18n.text('evidence') }}</strong>
+        <small>{{ current.evidenceCount }} {{ i18n.text('packageReferences') }}</small>
+      </a>
+      <a href="#decision-execution">
+        <span aria-hidden="true">03</span>
+        <strong>{{ i18n.text('execution') }}</strong>
+        <small>{{ i18n.text('executionHint') }}</small>
+      </a>
+    </nav>
 
-    <div class="detail-grid">
+    <div class="detail-grid anchored-section" id="decision-overview" tabindex="-1">
       <section class="meaning-block">
         <p class="section-label">{{ i18n.text('meaning') }}</p>
-        <p class="meaning">{{ current.meaning }}</p>
+        <p class="meaning">{{ meaningText(current) }}</p>
       </section>
-      <dl class="facts">
-        <div><dt>Domínio</dt><dd>{{ current.domain }}</dd></div>
-        <div><dt>RuleSet</dt><dd>{{ current.ruleSet }}</dd></div>
-        <div><dt>{{ i18n.text('authority') }}</dt><dd>{{ current.authority }}</dd></div>
-        <div><dt>{{ i18n.text('source') }}</dt><dd>{{ current.source }}</dd></div>
-        @if (current.configStatus) {
-          <div><dt>Config</dt><dd>{{ current.configStatus }}</dd></div>
-        }
-      </dl>
+      <div class="decision-context">
+        <dl class="facts">
+          <div><dt>{{ i18n.text('domain') }}</dt><dd>{{ current.domain }}</dd></div>
+          <div>
+            <dt>RuleSet</dt>
+            <dd>{{ current.ruleSet }}</dd>
+            <small>{{ i18n.text('ruleSetHint') }}</small>
+          </div>
+          <div><dt>{{ i18n.text('whoDecidesToday') }}</dt><dd>{{ authorityLabel(current.authority) }}</dd></div>
+          <div><dt>{{ i18n.text('migrationStrategy') }}</dt><dd>{{ persistenceLabel(current.authority) }}</dd></div>
+          <div><dt>{{ i18n.text('source') }}</dt><dd>{{ i18n.text('projectionSource') }}</dd></div>
+          @if (current.configStatus) {
+            <div><dt>{{ i18n.text('configVersion') }}</dt><dd>{{ configStatusLabel(current.configStatus) }}</dd></div>
+          }
+        </dl>
+        <details class="technical-details">
+          <summary>{{ i18n.text('technicalDetails') }}</summary>
+          <dl>
+            <div><dt>{{ i18n.text('authority') }}</dt><dd><code>{{ current.authority }}</code></dd></div>
+            <div><dt>{{ i18n.text('source') }}</dt><dd><code>{{ current.source }}</code></dd></div>
+            @if (current.configStatus) {
+              <div><dt>Config</dt><dd><code>{{ current.configStatus }}</code></dd></div>
+            }
+          </dl>
+        </details>
+      </div>
     </div>
 
     @if (policyConfig(); as studioConfig) {
@@ -553,6 +580,11 @@
       }
     }
 
+    <section class="anchored-section execution-section" id="decision-execution" tabindex="-1" [attr.aria-labelledby]="'decision-execution-title'">
+      <header class="section-introduction">
+        <p class="section-label" id="decision-execution-title">{{ i18n.text('execution') }}</p>
+        <p>{{ i18n.text('executionBoundary') }}</p>
+      </header>
     @if (runtime.mode() === 'remote') {
       <pax-snapshot-cockpit
         [ruleSetKey]="current.ruleSetKey"
@@ -595,18 +627,24 @@
         (cancelRollout)="cancelRollout($event)"
         (activateRollout)="activateRollout($event)"
         (operate)="operateSnapshot($event)" />
+    } @else {
+      <p class="empty">{{ i18n.text('executionUnavailableFixture') }}</p>
     }
+    </section>
 
-    <section class="evidence-ledger" aria-labelledby="evidence-title">
+    <section class="evidence-ledger anchored-section" id="decision-evidence" tabindex="-1" aria-labelledby="evidence-title">
       <div>
         <p class="section-label" id="evidence-title">{{ i18n.text('evidence') }}</p>
-        <p>{{ i18n.text('technicalEvidence') }}</p>
+        <p>{{ i18n.text('packageEvidenceScope') }}</p>
       </div>
-      <ol>
-        @for (item of current.evidence; track item.sha256) {
-          <li><span>{{ item.kind }}</span><code>{{ item.path }}</code><small>SHA-256 {{ item.sha256.slice(0, 12) }}…</small></li>
-        }
-      </ol>
+      <details class="evidence-details">
+        <summary>{{ current.evidenceCount }} {{ i18n.text('packageReferences') }}</summary>
+        <ol>
+          @for (item of current.evidence; track item.sha256) {
+            <li><span>{{ item.kind }}</span><code>{{ item.path }}</code><small>SHA-256 {{ item.sha256.slice(0, 12) }}…</small></li>
+          }
+        </ol>
+      </details>
     </section>
 
     @if (current.workspaceId) {

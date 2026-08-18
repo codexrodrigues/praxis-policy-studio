@@ -8,6 +8,7 @@ import {
 import { PolicyStudioI18n } from '../../core/i18n';
 import type { PolicyStudioRuntimeConfig } from '../../core/runtime-config';
 import type { DecisionSummary } from './catalog.fixture';
+import { createClientRequestId } from '../../core/client-request-id';
 
 @Component({
   selector: 'pax-decision-discovery',
@@ -47,7 +48,7 @@ export class DecisionDiscoveryComponent implements OnDestroy {
     this.inputInvalid.set(false);
     this.lastPrompt = normalized;
     this.subscription?.unsubscribe();
-    const requestId = crypto.randomUUID();
+    const requestId = createClientRequestId();
     this.activeRequestId = requestId;
     this.state.set({ kind: 'progress' });
     this.subscription = this.discovery.discover({

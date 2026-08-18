@@ -19,7 +19,10 @@
 
     @switch (state().kind) {
       @case ('progress') {
-        <p class="progress" role="status" aria-live="polite">{{ i18n.text('explainingDecision') }}</p>
+        <div class="progress" role="status" aria-live="polite">
+          <p>{{ i18n.text('explainingDecision') }}</p>
+          <button type="button" class="quiet-button" (click)="cancel()">{{ i18n.text('cancelAiExplanation') }}</button>
+        </div>
       }
       @case ('completed') {
         @if (state(); as completed) {

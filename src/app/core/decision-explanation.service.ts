@@ -8,6 +8,7 @@ import {
 } from '@praxisui/ai';
 import { Observable, catchError, filter, map, of, takeWhile } from 'rxjs';
 import type { PolicyStudioRuntimeConfig, SupportedLocale } from './runtime-config';
+import { createClientRequestId } from './client-request-id';
 
 export interface DecisionExplanationRequest {
   readonly definitionId: string;
@@ -52,7 +53,7 @@ export class DecisionExplanationService {
 
   explain(request: DecisionExplanationRequest): Observable<DecisionExplanationEvent> {
     const turnRequest: AgenticAuthoringTurnStreamRequest = {
-      clientTurnId: crypto.randomUUID(),
+      clientTurnId: createClientRequestId(),
       userPrompt: this.prompt(request.locale),
       targetApp: 'praxis-policy-studio',
       targetComponentId: 'policy-decision-explanation',

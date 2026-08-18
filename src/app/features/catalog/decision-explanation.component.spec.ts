@@ -94,4 +94,26 @@ describe('DecisionExplanationComponent', () => {
     component.config = { ...config, mode: 'fixture', configApiBaseUrl: null };
     expect(component.available()).toBe(false);
   });
+
+  it('lets the user cancel a request that is still in progress', () => {
+    const component = TestBed.runInInjectionContext(() => new DecisionExplanationComponent(TestBed.inject(PolicyStudioI18n)));
+    component.decision = decision();
+    component.config = config;
+    component.explain();
+    component.cancel();
+
+    expect(component.state()).toEqual({ kind: 'failed', reason: 'cancelled' });
+  });
+
+  it('leaves progress with a recoverable failure after the absolute timeout', () => {
+    vi.useFakeTimers();
+    const component = TestBed.runInInjectionContext(() => new DecisionExplanationComponent(TestBed.inject(PolicyStudioI18n)));
+    component.decision = decision();
+    component.config = config;
+    component.explain();
+    vi.advanceTimersByTime(90_000);
+
+    expect(component.state()).toEqual({ kind: 'failed', reason: 'failed' });
+    vi.useRealTimers();
+  });
 });
