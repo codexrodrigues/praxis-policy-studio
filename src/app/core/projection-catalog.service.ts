@@ -75,14 +75,20 @@ export class ProjectionCatalogService {
         }
         const detailReads = catalog.map(candidate => forkJoin({
           definition: this.domainRules.getDefinition(candidate.definitionId, this.requestOptions(config)),
-          factCatalog: this.domainRules.getDefinitionFacts(candidate.definitionId, this.requestOptions(config))
+          // Fact catalogs enrich the explanation only. Older Config deployments
+          // can publish a definition without exposing this optional endpoint.
+          factCatalog: this.domainRules.getDefinitionFacts(candidate.definitionId, this.requestOptions(config)).pipe(
+            catchError((error: unknown) => this.isMissingOptionalEndpoint(error)
+              ? of(null)
+              : throwError(() => error))
+          )
         }));
         return (detailReads.length ? forkJoin(detailReads) : of([])).pipe(map(definitionDetails => {
           const details = new Map(definitionDetails.map(detail => [detail.definition.id, detail]));
           return catalog.map((candidate, index) => {
         const detail = details.get(candidate.definitionId);
         const definition = detail?.definition;
-        const factCatalog = detail?.factCatalog;
+        const factCatalog = detail?.factCatalog ?? undefined;
         const decision = projection?.decisionRefs.find(item => item.decisionKey === candidate.ruleKey);
         const definitionCapability = definitionCapabilities.definitions.find(capability =>
           capability.definitionId === candidate.definitionId
@@ -98,7 +104,7 @@ export class ProjectionCatalogService {
           throw new Error(`CONFIG_FACT_OUTSIDE_GOVERNED_PROJECTION ${decision.decisionKey}`);
         }
         const facts = this.decisionFacts(factCatalog, locale);
-        if (conditionFactPaths.some(factPath => !facts.some(fact => fact.path === factPath))) {
+        if (factCatalog && conditionFactPaths.some(factPath => !facts.some(fact => fact.path === factPath))) {
           throw new Error(`CONFIG_FACT_CATALOG_INCOMPLETE ${decision.decisionKey}`);
         }
         return {
@@ -632,6 +638,10 @@ export class ProjectionCatalogService {
   }
 
   private isMissingSnapshotHead(error: unknown): boolean {
+    return this.isMissingOptionalEndpoint(error);
+  }
+
+  private isMissingOptionalEndpoint(error: unknown): boolean {
     return error instanceof HttpErrorResponse && error.status === 404;
   }
 

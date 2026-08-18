@@ -186,6 +186,31 @@ describe('ProjectionCatalogService', () => {
     expect(decisions[0]?.configDefinitionId).toBe('rule-1');
   });
 
+  it('keeps the catalog available when a compatible Config deployment has no fact-catalog endpoint', () => {
+    let decisions: readonly import('../features/catalog/catalog.fixture').DecisionSummary[] = [];
+    service.load('en-US', {
+      mode: 'remote', configApiBaseUrl: '', locale: 'en-US', projectionPath: null, initialDecisionKey: null
+    }).subscribe(value => decisions = value);
+
+    http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([]);
+    http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities').flush({
+      tenantId: 'default', environment: 'dev', definitions: []
+    });
+    http.expectOne(request => request.url.endsWith('/definitions/catalog')).flush({
+      schemaVersion: 'praxis-domain-rule-catalog.v1', page: 0, limit: 12, hasMore: false,
+      candidates: [{ definitionId: 'rule-optional-facts', ruleKey: 'hr.leave.eligibility', version: 1,
+        ruleType: 'selection_eligibility', status: 'active', contextKey: 'hr.leave' }]
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/rule-optional-facts').flush({
+      id: 'rule-optional-facts', ruleKey: 'hr.leave.eligibility', version: 1, status: 'active'
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/rule-optional-facts/facts')
+      .flush({}, { status: 404, statusText: 'Not Found' });
+
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0]?.facts).toEqual([]);
+  });
+
   it('discovers one operational command semantically and executes its published protocol', () => {
     const config = {
       mode: 'remote' as const, configApiBaseUrl: '', locale: 'en-US' as const,
