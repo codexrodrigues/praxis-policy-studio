@@ -62,8 +62,9 @@ multi-consumidor.
 2. **Evidência governada:** a V58 oferece baseline independente por cenário,
    idempotência, vínculo do run submetido e política opt-in. O Config rc.119
    revalida o receipt na composição de snapshot e devolve blockers tipados; o
-   Studio beta.14 os explica sem interpretar mensagens humanas. Ainda falta
-   provar essa cadeia no browser integrado multi-persona.
+   Studio beta.14 os explica sem interpretar mensagens humanas. A cadeia de sessão,
+   catálogo e segregação de papéis passou no browser integrado multi-persona; a
+   jornada mutável completa por persona permanece no próximo gate.
 3. **Consumo operacional governado:** concluído no V61. Metadata representa o
    `If-Match` cross-resource e Core/Studio descobrem e executam a action sem URL local.
    Desde o beta.12, o Studio também congela `Idempotency-Key` e `evaluatedAtUtc` após falha incerta,
@@ -73,8 +74,9 @@ multi-consumidor.
    o browser hermético cobre capability negada, confirmação e `412`. O host publicado prova
    author, dois approvers, publisher, operator e auditor como sujeitos mutuamente exclusivos na
    cadeia HTTP publicada. A prova local no mesmo PostgreSQL também confirma escopo server-owned, replay
-   idempotente no escopo do principal e `404` para workspace estrangeiro; ainda faltam browser
-   multi-persona integrado, repetição cross-tenant no Neon e Oracle/HADES autorizado.
+   idempotente no escopo do principal e `404` para workspace estrangeiro. A suíte browser integrada
+   passou depois com anonymous e as seis personas contra os dois serviços publicados; ainda faltam
+   repetição cross-tenant no Neon e Oracle/HADES autorizado.
 
 ## Prova publicada multi-persona de 2026-08-15
 
@@ -105,9 +107,14 @@ O Quickstart PR `#199` alinhou depois o seed ao escopo configurado do Rule Lab. 
 homologação `default/prod`, o author carregou a condição, criou workspace e
 cenário e persistiu um Test Run: candidate `ALLOW`, active
 `TECHNICAL_ERROR/ACTIVE_SNAPSHOT_UNAVAILABLE`. Isso fecha o sandbox candidate e
-prova fail-closed sem snapshot, mas não fecha publicação/ativação. A prova também
-não executa a suíte Playwright completa de seis personas, não repete o workspace
-estrangeiro no Neon e não constitui paridade Oracle/HADES.
+prova fail-closed sem snapshot, mas não fecha publicação/ativação.
+
+Em 2026-08-17, a suíte Playwright live completa passou com sete testes contra o
+Studio homologado e o Quickstart no commit `375e6c0`: anonymous mais as seis
+personas. Cada persona leu o mesmo catálogo com e sem headers adversariais de
+tenant/environment, e os resultados permaneceram idênticos porque o escopo é
+resolvido no servidor. O corte ainda não repete workspace estrangeiro no Neon e
+não constitui paridade Oracle/HADES.
 
 ## Gate de evidência
 

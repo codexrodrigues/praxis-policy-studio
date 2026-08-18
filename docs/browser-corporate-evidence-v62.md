@@ -22,20 +22,20 @@ era descobrível no desenvolvimento local, embora o contrato já existisse.
 ## O que esta prova não afirma
 
 Mocks de navegador não provam autenticação, autorização, isolamento de tenant,
-persistência, idempotência, PostgreSQL/Neon nem execução host-owned. Essas
-propriedades são cobertas por suites e provas HTTP do Quickstart, mas ainda falta
-repetir a jornada combinada `4302 ↔ 8088` com personas author, reviewer, operator
-e unauthorized no corte publicado.
+persistência, idempotência, PostgreSQL/Neon nem execução host-owned. A suíte live
+abaixo fecha autenticação e segregação de responsabilidades no browser publicado;
+persistência, idempotência e execução host-owned continuam pertencendo às suites
+e provas HTTP/PostgreSQL do Quickstart.
 
 Oracle/HADES permanece responsabilidade do adapter Ergon em ambiente autorizado.
 Nenhuma evidência sintética ou Neon deve ser apresentada como paridade Oracle.
 
-## Suíte live multi-persona preparada
+## Suíte live multi-persona comprovada
 
-O candidato seguinte adiciona uma suíte isolada em
+O Studio mantém uma suíte isolada em
 `e2e/policy-studio-multipersona.live.spec.ts`. Ela não usa os mocks V62 e não é
-executada pelo `npm run e2e` comum. Com o Quickstart real ouvindo na porta oficial
-`8088`, execute:
+executada pelo `npm run e2e` comum. Por padrão ela usa o Quickstart local na porta
+oficial `8088`; para repetir a prova publicada, informe também as duas URLs:
 
 ```bash
 POLICY_STUDIO_LIVE_AUTHOR_USERNAME=... \
@@ -50,6 +50,8 @@ POLICY_STUDIO_LIVE_OPERATOR_USERNAME=... \
 POLICY_STUDIO_LIVE_OPERATOR_PASSWORD=... \
 POLICY_STUDIO_LIVE_AUDITOR_USERNAME=... \
 POLICY_STUDIO_LIVE_AUDITOR_PASSWORD=... \
+POLICY_STUDIO_LIVE_STUDIO_URL=https://praxis-policy-studio-homolog.onrender.com \
+POLICY_STUDIO_LIVE_BACKEND_URL=https://praxis-api-quickstart.onrender.com \
 npm run e2e:live:multipersona
 ```
 
@@ -61,8 +63,9 @@ nas responsabilidades das outras personas sem materializar uma regra ou mover o
 head. Uma resposta funcional `400`, `404`, `409`, `412`, `422` ou `428` no probe
 permitido significa que a autorização foi atravessada; ela não é apresentada como
 sucesso do caso de negócio. `5xx`, `401`, `403`, redirect ou status inesperado falham
-o gate. Todas as chamadas também enviam `X-Tenant-ID` e `X-Env` adversariais e
-verificam que esses valores não são projetados pelo catálogo. A garantia persistente
+o gate. Para cada persona, a suíte repete a leitura com `X-Tenant-ID` e `X-Env`
+adversariais e exige resultado idêntico à leitura sem esses headers. Isso prova que
+o browser não substitui o escopo server-owned. A garantia persistente
 de que o escopo vem do principal — inclusive `404` para workspace estrangeiro —
 permanece no teste PostgreSQL do Quickstart; o browser não se torna owner dessa regra.
 
@@ -80,11 +83,15 @@ rota SPA diretamente, criou uma sessão real de author e carregou as dez decisõ
 do Quickstart publicado. CORS, filtro de Origin, auditor read-only `200` e recusa
 operacional `403` foram repetidos no container que serve essa origin.
 
-Essa é uma prova browser integrada de sessão e catálogo para a persona author,
-com segregação do auditor comprovada pela mesma cadeia publicada. A execução
-automatizada dos sete testes Playwright com as seis personas ainda não é
-reivindicada. O gate multi-persona só muda de “preparado” para “comprovado” quando
-a suíte inteira rodar contra o site e o host publicados.
+Em 2026-08-17, os sete testes passaram contra o Studio e o Quickstart publicados:
+anonymous, author, approver A, approver B, publisher, operator e auditor. Antes da
+execução foi corrigido um drift operacional: a origem homologada não estava mais
+nas allowlists `CORS_ALLOWED_ORIGINS` e
+`APP_SECURITY_CONFIG_ORIGIN_RESTRICTION_ALLOWED_ORIGINS` do serviço. As listas
+foram corrigidas e o mesmo commit `375e6c0` foi redeployado; nenhuma regra,
+snapshot ou dado de negócio foi criado por essa correção. O gate está comprovado
+para autenticação, leitura, segregação de responsabilidades e escopo server-owned;
+ele ainda não substitui uma jornada mutável completa por persona.
 
 O Quickstart PR `#199` corrigiu depois o seed que gravava em escopo fixo. Com o
 seed explicitamente habilitado no escopo server-owned `default/prod`, o mesmo
