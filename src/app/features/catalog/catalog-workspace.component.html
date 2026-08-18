@@ -31,7 +31,7 @@
       <span class="visually-hidden">{{ i18n.text('localCatalogFilter') }}</span>
       <input [value]="query()" (input)="updateQuery($any($event.target).value)" [placeholder]="i18n.text('localCatalogFilterHint')">
       @if (query()) {
-        <button type="button" (click)="updateQuery('')" [attr.aria-label]="i18n.text('clearSearch')">×</button>
+        <button type="button" (click)="clearQuery()" [attr.aria-label]="i18n.text('clearSearch')">×</button>
       }
     </label>
 
@@ -70,10 +70,10 @@
             [class.selected]="selected()?.key === decision.key"
             [attr.aria-current]="selected()?.key === decision.key ? 'true' : null"
             (click)="select(decision)">
-            <span class="decision-code">{{ decision.code }}</span>
             <span class="decision-copy">
               <strong>{{ decision.name }}</strong>
               <small>{{ decision.ruleSet }}</small>
+              <span class="decision-code">{{ decision.code }}</span>
               <span class="visually-hidden">{{ i18n.text(decision.state === 'verified' ? 'verifiedState' : 'draftState') }}</span>
             </span>
             <span class="state-dot" [class.verified]="decision.state === 'verified'" aria-hidden="true"></span>
@@ -83,6 +83,12 @@
         }
       }
     </div>
+    @if (selectionOutsideFilter()) {
+      <div class="selection-outside-filter" role="status">
+        <p>{{ i18n.text('selectionOutsideFilter') }}</p>
+        <button type="button" class="quiet-button" (click)="clearQuery()">{{ i18n.text('showSelectedDecision') }}</button>
+      </div>
+    }
   </aside>
 
   @if (selected(); as current) {
@@ -98,37 +104,37 @@
       </span>
       <div class="decision-actions" [attr.aria-label]="i18n.text('decisionActions')">
         @if (current.workspaceId && current.authoringSupported && hasWorkspaceAction('VIEW')) {
-          <button type="button" [disabled]="!current.condition || authoringBusy()" (click)="openAuthoringAndFocus()">
+          <button type="button" class="primary-action" [disabled]="!current.condition || authoringBusy()" (click)="openAuthoringAndFocus()">
             {{ i18n.text('editRule') }}
           </button>
         } @else if (!current.workspaceId && current.authoringSupported && hasDefinitionAction('CREATE_NEW_VERSION')) {
-          <button type="button" [disabled]="!current.configDefinitionId || authoringBusy()" (click)="createWorkspace()">
+          <button type="button" class="primary-action" [disabled]="!current.configDefinitionId || authoringBusy()" (click)="createWorkspace()">
             {{ i18n.text('createDraft') }}
           </button>
         }
         @if (current.workspaceId) {
-          <a class="quiet-button" href="#decision-tests">{{ i18n.text('testRule') }}</a>
+          <button type="button" class="quiet-button" (click)="navigateToSection('decision-tests')">{{ i18n.text('testRule') }}</button>
         }
       </div>
     </header>
 
     <nav class="decision-navigation" [attr.aria-label]="i18n.text('decisionNavigation')">
-      <a href="#decision-overview">
+      <button type="button" (click)="navigateToSection('decision-overview')">
         <span aria-hidden="true">01</span>
         <strong>{{ i18n.text('understand') }}</strong>
         <small>{{ i18n.text('understandHint') }}</small>
-      </a>
-      <a href="#decision-rule">
+      </button>
+      <button type="button" (click)="navigateToSection('decision-rule')">
         <span aria-hidden="true">02</span>
         <strong>{{ i18n.text('rule') }}</strong>
         <small>{{ i18n.text('ruleHint') }}</small>
-      </a>
+      </button>
       @if (current.workspaceId) {
-        <a href="#decision-tests">
+        <button type="button" (click)="navigateToSection('decision-tests')">
           <span aria-hidden="true">03</span>
           <strong>{{ i18n.text('test') }}</strong>
           <small>{{ scenarios().length }} {{ i18n.text('savedScenarios') }}</small>
-        </a>
+        </button>
       } @else {
         <span class="navigation-unavailable" [attr.aria-label]="i18n.text('testsRequireWorkspace')">
           <span aria-hidden="true">03</span>
@@ -136,16 +142,16 @@
           <small>{{ i18n.text('testsRequireWorkspace') }}</small>
         </span>
       }
-      <a href="#decision-execution">
+      <button type="button" (click)="navigateToSection('decision-execution')">
         <span aria-hidden="true">04</span>
         <strong>{{ i18n.text('operate') }}</strong>
         <small>{{ i18n.text('executionHint') }}</small>
-      </a>
-      <a href="#decision-history">
+      </button>
+      <button type="button" (click)="navigateToSection('decision-history')">
         <span aria-hidden="true">05</span>
         <strong>{{ i18n.text('history') }}</strong>
         <small>{{ current.evidenceCount }} {{ i18n.text('packageReferences') }}</small>
-      </a>
+      </button>
     </nav>
 
     <div class="detail-grid anchored-section" id="decision-overview" tabindex="-1">
@@ -204,10 +210,16 @@
             <p class="inspection-empty">{{ i18n.text('noCondition') }}</p>
           }
           <dl class="contract-facts">
-            <div><dt>{{ i18n.text('nullBehavior') }}</dt><dd>{{ current.nullSemantics ?? '—' }}</dd></div>
-            <div><dt>{{ i18n.text('operations') }}</dt><dd>{{ current.operationKeys.join(' · ') }}</dd></div>
-            <div><dt>{{ i18n.text('hostContract') }}</dt><dd>{{ current.hostContractVersion ?? '—' }}</dd></div>
+            <div><dt>{{ i18n.text('missingDataBehavior') }}</dt><dd>{{ nullSemanticsLabel(current.nullSemantics) }}</dd></div>
           </dl>
+          <details class="technical-details condition-technical-details">
+            <summary>{{ i18n.text('conditionTechnicalDetails') }}</summary>
+            <dl>
+              <div><dt>{{ i18n.text('nullBehavior') }}</dt><dd><code>{{ current.nullSemantics ?? '—' }}</code></dd></div>
+              <div><dt>{{ i18n.text('operations') }}</dt><dd><code>{{ current.operationKeys.join(' · ') || '—' }}</code></dd></div>
+              <div><dt>{{ i18n.text('hostContract') }}</dt><dd><code>{{ current.hostContractVersion ?? '—' }}</code></dd></div>
+            </dl>
+          </details>
         </section>
 
         <section class="facts-panel">
@@ -220,7 +232,7 @@
                 <small>{{ fact.description }} · {{ fact.valueType }} · {{ fact.nullable ? 'nullable' : 'obrigatório' }}</small>
               </li>
             }
-            @empty { <li class="inspection-empty">—</li> }
+            @empty { <li class="inspection-empty fact-gap">{{ i18n.text('factCatalogUnavailable') }}</li> }
           </ul>
         </section>
       </div>

@@ -306,6 +306,11 @@ test('preserves the governed workspace while editing, adding a typed scenario, a
   await mockGovernedBackend(page, false);
   await page.goto('/catalog');
 
+  await page.getByRole('button', { name: /^Regra/ }).click();
+  await expect(page.locator('#decision-rule')).toBeFocused();
+  await expect(page).toHaveURL(/\/catalog$/);
+  expect(configLoads).toBe(1);
+
   await page.getByRole('button', { name: 'Editar regra', exact: true }).click();
   await expect(page.locator('.draft-workspace')).toBeVisible();
   await page.locator('.draft-workspace').getByRole('spinbutton', { name: 'Valor' }).fill('2750');
@@ -315,7 +320,7 @@ test('preserves the governed workspace while editing, adding a typed scenario, a
   await expect(page.locator('.draft-workspace')).toBeVisible();
   expect(configLoads).toBe(1);
 
-  await page.getByRole('link', { name: 'Testar regra', exact: true }).click();
+  await page.getByRole('button', { name: 'Testar regra', exact: true }).click();
   await page.getByLabel('Chave do cenário').fill('limit-boundary');
   await page.getByLabel('Nome do cenário').fill('Limite permitido');
   await page.getByRole('spinbutton', { name: 'Valor solicitado' }).fill('3000');

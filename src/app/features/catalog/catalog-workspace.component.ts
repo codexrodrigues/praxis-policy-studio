@@ -101,6 +101,13 @@ export class CatalogWorkspaceComponent implements OnInit {
     return this.i18n.text('configOtherStatus');
   }
 
+  nullSemanticsLabel(value: string | null): string {
+    if (!value) return this.i18n.text('notInformed');
+    return value.toUpperCase() === 'FAIL_CLOSED'
+      ? this.i18n.text('nullFailClosed')
+      : this.i18n.text('nullBehaviorAvailableInTechnicalDetails');
+  }
+
   decisionOutcomeLabel(outcome: string): string {
     const key = ({
       ALLOW: 'outcomeAllow', DENY: 'outcomeDeny', NOT_APPLICABLE: 'outcomeNotApplicable',
@@ -261,6 +268,10 @@ export class CatalogWorkspaceComponent implements OnInit {
       ? this.allDecisions().filter(item => `${item.code} ${item.name} ${item.domain}`.toLocaleLowerCase().includes(query))
       : this.allDecisions();
   });
+  readonly selectionOutsideFilter = computed(() => {
+    const selected = this.selected();
+    return !!this.query().trim() && !!selected && !this.decisions().some(item => item.key === selected.key);
+  });
 
   constructor(readonly i18n: PolicyStudioI18n) {}
 
@@ -379,6 +390,18 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   updateQuery(value: string): void { this.query.set(value); }
+
+  clearQuery(): void {
+    this.query.set('');
+    requestAnimationFrame(() => this.host.nativeElement.querySelector<HTMLInputElement>('.search input')?.focus());
+  }
+
+  navigateToSection(sectionId: string): void {
+    const target = this.host.nativeElement.querySelector<HTMLElement>(`#${sectionId}`);
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    target.focus({ preventScroll: true });
+  }
   select(decision: DecisionSummary, forceReload = false): void {
     if (decision.key === this.selected()?.key && !forceReload) return;
     if ((forceReload || decision.key !== this.selected()?.key) && !this.confirmDraftDiscard()) return;

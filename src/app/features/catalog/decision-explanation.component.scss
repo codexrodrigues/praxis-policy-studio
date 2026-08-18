@@ -19,7 +19,7 @@ p { margin: 0; }
   font-weight: 700;
   cursor: pointer;
 }
-.explain-button { flex: 0 0 auto; background: var(--pax-color-primary, #076487); color: var(--pax-color-on-primary, #fff); border-color: var(--pax-color-primary, #076487); }
+.explain-button { flex: 0 0 auto; background: transparent; color: var(--pax-color-primary, #076487); border-color: var(--pax-color-primary, #076487); }
 .quiet-button { background: transparent; color: var(--pax-color-primary, #076487); }
 button:focus-visible { outline: 3px solid color-mix(in srgb, var(--pax-color-primary, #076487) 35%, transparent); outline-offset: 2px; }
 button:disabled { cursor: wait; opacity: .65; }
