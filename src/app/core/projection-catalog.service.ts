@@ -109,7 +109,9 @@ export class ProjectionCatalogService {
         }
         return {
           order: decision.order,
-          totalDecisions: catalog.length,
+          // Projection order is scoped to the governed decision set, not to the
+          // filtered/paginated catalog returned by discovery.
+          totalDecisions: projection.decisionRefs.length,
           key: decision.decisionKey,
           code: decision.reasonCode ?? decision.decisionKey,
           name: decision.presentationLabel,

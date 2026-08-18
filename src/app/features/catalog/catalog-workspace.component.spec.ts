@@ -476,6 +476,15 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(component.hasWorkspaceAction('PROMOTE')).toBe(false);
   });
 
+  it('translates governed outcomes and lifecycle states without changing their canonical values', () => {
+    expect(component.decisionOutcomeLabel('ALLOW')).toBe('Permitida');
+    expect(component.decisionOutcomeLabel('TECHNICAL_ERROR')).toBe('Erro técnico');
+    expect(component.scenarioStatusLabel('ACTIVE')).toBe('Ativo');
+    expect(component.workspaceStatusLabel('SUBMITTED')).toBe('Em revisão');
+    expect(component.comparisonLabel('CANDIDATE_MATCH')).toBe('Resultado esperado confirmado');
+    expect(component.comparisonLabel('CANDIDATE_MISMATCH')).toBe('Resultado diferente do esperado');
+  });
+
   it('governs review rationale as reactive state and rejects blank review commands', () => {
     component.select(decision('A'));
     capabilities.A[0].next({

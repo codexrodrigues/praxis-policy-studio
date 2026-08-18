@@ -39,6 +39,27 @@ No modo remoto, uma sessão ausente exibe o login explícito do ambiente de dese
 
 Abra `http://localhost:4302/catalog`.
 
+### Jornada da interface
+
+A decisão selecionada é organizada pelas tarefas `Entender`, `Regra`, `Testar`,
+`Operar` e `Histórico`. A interface usa linguagem de negócio na superfície
+principal e mantém IDs, status brutos e referências do Config em detalhes
+técnicos. `Testar` só fica navegável quando existe um workspace governado; a UI
+explica essa dependência sem transformar ausência de capability em novo login.
+A suíte de navegador comprova em desktop e narrow que a navegação interna não
+recarrega a aplicação, o editor permanece aberto, um cenário tipado pode ser criado
+e o sandbox devolve a comparação candidate × active sem overflow ou violações
+Axe no corpus hermético.
+O mesmo fluxo altera visualmente o limite governado de `3000` para `2750`, salva
+o draft por `PUT` com `If-Match`, recebe a nova revisão e continua a jornada sem
+perder o workspace. Outcomes, operações e estados continuam canônicos no
+transporte, mas são traduzidos para linguagem humana na superfície principal.
+
+A ordem de avaliação pertence ao conjunto de decisões declarado pela projeção e
+nunca ao tamanho do catálogo filtrado ou paginado. Por isso, precedência não é
+apresentada como indicador solto na visão geral. Quando voltar a ser materializada,
+deve informar o conjunto, o efeito de curto-circuito e o denominador canônico.
+
 Para integrar o primeiro consumidor, consulte o histórico no
 [handoff do Ergon beta.7](docs/ergon-handoff-beta7.md) e o corte V58 no
 [handoff Ergon beta.8](docs/ergon-handoff-beta8.md).
@@ -102,9 +123,9 @@ No perfil `dev`, o Quickstart publica pelo serviço canônico as sete condiçõe
 JSON Logic editáveis do caso de referência. O seed é idempotente, permanece em
 `draft` e não altera autoridade operacional.
 
-No modo remoto, a inspeção de cada decisão mostra a condição em leitura
-simbólica, os facts referenciados, a semântica de `null`, as operações cobertas,
-a posição na precedência e as evidências de origem. A comparação entre baseline
+No modo remoto, a área “Como esta decisão funciona” mostra a condição em leitura
+simbólica, os dados referenciados, a semântica de `null`, as operações cobertas e
+as evidências de origem. A comparação entre baseline
 e draft é deliberadamente assimétrica: a autoridade de referência declarada
 pela projeção permanece explícita, enquanto o Config aparece como draft técnico.
 No RN-013 essa referência é o Oracle legado; no Quickstart é o baseline sintético.

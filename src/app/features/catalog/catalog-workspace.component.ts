@@ -78,7 +78,7 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   meaningText(decision: DecisionSummary): string {
     if (decision.meaning.trim() && decision.meaning.trim() !== decision.name.trim()) return decision.meaning;
-    return `${this.i18n.text('decisionInRuleSet')} ${decision.ruleSet}. ${this.i18n.text('decisionOrderPrefix')} ${decision.order} ${this.i18n.text('decisionOrderConnector')} ${decision.totalDecisions}.`;
+    return `${this.i18n.text('decisionInDecisionSet')} ${decision.ruleSet}.`;
   }
 
   authorityLabel(authority: string): string {
@@ -94,9 +94,40 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   configStatusLabel(status: string): string {
-    return status.toUpperCase().includes('DRAFT')
-      ? this.i18n.text('configDraftLabel')
-      : status;
+    const normalized = status.toUpperCase();
+    if (normalized.includes('DRAFT')) return this.i18n.text('configDraftLabel');
+    if (normalized === 'APPROVED') return this.i18n.text('configApprovedLabel');
+    if (normalized === 'ACTIVE') return this.i18n.text('configActiveLabel');
+    return this.i18n.text('configOtherStatus');
+  }
+
+  decisionOutcomeLabel(outcome: string): string {
+    const key = ({
+      ALLOW: 'outcomeAllow', DENY: 'outcomeDeny', NOT_APPLICABLE: 'outcomeNotApplicable',
+      INCONCLUSIVE: 'outcomeInconclusive', TECHNICAL_ERROR: 'outcomeTechnicalError'
+    } as const)[outcome.toUpperCase() as 'ALLOW'];
+    return key ? this.i18n.text(key) : this.i18n.text('outcomeUnknown');
+  }
+
+  scenarioStatusLabel(status: string): string {
+    return status.toUpperCase() === 'ACTIVE' ? this.i18n.text('scenarioActiveLabel')
+      : status.toUpperCase() === 'DISABLED' ? this.i18n.text('scenarioDisabledLabel')
+        : this.i18n.text('statusUnknown');
+  }
+
+  workspaceStatusLabel(status: string): string {
+    const key = ({
+      OPEN: 'workspaceStateOpen', SUBMITTED: 'workspaceStateSubmitted', APPROVED: 'workspaceStateApproved',
+      REJECTED: 'workspaceStateRejected', PROMOTED: 'workspaceStatePromoted'
+    } as const)[status.toUpperCase() as 'OPEN'];
+    return key ? this.i18n.text(key) : this.i18n.text('statusUnknown');
+  }
+
+  comparisonLabel(comparison: string): string {
+    return comparison.toUpperCase().includes('MATCH') && !comparison.toUpperCase().includes('MISMATCH')
+      ? this.i18n.text('comparisonMatch')
+      : comparison.toUpperCase().includes('MISMATCH') ? this.i18n.text('comparisonMismatch')
+        : this.i18n.text('comparisonUnavailable');
   }
   readonly query = signal('');
   readonly allDecisions = signal<readonly DecisionSummary[]>([]);
@@ -589,6 +620,11 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.draftCondition.set(decision.workspaceCondition ?? decision.condition);
     this.editorState.set(null);
     this.authoringOpen.set(true);
+  }
+
+  openAuthoringAndFocus(): void {
+    this.openAuthoring();
+    requestAnimationFrame(() => this.host.nativeElement.querySelector<HTMLElement>('.draft-workspace')?.focus());
   }
 
   closeAuthoring(): void {
