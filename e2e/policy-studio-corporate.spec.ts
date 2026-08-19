@@ -15,8 +15,20 @@ const workspace = {
   updatedAt: '2026-08-15T05:00:00Z'
 };
 
+interface MockState {
+  sequence: number;
+  components: Map<string, string>;
+  createdScenario: {
+    id: string; workspaceId: string; scenarioKey: string; name: string;
+    facts: Record<string, unknown>; expectedDecision: string; status: string; etag: string
+  } | null;
+  savedCondition: unknown | null;
+}
+
 async function mockGovernedBackend(page: Page, operationalAllowed: boolean): Promise<void> {
-  const authoringStreams = { sequence: 0, components: new Map<string, string>() };
+  const authoringStreams: MockState = {
+    sequence: 0, components: new Map<string, string>(), createdScenario: null, savedCondition: null
+  };
   await page.route('**/app-config.json', route => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -29,18 +41,21 @@ async function mockGovernedBackend(page: Page, operationalAllowed: boolean): Pro
     })
   }));
   await page.route('**/api/**', async route => governedResponse(route, operationalAllowed, authoringStreams));
-  await page.route('**/schemas/**', async route => governedResponse(route, operationalAllowed));
+  await page.route('**/schemas/**', async route => governedResponse(route, operationalAllowed, authoringStreams));
   await page.route('**/auth/session', route => route.fulfill({ status: 204 }));
 }
 
 async function governedResponse(
   route: Route,
   operationalAllowed: boolean,
-  authoringStreams: { sequence: number; components: Map<string, string> }
+  authoringStreams: MockState
 ): Promise<void> {
   const request = route.request();
   const url = new URL(request.url());
   const path = url.pathname;
+  const currentWorkspace = authoringStreams.savedCondition == null ? workspace : {
+    ...workspace, revision: 5, etag: 'workspace-etag-5', condition: authoringStreams.savedCondition
+  };
   const json = (value: unknown, status = 200, headers?: Record<string, string>) =>
     route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value), headers });
 
@@ -141,9 +156,21 @@ async function governedResponse(
   if (path.endsWith(`/definitions/${definition.id}`)) return json(definition);
   if (path.endsWith(`/definitions/${definition.id}/timeline`)) return json([]);
   if (path.endsWith('/workspaces')) return json([workspace]);
+  if (path.endsWith('/workspaces/workspace-1/scenarios') && request.method() === 'POST') {
+    const body = request.postDataJSON() as {
+      scenarioKey: string; name: string; facts: Record<string, unknown>; expectedDecision: string
+    };
+    authoringStreams.createdScenario = {
+      id: 'scenario-new', workspaceId: workspace.id, scenarioKey: body.scenarioKey,
+      name: body.name, facts: body.facts, expectedDecision: body.expectedDecision,
+      status: 'ACTIVE', etag: 'scenario-new-etag'
+    };
+    return json(authoringStreams.createdScenario, 201);
+  }
   if (path.endsWith('/workspaces/workspace-1/scenarios')) return json([
     { id: 'scenario-create', scenarioKey: 'allow-create', name: 'CREATE permitido', expectedDecision: 'ALLOW', status: 'ACTIVE', facts: {} },
-    { id: 'scenario-update', scenarioKey: 'deny-update', name: 'UPDATE negado', expectedDecision: 'DENY', status: 'ACTIVE', facts: {} }
+    { id: 'scenario-update', scenarioKey: 'deny-update', name: 'UPDATE negado', expectedDecision: 'DENY', status: 'ACTIVE', facts: {} },
+    ...(authoringStreams.createdScenario ? [authoringStreams.createdScenario] : [])
   ]);
   if (path.endsWith('/workspaces/workspace-1/reviews')) return json([]);
   if (path.endsWith('/workspaces/workspace-1/test-runs')) return json([]);
@@ -151,7 +178,29 @@ async function governedResponse(
     workspaceId: workspace.id, ruleKey: workspace.ruleKey, status: 'OPEN', revision: 4,
     etag: workspace.etag, availableActions: ['VIEW', 'UPDATE_DRAFT', 'MANAGE_SCENARIOS', 'RECORD_TEST_RUN'], blockers: []
   });
-  if (path.endsWith('/workspaces/workspace-1')) return json(workspace);
+  if (path.endsWith('/workspaces/workspace-1/draft') && request.method() === 'PUT') {
+    const body = request.postDataJSON() as { condition: unknown };
+    expect(request.headers()['if-match']).toBe('"workspace-etag-4"');
+    authoringStreams.savedCondition = body.condition;
+    return json({ ...workspace, revision: 5, etag: 'workspace-etag-5', condition: body.condition });
+  }
+  if (path.endsWith('/workspaces/workspace-1')) return json(currentWorkspace);
+  if (path.endsWith('/policy-studio/sandbox/runs') && request.method() === 'POST') {
+    const body = request.postDataJSON() as { workspaceId: string; scenarioIds: string[]; evaluatedAtUtc: string };
+    return json({
+      runId: 'sandbox-run-1', workspaceId: body.workspaceId, workspaceRevision: 4,
+      evaluatedAtUtc: body.evaluatedAtUtc, activeSnapshotKey: null,
+      results: body.scenarioIds.map((scenarioId, index) => ({
+        scenarioId,
+        scenarioKey: scenarioId === 'scenario-new' ? 'limit-boundary' : index === 0 ? 'allow-create' : 'deny-update',
+        expectedDecision: scenarioId === 'scenario-update' ? 'DENY' : 'ALLOW',
+        candidateDecision: scenarioId === 'scenario-update' ? 'DENY' : 'ALLOW',
+        activeDecision: 'TECHNICAL_ERROR', comparison: 'CANDIDATE_MATCH',
+        candidateMatchesExpected: true, activeMatchesExpected: false,
+        candidateReasonCodes: [], activeReasonCodes: []
+      }))
+    }, 201);
+  }
   if (path === '/schemas/actions') return json({
     resourceKey: definition.resourceKey, resourcePath: '/api/human-resources/extraordinary-benefit-requests', actions: [{
       id: 'operational-proof', resourceKey: definition.resourceKey, scope: 'COLLECTION',
@@ -247,4 +296,43 @@ test('discovers, selects, and explains an exact governed decision', async ({ pag
       ? 'ai-discovery-narrow.png'
       : 'ai-discovery-desktop.png')
   });
+});
+
+test('preserves the governed workspace while editing, adding a typed scenario, and running the sandbox', async ({ page }, testInfo) => {
+  let configLoads = 0;
+  page.on('request', request => {
+    if (new URL(request.url()).pathname.endsWith('/app-config.json')) configLoads += 1;
+  });
+  await mockGovernedBackend(page, false);
+  await page.goto('/catalog');
+
+  await page.getByRole('button', { name: /^Regra/ }).click();
+  await expect(page.locator('#decision-rule')).toBeFocused();
+  await expect(page).toHaveURL(/\/catalog$/);
+  expect(configLoads).toBe(1);
+
+  await page.getByRole('button', { name: 'Editar regra', exact: true }).click();
+  await expect(page.locator('.draft-workspace')).toBeVisible();
+  await page.locator('.draft-workspace').getByRole('spinbutton', { name: 'Valor' }).fill('2750');
+  await page.getByRole('button', { name: 'Salvar draft governado' }).click();
+  await expect(page.getByText('Draft salvo com controle de concorrência.')).toBeVisible();
+  await page.getByRole('link', { name: 'Praxis Policy Studio — catálogo' }).click();
+  await expect(page.locator('.draft-workspace')).toBeVisible();
+  expect(configLoads).toBe(1);
+
+  await page.getByRole('button', { name: 'Testar regra', exact: true }).click();
+  await page.getByLabel('Chave do cenário').fill('limit-boundary');
+  await page.getByLabel('Nome do cenário').fill('Limite permitido');
+  await page.getByRole('spinbutton', { name: 'Valor solicitado' }).fill('3000');
+  await page.getByLabel('Decisão esperada').selectOption('ALLOW');
+  await page.getByRole('button', { name: 'Adicionar cenário' }).click();
+  await expect(page.getByText('Limite permitido', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Comparar com a versão ativa' }).click();
+  await expect(page.getByText('Sandbox concluído e evidência imutável registrada.')).toBeVisible();
+  await expect(page.locator('.sandbox-results').getByText('limit-boundary', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const violations = await new AxeBuilder({ page }).analyze();
+  expect(violations.violations).toEqual([]);
+  await page.screenshot({ path: testInfo.outputPath('authoring-sandbox-result.png'), fullPage: false });
 });

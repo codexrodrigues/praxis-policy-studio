@@ -307,6 +307,36 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     });
   });
 
+  it('keeps a filtered-out selection explicit and restores the full catalog on request', () => {
+    component.allDecisions.set([decision('A'), decision('B')]);
+    component.select(decision('A'));
+
+    component.updateQuery('B');
+
+    expect(component.decisions().map(item => item.key)).toEqual(['B']);
+    expect(component.selectionOutsideFilter()).toBe(true);
+
+    component.clearQuery();
+
+    expect(component.selectionOutsideFilter()).toBe(false);
+    expect(component.decisions().map(item => item.key)).toEqual(['A', 'B']);
+  });
+
+  it('moves focus within the workstation without changing browser navigation', () => {
+    const host = TestBed.inject(ElementRef).nativeElement as HTMLElement;
+    const target = document.createElement('section');
+    target.id = 'decision-rule';
+    target.tabIndex = -1;
+    target.scrollIntoView = vi.fn();
+    target.focus = vi.fn();
+    host.append(target);
+
+    component.navigateToSection('decision-rule');
+
+    expect(target.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+    expect(target.focus).toHaveBeenCalledWith({ preventScroll: true });
+  });
+
   it('fails locally when expected output is invalid JSON', () => {
     component.select(decision('A'));
     capabilities.A[0].next({
@@ -474,6 +504,15 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(component.hasWorkspaceAction('UPDATE_DRAFT')).toBe(false);
     expect(component.hasWorkspaceAction('SUBMIT')).toBe(false);
     expect(component.hasWorkspaceAction('PROMOTE')).toBe(false);
+  });
+
+  it('translates governed outcomes and lifecycle states without changing their canonical values', () => {
+    expect(component.decisionOutcomeLabel('ALLOW')).toBe('Permitida');
+    expect(component.decisionOutcomeLabel('TECHNICAL_ERROR')).toBe('Erro técnico');
+    expect(component.scenarioStatusLabel('ACTIVE')).toBe('Ativo');
+    expect(component.workspaceStatusLabel('SUBMITTED')).toBe('Em revisão');
+    expect(component.comparisonLabel('CANDIDATE_MATCH')).toBe('Resultado esperado confirmado');
+    expect(component.comparisonLabel('CANDIDATE_MISMATCH')).toBe('Resultado diferente do esperado');
   });
 
   it('governs review rationale as reactive state and rejects blank review commands', () => {

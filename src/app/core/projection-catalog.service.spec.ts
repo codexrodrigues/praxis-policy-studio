@@ -79,7 +79,22 @@ describe('ProjectionCatalogService', () => {
       projectionPath: '/projections/reference.json', initialDecisionKey: null
     }).subscribe(value => decisions = value);
 
-    http.expectOne('/projections/reference.json').flush(projection);
+    http.expectOne('/projections/reference.json').flush({
+      ...projection,
+      decisionRefs: [
+        ...projection.decisionRefs,
+        {
+          ...projection.decisionRefs[0],
+          order: 2,
+          decisionKey: 'grant.residency',
+          reasonCode: 'RESIDENCY',
+          presentationLabel: 'Residency requirement',
+          semanticSourceRef: 'factory#residency',
+          targetPlanRef: 'golden#residency',
+          editable: false
+        }
+      ]
+    });
     const definitions = http.expectOne(request =>
       request.url === '/api/praxis/config/domain-rules/definitions/catalog'
       && request.params.get('page') === '0'
@@ -122,6 +137,8 @@ describe('ProjectionCatalogService', () => {
     expect(decisions[0]?.authoringSupported).toBe(true);
     expect(decisions[0]?.availableDefinitionActions).toEqual(['CREATE_NEW_VERSION']);
     expect(decisions[0]?.condition).toEqual({ '<=': [{ var: 'request.requestedAmount' }, 3000] });
+    expect(decisions[0]?.order).toBe(1);
+    expect(decisions[0]?.totalDecisions).toBe(2);
   });
 
   it('navigates multiple governed domains without making a projection authoritative', () => {

@@ -223,3 +223,35 @@ Uma versão estável exige também P2/P3, repetição do isolamento entre
 tenant/environment no Neon, recuperação de conflito, auditoria/redaction, SLO e rollback
 comprovado. O assistente explicativo já pode ser validado de forma incremental e
 continua deliberadamente separado do authoring autônomo.
+
+## Corte UX de navegação e linguagem — 2026-08-18
+
+O corte posterior à beta.15 remove a navegação documental dos comandos
+`Entender`, `Regra`, `Testar`, `Operar` e `Histórico`. Esses comandos agora movem
+foco e rolagem dentro da workstation sem alterar a URL, recarregar
+`app-config.json`, invalidar a seleção ou fechar o editor. A regressão é coberta
+no E2E desktop/narrow junto do round-trip de edição, cenário tipado, sandbox e
+ETag.
+
+O mesmo corte:
+
+- explicita quando a decisão aberta ficou fora do filtro local;
+- prioriza visualmente `Criar rascunho`/`Editar regra` e mantém a explicação por
+  IA como ação consultiva;
+- substitui a afirmação ampla “evidência técnica verificada” por “estrutura
+  técnica disponível”;
+- apresenta `FAIL_CLOSED` em linguagem humana e move operações, contrato do host
+  e valor canônico para detalhes técnicos;
+- falha de forma explícita quando a condição usa dados que o catálogo de facts
+  não publicou, sem fabricar um schema no frontend.
+
+A navegação corrigida revelou dois botões contextuais sem nome acessível no
+`@praxisui/visual-builder`. A correção pertence ao owner da biblioteca e foi
+validada pelo teste focal do editor e pelo Axe do Policy Studio em desktop e
+narrow. O manifesto AI e o registry não mudam: não houve alteração de API,
+configuração, JSON Logic ou operação authorable.
+
+Permanecem como gaps canônicos: publicar o catálogo de facts para todas as
+definições, separar com precisão maturidade técnica, aprovação e autoridade
+operacional, e tornar o progresso da explicação assistida observável antes do
+timeout terminal.
