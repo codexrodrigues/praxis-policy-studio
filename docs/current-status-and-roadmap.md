@@ -1,15 +1,16 @@
 # Estado e roadmap do Praxis Policy Studio
 
-- Baseline validada: Studio `0.1.0-beta.15`, Config `0.1.0-rc.127` e
-  Quickstart no commit publicado `482cdf9`, com transporte, governance V58,
+- Baseline de desenvolvimento validada: Studio `main@2ce1035` mais o corte local
+  de integridade corporativa, Config `0.1.0-rc.128` e Quickstart `main@5448625`,
+  com transporte, governance V58,
   snapshot v1/v2 e cadeia de folha host-owned no Neon homologado
-- Data da auditoria: 2026-08-18
-- Escopo: Studio beta.15, Metadata rc.127, Config rc.127, Quickstart rc.43,
-  Contracts beta.4, `@praxisui/*` rc.35 e handoff Ergon #300
+- Data da auditoria: 2026-08-19
+- Escopo: Studio pós-beta.15, Metadata rc.127, Config rc.128, Quickstart rc.43,
+  Contracts beta.4, `@praxisui/*` rc.38 e handoff Ergon #300
 
 ## Leitura executiva
 
-O produto corporativo completo está estimado em **69%**, com margem de ±5 pontos
+O produto corporativo completo está estimado em **66%**, com margem de ±5 pontos
 percentuais. Essa estimativa mede capabilities comprovadas, não linhas de código.
 A beta.15 demonstra um vertical slice relevante, materializa no cockpit os
 blockers tipados do gate de snapshot e separa explicitamente a identidade do
@@ -27,8 +28,8 @@ Marcos diferentes têm distâncias diferentes:
 
 | Marco | Estimativa atual | Significado |
 | --- | ---: | --- |
-| beta integrada controlada com Quickstart | 99% | contratos, action discovery, catálogo não vazio no Neon e matriz browser multi-persona foram comprovados; falta repetir no corte publicado a asserção nova de catálogo não vazio |
-| versão estável corporativa | 62% | isolamento estrutural, segregação, sessão/catálogo, workspace e sandbox candidate no site homologado foram provados; faltam Neon cross-tenant, snapshot ativo, gates posteriores, matriz browser multi-persona e operação corporativa |
+| beta integrada controlada com Quickstart | 92% | contratos, action discovery, catálogo não vazio no Neon e matriz browser multi-persona foram comprovados; falta repetir os E2E no HEAD exato com UI rc.38 e publicar nova tag do Studio |
+| versão estável corporativa | 60% | isolamento estrutural, segregação, sessão/catálogo, workspace, sandbox e diálogos críticos foram provados; faltam Neon cross-tenant, gates posteriores, decomposição adicional do workspace e operação sustentada |
 | produto maduro multi-cliente com authoring complexo e IA | 34% | RuleSet completo, discovery amplo, impacto, execução explicável e agente governado |
 
 Rubrica das estimativas: `0` ausente, `25` seam/contrato, `50` vertical slice com

@@ -1,0 +1,18 @@
+<dialog #dialog class="governed-confirmation" (cancel)="cancel($event)" (close)="cancelled.emit()">
+  @if (confirmation(); as current) {
+    <form method="dialog" (submit)="$event.preventDefault(); confirmed.emit()">
+      <header>
+        <span aria-hidden="true">!</span>
+        <div>
+          <h2>{{ current.title }}</h2>
+          <p>{{ current.message }}</p>
+        </div>
+      </header>
+      <code>{{ current.target }}</code>
+      <footer>
+        <button type="button" class="quiet-button" (click)="cancel()">{{ current.cancelLabel }}</button>
+        <button type="submit" class="critical-action">{{ current.confirmLabel }}</button>
+      </footer>
+    </form>
+  }
+</dialog>

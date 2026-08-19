@@ -355,8 +355,8 @@
                             [disabled]="scenarioFactIsNull(fact.path)"
                             [value]="scenarioFactDisplayValue(fact.path)"
                             (change)="setScenarioFactValue(fact, $any($event.target).value === 'true')">
-                            <option value="false">false</option>
-                            <option value="true">true</option>
+                            <option value="false">{{ i18n.text('booleanFalse') }}</option>
+                            <option value="true">{{ i18n.text('booleanTrue') }}</option>
                           </select>
                         }
                         @case ('number') {
@@ -440,7 +440,60 @@
                 <section class="scenario-inline-editor" [attr.aria-label]="i18n.text('editScenario')">
                   <label><span>{{ i18n.text('scenarioKey') }}</span><input #editScenarioKey required [value]="scenario.scenarioKey" (input)="markScenarioEditDirty()"></label>
                   <label><span>{{ i18n.text('scenarioName') }}</span><input #editScenarioName required [value]="scenario.name" (input)="markScenarioEditDirty()"></label>
-                  <label class="scenario-facts"><span>{{ i18n.text('scenarioFacts') }}</span><textarea #editScenarioFacts rows="5" required [value]="formatScenarioFacts(scenario)" (input)="markScenarioEditDirty()"></textarea></label>
+                  @if (current.facts.length) {
+                    <fieldset class="scenario-fact-editor">
+                      <legend>{{ i18n.text('scenarioFacts') }}</legend>
+                      <div class="scenario-fact-grid">
+                        @for (fact of current.facts; track fact.path) {
+                          <div class="scenario-fact-field">
+                            <label>
+                              <span>{{ fact.label }}</span>
+                              @switch (fact.valueType) {
+                                @case ('boolean') {
+                                  <select [disabled]="editingScenarioFactIsNull(fact.path)"
+                                    [value]="editingScenarioFactDisplayValue(fact.path)"
+                                    (change)="setEditingScenarioFactValue(fact, $any($event.target).value === 'true')">
+                                    <option value="false">{{ i18n.text('booleanFalse') }}</option>
+                                    <option value="true">{{ i18n.text('booleanTrue') }}</option>
+                                  </select>
+                                }
+                                @case ('number') {
+                                  <input type="number" inputmode="decimal" [required]="!fact.nullable"
+                                    [disabled]="editingScenarioFactIsNull(fact.path)"
+                                    [value]="editingScenarioFactDisplayValue(fact.path)"
+                                    (input)="setEditingScenarioFactValue(fact, $any($event.target).value)">
+                                }
+                                @case ('date') {
+                                  <input type="date" [required]="!fact.nullable"
+                                    [disabled]="editingScenarioFactIsNull(fact.path)"
+                                    [value]="editingScenarioFactDisplayValue(fact.path)"
+                                    (input)="setEditingScenarioFactValue(fact, $any($event.target).value)">
+                                }
+                                @default {
+                                  <input type="text" [required]="!fact.nullable"
+                                    [disabled]="editingScenarioFactIsNull(fact.path)"
+                                    [value]="editingScenarioFactDisplayValue(fact.path)"
+                                    (input)="setEditingScenarioFactValue(fact, $any($event.target).value)">
+                                }
+                              }
+                            </label>
+                            <small>{{ fact.description }} · <code>{{ fact.path }}</code></small>
+                            @if (fact.nullable) {
+                              <label class="scenario-fact-null">
+                                <input type="checkbox" [checked]="editingScenarioFactIsNull(fact.path)"
+                                  (change)="setEditingScenarioFactNull(fact, $any($event.target).checked)">
+                                <span>{{ i18n.text('scenarioFactNull') }}</span>
+                              </label>
+                            }
+                          </div>
+                        }
+                      </div>
+                    </fieldset>
+                  }
+                  <label class="scenario-facts" [hidden]="current.facts.length">
+                    <span>{{ i18n.text('scenarioFacts') }}</span>
+                    <textarea #editScenarioFacts rows="5" required [value]="current.facts.length ? editingScenarioFactsJson() : formatScenarioFacts(scenario)" (input)="markScenarioEditDirty()"></textarea>
+                  </label>
                   <label><span>{{ i18n.text('expectedDecision') }}</span>
                     <select #editExpectedDecision [value]="scenario.expectedDecision" (change)="markScenarioEditDirty()">
                       <option value="ALLOW">{{ decisionOutcomeLabel('ALLOW') }}</option>
@@ -461,7 +514,7 @@
                   <label><span>{{ i18n.text('expectedEffectIntents') }}</span><textarea #editEffectIntents rows="2" [value]="scenarioAssertions(scenario.expectedEffectIntents)" (input)="markScenarioEditDirty()"></textarea></label>
                   <div class="authoring-actions">
                     <button type="button" class="quiet-button" (click)="cancelScenarioEdit()">{{ i18n.text('cancel') }}</button>
-                    <button type="button" [disabled]="authoringBusy()" (click)="updateScenario(scenario, editScenarioKey.value, editScenarioName.value, editScenarioFacts.value, editExpectedDecision.value, editScenarioStatus.value, editExpectedOutput.value, editReasonCodes.value, editEffectIntents.value)">{{ i18n.text('saveScenario') }}</button>
+                    <button type="button" [disabled]="authoringBusy()" (click)="updateScenario(scenario, editScenarioKey.value, editScenarioName.value, current.facts.length ? editingScenarioFactsJson() : editScenarioFacts.value, editExpectedDecision.value, editScenarioStatus.value, editExpectedOutput.value, editReasonCodes.value, editEffectIntents.value)">{{ i18n.text('saveScenario') }}</button>
                   </div>
                 </section>
               }
@@ -516,17 +569,7 @@
             </section>
           }
         }
-        @if (sandboxRun(); as run) {
-          <div class="sandbox-results" aria-live="polite">
-            @for (result of run.results; track result.scenarioId) {
-              <article [class.passed]="result.candidateMatchesExpected">
-                <strong>{{ result.scenarioKey }}</strong>
-                <span>{{ decisionOutcomeLabel(result.candidateDecision) }} / {{ decisionOutcomeLabel(result.expectedDecision) }}</span>
-                <small>{{ comparisonLabel(result.comparison) }} · {{ i18n.text('activeVersion') }} {{ decisionOutcomeLabel(result.activeDecision) }}</small>
-              </article>
-            }
-          </div>
-        }
+        <pax-policy-sandbox-results [run]="sandboxRun()" />
       </section>
 
 
@@ -578,9 +621,7 @@
         } @else if (workspaceCapabilitiesError()) {
           <p class="state-message" role="alert">{{ i18n.text('governedCommandFailed') }}</p>
         } @else if (workspaceCapabilities(); as capabilities) {
-          @for (blocker of capabilities.blockers; track blocker.code + blocker.action) {
-            <p class="authority-note"><strong>{{ blocker.action }}</strong> · {{ blocker.message }}</p>
-          }
+          <pax-workspace-blockers [capabilities]="capabilities" />
         }
         <small class="authority-note">{{ i18n.text('serverAuthorizesActions') }}</small>
       </section>
@@ -805,3 +846,8 @@
     </section>
   }
 </div>
+
+<pax-governed-confirmation-dialog
+  [confirmation]="governedConfirmation()"
+  (confirmed)="confirmGovernedOperation()"
+  (cancelled)="cancelGovernedOperation()" />

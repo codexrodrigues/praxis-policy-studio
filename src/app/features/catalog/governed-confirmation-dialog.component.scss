@@ -1,0 +1,33 @@
+:host { display: contents; }
+
+.governed-confirmation {
+  width: min(32rem, calc(100vw - 2rem));
+  border: 0;
+  border-radius: 1rem;
+  padding: 0;
+  color: var(--pax-color-on-surface, #172126);
+  background: var(--pax-color-surface, #fff);
+  box-shadow: 0 1.25rem 4rem rgb(0 0 0 / 24%);
+}
+
+.governed-confirmation::backdrop { background: rgb(10 24 31 / 56%); }
+.governed-confirmation form { display: grid; gap: 1rem; padding: 1.25rem; }
+.governed-confirmation header { display: flex; gap: .85rem; align-items: flex-start; }
+.governed-confirmation header > span {
+  display: grid;
+  place-items: center;
+  flex: 0 0 2rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--pax-color-error-container, #ffdad6);
+  color: var(--pax-color-on-error-container, #410002);
+  font-weight: 800;
+}
+.governed-confirmation h2 { margin: 0; font-size: 1.15rem; }
+.governed-confirmation p { margin: .35rem 0 0; color: var(--pax-color-on-surface-variant, #52636a); }
+.governed-confirmation code { overflow-wrap: anywhere; padding: .75rem; border-radius: .5rem; background: var(--pax-color-surface-container, #eef3f5); }
+.governed-confirmation footer { display: flex; justify-content: flex-end; gap: .75rem; }
+.governed-confirmation button { min-height: 2.75rem; padding: .6rem 1rem; border-radius: .55rem; font: inherit; font-weight: 750; cursor: pointer; }
+.governed-confirmation .quiet-button { border: 1px solid var(--pax-color-outline, #697a82); background: transparent; color: inherit; }
+.governed-confirmation .critical-action { border: 1px solid var(--pax-color-error, #ba1a1a); background: var(--pax-color-error, #ba1a1a); color: var(--pax-color-on-error, #fff); }

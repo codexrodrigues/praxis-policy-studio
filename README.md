@@ -76,8 +76,10 @@ O complemento operacional corrente está no
 [handoff V61](docs/ergon-handoff-v61.md): ele registra a cadeia de discovery
 cross-resource consumida pelo Studio e preserva a prova Neon do V60 sem a
 confundir com evidência Oracle.
-O beta.15 usa a cadeia Contracts beta.4, Config rc.127,
-Metadata rc.127, Quickstart rc.43 e `@praxisui/*` rc.35. O corte consome o
+O `main` posterior ao beta.15 usa a cadeia Contracts beta.4, Config rc.128,
+Metadata rc.127, Quickstart rc.43 e `@praxisui/*` rc.38. Como essas mudanças
+ainda não possuem uma nova tag do Studio, beta.15 não deve ser usado como nome
+do corte corrente. O corte consome o
 catálogo canônico de facts por definição e deriva inputs tipados de cenário,
 mantendo JSON somente como preview/fallback legado. A prova de navegador
 desktop/narrow, teclado e axe usa backend hermético; ela não substitui a prova
@@ -118,13 +120,20 @@ actions principal-specific de catálogos server-owned; o browser não reutiliza
 uma capability para autorizar outra operação. A política alvo para definitions,
 timelines e materializations é
 `ROLE_RULE_DEFINITION_READER`; o drift anterior com snapshot reader foi corrigido
-no Config e precisa integrar o próximo corte publicado. O Config resolve principal,
+no Config rc.128. O Config resolve principal,
 tenant e ambiente no servidor. Nenhum token ou segredo deve ser versionado.
 
 O catálogo distingue indisponibilidade de falta de permissão e não transforma
 status técnico do Config em homologação de negócio. A projeção governada segue
 sendo a fonte das identidades e da ordem exibidas; o Config apenas acrescenta o estado
 persistido que tenha a mesma chave canônica.
+
+Operações críticas de snapshot e rollout usam um diálogo contextual próprio,
+com alvo e consequência visíveis antes do comando. O diálogo não concede
+capability: ao confirmar, o Studio revalida o estado local publicado pelo
+servidor e o backend continua revalidando principal, ETag e lifecycle. Blockers
+de workspace e resultados de sandbox são componentes de apresentação isolados,
+reduzindo o acoplamento do workspace sem criar novos contratos.
 
 No perfil `dev`, o Quickstart publica pelo serviço canônico as sete condições
 JSON Logic editáveis do caso de referência. O seed é idempotente, permanece em
@@ -288,10 +297,11 @@ fingerprints e declara `canApply=false`; uma resposta divergente, incompleta ou
 aplicável é rejeitada. Facts runtime, tenant, atores, rationale e payloads
 materializados não são enviados ao provider nem exibidos nessa superfície.
 
-O beta.15 consome o catálogo canônico de facts por definição publicado pelo
+O `main` posterior ao beta.15 consome o catálogo canônico de facts por definição publicado pelo
 Config através de `@praxisui/core`. O formulário de cenário passa a ser tipado e
-grounded (tipo, nulabilidade, descrição, sensibilidade e redaction), mantendo o
-JSON canônico apenas como preview e fallback para definições legadas. Catálogo
+grounded tanto na criação quanto na edição (tipo, nulabilidade, descrição,
+sensibilidade e redaction), mantendo o JSON canônico apenas como preview e
+fallback para definições legadas. Catálogo
 multi-domínio canônico, proposição de cenários e diff vêm nos próximos incrementos.
 Create, edit, test, submit e, depois, publish/rollout poderão ser executados por
 um agente delegado somente pelas mesmas actions, capabilities, ETag,

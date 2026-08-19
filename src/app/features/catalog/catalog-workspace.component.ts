@@ -43,12 +43,22 @@ import { forkJoin } from 'rxjs';
 import { DecisionExplanationComponent } from './decision-explanation.component';
 import { DecisionDiscoveryComponent } from './decision-discovery.component';
 import { createClientRequestId } from '../../core/client-request-id';
+import {
+  GovernedConfirmationDialogComponent,
+  type GovernedConfirmationView
+} from './governed-confirmation-dialog.component';
+import { PolicySandboxResultsComponent } from './policy-sandbox-results.component';
+import { WorkspaceBlockersComponent } from './workspace-blockers.component';
 
 interface PendingOperationalCommand {
   readonly workspaceId: string;
   readonly selectionFingerprint: string;
   readonly idempotencyKey: string;
   readonly evaluatedAtUtc: string;
+}
+
+interface PendingGovernedConfirmation extends GovernedConfirmationView {
+  readonly execute: () => void;
 }
 
 type DecisionWorkMode = 'understand' | 'rule' | 'test' | 'operate' | 'history';
@@ -60,7 +70,10 @@ type DecisionWorkMode = 'understand' | 'rule' | 'test' | 'operate' | 'history';
     LocalDraftWorkspaceComponent,
     SnapshotCockpitComponent,
     DecisionExplanationComponent,
-    DecisionDiscoveryComponent
+    DecisionDiscoveryComponent,
+    GovernedConfirmationDialogComponent,
+    PolicySandboxResultsComponent,
+    WorkspaceBlockersComponent
   ],
   providers: [
     ProjectionCatalogService,
@@ -138,6 +151,7 @@ export class CatalogWorkspaceComponent implements OnInit {
       : comparison.toUpperCase().includes('MISMATCH') ? this.i18n.text('comparisonMismatch')
         : this.i18n.text('comparisonUnavailable');
   }
+
   readonly query = signal('');
   readonly allDecisions = signal<readonly DecisionSummary[]>([]);
   readonly selected = signal<DecisionSummary | null>(null);
@@ -170,6 +184,7 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly authoringBusy = signal(false);
   readonly authoringError = signal(false);
   readonly authoringFeedback = signal<string | null>(null);
+  readonly governedConfirmation = signal<PendingGovernedConfirmation | null>(null);
   readonly scenarios = signal<readonly DomainRuleTestScenario[]>([]);
   readonly scenarioFactDraft = signal<Readonly<Record<string, unknown>>>({});
   readonly scenarioFactsFallback = signal('{}');
@@ -177,6 +192,7 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly activeScenarios = computed(() => this.scenarios().filter(item => item.status === 'ACTIVE'));
   readonly editingScenarioId = signal<string | null>(null);
   readonly editingScenarioDirty = signal(false);
+  readonly editingScenarioFactDraft = signal<Readonly<Record<string, unknown>>>({});
   readonly reviews = signal<readonly DomainRuleWorkspaceReview[]>([]);
   readonly reviewRationaleValue = signal('');
   readonly workspaceCapabilities = signal<DomainRuleWorkspaceCapabilities | null>(null);
@@ -249,7 +265,9 @@ export class CatalogWorkspaceComponent implements OnInit {
     canonicalDecisionExpression(this.draftCondition()));
   readonly semanticDiff = computed(() => semanticDecisionDiff(
     this.selected()?.condition,
-    this.selected()?.workspaceCondition ?? this.draftCondition()
+    this.authoringOpen()
+      ? this.draftCondition()
+      : this.selected()?.workspaceCondition ?? this.draftCondition()
   ));
   readonly editorConfig = computed<RuleBuilderConfig | null>(() => {
     const decision = this.selected();
@@ -436,7 +454,7 @@ export class CatalogWorkspaceComponent implements OnInit {
       this.revealSelectedDecision();
       return;
     }
-    if ((forceReload || decision.key !== this.selected()?.key) && !this.confirmDraftDiscard()) return;
+    if ((forceReload || decision.key !== this.selected()?.key) && !this.confirmUnsavedWorkDiscard()) return;
     const selectionRevision = ++this.selectionRevision;
     this.selected.set(decision);
     this.narrowDetailOpen.set(revealOnNarrow);
@@ -709,14 +727,20 @@ export class CatalogWorkspaceComponent implements OnInit {
       || !this.hasDefinitionAction('CREATE_NEW_VERSION') || this.authoringBusy()) return;
     this.authoringBusy.set(true);
     this.clearAuthoringMessage();
+    const commandRevision = this.selectionRevision;
+    const commandRuleKey = decision.key;
     this.catalog.createWorkspace(decision.configDefinitionId, decision.name, state.config).subscribe({
       next: workspace => {
+        if (!this.isCurrentCommand(commandRevision, commandRuleKey)) {
+          this.authoringBusy.set(false);
+          return;
+        }
         this.applyWorkspace(workspace);
         this.authoringBusy.set(false);
         this.authoringFeedback.set(this.i18n.text('workspaceCreated'));
         this.loadLifecycle();
       },
-      error: error => this.failAuthoring(error)
+      error: error => this.failAuthoringCommand(error, commandRevision, commandRuleKey)
     });
   }
 
@@ -727,18 +751,25 @@ export class CatalogWorkspaceComponent implements OnInit {
       || !this.hasWorkspaceAction('UPDATE_DRAFT') || this.authoringBusy()) return;
     this.authoringBusy.set(true);
     this.clearAuthoringMessage();
+    const commandRevision = this.selectionRevision;
+    const commandRuleKey = decision.key;
+    const commandWorkspaceId = decision.workspaceId;
     this.catalog.saveWorkspaceDraft({
       id: decision.workspaceId,
       etag: decision.workspaceEtag,
       parameters: { ...(decision.workspaceParameters ?? {}) }
     }, this.draftCondition(), state.config).subscribe({
       next: workspace => {
+        if (!this.isCurrentCommand(commandRevision, commandRuleKey, commandWorkspaceId)) {
+          this.authoringBusy.set(false);
+          return;
+        }
         this.applyWorkspace(workspace);
         this.authoringBusy.set(false);
         this.authoringFeedback.set(this.i18n.text('draftSaved'));
         this.loadLifecycle();
       },
-      error: error => this.failAuthoring(error)
+      error: error => this.failAuthoringCommand(error, commandRevision, commandRuleKey, commandWorkspaceId)
     });
   }
 
@@ -965,6 +996,8 @@ export class CatalogWorkspaceComponent implements OnInit {
     }
     this.authoringBusy.set(true);
     this.clearAuthoringMessage();
+    const commandRevision = this.selectionRevision;
+    const commandRuleKey = this.selected()!.key;
     this.catalog.createScenario(workspaceId, {
       scenarioKey: key.trim(),
       name: name.trim(),
@@ -975,6 +1008,10 @@ export class CatalogWorkspaceComponent implements OnInit {
       expectedEffectIntents: this.assertionList(expectedEffectIntents)
     }, state.config).subscribe({
       next: receipt => {
+        if (!this.isCurrentCommand(commandRevision, commandRuleKey, workspaceId)) {
+          this.authoringBusy.set(false);
+          return;
+        }
         this.applyWorkspace(receipt.workspace);
         this.scenarios.update(items => this.withScenario(items, receipt.scenario));
         this.sandboxIdempotencyKey = null;
@@ -986,7 +1023,7 @@ export class CatalogWorkspaceComponent implements OnInit {
         form.reset();
         this.loadLifecycle();
       },
-      error: error => this.failAuthoring(error)
+      error: error => this.failAuthoringCommand(error, commandRevision, commandRuleKey, workspaceId)
     });
   }
 
@@ -1047,8 +1084,15 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   editScenario(scenarioId: string): void {
     if (!this.hasWorkspaceAction('MANAGE_SCENARIOS') || this.authoringBusy()) return;
+    if (scenarioId !== this.editingScenarioId() && this.editingScenarioDirty()
+      && !window.confirm(this.i18n.text('discardChanges'))) return;
+    const scenario = this.scenarios().find(item => item.id === scenarioId);
+    if (!scenario) return;
     this.editingScenarioId.set(scenarioId);
     this.editingScenarioDirty.set(false);
+    this.editingScenarioFactDraft.set(Object.fromEntries(
+      (this.selected()?.facts ?? []).map(fact => [fact.path, this.valueAtPath(scenario.facts, fact.path)])
+    ));
     this.clearAuthoringMessage();
   }
 
@@ -1056,9 +1100,39 @@ export class CatalogWorkspaceComponent implements OnInit {
     if (this.editingScenarioDirty() && !window.confirm(this.i18n.text('discardChanges'))) return;
     this.editingScenarioId.set(null);
     this.editingScenarioDirty.set(false);
+    this.editingScenarioFactDraft.set({});
   }
 
   markScenarioEditDirty(): void { this.editingScenarioDirty.set(true); }
+
+  setEditingScenarioFactValue(fact: DecisionFact, rawValue: string | boolean): void {
+    const value = this.parseScenarioFactValue(fact, rawValue);
+    this.editingScenarioFactDraft.update(current => ({ ...current, [fact.path]: value }));
+    this.editingScenarioDirty.set(true);
+  }
+
+  setEditingScenarioFactNull(fact: DecisionFact, useNull: boolean): void {
+    this.editingScenarioFactDraft.update(current => {
+      const next = { ...current };
+      if (useNull) next[fact.path] = null;
+      else delete next[fact.path];
+      return next;
+    });
+    this.editingScenarioDirty.set(true);
+  }
+
+  editingScenarioFactIsNull(path: string): boolean {
+    return this.editingScenarioFactDraft()[path] === null;
+  }
+
+  editingScenarioFactDisplayValue(path: string): string {
+    const value = this.editingScenarioFactDraft()[path];
+    return Array.isArray(value) ? value.join(', ') : value == null ? '' : String(value);
+  }
+
+  editingScenarioFactsJson(): string {
+    return JSON.stringify(this.nestedFactPayload(this.editingScenarioFactDraft()), null, 2);
+  }
 
   updateScenario(
     scenario: DomainRuleTestScenario,
@@ -1102,6 +1176,8 @@ export class CatalogWorkspaceComponent implements OnInit {
     }
     this.authoringBusy.set(true);
     this.clearAuthoringMessage();
+    const commandRevision = this.selectionRevision;
+    const commandRuleKey = this.selected()!.key;
     this.catalog.updateScenario(workspaceId, scenario.id, {
       scenarioKey,
       name: scenarioName,
@@ -1113,6 +1189,10 @@ export class CatalogWorkspaceComponent implements OnInit {
       status: status as 'ACTIVE' | 'DISABLED'
     }, scenario.etag, state.config).subscribe({
       next: receipt => {
+        if (!this.isCurrentCommand(commandRevision, commandRuleKey, workspaceId)) {
+          this.authoringBusy.set(false);
+          return;
+        }
         this.applyWorkspace(receipt.workspace);
         this.scenarios.update(items => this.withScenario(items, receipt.scenario));
         this.sandboxRun.set(null);
@@ -1120,11 +1200,12 @@ export class CatalogWorkspaceComponent implements OnInit {
         this.sandboxEvaluatedAtUtc = null;
         this.editingScenarioId.set(null);
         this.editingScenarioDirty.set(false);
+        this.editingScenarioFactDraft.set({});
         this.authoringBusy.set(false);
         this.authoringFeedback.set(this.i18n.text('scenarioUpdated'));
         this.loadLifecycle();
       },
-      error: error => this.failAuthoring(error)
+      error: error => this.failAuthoringCommand(error, commandRevision, commandRuleKey, workspaceId)
     });
   }
 
@@ -1160,12 +1241,15 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   runGovernedSandbox(): void {
     const state = this.runtime.state();
-    const workspaceId = this.selected()?.workspaceId;
+    const current = this.selected();
+    const workspaceId = current?.workspaceId;
     const scenarioIds = this.activeScenarios().map(item => item.id);
     if (state.kind !== 'ready' || !workspaceId
       || !scenarioIds.length || !this.hasWorkspaceAction('RECORD_TEST_RUN') || this.authoringBusy()) return;
     this.authoringBusy.set(true);
     this.clearAuthoringMessage();
+    const commandRevision = this.selectionRevision;
+    const commandRuleKey = current!.key;
     const idempotencyKey = this.sandboxIdempotencyKey
       ??= `policy-studio:${workspaceId}:${createClientRequestId()}`;
     const evaluatedAtUtc = this.sandboxEvaluatedAtUtc ??= new Date().toISOString();
@@ -1177,6 +1261,10 @@ export class CatalogWorkspaceComponent implements OnInit {
       state.config
     ).subscribe({
       next: run => {
+        if (!this.isCurrentCommand(commandRevision, commandRuleKey, workspaceId)) {
+          this.authoringBusy.set(false);
+          return;
+        }
         this.sandboxIdempotencyKey = null;
         this.sandboxEvaluatedAtUtc = null;
         this.sandboxRun.set(run);
@@ -1185,7 +1273,7 @@ export class CatalogWorkspaceComponent implements OnInit {
         this.loadLifecycle();
         this.loadWorkspaceCapabilities();
       },
-      error: error => this.failAuthoring(error)
+      error: error => this.failAuthoringCommand(error, commandRevision, commandRuleKey, workspaceId)
     });
   }
 
@@ -1196,14 +1284,20 @@ export class CatalogWorkspaceComponent implements OnInit {
       || !this.hasWorkspaceAction('SUBMIT') || this.authoringBusy()) return;
     this.authoringBusy.set(true);
     this.clearAuthoringMessage();
+    const commandRevision = this.selectionRevision;
+    const commandRuleKey = decision.key;
     this.catalog.submitWorkspace(decision.workspaceId, decision.workspaceEtag, state.config).subscribe({
       next: workspace => {
+        if (!this.isCurrentCommand(commandRevision, commandRuleKey, decision.workspaceId!)) {
+          this.authoringBusy.set(false);
+          return;
+        }
         this.applyWorkspace(workspace);
         this.authoringBusy.set(false);
         this.authoringFeedback.set(this.i18n.text('workspaceSubmitted'));
         this.loadLifecycle();
       },
-      error: error => this.failAuthoring(error)
+      error: error => this.failAuthoringCommand(error, commandRevision, commandRuleKey, decision.workspaceId!)
     });
   }
 
@@ -1219,8 +1313,14 @@ export class CatalogWorkspaceComponent implements OnInit {
       || !normalizedRationale || !this.hasWorkspaceAction('REVIEW') || this.authoringBusy()) return;
     this.authoringBusy.set(true);
     this.clearAuthoringMessage();
+    const commandRevision = this.selectionRevision;
+    const commandRuleKey = current.key;
     this.catalog.reviewWorkspace(current.workspaceId, current.workspaceEtag, decision, normalizedRationale, state.config).subscribe({
       next: workspace => {
+        if (!this.isCurrentCommand(commandRevision, commandRuleKey, current.workspaceId!)) {
+          this.authoringBusy.set(false);
+          return;
+        }
         this.applyWorkspace(workspace);
         this.authoringBusy.set(false);
         this.authoringFeedback.set(this.i18n.text(decision === 'APPROVE' ? 'workspaceApproved' : 'workspaceRejected'));
@@ -1229,7 +1329,7 @@ export class CatalogWorkspaceComponent implements OnInit {
         this.loadReviews();
         this.loadLifecycle();
       },
-      error: error => this.failAuthoring(error)
+      error: error => this.failAuthoringCommand(error, commandRevision, commandRuleKey, current.workspaceId!)
     });
   }
 
@@ -1240,8 +1340,14 @@ export class CatalogWorkspaceComponent implements OnInit {
       || !this.hasWorkspaceAction('PROMOTE') || this.authoringBusy()) return;
     this.authoringBusy.set(true);
     this.clearAuthoringMessage();
+    const commandRevision = this.selectionRevision;
+    const commandRuleKey = current.key;
     this.catalog.promoteWorkspace(current.workspaceId, current.workspaceEtag, state.config).subscribe({
       next: workspace => {
+        if (!this.isCurrentCommand(commandRevision, commandRuleKey, current.workspaceId!)) {
+          this.authoringBusy.set(false);
+          return;
+        }
         this.applyWorkspace(workspace);
         this.authoringBusy.set(false);
         this.authoringFeedback.set(this.i18n.text('workspacePromoted'));
@@ -1249,36 +1355,50 @@ export class CatalogWorkspaceComponent implements OnInit {
         this.loadReviews();
         this.loadLifecycle();
       },
-      error: error => this.failAuthoring(error)
+      error: error => this.failAuthoringCommand(error, commandRevision, commandRuleKey, current.workspaceId!)
     });
   }
 
   inspectPublicationReadiness(): void {
     const state = this.runtime.state();
-    const definitionId = this.selected()?.promotedDefinitionId;
+    const current = this.selected();
+    const definitionId = current?.promotedDefinitionId;
     if (state.kind !== 'ready' || !definitionId || this.authoringBusy()) return;
     this.authoringBusy.set(true);
     this.clearAuthoringMessage();
+    const commandRevision = this.selectionRevision;
+    const commandRuleKey = current!.key;
     this.catalog.inspectPublicationReadiness(definitionId, state.config).subscribe({
       next: readiness => {
+        if (!this.isCurrentCommand(commandRevision, commandRuleKey)) {
+          this.authoringBusy.set(false);
+          return;
+        }
         this.publicationReadiness.set(readiness);
         this.publicationResult.set(null);
         this.authoringBusy.set(false);
       },
-      error: error => this.failAuthoring(error)
+      error: error => this.failAuthoringCommand(error, commandRevision, commandRuleKey)
     });
   }
 
   publishGovernedDefinition(): void {
     const state = this.runtime.state();
-    const definitionId = this.selected()?.promotedDefinitionId;
+    const current = this.selected();
+    const definitionId = current?.promotedDefinitionId;
     if (state.kind !== 'ready' || !definitionId || this.authoringBusy()
       || this.publicationReadiness()?.readiness !== 'ready_to_publish'
       || !this.hasDefinitionAction('PUBLISH')) return;
     this.authoringBusy.set(true);
     this.clearAuthoringMessage();
+    const commandRevision = this.selectionRevision;
+    const commandRuleKey = current!.key;
     this.catalog.publishDefinition(definitionId, state.config).subscribe({
       next: publication => {
+        if (!this.isCurrentCommand(commandRevision, commandRuleKey)) {
+          this.authoringBusy.set(false);
+          return;
+        }
         this.publicationResult.set(publication);
         this.authoringBusy.set(false);
         this.authoringFeedback.set(this.i18n.text(
@@ -1287,7 +1407,7 @@ export class CatalogWorkspaceComponent implements OnInit {
         this.loadTimeline();
         this.loadSnapshots();
       },
-      error: error => this.failAuthoring(error)
+      error: error => this.failAuthoringCommand(error, commandRevision, commandRuleKey)
     });
   }
 
@@ -1309,14 +1429,26 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   approveRolloutPolicy(policy: DomainRuleRolloutPolicy): void {
-    const state = this.runtime.state();
-    if (state.kind !== 'ready' || this.rolloutPolicyBusy()
+    if (this.runtime.state().kind !== 'ready' || this.rolloutPolicyBusy()
       || !policy.availableActions.includes('APPROVE')) return;
-    if (!window.confirm(`${this.i18n.text('confirmRolloutPolicyApproval')}\n${policy.policyKey} v${policy.policyVersion}`)) return;
+    this.openGovernedConfirmation(
+      this.i18n.text('confirmRolloutPolicyApproval'),
+      `${policy.policyKey} · v${policy.policyVersion}`,
+      this.i18n.text('approveRolloutPolicy'),
+      () => this.executeApproveRolloutPolicy(policy)
+    );
+  }
+
+  private executeApproveRolloutPolicy(policy: DomainRuleRolloutPolicy): void {
+    const state = this.runtime.state();
+    const currentPolicy = this.rolloutPolicyCatalog()?.versions
+      .find(item => item.policyId === policy.policyId);
+    if (state.kind !== 'ready' || this.rolloutPolicyBusy()
+      || !currentPolicy?.availableActions.includes('APPROVE')) return;
     this.rolloutPolicyBusy.set(true);
     this.rolloutPolicyFeedback.set(null);
     this.rolloutPolicyFeedbackError.set(false);
-    this.catalog.approveRolloutPolicy(policy, state.config).subscribe({
+    this.catalog.approveRolloutPolicy(currentPolicy, state.config).subscribe({
       next: () => {
         this.rolloutPolicyBusy.set(false);
         this.rolloutPolicyFeedback.set(this.i18n.text('rolloutPolicyApproved'));
@@ -1327,15 +1459,27 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   activateRolloutPolicy(policy: DomainRuleRolloutPolicy): void {
+    if (this.runtime.state().kind !== 'ready' || !this.rolloutPolicyCatalog()?.headEtag || this.rolloutPolicyBusy()
+      || !policy.availableActions.includes('ACTIVATE')) return;
+    this.openGovernedConfirmation(
+      this.i18n.text('confirmRolloutPolicyActivation'),
+      `${policy.policyKey} · v${policy.policyVersion}`,
+      this.i18n.text('activateRolloutPolicy'),
+      () => this.executeActivateRolloutPolicy(policy)
+    );
+  }
+
+  private executeActivateRolloutPolicy(policy: DomainRuleRolloutPolicy): void {
     const state = this.runtime.state();
     const headEtag = this.rolloutPolicyCatalog()?.headEtag;
+    const currentPolicy = this.rolloutPolicyCatalog()?.versions
+      .find(item => item.policyId === policy.policyId);
     if (state.kind !== 'ready' || !headEtag || this.rolloutPolicyBusy()
-      || !policy.availableActions.includes('ACTIVATE')) return;
-    if (!window.confirm(`${this.i18n.text('confirmRolloutPolicyActivation')}\n${policy.policyKey} v${policy.policyVersion}`)) return;
+      || !currentPolicy?.availableActions.includes('ACTIVATE')) return;
     this.rolloutPolicyBusy.set(true);
     this.rolloutPolicyFeedback.set(null);
     this.rolloutPolicyFeedbackError.set(false);
-    this.catalog.activateRolloutPolicy(policy, headEtag, state.config).subscribe({
+    this.catalog.activateRolloutPolicy(currentPolicy, headEtag, state.config).subscribe({
       next: () => {
         this.rolloutPolicyBusy.set(false);
         this.rolloutPolicyFeedback.set(this.i18n.text('rolloutPolicyActivated'));
@@ -1346,11 +1490,22 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   createRollout(candidateSnapshotKey: string): void {
+    if (this.runtime.state().kind !== 'ready' || !this.snapshotHead()?.headEtag || this.rolloutBusy()
+      || !this.rolloutCatalog()?.availableActions.includes('CREATE_ROLLOUT')) return;
+    this.openGovernedConfirmation(
+      this.i18n.text('confirmStartRollout'),
+      candidateSnapshotKey,
+      this.i18n.text('startRollout'),
+      () => this.executeCreateRollout(candidateSnapshotKey)
+    );
+  }
+
+  private executeCreateRollout(candidateSnapshotKey: string): void {
     const state = this.runtime.state();
     const headEtag = this.snapshotHead()?.headEtag;
     if (state.kind !== 'ready' || !headEtag || this.rolloutBusy()
-      || !this.rolloutCatalog()?.availableActions.includes('CREATE_ROLLOUT')) return;
-    if (!window.confirm(`${this.i18n.text('confirmStartRollout')}\n${candidateSnapshotKey}`)) return;
+      || !this.rolloutCatalog()?.availableActions.includes('CREATE_ROLLOUT')
+      || !this.snapshotVersions().some(item => item.snapshotKey === candidateSnapshotKey && !item.active)) return;
     this.rolloutBusy.set(true);
     this.clearRolloutFeedback();
     this.catalog.createRollout(candidateSnapshotKey, headEtag, state.config).subscribe({
@@ -1364,13 +1519,25 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   cancelRollout(item: DomainRuleRolloutCatalogItem): void {
-    const state = this.runtime.state();
-    if (state.kind !== 'ready' || this.rolloutBusy()
+    if (this.runtime.state().kind !== 'ready' || this.rolloutBusy()
       || !item.availableActions.includes('CANCEL')) return;
-    if (!window.confirm(this.i18n.text('confirmCancelRollout'))) return;
+    this.openGovernedConfirmation(
+      this.i18n.text('confirmCancelRollout'),
+      item.rollout.candidateSnapshotKey,
+      this.i18n.text('cancelRollout'),
+      () => this.executeCancelRollout(item)
+    );
+  }
+
+  private executeCancelRollout(item: DomainRuleRolloutCatalogItem): void {
+    const state = this.runtime.state();
+    const currentItem = this.rolloutCatalog()?.rollouts
+      .find(candidate => candidate.rollout.rolloutId === item.rollout.rolloutId);
+    if (state.kind !== 'ready' || this.rolloutBusy()
+      || !currentItem?.availableActions.includes('CANCEL')) return;
     this.rolloutBusy.set(true);
     this.clearRolloutFeedback();
-    this.catalog.cancelRollout(item, state.config).subscribe({
+    this.catalog.cancelRollout(currentItem, state.config).subscribe({
       next: () => {
         this.rolloutBusy.set(false);
         this.rolloutFeedback.set(this.i18n.text('rolloutCancelled'));
@@ -1381,13 +1548,25 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   activateRollout(item: DomainRuleRolloutCatalogItem): void {
-    const state = this.runtime.state();
-    if (state.kind !== 'ready' || this.rolloutBusy()
+    if (this.runtime.state().kind !== 'ready' || this.rolloutBusy()
       || !item.availableActions.includes('ACTIVATE_CANDIDATE')) return;
-    if (!window.confirm(`${this.i18n.text('confirmPromoteCandidate')}\n${item.rollout.candidateSnapshotKey}`)) return;
+    this.openGovernedConfirmation(
+      this.i18n.text('confirmPromoteCandidate'),
+      item.rollout.candidateSnapshotKey,
+      this.i18n.text('promoteCandidate'),
+      () => this.executeActivateRollout(item)
+    );
+  }
+
+  private executeActivateRollout(item: DomainRuleRolloutCatalogItem): void {
+    const state = this.runtime.state();
+    const currentItem = this.rolloutCatalog()?.rollouts
+      .find(candidate => candidate.rollout.rolloutId === item.rollout.rolloutId);
+    if (state.kind !== 'ready' || this.rolloutBusy()
+      || !currentItem?.availableActions.includes('ACTIVATE_CANDIDATE')) return;
     this.rolloutBusy.set(true);
     this.clearRolloutFeedback();
-    this.catalog.activateRolloutCandidate(item, state.config).subscribe({
+    this.catalog.activateRolloutCandidate(currentItem, state.config).subscribe({
       next: () => {
         this.rolloutBusy.set(false);
         this.rolloutFeedback.set(this.i18n.text('candidatePromoted'));
@@ -1413,28 +1592,66 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   operateSnapshot(version: DomainRuleSnapshotVersion): void {
-    const state = this.runtime.state();
-    const headEtag = this.snapshotHead()?.headEtag;
-    if (state.kind !== 'ready' || !headEtag || this.snapshotBusy()
+    if (this.runtime.state().kind !== 'ready' || !this.snapshotHead()?.headEtag || this.snapshotBusy()
       || (version.availableAction !== 'ACTIVATE' && version.availableAction !== 'ROLLBACK')) return;
     const confirmationKey = version.availableAction === 'ROLLBACK'
       ? 'confirmSnapshotRollback'
       : 'confirmSnapshotActivation';
-    if (!window.confirm(`${this.i18n.text(confirmationKey)}\n${version.snapshotKey}`)) return;
+    this.openGovernedConfirmation(
+      this.i18n.text(confirmationKey),
+      version.snapshotKey,
+      this.i18n.text(version.availableAction === 'ROLLBACK' ? 'rollbackSnapshot' : 'activateSnapshot'),
+      () => this.executeOperateSnapshot(version)
+    );
+  }
+
+  private executeOperateSnapshot(version: DomainRuleSnapshotVersion): void {
+    const state = this.runtime.state();
+    const headEtag = this.snapshotHead()?.headEtag;
+    const currentVersion = this.snapshotVersions()
+      .find(item => item.snapshotKey === version.snapshotKey);
+    if (state.kind !== 'ready' || !headEtag || this.snapshotBusy()
+      || (currentVersion?.availableAction !== 'ACTIVATE' && currentVersion?.availableAction !== 'ROLLBACK')) return;
     this.snapshotBusy.set(true);
     this.snapshotFeedback.set(null);
     this.snapshotFeedbackError.set(false);
     this.snapshotBlockers.set([]);
-    this.catalog.operateSnapshot(version, headEtag, state.config).subscribe({
+    this.catalog.operateSnapshot(currentVersion, headEtag, state.config).subscribe({
       next: () => {
         this.snapshotBusy.set(false);
         this.snapshotFeedbackError.set(false);
         this.snapshotFeedback.set(this.i18n.text(
-          version.availableAction === 'ROLLBACK' ? 'snapshotRolledBack' : 'snapshotActivated'));
+          currentVersion.availableAction === 'ROLLBACK' ? 'snapshotRolledBack' : 'snapshotActivated'));
         this.loadSnapshots();
         this.loadLifecycle();
       },
       error: error => this.failSnapshotOperation(error)
+    });
+  }
+
+  confirmGovernedOperation(): void {
+    const pending = this.governedConfirmation();
+    this.governedConfirmation.set(null);
+    pending?.execute();
+  }
+
+  cancelGovernedOperation(): void {
+    this.governedConfirmation.set(null);
+  }
+
+  private openGovernedConfirmation(
+    message: string,
+    target: string,
+    confirmLabel: string,
+    execute: () => void
+  ): void {
+    this.governedConfirmation.set({
+      title: this.i18n.text('governedConfirmationTitle'),
+      message,
+      target,
+      confirmLabel,
+      cancelLabel: this.i18n.text('cancel'),
+      execute
     });
   }
 
@@ -1444,7 +1661,7 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   @HostListener('window:beforeunload', ['$event'])
   protectDraftOnUnload(event: BeforeUnloadEvent): void {
-    if (!this.draftChanged()) return;
+    if (!this.hasUnsavedWork()) return;
     event.preventDefault();
     event.returnValue = '';
   }
@@ -1452,6 +1669,14 @@ export class CatalogWorkspaceComponent implements OnInit {
   private confirmDraftDiscard(): boolean {
     return !this.authoringOpen() || !this.draftChanged()
       || window.confirm(this.i18n.text('discardChanges'));
+  }
+
+  private hasUnsavedWork(): boolean {
+    return (this.authoringOpen() && this.draftChanged()) || this.editingScenarioDirty();
+  }
+
+  private confirmUnsavedWorkDiscard(): boolean {
+    return !this.hasUnsavedWork() || window.confirm(this.i18n.text('discardChanges'));
   }
 
   private revealSelectedDecision(): void {
@@ -1504,6 +1729,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.operationalScenarioModes.set({});
     this.editingScenarioId.set(null);
     this.editingScenarioDirty.set(false);
+    this.editingScenarioFactDraft.set({});
     this.operationalConfirmationOpen.set(false);
     this.sandboxRun.set(null);
     this.sandboxIdempotencyKey = null;
@@ -1550,6 +1776,38 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.loadWorkspaceCapabilities();
   }
 
+  private isCurrentCommand(revision: number, ruleKey: string, workspaceId?: string): boolean {
+    const current = this.selected();
+    return revision === this.selectionRevision
+      && current?.key === ruleKey
+      && (!workspaceId || current.workspaceId === workspaceId);
+  }
+
+  private valueAtPath(source: Record<string, unknown>, path: string): unknown {
+    return path.split('.').reduce<unknown>((value, segment) =>
+      value && typeof value === 'object' && !Array.isArray(value)
+        ? (value as Record<string, unknown>)[segment]
+        : undefined, source);
+  }
+
+  private nestedFactPayload(values: Readonly<Record<string, unknown>>): Record<string, unknown> {
+    const payload: Record<string, unknown> = {};
+    Object.entries(values).forEach(([path, value]) => {
+      const segments = path.split('.');
+      let target = payload;
+      segments.forEach((segment, index) => {
+        if (index === segments.length - 1) {
+          target[segment] = value;
+          return;
+        }
+        const nested = target[segment];
+        if (!nested || typeof nested !== 'object' || Array.isArray(nested)) target[segment] = {};
+        target = target[segment] as Record<string, unknown>;
+      });
+    });
+    return payload;
+  }
+
   private clearAuthoringMessage(): void {
     this.authoringError.set(false);
     this.authoringFeedback.set(null);
@@ -1558,12 +1816,31 @@ export class CatalogWorkspaceComponent implements OnInit {
   private failAuthoring(error: unknown): void {
     this.authoringBusy.set(false);
     this.authoringError.set(true);
+    if (error instanceof HttpErrorResponse && error.status === 401) {
+      this.sessionActive.set(false);
+      this.authenticationRequired.set(true);
+      this.authoringFeedback.set(this.i18n.text('sessionExpired'));
+      return;
+    }
     const key = error instanceof HttpErrorResponse && error.status === 403
       ? 'governedCommandForbidden'
       : error instanceof HttpErrorResponse && (error.status === 409 || error.status === 412)
         ? 'governedCommandConflict'
         : 'governedCommandFailed';
     this.authoringFeedback.set(this.i18n.text(key));
+  }
+
+  private failAuthoringCommand(
+    error: unknown,
+    revision: number,
+    ruleKey: string,
+    workspaceId?: string
+  ): void {
+    if (!this.isCurrentCommand(revision, ruleKey, workspaceId)) {
+      this.authoringBusy.set(false);
+      return;
+    }
+    this.failAuthoring(error);
   }
 
   private failSnapshotOperation(error: unknown): void {
