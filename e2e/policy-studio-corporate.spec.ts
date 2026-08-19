@@ -244,6 +244,9 @@ test('distinguishes an unauthenticated session and preserves keyboard access', a
 test('shows capability-limited operational proof without exposing a command', async ({ page }, testInfo) => {
   await mockGovernedBackend(page, false);
   await page.goto('/catalog');
+  if (testInfo.project.name === 'narrow') {
+    await page.getByRole('button', { name: /O valor solicitado deve respeitar o limite do programa/ }).click();
+  }
   await page.getByRole('button', { name: 'Testar regra', exact: true }).click();
 
   await expect(page.getByRole('heading', { name: 'O valor solicitado deve respeitar o limite do programa.' })).toBeVisible();
@@ -260,6 +263,9 @@ test('shows capability-limited operational proof without exposing a command', as
 test('confirms the operation and explains a stale workspace ETag', async ({ page }, testInfo) => {
   await mockGovernedBackend(page, true);
   await page.goto('/catalog');
+  if (testInfo.project.name === 'narrow') {
+    await page.getByRole('button', { name: /O valor solicitado deve respeitar o limite do programa/ }).click();
+  }
   await page.getByRole('button', { name: 'Testar regra', exact: true }).click();
   const modes = page.getByLabel('Operação do cenário');
   await modes.nth(0).selectOption('CREATE');
@@ -300,6 +306,27 @@ test('discovers, selects, and explains an exact governed decision', async ({ pag
   });
 });
 
+test('uses a catalog-to-decision flow on narrow screens', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'narrow', 'Narrow navigation only');
+  await mockGovernedBackend(page, false);
+  await page.goto('/catalog');
+
+  const decision = page.getByRole('button', { name: /O valor solicitado deve respeitar o limite do programa/ });
+  await expect(decision).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'O valor solicitado deve respeitar o limite do programa.' })).toBeHidden();
+  await page.screenshot({ path: testInfo.outputPath('narrow-catalog.png'), fullPage: false });
+
+  await decision.click();
+  await expect(page.getByRole('button', { name: 'Voltar ao catálogo' })).toBeFocused();
+  await expect(page.getByRole('heading', { name: 'O valor solicitado deve respeitar o limite do programa.' })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('narrow-decision.png'), fullPage: false });
+  await page.getByRole('button', { name: 'Voltar ao catálogo' }).click();
+
+  await expect(decision).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'O valor solicitado deve respeitar o limite do programa.' })).toBeHidden();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
 test('preserves the governed workspace while editing, adding a typed scenario, and running the sandbox', async ({ page }, testInfo) => {
   let configLoads = 0;
   page.on('request', request => {
@@ -307,6 +334,9 @@ test('preserves the governed workspace while editing, adding a typed scenario, a
   });
   await mockGovernedBackend(page, false);
   await page.goto('/catalog');
+  if (testInfo.project.name === 'narrow') {
+    await page.getByRole('button', { name: /O valor solicitado deve respeitar o limite do programa/ }).click();
+  }
 
   await page.getByRole('button', { name: /^Regra/ }).click();
   await expect(page.locator('#decision-rule')).toBeFocused();

@@ -260,3 +260,18 @@ Permanecem como gaps canônicos: publicar o catálogo de facts para todas as
 definições, separar com precisão maturidade técnica, aprovação e autoridade
 operacional, e tornar o progresso da explicação assistida observável antes do
 timeout terminal.
+
+### Fluxo narrow e hierarquia de identidade
+
+O corte seguinte materializa o narrow como fluxo `catálogo → decisão`, em vez de
+empilhar uma lista rolável e toda a workstation na mesma página. A seleção abre a
+decisão em uma superfície dedicada; `Voltar ao catálogo` preserva a identidade,
+o workspace e o draft governado. A decisão aberta possui seu próprio heading
+principal e devolve foco ao filtro ao retornar.
+
+Código da decisão e chave canônica deixaram de competir com o nome empresarial
+na lista e no cabeçalho. Eles continuam disponíveis em `Ver valores técnicos` e
+no nome acessível da linha. Esta é uma correção `ja-suportado-so-ux`; nenhum DTO,
+endpoint ou contrato público foi criado. A ausência de catálogo de facts segue
+classificada como `suportado-parcialmente` e falha fechada até a fonte governada
+publicar os dados necessários.

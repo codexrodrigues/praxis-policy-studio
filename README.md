@@ -49,6 +49,10 @@ de negócio na superfície principal e mantém IDs, status brutos e referências
 Config em detalhes técnicos. `Testar` só fica navegável quando existe um
 workspace governado; a UI
 explica essa dependência sem transformar ausência de capability em novo login.
+Em viewports estreitos, catálogo e decisão deixam de competir pelo mesmo espaço:
+o operador seleciona uma decisão, trabalha em uma página dedicada e retorna ao
+catálogo sem perder seleção, workspace ou draft. Códigos e chaves canônicas ficam
+nos detalhes técnicos, embora continuem disponíveis para tecnologias assistivas.
 A suíte de navegador comprova em desktop e narrow que a navegação interna não
 recarrega a aplicação, o editor permanece aberto, um cenário tipado pode ser criado
 e o sandbox devolve a comparação candidate × active sem overflow ou violações
