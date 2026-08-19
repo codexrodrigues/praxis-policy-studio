@@ -373,73 +373,16 @@
           </details>
           <button type="submit" [disabled]="authoringBusy() || !hasWorkspaceAction('MANAGE_SCENARIOS')">{{ i18n.text('addScenario') }}</button>
         </form>
-        <div class="scenario-list">
-          @for (scenario of scenarios(); track scenario.id) {
-            <article>
-              <strong>{{ scenario.name }}</strong><code>{{ scenario.scenarioKey }}</code>
-              <span>{{ decisionOutcomeLabel(scenario.expectedDecision) }} · {{ scenarioStatusLabel(scenario.status) }}</span>
-              @if (scenario.expectedOutput != null) {
-                <small>{{ i18n.text('expectedOutput') }}: <code>{{ scenarioExpectedOutput(scenario) }}</code></small>
-              }
-              @if (scenario.expectedReasonCodes?.length) {
-                <small>{{ i18n.text('expectedReasonCodes') }}: {{ scenario.expectedReasonCodes?.join(', ') }}</small>
-              }
-              @if (scenario.expectedEffectIntents?.length) {
-                <small>{{ i18n.text('expectedEffectIntents') }}: {{ scenario.expectedEffectIntents?.join(', ') }}</small>
-              }
-              <button type="button" class="quiet-button" [disabled]="authoringBusy() || !hasWorkspaceAction('MANAGE_SCENARIOS')" (click)="editScenario(scenario.id)">
-                {{ i18n.text('editScenario') }}
-              </button>
-              @if (editingScenarioId() === scenario.id) {
-                <section class="scenario-inline-editor" [attr.aria-label]="i18n.text('editScenario')">
-                  <label><span>{{ i18n.text('scenarioKey') }}</span><input #editScenarioKey required [value]="scenario.scenarioKey" (input)="markScenarioEditDirty()"></label>
-                  <label><span>{{ i18n.text('scenarioName') }}</span><input #editScenarioName required [value]="scenario.name" (input)="markScenarioEditDirty()"></label>
-                  @if (current.facts.length) {
-                    <pax-scenario-facts-editor [facts]="current.facts" [values]="editingScenarioFactDraft()"
-                      (valueChanged)="setEditingScenarioFactValue($event.fact, $event.value)"
-                      (nullChanged)="setEditingScenarioFactNull($event.fact, $event.useNull)" />
-                  }
-                  <label class="scenario-facts" [hidden]="current.facts.length">
-                    <span>{{ i18n.text('scenarioFacts') }}</span>
-                    <textarea #editScenarioFacts rows="5" required [value]="current.facts.length ? editingScenarioFactsJson() : formatScenarioFacts(scenario)" (input)="markScenarioEditDirty()"></textarea>
-                  </label>
-                  <label><span>{{ i18n.text('expectedDecision') }}</span>
-                    <select #editExpectedDecision [value]="scenario.expectedDecision" (change)="markScenarioEditDirty()">
-                      <option value="ALLOW">{{ decisionOutcomeLabel('ALLOW') }}</option>
-                      <option value="DENY">{{ decisionOutcomeLabel('DENY') }}</option>
-                      <option value="NOT_APPLICABLE">{{ decisionOutcomeLabel('NOT_APPLICABLE') }}</option>
-                      <option value="INCONCLUSIVE">{{ decisionOutcomeLabel('INCONCLUSIVE') }}</option>
-                      <option value="TECHNICAL_ERROR">{{ decisionOutcomeLabel('TECHNICAL_ERROR') }}</option>
-                    </select>
-                  </label>
-                  <label><span>{{ i18n.text('scenarioStatus') }}</span>
-                    <select #editScenarioStatus [value]="scenario.status" (change)="markScenarioEditDirty()">
-                      <option value="ACTIVE">{{ i18n.text('scenarioActive') }}</option>
-                      <option value="DISABLED">{{ i18n.text('scenarioDisabled') }}</option>
-                    </select>
-                  </label>
-                  <label><span>{{ i18n.text('expectedOutput') }}</span><textarea #editExpectedOutput rows="3" [value]="scenarioExpectedOutput(scenario)" (input)="markScenarioEditDirty()"></textarea></label>
-                  <label><span>{{ i18n.text('expectedReasonCodes') }}</span><textarea #editReasonCodes rows="2" [value]="scenarioAssertions(scenario.expectedReasonCodes)" (input)="markScenarioEditDirty()"></textarea></label>
-                  <label><span>{{ i18n.text('expectedEffectIntents') }}</span><textarea #editEffectIntents rows="2" [value]="scenarioAssertions(scenario.expectedEffectIntents)" (input)="markScenarioEditDirty()"></textarea></label>
-                  <div class="authoring-actions">
-                    <button type="button" class="quiet-button" (click)="cancelScenarioEdit()">{{ i18n.text('cancel') }}</button>
-                    <button type="button" [disabled]="authoringBusy()" (click)="updateScenario(scenario, editScenarioKey.value, editScenarioName.value, current.facts.length ? editingScenarioFactsJson() : editScenarioFacts.value, editExpectedDecision.value, editScenarioStatus.value, editExpectedOutput.value, editReasonCodes.value, editEffectIntents.value)">{{ i18n.text('saveScenario') }}</button>
-                  </div>
-                </section>
-              }
-              @if (operationalAction()) {
-                <label class="operation-mode">
-                  <span>{{ i18n.text('operationalMode') }}</span>
-                  <select #operationMode [value]="operationalScenarioModes()[scenario.id]" (change)="setOperationalScenarioMode(scenario.id, operationMode.value)">
-                    <option value="">{{ i18n.text('excludeOperationalScenario') }}</option>
-                    <option value="CREATE">{{ i18n.text('createOperation') }}</option>
-                    <option value="UPDATE">{{ i18n.text('updateOperation') }}</option>
-                  </select>
-                </label>
-              }
-            </article>
-          } @empty { <p class="empty">{{ i18n.text('noScenarios') }}</p> }
-        </div>
+        <pax-scenario-catalog [scenarios]="scenarios()" [facts]="current.facts"
+          [editingScenarioId]="editingScenarioId()" [editingFactValues]="editingScenarioFactDraft()"
+          [editingFactsJson]="editingScenarioFactsJson()" [busy]="authoringBusy()"
+          [canManage]="hasWorkspaceAction('MANAGE_SCENARIOS')" [operationalModeEnabled]="!!operationalAction()"
+          [operationalModes]="operationalScenarioModes()" (editRequested)="editScenario($event)"
+          (cancelRequested)="cancelScenarioEdit()" (editDirty)="markScenarioEditDirty()"
+          (factValueChanged)="setEditingScenarioFactValue($event.fact, $event.value)"
+          (factNullChanged)="setEditingScenarioFactNull($event.fact, $event.useNull)"
+          (updateRequested)="updateScenarioFromView($event)"
+          (operationModeChanged)="setOperationalScenarioMode($event.scenarioId, $event.mode)" />
         <div class="governed-actions">
           <button type="button" [disabled]="authoringBusy() || !hasWorkspaceAction('RECORD_TEST_RUN') || !activeScenarios().length || draftChanged()" (click)="runGovernedSandbox()">
             {{ i18n.text('runSandbox') }}

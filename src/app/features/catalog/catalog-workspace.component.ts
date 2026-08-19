@@ -50,6 +50,7 @@ import {
 import { PolicySandboxResultsComponent } from './policy-sandbox-results.component';
 import { WorkspaceBlockersComponent } from './workspace-blockers.component';
 import { ScenarioFactsEditorComponent } from './scenario-facts-editor.component';
+import { ScenarioCatalogComponent, type ScenarioUpdateView } from './scenario-catalog.component';
 
 interface PendingOperationalCommand {
   readonly workspaceId: string;
@@ -75,7 +76,8 @@ type DecisionWorkMode = 'understand' | 'rule' | 'test' | 'operate' | 'history';
     GovernedConfirmationDialogComponent,
     PolicySandboxResultsComponent,
     WorkspaceBlockersComponent,
-    ScenarioFactsEditorComponent
+    ScenarioFactsEditorComponent,
+    ScenarioCatalogComponent
   ],
   providers: [
     ProjectionCatalogService,
@@ -1240,16 +1242,11 @@ export class CatalogWorkspaceComponent implements OnInit {
     });
   }
 
-  scenarioExpectedOutput(scenario: DomainRuleTestScenario): string {
-    return scenario.expectedOutput == null ? '' : JSON.stringify(scenario.expectedOutput, null, 2);
-  }
-
-  formatScenarioFacts(scenario: DomainRuleTestScenario): string {
-    return JSON.stringify(scenario.facts, null, 2);
-  }
-
-  scenarioAssertions(values: readonly string[] | undefined): string {
-    return values?.join('\n') ?? '';
+  updateScenarioFromView(request: ScenarioUpdateView): void {
+    this.updateScenario(
+      request.scenario, request.key, request.name, request.factsJson,
+      request.expectedDecision, request.status, request.expectedOutputJson,
+      request.expectedReasonCodes, request.expectedEffectIntents);
   }
 
   private optionalJson(value: string): unknown {

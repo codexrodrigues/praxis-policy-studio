@@ -145,6 +145,10 @@ e na correção: ele projeta os descritores governados como controles tipados e
 emite alterações de valor/null, enquanto parsing, payload canônico, persistência,
 ETag e capabilities permanecem no orquestrador. Essa fronteira reduz duplicação
 sem promover um contrato local concorrente ao Config ou ao Core.
+O catálogo de cenários segue a mesma regra: renderiza lista, edição e seleção do
+modo operacional e emite comandos de UI tipados. Ele não injeta serviços nem
+infere permissões; o workspace continua responsável por validar capability,
+normalizar o payload, aplicar ETag e invalidar evidência anterior.
 
 No perfil `dev`, o Quickstart publica pelo serviço canônico as sete condições
 JSON Logic editáveis do caso de referência. O seed é idempotente, permanece em

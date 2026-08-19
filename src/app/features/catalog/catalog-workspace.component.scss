@@ -155,8 +155,7 @@ h1 { font-size: 1.35rem; letter-spacing: -.02em; }
 .draft-workspace > header { margin-bottom: 1rem; }
 .draft-workspace > footer { margin-top: 1rem; }
 
-.scenario-assertions,
-.scenario-inline-editor {
+.scenario-assertions {
   grid-column: 1 / -1;
   display: grid;
   gap: 0.75rem;
@@ -172,35 +171,8 @@ h1 { font-size: 1.35rem; letter-spacing: -.02em; }
   font-weight: 750;
 }
 
-.scenario-assertions p,
-.scenario-inline-editor small {
+.scenario-assertions p {
   color: var(--workspace-muted);
   font-size: 0.78rem;
   line-height: 1.45;
-}
-
-.scenario-inline-editor label {
-  display: grid;
-  gap: 0.3rem;
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.scenario-inline-editor textarea {
-  width: 100%;
-  border: 1px solid var(--pax-color-outline, #697a82);
-  border-radius: 0.5rem;
-  padding: 0.65rem;
-  background: var(--pax-color-surface, #f9fbfc);
-  color: inherit;
-  font: inherit;
-}
-
-.scenario-list article > small,
-.scenario-list article > .quiet-button {
-  grid-column: 1 / -1;
-}
-
-.scenario-list article > .quiet-button {
-  justify-self: start;
 }

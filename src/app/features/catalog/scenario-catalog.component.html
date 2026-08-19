@@ -1,0 +1,63 @@
+<div class="scenario-list">
+  @for (scenario of scenarios(); track scenario.id) {
+    <article>
+      <strong>{{ scenario.name }}</strong><code>{{ scenario.scenarioKey }}</code>
+      <span>{{ outcome(scenario.expectedDecision) }} · {{ status(scenario.status) }}</span>
+      @if (scenario.expectedOutput != null) {
+        <small>{{ i18n.text('expectedOutput') }}: <code>{{ expectedOutput(scenario) }}</code></small>
+      }
+      @if (scenario.expectedReasonCodes?.length) {
+        <small>{{ i18n.text('expectedReasonCodes') }}: {{ scenario.expectedReasonCodes?.join(', ') }}</small>
+      }
+      @if (scenario.expectedEffectIntents?.length) {
+        <small>{{ i18n.text('expectedEffectIntents') }}: {{ scenario.expectedEffectIntents?.join(', ') }}</small>
+      }
+      <button type="button" class="quiet-button" [disabled]="busy() || !canManage()"
+        (click)="editRequested.emit(scenario.id)">{{ i18n.text('editScenario') }}</button>
+      @if (editingScenarioId() === scenario.id) {
+        <section class="scenario-inline-editor" [attr.aria-label]="i18n.text('editScenario')">
+          <label><span>{{ i18n.text('scenarioKey') }}</span><input #key required [value]="scenario.scenarioKey" (input)="editDirty.emit()"></label>
+          <label><span>{{ i18n.text('scenarioName') }}</span><input #name required [value]="scenario.name" (input)="editDirty.emit()"></label>
+          @if (facts().length) {
+            <pax-scenario-facts-editor [facts]="facts()" [values]="editingFactValues()"
+              (valueChanged)="factValueChanged.emit($event)" (nullChanged)="factNullChanged.emit($event)" />
+          }
+          <label class="scenario-facts" [hidden]="facts().length">
+            <span>{{ i18n.text('scenarioFacts') }}</span>
+            <textarea #rawFacts rows="5" required [value]="facts().length ? editingFactsJson() : factsJson(scenario)" (input)="editDirty.emit()"></textarea>
+          </label>
+          <label><span>{{ i18n.text('expectedDecision') }}</span>
+            <select #decision [value]="scenario.expectedDecision" (change)="editDirty.emit()">
+              <option value="ALLOW">{{ outcome('ALLOW') }}</option><option value="DENY">{{ outcome('DENY') }}</option>
+              <option value="NOT_APPLICABLE">{{ outcome('NOT_APPLICABLE') }}</option>
+              <option value="INCONCLUSIVE">{{ outcome('INCONCLUSIVE') }}</option>
+              <option value="TECHNICAL_ERROR">{{ outcome('TECHNICAL_ERROR') }}</option>
+            </select>
+          </label>
+          <label><span>{{ i18n.text('scenarioStatus') }}</span>
+            <select #scenarioStatus [value]="scenario.status" (change)="editDirty.emit()">
+              <option value="ACTIVE">{{ i18n.text('scenarioActive') }}</option>
+              <option value="DISABLED">{{ i18n.text('scenarioDisabled') }}</option>
+            </select>
+          </label>
+          <label><span>{{ i18n.text('expectedOutput') }}</span><textarea #output rows="3" [value]="expectedOutput(scenario)" (input)="editDirty.emit()"></textarea></label>
+          <label><span>{{ i18n.text('expectedReasonCodes') }}</span><textarea #reasons rows="2" [value]="assertions(scenario.expectedReasonCodes)" (input)="editDirty.emit()"></textarea></label>
+          <label><span>{{ i18n.text('expectedEffectIntents') }}</span><textarea #effects rows="2" [value]="assertions(scenario.expectedEffectIntents)" (input)="editDirty.emit()"></textarea></label>
+          <div class="authoring-actions">
+            <button type="button" class="quiet-button" (click)="cancelRequested.emit()">{{ i18n.text('cancel') }}</button>
+            <button type="button" [disabled]="busy()" (click)="updateRequested.emit({ scenario, key: key.value, name: name.value, factsJson: facts().length ? editingFactsJson() : rawFacts.value, expectedDecision: decision.value, status: scenarioStatus.value, expectedOutputJson: output.value, expectedReasonCodes: reasons.value, expectedEffectIntents: effects.value })">{{ i18n.text('saveScenario') }}</button>
+          </div>
+        </section>
+      }
+      @if (operationalModeEnabled()) {
+        <label class="operation-mode"><span>{{ i18n.text('operationalMode') }}</span>
+          <select #mode [value]="operationalModes()[scenario.id]" (change)="operationModeChanged.emit({ scenarioId: scenario.id, mode: mode.value })">
+            <option value="">{{ i18n.text('excludeOperationalScenario') }}</option>
+            <option value="CREATE">{{ i18n.text('createOperation') }}</option>
+            <option value="UPDATE">{{ i18n.text('updateOperation') }}</option>
+          </select>
+        </label>
+      }
+    </article>
+  } @empty { <p class="empty">{{ i18n.text('noScenarios') }}</p> }
+</div>
