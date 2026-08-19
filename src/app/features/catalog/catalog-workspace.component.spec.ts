@@ -305,7 +305,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     component.setScenarioFactValue(component.selected()!.facts[1], 'benefit:request, benefit:review');
     component.setScenarioFactNull(component.selected()!.facts[2], true);
 
-    expect(JSON.parse(component.scenarioFactsForSubmit())).toEqual({
+    expect(JSON.parse(component.scenarioFactsJson())).toEqual({
       request: { requestedAmount: 2500.5 },
       actor: { permissions: ['benefit:request', 'benefit:review'] },
       customer: { additionalEligible: null }

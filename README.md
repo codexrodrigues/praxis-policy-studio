@@ -149,6 +149,10 @@ O catálogo de cenários segue a mesma regra: renderiza lista, edição e seleç
 modo operacional e emite comandos de UI tipados. Ele não injeta serviços nem
 infere permissões; o workspace continua responsável por validar capability,
 normalizar o payload, aplicar ETag e invalidar evidência anterior.
+O formulário de criação também é uma superfície isolada: coleta valores humanos,
+facts tipados e asserções e entrega uma solicitação local ao orquestrador. O form
+só é limpo depois do receipt de sucesso; falhas de validação, autenticação,
+concorrência ou rede preservam integralmente a entrada do usuário.
 
 No perfil `dev`, o Quickstart publica pelo serviço canônico as sete condições
 JSON Logic editáveis do caso de referência. O seed é idempotente, permanece em

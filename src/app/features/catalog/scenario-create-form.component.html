@@ -1,0 +1,31 @@
+<form #form class="scenario-form" (submit)="$event.preventDefault(); createRequested.emit({ key: key.value, name: name.value, factsJson: facts().length ? factsJson() : fallbackJson(), expectedDecision: decision.value, expectedOutputJson: output.value, expectedReasonCodes: reasons.value, expectedEffectIntents: effects.value, form })">
+  <label><span>{{ i18n.text('scenarioKey') }}</span><input #key required></label>
+  <label><span>{{ i18n.text('scenarioName') }}</span><input #name required></label>
+  @if (facts().length) {
+    <pax-scenario-facts-editor [facts]="facts()" [values]="factValues()" [preview]="factsJson()"
+      (valueChanged)="factValueChanged.emit($event)" (nullChanged)="factNullChanged.emit($event)" />
+  } @else {
+    <fieldset class="scenario-fact-editor">
+      <legend>{{ i18n.text('scenarioFacts') }}</legend>
+      <p>{{ i18n.text('scenarioFactsFallback') }}</p>
+      <textarea name="scenarioFactsFallback" rows="4" required [ngModel]="fallbackJson()"
+        (ngModelChange)="fallbackJsonChanged.emit($event)"></textarea>
+    </fieldset>
+  }
+  <label><span>{{ i18n.text('expectedDecision') }}</span>
+    <select #decision>
+      <option value="ALLOW">{{ outcome('ALLOW') }}</option><option value="DENY">{{ outcome('DENY') }}</option>
+      <option value="NOT_APPLICABLE">{{ outcome('NOT_APPLICABLE') }}</option>
+      <option value="INCONCLUSIVE">{{ outcome('INCONCLUSIVE') }}</option>
+      <option value="TECHNICAL_ERROR">{{ outcome('TECHNICAL_ERROR') }}</option>
+    </select>
+  </label>
+  <details class="scenario-assertions">
+    <summary>{{ i18n.text('expectedAssertions') }}</summary>
+    <p>{{ i18n.text('expectedAssertionsHint') }}</p>
+    <label><span>{{ i18n.text('expectedOutput') }}</span><textarea #output rows="3"></textarea></label>
+    <label><span>{{ i18n.text('expectedReasonCodes') }}</span><textarea #reasons rows="2"></textarea></label>
+    <label><span>{{ i18n.text('expectedEffectIntents') }}</span><textarea #effects rows="2"></textarea></label>
+  </details>
+  <button type="submit" [disabled]="busy() || !canManage()">{{ i18n.text('addScenario') }}</button>
+</form>

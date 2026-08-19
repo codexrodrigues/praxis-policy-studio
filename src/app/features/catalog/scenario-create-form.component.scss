@@ -1,0 +1,8 @@
+:host, .scenario-form { display: grid; min-width: 0; }
+.scenario-form { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+label { display: grid; gap: .3rem; font-size: .78rem; font-weight: 700; }
+input, textarea, select { min-width: 0; border: 1px solid var(--pax-color-outline-variant, #8c9ca4); border-radius: .5rem; padding: .65rem; background: var(--pax-color-surface, #fff); color: inherit; font: inherit; }
+.scenario-assertions { grid-column: 1 / -1; display: grid; gap: .75rem; padding: .85rem; border: 1px solid var(--pax-color-outline-variant, #8c9ca4); border-radius: .65rem; background: var(--pax-color-surface-container-lowest, #fff); }
+.scenario-assertions summary { cursor: pointer; color: var(--pax-color-primary, #005f73); font-weight: 750; }
+.scenario-assertions p { color: var(--pax-color-on-surface-variant, #455a64); font-size: .78rem; line-height: 1.45; }
+@media (max-width: 48rem) { .scenario-form { grid-template-columns: 1fr; } }

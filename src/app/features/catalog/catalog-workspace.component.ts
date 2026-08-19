@@ -1,5 +1,4 @@
 import { ChangeDetectionStrategy, Component, ElementRef, HostListener, OnInit, computed, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { PolicyStudioI18n } from '../../core/i18n';
 import { ProjectionCatalogService } from '../../core/projection-catalog.service';
 import { DecisionFact, DecisionLifecycleSummary, DecisionPublicationResult, DecisionSummary, PolicySandboxRun, PublicationReadiness } from './catalog.fixture';
@@ -49,8 +48,8 @@ import {
 } from './governed-confirmation-dialog.component';
 import { PolicySandboxResultsComponent } from './policy-sandbox-results.component';
 import { WorkspaceBlockersComponent } from './workspace-blockers.component';
-import { ScenarioFactsEditorComponent } from './scenario-facts-editor.component';
 import { ScenarioCatalogComponent, type ScenarioUpdateView } from './scenario-catalog.component';
+import { ScenarioCreateFormComponent, type ScenarioCreateView } from './scenario-create-form.component';
 
 interface PendingOperationalCommand {
   readonly workspaceId: string;
@@ -68,7 +67,6 @@ type DecisionWorkMode = 'understand' | 'rule' | 'test' | 'operate' | 'history';
 @Component({
   selector: 'pax-catalog-workspace',
   imports: [
-    FormsModule,
     LocalDraftWorkspaceComponent,
     SnapshotCockpitComponent,
     DecisionExplanationComponent,
@@ -76,8 +74,8 @@ type DecisionWorkMode = 'understand' | 'rule' | 'test' | 'operate' | 'history';
     GovernedConfirmationDialogComponent,
     PolicySandboxResultsComponent,
     WorkspaceBlockersComponent,
-    ScenarioFactsEditorComponent,
-    ScenarioCatalogComponent
+    ScenarioCatalogComponent,
+    ScenarioCreateFormComponent
   ],
   providers: [
     ProjectionCatalogService,
@@ -1059,6 +1057,13 @@ export class CatalogWorkspaceComponent implements OnInit {
     });
   }
 
+  createScenarioFromView(request: ScenarioCreateView): void {
+    this.createScenario(
+      request.key, request.name, request.factsJson, request.expectedDecision,
+      request.expectedOutputJson, request.expectedReasonCodes,
+      request.expectedEffectIntents, request.form);
+  }
+
   setScenarioFactValue(fact: DecisionFact, rawValue: string | boolean): void {
     const value = this.parseScenarioFactValue(fact, rawValue);
     this.scenarioFactDraft.update(current => ({ ...current, [fact.path]: value }));
@@ -1071,10 +1076,6 @@ export class CatalogWorkspaceComponent implements OnInit {
       else delete next[fact.path];
       return next;
     });
-  }
-
-  scenarioFactsForSubmit(): string {
-    return this.selected()?.facts.length ? this.scenarioFactsJson() : this.scenarioFactsFallback();
   }
 
   private parseScenarioFactValue(fact: DecisionFact, rawValue: string | boolean): unknown {
