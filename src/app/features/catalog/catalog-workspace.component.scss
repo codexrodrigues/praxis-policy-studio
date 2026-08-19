@@ -154,25 +154,3 @@ h1 { font-size: 1.35rem; letter-spacing: -.02em; }
 
 .draft-workspace > header { margin-bottom: 1rem; }
 .draft-workspace > footer { margin-top: 1rem; }
-
-.scenario-assertions {
-  grid-column: 1 / -1;
-  display: grid;
-  gap: 0.75rem;
-  padding: 0.85rem;
-  border: 1px solid var(--workspace-outline-soft);
-  border-radius: 0.65rem;
-  background: var(--pax-color-surface-container-lowest, #fff);
-}
-
-.scenario-assertions summary {
-  cursor: pointer;
-  color: var(--workspace-primary);
-  font-weight: 750;
-}
-
-.scenario-assertions p {
-  color: var(--workspace-muted);
-  font-size: 0.78rem;
-  line-height: 1.45;
-}

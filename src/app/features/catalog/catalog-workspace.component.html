@@ -338,41 +338,13 @@
           </div>
           <strong>{{ scenarios().length }}</strong>
         </header>
-        <form #scenarioForm class="scenario-form" (submit)="$event.preventDefault(); createScenario(scenarioKey.value, scenarioName.value, scenarioFactsForSubmit(), expectedDecision.value, scenarioExpectedOutputField.value, scenarioReasonCodes.value, scenarioEffectIntents.value, scenarioForm)">
-          <label><span>{{ i18n.text('scenarioKey') }}</span><input #scenarioKey required></label>
-          <label><span>{{ i18n.text('scenarioName') }}</span><input #scenarioName required></label>
-          @if (current.facts.length) {
-            <pax-scenario-facts-editor [facts]="current.facts" [values]="scenarioFactDraft()"
-              [preview]="scenarioFactsJson()"
-              (valueChanged)="setScenarioFactValue($event.fact, $event.value)"
-              (nullChanged)="setScenarioFactNull($event.fact, $event.useNull)" />
-          } @else {
-            <fieldset class="scenario-fact-editor">
-              <legend>{{ i18n.text('scenarioFacts') }}</legend>
-              <p>{{ i18n.text('scenarioFactsFallback') }}</p>
-              <textarea name="scenarioFactsFallback" rows="4" required
-                [ngModel]="scenarioFactsFallback()"
-                (ngModelChange)="scenarioFactsFallback.set($event)"></textarea>
-            </fieldset>
-          }
-          <label><span>{{ i18n.text('expectedDecision') }}</span>
-            <select #expectedDecision>
-              <option value="ALLOW">{{ decisionOutcomeLabel('ALLOW') }}</option>
-              <option value="DENY">{{ decisionOutcomeLabel('DENY') }}</option>
-              <option value="NOT_APPLICABLE">{{ decisionOutcomeLabel('NOT_APPLICABLE') }}</option>
-              <option value="INCONCLUSIVE">{{ decisionOutcomeLabel('INCONCLUSIVE') }}</option>
-              <option value="TECHNICAL_ERROR">{{ decisionOutcomeLabel('TECHNICAL_ERROR') }}</option>
-            </select>
-          </label>
-          <details class="scenario-assertions">
-            <summary>{{ i18n.text('expectedAssertions') }}</summary>
-            <p>{{ i18n.text('expectedAssertionsHint') }}</p>
-            <label><span>{{ i18n.text('expectedOutput') }}</span><textarea #scenarioExpectedOutputField rows="3"></textarea></label>
-            <label><span>{{ i18n.text('expectedReasonCodes') }}</span><textarea #scenarioReasonCodes rows="2"></textarea></label>
-            <label><span>{{ i18n.text('expectedEffectIntents') }}</span><textarea #scenarioEffectIntents rows="2"></textarea></label>
-          </details>
-          <button type="submit" [disabled]="authoringBusy() || !hasWorkspaceAction('MANAGE_SCENARIOS')">{{ i18n.text('addScenario') }}</button>
-        </form>
+        <pax-scenario-create-form [facts]="current.facts" [factValues]="scenarioFactDraft()"
+          [factsJson]="scenarioFactsJson()" [fallbackJson]="scenarioFactsFallback()"
+          [busy]="authoringBusy()" [canManage]="hasWorkspaceAction('MANAGE_SCENARIOS')"
+          (factValueChanged)="setScenarioFactValue($event.fact, $event.value)"
+          (factNullChanged)="setScenarioFactNull($event.fact, $event.useNull)"
+          (fallbackJsonChanged)="scenarioFactsFallback.set($event)"
+          (createRequested)="createScenarioFromView($event)" />
         <pax-scenario-catalog [scenarios]="scenarios()" [facts]="current.facts"
           [editingScenarioId]="editingScenarioId()" [editingFactValues]="editingScenarioFactDraft()"
           [editingFactsJson]="editingScenarioFactsJson()" [busy]="authoringBusy()"
