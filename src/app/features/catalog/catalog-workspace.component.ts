@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, ElementRef, HostListener, OnInit, c
 import { FormsModule } from '@angular/forms';
 import { PolicyStudioI18n } from '../../core/i18n';
 import { ProjectionCatalogService } from '../../core/projection-catalog.service';
-import { DecisionFact, DecisionLifecycleSummary, DecisionPublicationResult, DecisionSummary, PolicySandboxRun, PolicySandboxScenarioResult, PublicationReadiness } from './catalog.fixture';
+import { DecisionFact, DecisionLifecycleSummary, DecisionPublicationResult, DecisionSummary, PolicySandboxRun, PublicationReadiness } from './catalog.fixture';
 import { DecisionTimelineEvent } from './catalog.fixture';
 import { RuntimeConfigService } from '../../core/runtime-config.service';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -43,12 +43,22 @@ import { forkJoin } from 'rxjs';
 import { DecisionExplanationComponent } from './decision-explanation.component';
 import { DecisionDiscoveryComponent } from './decision-discovery.component';
 import { createClientRequestId } from '../../core/client-request-id';
+import {
+  GovernedConfirmationDialogComponent,
+  type GovernedConfirmationView
+} from './governed-confirmation-dialog.component';
+import { PolicySandboxResultsComponent } from './policy-sandbox-results.component';
+import { WorkspaceBlockersComponent } from './workspace-blockers.component';
 
 interface PendingOperationalCommand {
   readonly workspaceId: string;
   readonly selectionFingerprint: string;
   readonly idempotencyKey: string;
   readonly evaluatedAtUtc: string;
+}
+
+interface PendingGovernedConfirmation extends GovernedConfirmationView {
+  readonly execute: () => void;
 }
 
 type DecisionWorkMode = 'understand' | 'rule' | 'test' | 'operate' | 'history';
@@ -60,7 +70,10 @@ type DecisionWorkMode = 'understand' | 'rule' | 'test' | 'operate' | 'history';
     LocalDraftWorkspaceComponent,
     SnapshotCockpitComponent,
     DecisionExplanationComponent,
-    DecisionDiscoveryComponent
+    DecisionDiscoveryComponent,
+    GovernedConfirmationDialogComponent,
+    PolicySandboxResultsComponent,
+    WorkspaceBlockersComponent
   ],
   providers: [
     ProjectionCatalogService,
@@ -139,32 +152,6 @@ export class CatalogWorkspaceComponent implements OnInit {
         : this.i18n.text('comparisonUnavailable');
   }
 
-  sandboxResultPassed(result: PolicySandboxScenarioResult): boolean {
-    const comparable = result.candidateDecision !== 'TECHNICAL_ERROR'
-      && result.activeDecision !== 'TECHNICAL_ERROR';
-    return comparable && result.candidateMatchesExpected && result.activeMatchesExpected
-      && this.comparisonLabel(result.comparison) === this.i18n.text('comparisonMatch');
-  }
-
-  workspaceBlockerLabel(code: string): string {
-    switch (code) {
-      case 'CURRENT_PASSING_TEST_RUN_REQUIRED': return this.i18n.text('workspaceBlockerCurrentTestRequired');
-      case 'TEST_RUN_DOES_NOT_PROVE_CURRENT_REVISION': return this.i18n.text('workspaceBlockerCurrentRevisionRequired');
-      case 'ACTIVE_SCENARIO_REQUIRED': return this.i18n.text('workspaceBlockerActiveScenarioRequired');
-      case 'ACTIVE_SCENARIO_COVERAGE_INCOMPLETE': return this.i18n.text('workspaceBlockerCoverageIncomplete');
-      case 'TEST_RUN_NOT_PASSING': return this.i18n.text('workspaceBlockerTestNotPassing');
-      case 'BOUND_TEST_RUN_REQUIRED': return this.i18n.text('snapshotBlockerBoundTestRunRequired');
-      case 'REQUIRED_BASELINE_AUTHORITY_MISSING': return this.i18n.text('snapshotBlockerBaselineAuthorityMissing');
-      case 'REQUIRED_BASELINE_ELIGIBILITY_MISSING': return this.i18n.text('snapshotBlockerBaselineEligibilityMissing');
-      case 'CLEANUP_EVIDENCE_INCOMPLETE': return this.i18n.text('snapshotBlockerCleanupIncomplete');
-      case 'BASELINE_PARITY_INCOMPLETE': return this.i18n.text('snapshotBlockerBaselineParityIncomplete');
-      case 'OPERATION_DECISION_MATRIX_INCOMPLETE': return this.i18n.text('snapshotBlockerOperationMatrixIncomplete');
-      case 'REVIEWED_TEST_RUN_PROVENANCE_AMBIGUOUS': return this.i18n.text('snapshotBlockerProvenanceAmbiguous');
-      case 'TEST_EVIDENCE_POLICY_INVALID': return this.i18n.text('snapshotBlockerPolicyInvalid');
-      case 'TEST_EVIDENCE_GATE_UNAVAILABLE': return this.i18n.text('snapshotBlockerGateUnavailable');
-      default: return this.i18n.text('snapshotBlockerUnknown');
-    }
-  }
   readonly query = signal('');
   readonly allDecisions = signal<readonly DecisionSummary[]>([]);
   readonly selected = signal<DecisionSummary | null>(null);
@@ -197,6 +184,7 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly authoringBusy = signal(false);
   readonly authoringError = signal(false);
   readonly authoringFeedback = signal<string | null>(null);
+  readonly governedConfirmation = signal<PendingGovernedConfirmation | null>(null);
   readonly scenarios = signal<readonly DomainRuleTestScenario[]>([]);
   readonly scenarioFactDraft = signal<Readonly<Record<string, unknown>>>({});
   readonly scenarioFactsFallback = signal('{}');
@@ -1441,14 +1429,26 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   approveRolloutPolicy(policy: DomainRuleRolloutPolicy): void {
-    const state = this.runtime.state();
-    if (state.kind !== 'ready' || this.rolloutPolicyBusy()
+    if (this.runtime.state().kind !== 'ready' || this.rolloutPolicyBusy()
       || !policy.availableActions.includes('APPROVE')) return;
-    if (!window.confirm(`${this.i18n.text('confirmRolloutPolicyApproval')}\n${policy.policyKey} v${policy.policyVersion}`)) return;
+    this.openGovernedConfirmation(
+      this.i18n.text('confirmRolloutPolicyApproval'),
+      `${policy.policyKey} · v${policy.policyVersion}`,
+      this.i18n.text('approveRolloutPolicy'),
+      () => this.executeApproveRolloutPolicy(policy)
+    );
+  }
+
+  private executeApproveRolloutPolicy(policy: DomainRuleRolloutPolicy): void {
+    const state = this.runtime.state();
+    const currentPolicy = this.rolloutPolicyCatalog()?.versions
+      .find(item => item.policyId === policy.policyId);
+    if (state.kind !== 'ready' || this.rolloutPolicyBusy()
+      || !currentPolicy?.availableActions.includes('APPROVE')) return;
     this.rolloutPolicyBusy.set(true);
     this.rolloutPolicyFeedback.set(null);
     this.rolloutPolicyFeedbackError.set(false);
-    this.catalog.approveRolloutPolicy(policy, state.config).subscribe({
+    this.catalog.approveRolloutPolicy(currentPolicy, state.config).subscribe({
       next: () => {
         this.rolloutPolicyBusy.set(false);
         this.rolloutPolicyFeedback.set(this.i18n.text('rolloutPolicyApproved'));
@@ -1459,15 +1459,27 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   activateRolloutPolicy(policy: DomainRuleRolloutPolicy): void {
+    if (this.runtime.state().kind !== 'ready' || !this.rolloutPolicyCatalog()?.headEtag || this.rolloutPolicyBusy()
+      || !policy.availableActions.includes('ACTIVATE')) return;
+    this.openGovernedConfirmation(
+      this.i18n.text('confirmRolloutPolicyActivation'),
+      `${policy.policyKey} · v${policy.policyVersion}`,
+      this.i18n.text('activateRolloutPolicy'),
+      () => this.executeActivateRolloutPolicy(policy)
+    );
+  }
+
+  private executeActivateRolloutPolicy(policy: DomainRuleRolloutPolicy): void {
     const state = this.runtime.state();
     const headEtag = this.rolloutPolicyCatalog()?.headEtag;
+    const currentPolicy = this.rolloutPolicyCatalog()?.versions
+      .find(item => item.policyId === policy.policyId);
     if (state.kind !== 'ready' || !headEtag || this.rolloutPolicyBusy()
-      || !policy.availableActions.includes('ACTIVATE')) return;
-    if (!window.confirm(`${this.i18n.text('confirmRolloutPolicyActivation')}\n${policy.policyKey} v${policy.policyVersion}`)) return;
+      || !currentPolicy?.availableActions.includes('ACTIVATE')) return;
     this.rolloutPolicyBusy.set(true);
     this.rolloutPolicyFeedback.set(null);
     this.rolloutPolicyFeedbackError.set(false);
-    this.catalog.activateRolloutPolicy(policy, headEtag, state.config).subscribe({
+    this.catalog.activateRolloutPolicy(currentPolicy, headEtag, state.config).subscribe({
       next: () => {
         this.rolloutPolicyBusy.set(false);
         this.rolloutPolicyFeedback.set(this.i18n.text('rolloutPolicyActivated'));
@@ -1478,11 +1490,22 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   createRollout(candidateSnapshotKey: string): void {
+    if (this.runtime.state().kind !== 'ready' || !this.snapshotHead()?.headEtag || this.rolloutBusy()
+      || !this.rolloutCatalog()?.availableActions.includes('CREATE_ROLLOUT')) return;
+    this.openGovernedConfirmation(
+      this.i18n.text('confirmStartRollout'),
+      candidateSnapshotKey,
+      this.i18n.text('startRollout'),
+      () => this.executeCreateRollout(candidateSnapshotKey)
+    );
+  }
+
+  private executeCreateRollout(candidateSnapshotKey: string): void {
     const state = this.runtime.state();
     const headEtag = this.snapshotHead()?.headEtag;
     if (state.kind !== 'ready' || !headEtag || this.rolloutBusy()
-      || !this.rolloutCatalog()?.availableActions.includes('CREATE_ROLLOUT')) return;
-    if (!window.confirm(`${this.i18n.text('confirmStartRollout')}\n${candidateSnapshotKey}`)) return;
+      || !this.rolloutCatalog()?.availableActions.includes('CREATE_ROLLOUT')
+      || !this.snapshotVersions().some(item => item.snapshotKey === candidateSnapshotKey && !item.active)) return;
     this.rolloutBusy.set(true);
     this.clearRolloutFeedback();
     this.catalog.createRollout(candidateSnapshotKey, headEtag, state.config).subscribe({
@@ -1496,13 +1519,25 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   cancelRollout(item: DomainRuleRolloutCatalogItem): void {
-    const state = this.runtime.state();
-    if (state.kind !== 'ready' || this.rolloutBusy()
+    if (this.runtime.state().kind !== 'ready' || this.rolloutBusy()
       || !item.availableActions.includes('CANCEL')) return;
-    if (!window.confirm(this.i18n.text('confirmCancelRollout'))) return;
+    this.openGovernedConfirmation(
+      this.i18n.text('confirmCancelRollout'),
+      item.rollout.candidateSnapshotKey,
+      this.i18n.text('cancelRollout'),
+      () => this.executeCancelRollout(item)
+    );
+  }
+
+  private executeCancelRollout(item: DomainRuleRolloutCatalogItem): void {
+    const state = this.runtime.state();
+    const currentItem = this.rolloutCatalog()?.rollouts
+      .find(candidate => candidate.rollout.rolloutId === item.rollout.rolloutId);
+    if (state.kind !== 'ready' || this.rolloutBusy()
+      || !currentItem?.availableActions.includes('CANCEL')) return;
     this.rolloutBusy.set(true);
     this.clearRolloutFeedback();
-    this.catalog.cancelRollout(item, state.config).subscribe({
+    this.catalog.cancelRollout(currentItem, state.config).subscribe({
       next: () => {
         this.rolloutBusy.set(false);
         this.rolloutFeedback.set(this.i18n.text('rolloutCancelled'));
@@ -1513,13 +1548,25 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   activateRollout(item: DomainRuleRolloutCatalogItem): void {
-    const state = this.runtime.state();
-    if (state.kind !== 'ready' || this.rolloutBusy()
+    if (this.runtime.state().kind !== 'ready' || this.rolloutBusy()
       || !item.availableActions.includes('ACTIVATE_CANDIDATE')) return;
-    if (!window.confirm(`${this.i18n.text('confirmPromoteCandidate')}\n${item.rollout.candidateSnapshotKey}`)) return;
+    this.openGovernedConfirmation(
+      this.i18n.text('confirmPromoteCandidate'),
+      item.rollout.candidateSnapshotKey,
+      this.i18n.text('promoteCandidate'),
+      () => this.executeActivateRollout(item)
+    );
+  }
+
+  private executeActivateRollout(item: DomainRuleRolloutCatalogItem): void {
+    const state = this.runtime.state();
+    const currentItem = this.rolloutCatalog()?.rollouts
+      .find(candidate => candidate.rollout.rolloutId === item.rollout.rolloutId);
+    if (state.kind !== 'ready' || this.rolloutBusy()
+      || !currentItem?.availableActions.includes('ACTIVATE_CANDIDATE')) return;
     this.rolloutBusy.set(true);
     this.clearRolloutFeedback();
-    this.catalog.activateRolloutCandidate(item, state.config).subscribe({
+    this.catalog.activateRolloutCandidate(currentItem, state.config).subscribe({
       next: () => {
         this.rolloutBusy.set(false);
         this.rolloutFeedback.set(this.i18n.text('candidatePromoted'));
@@ -1545,28 +1592,66 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   operateSnapshot(version: DomainRuleSnapshotVersion): void {
-    const state = this.runtime.state();
-    const headEtag = this.snapshotHead()?.headEtag;
-    if (state.kind !== 'ready' || !headEtag || this.snapshotBusy()
+    if (this.runtime.state().kind !== 'ready' || !this.snapshotHead()?.headEtag || this.snapshotBusy()
       || (version.availableAction !== 'ACTIVATE' && version.availableAction !== 'ROLLBACK')) return;
     const confirmationKey = version.availableAction === 'ROLLBACK'
       ? 'confirmSnapshotRollback'
       : 'confirmSnapshotActivation';
-    if (!window.confirm(`${this.i18n.text(confirmationKey)}\n${version.snapshotKey}`)) return;
+    this.openGovernedConfirmation(
+      this.i18n.text(confirmationKey),
+      version.snapshotKey,
+      this.i18n.text(version.availableAction === 'ROLLBACK' ? 'rollbackSnapshot' : 'activateSnapshot'),
+      () => this.executeOperateSnapshot(version)
+    );
+  }
+
+  private executeOperateSnapshot(version: DomainRuleSnapshotVersion): void {
+    const state = this.runtime.state();
+    const headEtag = this.snapshotHead()?.headEtag;
+    const currentVersion = this.snapshotVersions()
+      .find(item => item.snapshotKey === version.snapshotKey);
+    if (state.kind !== 'ready' || !headEtag || this.snapshotBusy()
+      || (currentVersion?.availableAction !== 'ACTIVATE' && currentVersion?.availableAction !== 'ROLLBACK')) return;
     this.snapshotBusy.set(true);
     this.snapshotFeedback.set(null);
     this.snapshotFeedbackError.set(false);
     this.snapshotBlockers.set([]);
-    this.catalog.operateSnapshot(version, headEtag, state.config).subscribe({
+    this.catalog.operateSnapshot(currentVersion, headEtag, state.config).subscribe({
       next: () => {
         this.snapshotBusy.set(false);
         this.snapshotFeedbackError.set(false);
         this.snapshotFeedback.set(this.i18n.text(
-          version.availableAction === 'ROLLBACK' ? 'snapshotRolledBack' : 'snapshotActivated'));
+          currentVersion.availableAction === 'ROLLBACK' ? 'snapshotRolledBack' : 'snapshotActivated'));
         this.loadSnapshots();
         this.loadLifecycle();
       },
       error: error => this.failSnapshotOperation(error)
+    });
+  }
+
+  confirmGovernedOperation(): void {
+    const pending = this.governedConfirmation();
+    this.governedConfirmation.set(null);
+    pending?.execute();
+  }
+
+  cancelGovernedOperation(): void {
+    this.governedConfirmation.set(null);
+  }
+
+  private openGovernedConfirmation(
+    message: string,
+    target: string,
+    confirmLabel: string,
+    execute: () => void
+  ): void {
+    this.governedConfirmation.set({
+      title: this.i18n.text('governedConfirmationTitle'),
+      message,
+      target,
+      confirmLabel,
+      cancelLabel: this.i18n.text('cancel'),
+      execute
     });
   }
 

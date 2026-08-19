@@ -29,7 +29,7 @@ Marcos diferentes têm distâncias diferentes:
 | Marco | Estimativa atual | Significado |
 | --- | ---: | --- |
 | beta integrada controlada com Quickstart | 92% | contratos, action discovery, catálogo não vazio no Neon e matriz browser multi-persona foram comprovados; falta repetir os E2E no HEAD exato com UI rc.38 e publicar nova tag do Studio |
-| versão estável corporativa | 58% | isolamento estrutural, segregação, sessão/catálogo, workspace e sandbox candidate foram provados; faltam Neon cross-tenant, gates posteriores, diálogos corporativos, decomposição do workspace e operação sustentada |
+| versão estável corporativa | 60% | isolamento estrutural, segregação, sessão/catálogo, workspace, sandbox e diálogos críticos foram provados; faltam Neon cross-tenant, gates posteriores, decomposição adicional do workspace e operação sustentada |
 | produto maduro multi-cliente com authoring complexo e IA | 34% | RuleSet completo, discovery amplo, impacto, execução explicável e agente governado |
 
 Rubrica das estimativas: `0` ausente, `25` seam/contrato, `50` vertical slice com

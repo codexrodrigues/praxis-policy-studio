@@ -569,17 +569,7 @@
             </section>
           }
         }
-        @if (sandboxRun(); as run) {
-          <div class="sandbox-results" aria-live="polite">
-            @for (result of run.results; track result.scenarioId) {
-              <article [class.passed]="sandboxResultPassed(result)">
-                <strong>{{ result.scenarioKey }}</strong>
-                <span>{{ decisionOutcomeLabel(result.candidateDecision) }} / {{ decisionOutcomeLabel(result.expectedDecision) }}</span>
-                <small>{{ comparisonLabel(result.comparison) }} · {{ i18n.text('activeVersion') }} {{ decisionOutcomeLabel(result.activeDecision) }}</small>
-              </article>
-            }
-          </div>
-        }
+        <pax-policy-sandbox-results [run]="sandboxRun()" />
       </section>
 
 
@@ -631,9 +621,7 @@
         } @else if (workspaceCapabilitiesError()) {
           <p class="state-message" role="alert">{{ i18n.text('governedCommandFailed') }}</p>
         } @else if (workspaceCapabilities(); as capabilities) {
-          @for (blocker of capabilities.blockers; track blocker.code + blocker.action) {
-            <p class="authority-note">{{ workspaceBlockerLabel(blocker.code) }}</p>
-          }
+          <pax-workspace-blockers [capabilities]="capabilities" />
         }
         <small class="authority-note">{{ i18n.text('serverAuthorizesActions') }}</small>
       </section>
@@ -858,3 +846,8 @@
     </section>
   }
 </div>
+
+<pax-governed-confirmation-dialog
+  [confirmation]="governedConfirmation()"
+  (confirmed)="confirmGovernedOperation()"
+  (cancelled)="cancelGovernedOperation()" />

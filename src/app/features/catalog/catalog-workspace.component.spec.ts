@@ -47,6 +47,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
   const createScenario = vi.fn();
   const updateScenario = vi.fn();
   const reviewWorkspace = vi.fn();
+  const cancelRollout = vi.fn();
   let sandboxRuns: Subject<any>[];
   let runSandbox: ReturnType<typeof vi.fn>;
   const operationalTestAction = vi.fn();
@@ -77,12 +78,14 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     createScenario.mockReset();
     updateScenario.mockReset();
     reviewWorkspace.mockReset();
+    cancelRollout.mockReset();
     operationalTestAction.mockReset();
     runOperationalTest.mockReset();
     logoutSession.mockReset();
     logoutResult = new Subject<void>();
     logoutSession.mockReturnValue(logoutResult.asObservable());
     operationalTestAction.mockReturnValue(of(null));
+    cancelRollout.mockReturnValue(of(void 0));
     createWorkspace.mockReturnValue(of({
       id: 'workspace-A', ruleKey: 'A', status: 'OPEN', etag: 'etag-new', revision: 1,
       parameters: {}
@@ -108,6 +111,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
         createScenario,
         updateScenario,
         reviewWorkspace,
+        cancelRollout,
         runSandbox
       } }
     ] });
@@ -468,6 +472,42 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(component.authoringFeedback()).toContain('sessão expirou');
   });
 
+  it('requires the contextual governed dialog before cancelling a rollout', () => {
+    const item = {
+      rollout: { candidateSnapshotKey: 'snapshot-candidate', rolloutId: 'rollout-A' },
+      availableActions: ['CANCEL']
+    } as any;
+    component.rolloutCatalog.set({ availableActions: [], rollouts: [item] } as any);
+
+    component.cancelRollout(item);
+
+    expect(cancelRollout).not.toHaveBeenCalled();
+    expect(component.governedConfirmation()?.target).toBe('snapshot-candidate');
+    expect(component.governedConfirmation()?.confirmLabel).toBe('Cancelar rollout');
+
+    component.confirmGovernedOperation();
+
+    expect(cancelRollout).toHaveBeenCalledWith(item, config);
+    expect(component.governedConfirmation()).toBeNull();
+  });
+
+  it('fails closed when a governed action disappears while its dialog is open', () => {
+    const item = {
+      rollout: { candidateSnapshotKey: 'snapshot-candidate', rolloutId: 'rollout-A' },
+      availableActions: ['CANCEL']
+    } as any;
+    component.rolloutCatalog.set({ availableActions: [], rollouts: [item] } as any);
+    component.cancelRollout(item);
+    component.rolloutCatalog.set({
+      availableActions: [], rollouts: [{ ...item, availableActions: [] }]
+    } as any);
+
+    component.confirmGovernedOperation();
+
+    expect(cancelRollout).not.toHaveBeenCalled();
+    expect(component.rolloutBusy()).toBe(false);
+  });
+
   it('returns to the narrow catalog without discarding the governed selection', () => {
     component.select(decision('A'));
 
@@ -653,23 +693,6 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(component.workspaceStatusLabel('SUBMITTED')).toBe('Em revisão');
     expect(component.comparisonLabel('CANDIDATE_MATCH')).toBe('Resultado esperado confirmado');
     expect(component.comparisonLabel('CANDIDATE_MISMATCH')).toBe('Resultado diferente do esperado');
-    expect(component.workspaceBlockerLabel('ACTIVE_SCENARIO_REQUIRED'))
-      .toBe('Cadastre e ative ao menos um cenário antes de solicitar revisão.');
-    expect(component.workspaceBlockerLabel('FUTURE_BLOCKER'))
-      .toContain('ainda não reconhece');
-  });
-
-  it('does not present a partial candidate result as an overall pass', () => {
-    const base = {
-      scenarioId: 'scenario-A', scenarioKey: 'A', expectedDecision: 'ALLOW',
-      candidateDecision: 'ALLOW', activeDecision: 'DENY', comparison: 'CANDIDATE_MISMATCH',
-      candidateMatchesExpected: true, activeMatchesExpected: false,
-      candidateReasonCodes: [], activeReasonCodes: []
-    };
-    expect(component.sandboxResultPassed(base)).toBe(false);
-    expect(component.sandboxResultPassed({
-      ...base, activeDecision: 'ALLOW', comparison: 'CANDIDATE_MATCH', activeMatchesExpected: true
-    })).toBe(true);
   });
 
   it('compares the local authoring candidate instead of the last saved workspace condition', () => {

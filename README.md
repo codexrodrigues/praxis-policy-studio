@@ -128,6 +128,13 @@ status técnico do Config em homologação de negócio. A projeção governada s
 sendo a fonte das identidades e da ordem exibidas; o Config apenas acrescenta o estado
 persistido que tenha a mesma chave canônica.
 
+Operações críticas de snapshot e rollout usam um diálogo contextual próprio,
+com alvo e consequência visíveis antes do comando. O diálogo não concede
+capability: ao confirmar, o Studio revalida o estado local publicado pelo
+servidor e o backend continua revalidando principal, ETag e lifecycle. Blockers
+de workspace e resultados de sandbox são componentes de apresentação isolados,
+reduzindo o acoplamento do workspace sem criar novos contratos.
+
 No perfil `dev`, o Quickstart publica pelo serviço canônico as sete condições
 JSON Logic editáveis do caso de referência. O seed é idempotente, permanece em
 `draft` e não altera autoridade operacional.
