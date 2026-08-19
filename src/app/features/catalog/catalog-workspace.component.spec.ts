@@ -281,8 +281,9 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     } as any, 'allow-create', 'Allow create', '[]', 'ALLOW', 'ACTIVE', '', '', '');
 
     expect(updateScenario).not.toHaveBeenCalled();
-    expect(component.authoringError()).toBe(true);
-    expect(component.authoringFeedback()).toBe('Facts JSON deve ser um objeto válido.');
+    expect(component.scenarioError()).toBe(true);
+    expect(component.scenarioFeedback()).toBe('Facts JSON deve ser um objeto válido.');
+    expect(component.authoringFeedback()).toBeNull();
   });
 
   it('builds the canonical nested scenario payload from governed fact descriptors', () => {
@@ -584,8 +585,9 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     );
 
     expect(createScenario).not.toHaveBeenCalled();
-    expect(component.authoringError()).toBe(true);
-    expect(component.authoringFeedback()).toBe('O output esperado deve ser um JSON válido ou ficar vazio.');
+    expect(component.scenarioError()).toBe(true);
+    expect(component.scenarioFeedback()).toBe('O output esperado deve ser um JSON válido ou ficar vazio.');
+    expect(component.authoringFeedback()).toBeNull();
   });
 
   it('requires an explicit operation and confirmation before invoking the discovered host action', () => {

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ElementRef, HostListener, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, HostListener, OnInit, computed, inject, signal, type WritableSignal } from '@angular/core';
 import { PolicyStudioI18n } from '../../core/i18n';
 import { ProjectionCatalogService } from '../../core/projection-catalog.service';
 import { DecisionFact, DecisionLifecycleSummary, DecisionPublicationResult, DecisionSummary, PolicySandboxRun, PublicationReadiness } from './catalog.fixture';
@@ -186,6 +186,10 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly authoringBusy = signal(false);
   readonly authoringError = signal(false);
   readonly authoringFeedback = signal<string | null>(null);
+  readonly scenarioFeedback = signal<string | null>(null);
+  readonly scenarioError = signal(false);
+  readonly sandboxFeedback = signal<string | null>(null);
+  readonly sandboxError = signal(false);
   readonly governedConfirmation = signal<PendingGovernedConfirmation | null>(null);
   readonly scenarios = signal<readonly DomainRuleTestScenario[]>([]);
   readonly scenarioFactDraft = signal<Readonly<Record<string, unknown>>>({});
@@ -488,6 +492,8 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.publicationResult.set(null);
     this.authoringFeedback.set(null);
     this.authoringError.set(false);
+    this.clearTaskMessage(this.scenarioFeedback, this.scenarioError);
+    this.clearTaskMessage(this.sandboxFeedback, this.sandboxError);
     this.reviewRationaleValue.set('');
     this.operationalAction.set(null);
     this.operationalActionError.set(false);
@@ -1013,19 +1019,19 @@ export class CatalogWorkspaceComponent implements OnInit {
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error();
       facts = parsed as Record<string, unknown>;
     } catch {
-      this.authoringError.set(true);
-      this.authoringFeedback.set(this.i18n.text('invalidFacts'));
+      this.scenarioError.set(true);
+      this.scenarioFeedback.set(this.i18n.text('invalidFacts'));
       return;
     }
     try {
       expectedOutput = this.optionalJson(expectedOutputJson);
     } catch {
-      this.authoringError.set(true);
-      this.authoringFeedback.set(this.i18n.text('invalidExpectedOutput'));
+      this.scenarioError.set(true);
+      this.scenarioFeedback.set(this.i18n.text('invalidExpectedOutput'));
       return;
     }
     this.authoringBusy.set(true);
-    this.clearAuthoringMessage();
+    this.clearTaskMessage(this.scenarioFeedback, this.scenarioError);
     const commandRevision = this.selectionRevision;
     const commandRuleKey = this.selected()!.key;
     this.catalog.createScenario(workspaceId, {
@@ -1047,13 +1053,14 @@ export class CatalogWorkspaceComponent implements OnInit {
         this.sandboxIdempotencyKey = null;
         this.sandboxEvaluatedAtUtc = null;
         this.authoringBusy.set(false);
-        this.authoringFeedback.set(this.i18n.text('scenarioCreated'));
+        this.scenarioFeedback.set(this.i18n.text('scenarioCreated'));
         this.scenarioFactDraft.set({});
         this.scenarioFactsFallback.set('{}');
         form.reset();
         this.loadLifecycle();
       },
-      error: error => this.failAuthoringCommand(error, commandRevision, commandRuleKey, workspaceId)
+      error: error => this.failTaskCommand(error, commandRevision, commandRuleKey, workspaceId,
+        this.scenarioFeedback, this.scenarioError)
     });
   }
 
@@ -1186,8 +1193,8 @@ export class CatalogWorkspaceComponent implements OnInit {
     const scenarioKey = key.trim();
     const scenarioName = name.trim();
     if (!scenarioKey || !scenarioName) {
-      this.authoringError.set(true);
-      this.authoringFeedback.set(this.i18n.text('scenarioIdentityRequired'));
+      this.scenarioError.set(true);
+      this.scenarioFeedback.set(this.i18n.text('scenarioIdentityRequired'));
       return;
     }
     let facts: Record<string, unknown>;
@@ -1196,20 +1203,20 @@ export class CatalogWorkspaceComponent implements OnInit {
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error();
       facts = parsed as Record<string, unknown>;
     } catch {
-      this.authoringError.set(true);
-      this.authoringFeedback.set(this.i18n.text('invalidFacts'));
+      this.scenarioError.set(true);
+      this.scenarioFeedback.set(this.i18n.text('invalidFacts'));
       return;
     }
     let expectedOutput: unknown;
     try {
       expectedOutput = this.optionalJson(expectedOutputJson);
     } catch {
-      this.authoringError.set(true);
-      this.authoringFeedback.set(this.i18n.text('invalidExpectedOutput'));
+      this.scenarioError.set(true);
+      this.scenarioFeedback.set(this.i18n.text('invalidExpectedOutput'));
       return;
     }
     this.authoringBusy.set(true);
-    this.clearAuthoringMessage();
+    this.clearTaskMessage(this.scenarioFeedback, this.scenarioError);
     const commandRevision = this.selectionRevision;
     const commandRuleKey = this.selected()!.key;
     this.catalog.updateScenario(workspaceId, scenario.id, {
@@ -1236,10 +1243,11 @@ export class CatalogWorkspaceComponent implements OnInit {
         this.editingScenarioDirty.set(false);
         this.editingScenarioFactDraft.set({});
         this.authoringBusy.set(false);
-        this.authoringFeedback.set(this.i18n.text('scenarioUpdated'));
+        this.scenarioFeedback.set(this.i18n.text('scenarioUpdated'));
         this.loadLifecycle();
       },
-      error: error => this.failAuthoringCommand(error, commandRevision, commandRuleKey, workspaceId)
+      error: error => this.failTaskCommand(error, commandRevision, commandRuleKey, workspaceId,
+        this.scenarioFeedback, this.scenarioError)
     });
   }
 
@@ -1276,7 +1284,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     if (state.kind !== 'ready' || !workspaceId
       || !scenarioIds.length || !this.hasWorkspaceAction('RECORD_TEST_RUN') || this.authoringBusy()) return;
     this.authoringBusy.set(true);
-    this.clearAuthoringMessage();
+    this.clearTaskMessage(this.sandboxFeedback, this.sandboxError);
     const commandRevision = this.selectionRevision;
     const commandRuleKey = current!.key;
     const idempotencyKey = this.sandboxIdempotencyKey
@@ -1298,11 +1306,12 @@ export class CatalogWorkspaceComponent implements OnInit {
         this.sandboxEvaluatedAtUtc = null;
         this.sandboxRun.set(run);
         this.authoringBusy.set(false);
-        this.authoringFeedback.set(this.i18n.text('sandboxCompleted'));
+        this.sandboxFeedback.set(this.i18n.text('sandboxCompleted'));
         this.loadLifecycle();
         this.loadWorkspaceCapabilities();
       },
-      error: error => this.failAuthoringCommand(error, commandRevision, commandRuleKey, workspaceId)
+      error: error => this.failTaskCommand(error, commandRevision, commandRuleKey, workspaceId,
+        this.sandboxFeedback, this.sandboxError)
     });
   }
 
@@ -1854,6 +1863,47 @@ export class CatalogWorkspaceComponent implements OnInit {
   private clearAuthoringMessage(): void {
     this.authoringError.set(false);
     this.authoringFeedback.set(null);
+  }
+
+  private clearTaskMessage(feedback: WritableSignal<string | null>, error: WritableSignal<boolean>): void {
+    error.set(false);
+    feedback.set(null);
+  }
+
+  private failTask(
+    failure: unknown,
+    feedback: WritableSignal<string | null>,
+    error: WritableSignal<boolean>
+  ): void {
+    this.authoringBusy.set(false);
+    error.set(true);
+    if (failure instanceof HttpErrorResponse && failure.status === 401) {
+      this.sessionActive.set(false);
+      this.authenticationRequired.set(true);
+      feedback.set(this.i18n.text('sessionExpired'));
+      return;
+    }
+    const key = failure instanceof HttpErrorResponse && failure.status === 403
+      ? 'governedCommandForbidden'
+      : failure instanceof HttpErrorResponse && (failure.status === 409 || failure.status === 412)
+        ? 'governedCommandConflict'
+        : 'governedCommandFailed';
+    feedback.set(this.i18n.text(key));
+  }
+
+  private failTaskCommand(
+    failure: unknown,
+    revision: number,
+    ruleKey: string,
+    workspaceId: string | undefined,
+    feedback: WritableSignal<string | null>,
+    error: WritableSignal<boolean>
+  ): void {
+    if (!this.isCurrentCommand(revision, ruleKey, workspaceId)) {
+      this.authoringBusy.set(false);
+      return;
+    }
+    this.failTask(failure, feedback, error);
   }
 
   private failAuthoring(error: unknown): void {

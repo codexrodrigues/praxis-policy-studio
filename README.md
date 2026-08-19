@@ -153,6 +153,10 @@ O formulário de criação também é uma superfície isolada: coleta valores hu
 facts tipados e asserções e entrega uma solicitação local ao orquestrador. O form
 só é limpo depois do receipt de sucesso; falhas de validação, autenticação,
 concorrência ou rede preservam integralmente a entrada do usuário.
+Feedback de criação/edição de cenário e feedback de sandbox possuem estados
+separados e são renderizados junto da tarefa correspondente. Eles continuam
+compartilhando a exclusão mútua de comandos governados, mas uma mensagem de teste
+não sobrescreve mais um erro de cenário, nem é exibida fora de contexto.
 
 No perfil `dev`, o Quickstart publica pelo serviço canônico as sete condições
 JSON Logic editáveis do caso de referência. O seed é idempotente, permanece em

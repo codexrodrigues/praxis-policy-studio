@@ -345,6 +345,10 @@
           (factNullChanged)="setScenarioFactNull($event.fact, $event.useNull)"
           (fallbackJsonChanged)="scenarioFactsFallback.set($event)"
           (createRequested)="createScenarioFromView($event)" />
+        @if (scenarioFeedback()) {
+          <p class="task-feedback" [class.state-message]="scenarioError()"
+            [attr.role]="scenarioError() ? 'alert' : 'status'">{{ scenarioFeedback() }}</p>
+        }
         <pax-scenario-catalog [scenarios]="scenarios()" [facts]="current.facts"
           [editingScenarioId]="editingScenarioId()" [editingFactValues]="editingScenarioFactDraft()"
           [editingFactsJson]="editingScenarioFactsJson()" [busy]="authoringBusy()"
@@ -363,6 +367,10 @@
             {{ i18n.text('submitReview') }}
           </button>
         </div>
+        @if (sandboxFeedback()) {
+          <p class="task-feedback" [class.state-message]="sandboxError()"
+            [attr.role]="sandboxError() ? 'alert' : 'status'">{{ sandboxFeedback() }}</p>
+        }
         @if (operationalActionLoading()) {
           <p class="empty" role="status">{{ i18n.text('loadingOperationalAction') }}</p>
         } @else if (operationalActionError()) {
