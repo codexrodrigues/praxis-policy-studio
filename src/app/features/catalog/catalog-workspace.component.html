@@ -119,18 +119,18 @@
     </header>
 
     <nav class="decision-navigation" [attr.aria-label]="i18n.text('decisionNavigation')">
-      <button type="button" (click)="navigateToSection('decision-overview')">
+      <button type="button" [class.active]="activeMode() === 'understand'" [attr.aria-current]="activeMode() === 'understand' ? 'page' : null" (click)="navigateToSection('decision-overview')">
         <span aria-hidden="true">01</span>
         <strong>{{ i18n.text('understand') }}</strong>
         <small>{{ i18n.text('understandHint') }}</small>
       </button>
-      <button type="button" (click)="navigateToSection('decision-rule')">
+      <button type="button" [class.active]="activeMode() === 'rule'" [attr.aria-current]="activeMode() === 'rule' ? 'page' : null" (click)="navigateToSection('decision-rule')">
         <span aria-hidden="true">02</span>
         <strong>{{ i18n.text('rule') }}</strong>
         <small>{{ i18n.text('ruleHint') }}</small>
       </button>
       @if (current.workspaceId) {
-        <button type="button" (click)="navigateToSection('decision-tests')">
+        <button type="button" [class.active]="activeMode() === 'test'" [attr.aria-current]="activeMode() === 'test' ? 'page' : null" (click)="navigateToSection('decision-tests')">
           <span aria-hidden="true">03</span>
           <strong>{{ i18n.text('test') }}</strong>
           <small>{{ scenarios().length }} {{ i18n.text('savedScenarios') }}</small>
@@ -142,19 +142,23 @@
           <small>{{ i18n.text('testsRequireWorkspace') }}</small>
         </span>
       }
-      <button type="button" (click)="navigateToSection('decision-execution')">
+      <button type="button" [class.active]="activeMode() === 'operate'" [attr.aria-current]="activeMode() === 'operate' ? 'page' : null" (click)="navigateToSection('decision-execution')">
         <span aria-hidden="true">04</span>
         <strong>{{ i18n.text('operate') }}</strong>
         <small>{{ i18n.text('executionHint') }}</small>
       </button>
-      <button type="button" (click)="navigateToSection('decision-history')">
+      <button type="button" [class.active]="activeMode() === 'history'" [attr.aria-current]="activeMode() === 'history' ? 'page' : null" (click)="navigateToSection('decision-history')">
         <span aria-hidden="true">05</span>
         <strong>{{ i18n.text('history') }}</strong>
         <small>{{ current.evidenceCount }} {{ i18n.text('packageReferences') }}</small>
       </button>
     </nav>
 
-    <div class="detail-grid anchored-section" id="decision-overview" tabindex="-1">
+    @if (authoringFeedback()) {
+      <p class="work-mode-feedback" [class.state-message]="authoringError()" [attr.role]="authoringError() ? 'alert' : 'status'">{{ authoringFeedback() }}</p>
+    }
+
+    <div class="detail-grid anchored-section work-mode-panel" id="decision-overview" tabindex="-1" [hidden]="activeMode() !== 'understand'">
       <section class="meaning-block">
         <p class="section-label">{{ i18n.text('meaning') }}</p>
         <p class="meaning">{{ meaningText(current) }}</p>
@@ -189,11 +193,13 @@
       </div>
     </div>
 
-    @if (policyConfig(); as studioConfig) {
-      <pax-decision-explanation [decision]="current" [config]="studioConfig" />
-    }
+    <div class="work-mode-panel" [hidden]="activeMode() !== 'understand'">
+      @if (policyConfig(); as studioConfig) {
+        <pax-decision-explanation [decision]="current" [config]="studioConfig" />
+      }
+    </div>
 
-    <section class="inspection anchored-section" id="decision-rule" tabindex="-1" aria-labelledby="inspection-title">
+    <section class="inspection anchored-section work-mode-panel" id="decision-rule" tabindex="-1" aria-labelledby="inspection-title" [hidden]="activeMode() !== 'rule'">
       <header class="inspection-heading">
         <div>
           <p class="section-label" id="inspection-title">{{ i18n.text('inspection') }}</p>
@@ -276,7 +282,7 @@
 
 
     @if (authoringOpen() && editorConfig(); as authoringConfig) {
-      <section class="draft-workspace" tabindex="-1" aria-labelledby="draft-workspace-title">
+      <section class="draft-workspace work-mode-panel" tabindex="-1" aria-labelledby="draft-workspace-title" [hidden]="activeMode() !== 'rule'">
         <header>
           <div>
             <p class="section-label">{{ i18n.text('localDraft') }}</p>
@@ -320,7 +326,7 @@
     }
 
     @if (current.workspaceId) {
-      <section class="scenario-workspace anchored-section" id="decision-tests" tabindex="-1" aria-labelledby="scenario-title">
+      <section class="scenario-workspace anchored-section work-mode-panel" id="decision-tests" tabindex="-1" aria-labelledby="scenario-title" [hidden]="activeMode() !== 'test'">
         <header>
           <div>
             <p class="section-label" id="scenario-title">{{ i18n.text('testScenarios') }}</p>
@@ -517,13 +523,10 @@
             }
           </div>
         }
-        @if (authoringFeedback()) {
-          <p [class.state-message]="authoringError()" [attr.role]="authoringError() ? 'alert' : 'status'">{{ authoringFeedback() }}</p>
-        }
       </section>
 
 
-      <section class="review-workspace" aria-labelledby="review-title">
+      <section class="review-workspace work-mode-panel" aria-labelledby="review-title" [hidden]="activeMode() !== 'operate'">
         <header>
           <div>
             <p class="section-label" id="review-title">{{ i18n.text('independentReview') }}</p>
@@ -579,7 +582,7 @@
       </section>
 
       @if (current.promotedDefinitionId) {
-        <section class="publication-workspace" aria-labelledby="publication-title">
+        <section class="publication-workspace work-mode-panel" aria-labelledby="publication-title" [hidden]="activeMode() !== 'operate'">
           <header>
             <div>
               <p class="section-label" id="publication-title">{{ i18n.text('publicationReadiness') }}</p>
@@ -616,7 +619,7 @@
       }
     }
 
-    <section class="anchored-section execution-section" id="decision-execution" tabindex="-1" [attr.aria-labelledby]="'decision-execution-title'">
+    <section class="anchored-section execution-section work-mode-panel" id="decision-execution" tabindex="-1" [attr.aria-labelledby]="'decision-execution-title'" [hidden]="activeMode() !== 'operate'">
       <header class="section-introduction">
         <p class="section-label" id="decision-execution-title">{{ i18n.text('execution') }}</p>
         <p>{{ i18n.text('executionBoundary') }}</p>
@@ -668,7 +671,7 @@
     }
     </section>
 
-    <section class="evidence-ledger anchored-section" id="decision-history" tabindex="-1" aria-labelledby="evidence-title">
+    <section class="evidence-ledger anchored-section work-mode-panel" id="decision-history" tabindex="-1" aria-labelledby="evidence-title" [hidden]="activeMode() !== 'history'">
       <div>
         <p class="section-label" id="evidence-title">{{ i18n.text('evidence') }}</p>
         <p>{{ i18n.text('packageEvidenceScope') }}</p>
@@ -684,7 +687,7 @@
     </section>
 
     @if (current.workspaceId) {
-      <section class="timeline" aria-labelledby="lifecycle-title">
+      <section class="timeline work-mode-panel" aria-labelledby="lifecycle-title" [hidden]="activeMode() !== 'history'">
         <p class="section-label" id="lifecycle-title">{{ i18n.text('governedLifecycle') }}</p>
         @if (lifecycleLoading()) {
           <p class="empty" aria-live="polite">{{ i18n.text('loading') }}</p>
@@ -759,7 +762,7 @@
     }
 
     @if (current.configDefinitionId) {
-      <section class="timeline" aria-labelledby="timeline-title">
+      <section class="timeline work-mode-panel" aria-labelledby="timeline-title" [hidden]="activeMode() !== 'history'">
         <p class="section-label" id="timeline-title">{{ i18n.text('timeline') }}</p>
         @if (timelineLoading()) {
           <p class="empty timeline-empty" aria-live="polite">{{ i18n.text('loading') }}</p>

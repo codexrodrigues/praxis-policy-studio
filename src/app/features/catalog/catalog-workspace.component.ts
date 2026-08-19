@@ -51,6 +51,8 @@ interface PendingOperationalCommand {
   readonly evaluatedAtUtc: string;
 }
 
+type DecisionWorkMode = 'understand' | 'rule' | 'test' | 'operate' | 'history';
+
 @Component({
   selector: 'pax-catalog-workspace',
   imports: [
@@ -139,6 +141,7 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly query = signal('');
   readonly allDecisions = signal<readonly DecisionSummary[]>([]);
   readonly selected = signal<DecisionSummary | null>(null);
+  readonly activeMode = signal<DecisionWorkMode>('understand');
   readonly policyConfig = computed(() => {
     const state = this.runtime.state();
     return state.kind === 'ready' ? state.config : null;
@@ -397,16 +400,29 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   navigateToSection(sectionId: string): void {
-    const target = this.host.nativeElement.querySelector<HTMLElement>(`#${sectionId}`);
-    if (!target) return;
-    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    target.focus({ preventScroll: true });
+    const modeBySection: Readonly<Record<string, DecisionWorkMode>> = {
+      'decision-overview': 'understand',
+      'decision-rule': 'rule',
+      'decision-tests': 'test',
+      'decision-execution': 'operate',
+      'decision-history': 'history'
+    };
+    const mode = modeBySection[sectionId];
+    if (!mode) return;
+    this.activeMode.set(mode);
+    requestAnimationFrame(() => {
+      const target = this.host.nativeElement.querySelector<HTMLElement>(`#${sectionId}`);
+      if (!target) return;
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      target.focus({ preventScroll: true });
+    });
   }
   select(decision: DecisionSummary, forceReload = false): void {
     if (decision.key === this.selected()?.key && !forceReload) return;
     if ((forceReload || decision.key !== this.selected()?.key) && !this.confirmDraftDiscard()) return;
     const selectionRevision = ++this.selectionRevision;
     this.selected.set(decision);
+    this.activeMode.set('understand');
     this.authoringOpen.set(false);
     this.draftCondition.set(decision.condition);
     this.editorState.set(null);
