@@ -141,6 +141,7 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly query = signal('');
   readonly allDecisions = signal<readonly DecisionSummary[]>([]);
   readonly selected = signal<DecisionSummary | null>(null);
+  readonly narrowDetailOpen = signal(false);
   readonly activeMode = signal<DecisionWorkMode>('understand');
   readonly policyConfig = computed(() => {
     const state = this.runtime.state();
@@ -299,7 +300,7 @@ export class CatalogWorkspaceComponent implements OnInit {
         this.logoutFailed.set(false);
         this.allDecisions.set(decisions);
         const initial = decisions.find(item => item.key === state.config.initialDecisionKey) ?? decisions[0] ?? null;
-        if (initial) this.select(initial, true);
+        if (initial) this.select(initial, true, false);
         else this.clearSelection();
         this.loading.set(false);
       },
@@ -417,11 +418,27 @@ export class CatalogWorkspaceComponent implements OnInit {
       target.focus({ preventScroll: true });
     });
   }
-  select(decision: DecisionSummary, forceReload = false): void {
-    if (decision.key === this.selected()?.key && !forceReload) return;
+
+  returnToCatalog(): void {
+    if (!this.confirmDraftDiscard()) return;
+    this.narrowDetailOpen.set(false);
+    requestAnimationFrame(() => {
+      const search = this.host.nativeElement.querySelector<HTMLInputElement>('.search input');
+      search?.scrollIntoView({ block: 'start' });
+      search?.focus({ preventScroll: true });
+    });
+  }
+
+  select(decision: DecisionSummary, forceReload = false, revealOnNarrow = true): void {
+    if (decision.key === this.selected()?.key && !forceReload) {
+      if (revealOnNarrow) this.narrowDetailOpen.set(true);
+      this.revealSelectedDecision();
+      return;
+    }
     if ((forceReload || decision.key !== this.selected()?.key) && !this.confirmDraftDiscard()) return;
     const selectionRevision = ++this.selectionRevision;
     this.selected.set(decision);
+    this.narrowDetailOpen.set(revealOnNarrow);
     this.activeMode.set('understand');
     this.authoringOpen.set(false);
     this.draftCondition.set(decision.condition);
@@ -1429,6 +1446,12 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   private revealSelectedDecision(): void {
     requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (window.matchMedia?.('(max-width: 760px)').matches) {
+        const back = this.host.nativeElement.querySelector<HTMLElement>('.narrow-back');
+        back?.scrollIntoView({ block: 'start' });
+        back?.focus({ preventScroll: true });
+        return;
+      }
       this.host.nativeElement.querySelector<HTMLElement>('.decision-row.selected')
         ?.scrollIntoView({ block: 'center', inline: 'nearest' });
     }));
@@ -1456,6 +1479,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     ++this.hostStatusLoadRevision;
     ++this.executionSummaryLoadRevision;
     this.selected.set(null);
+    this.narrowDetailOpen.set(false);
     this.authoringOpen.set(false);
     this.draftCondition.set(null);
     this.editorState.set(null);

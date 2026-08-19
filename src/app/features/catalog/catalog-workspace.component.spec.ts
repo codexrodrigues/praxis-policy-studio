@@ -357,6 +357,15 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(component.draftCondition()).toEqual({ '<=': [{ var: 'request.requestedAmount' }, 2750] });
   });
 
+  it('returns to the narrow catalog without discarding the governed selection', () => {
+    component.select(decision('A'));
+
+    component.returnToCatalog();
+
+    expect(component.narrowDetailOpen()).toBe(false);
+    expect(component.selected()?.key).toBe('A');
+  });
+
   it('fails locally when expected output is invalid JSON', () => {
     component.select(decision('A'));
     capabilities.A[0].next({

@@ -1,4 +1,4 @@
-<div class="workspace">
+<div class="workspace" [class.decision-open]="narrowDetailOpen()">
   <aside class="catalog-pane" aria-label="Catálogo de decisões">
     <header class="pane-heading">
       <div>
@@ -6,7 +6,7 @@
         <h1 id="catalog-title">{{ i18n.text('catalog') }}</h1>
       </div>
       <div class="pane-actions">
-        <span class="count">{{ decisions().length }} {{ i18n.text('decisions') }}</span>
+        <span class="count">{{ decisions().length }} {{ i18n.text(decisions().length === 1 ? 'decision' : 'decisions') }}</span>
         @if (sessionActive()) {
           <button type="button" class="quiet-button session-logout" [disabled]="signingOut()" (click)="logout()">
             {{ i18n.text(signingOut() ? 'signingOut' : 'logout') }}
@@ -73,7 +73,7 @@
             <span class="decision-copy">
               <strong>{{ decision.name }}</strong>
               <small>{{ decision.ruleSet }}</small>
-              <span class="decision-code">{{ decision.code }}</span>
+              <span class="visually-hidden">{{ i18n.text('technicalDecisionCode') }}: {{ decision.code }}</span>
               <span class="visually-hidden">{{ i18n.text(decision.state === 'verified' ? 'verifiedState' : 'draftState') }}</span>
             </span>
             <span class="state-dot" [class.verified]="decision.state === 'verified'" aria-hidden="true"></span>
@@ -93,11 +93,13 @@
 
   @if (selected(); as current) {
   <article class="decision-pane" aria-labelledby="decision-title" [attr.aria-busy]="authoringBusy() || snapshotBusy() || rolloutPolicyBusy() || rolloutBusy()">
+    <button type="button" class="narrow-back quiet-button" (click)="returnToCatalog()">
+      <span aria-hidden="true">←</span> {{ i18n.text('backToCatalog') }}
+    </button>
     <header class="decision-header">
       <div>
-        <p class="eyebrow">{{ i18n.text('selected') }} · {{ current.code }}</p>
-        <h2 id="decision-title">{{ current.name }}</h2>
-        <p class="canonical-key">{{ current.key }}</p>
+        <p class="eyebrow">{{ i18n.text('selected') }}</p>
+        <h1 class="decision-title" id="decision-title">{{ current.name }}</h1>
       </div>
       <span class="status" [class.verified]="current.state === 'verified'">
         {{ i18n.text(current.state === 'verified' ? 'verifiedState' : 'draftState') }}
@@ -183,6 +185,8 @@
         <details class="technical-details">
           <summary>{{ i18n.text('technicalDetails') }}</summary>
           <dl>
+            <div><dt>{{ i18n.text('technicalDecisionCode') }}</dt><dd><code>{{ current.code }}</code></dd></div>
+            <div><dt>{{ i18n.text('canonicalDecisionKey') }}</dt><dd><code>{{ current.key }}</code></dd></div>
             <div><dt>{{ i18n.text('authority') }}</dt><dd><code>{{ current.authority }}</code></dd></div>
             <div><dt>{{ i18n.text('source') }}</dt><dd><code>{{ current.source }}</code></dd></div>
             @if (current.configStatus) {
