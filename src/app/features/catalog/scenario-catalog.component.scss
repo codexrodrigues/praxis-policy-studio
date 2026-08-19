@@ -1,0 +1,9 @@
+:host, .scenario-list { display: grid; gap: .5rem; }
+.scenario-list article { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 1rem; padding: .75rem; background: var(--pax-color-surface-container-low, #f3f6f7); }
+.scenario-inline-editor { grid-column: 1 / -1; display: grid; gap: .75rem; padding: .85rem; border: 1px solid var(--pax-color-outline-variant, #8c9ca4); border-radius: .65rem; background: var(--pax-color-surface-container-lowest, #fff); }
+.scenario-inline-editor label { display: grid; gap: .3rem; font-size: .78rem; font-weight: 700; }
+.scenario-inline-editor input, .scenario-inline-editor textarea, .scenario-inline-editor select { min-width: 0; width: 100%; border: 1px solid var(--pax-color-outline, #697a82); border-radius: .5rem; padding: .65rem; background: var(--pax-color-surface, #f9fbfc); color: inherit; font: inherit; }
+.scenario-list article > small, .scenario-list article > .quiet-button { grid-column: 1 / -1; }
+.scenario-list article > .quiet-button { justify-self: start; }
+.authoring-actions { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+@media (max-width: 48rem) { .scenario-list article { grid-template-columns: 1fr; gap: .3rem; } }
