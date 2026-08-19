@@ -5,7 +5,10 @@ const definition = {
   id: '7b0fca89-cb64-40bf-8eea-d3467083bbf4', ruleKey: 'grant.amount-parameters', version: 1, status: 'approved',
   resourceKey: 'human-resources.extraordinary-benefit-requests',
   serviceKey: 'extraordinary-benefit-request-service',
-  condition: { '<=': [{ var: 'request.requestedAmount' }, 3000] },
+  condition: { or: [
+    { '===': [{ coalesce: [{ var: 'request.requestedAmount' }] }, null] },
+    { '<=': [{ var: 'request.requestedAmount' }, 3000] }
+  ] },
   parameters: { nullSemantics: 'FAIL_CLOSED', operationKeys: ['CREATE', 'UPDATE'] }
 };
 
@@ -179,8 +182,13 @@ async function governedResponse(
     etag: workspace.etag, availableActions: ['VIEW', 'UPDATE_DRAFT', 'MANAGE_SCENARIOS', 'RECORD_TEST_RUN'], blockers: []
   });
   if (path.endsWith('/workspaces/workspace-1/draft') && request.method() === 'PUT') {
-    const body = request.postDataJSON() as { condition: unknown };
+    const body = request.postDataJSON() as { condition: unknown; parameters: unknown };
     expect(request.headers()['if-match']).toBe('"workspace-etag-4"');
+    expect(body.condition).toEqual({ or: [
+      { '===': [{ coalesce: [{ var: 'request.requestedAmount' }] }, null] },
+      { '<=': [{ var: 'request.requestedAmount' }, 2750] }
+    ] });
+    expect(body.parameters).toEqual(workspace.parameters);
     authoringStreams.savedCondition = body.condition;
     return json({ ...workspace, revision: 5, etag: 'workspace-etag-5', condition: body.condition });
   }
