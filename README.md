@@ -132,6 +132,13 @@ Operações críticas de snapshot e rollout usam um diálogo contextual próprio
 com alvo e consequência visíveis antes do comando. O diálogo não concede
 capability: ao confirmar, o Studio revalida o estado local publicado pelo
 servidor e o backend continua revalidando principal, ETag e lifecycle. Blockers
+Alterações locais de regra e cenário usam a mesma superfície contextual antes
+de trocar de decisão, fechar, restaurar ou voltar ao catálogo narrow. Cancelar
+preserva o trabalho e o foco da tarefa; confirmar executa a continuação capturada
+e descarta efetivamente o estado local. Apenas o fechamento da aba usa o aviso
+nativo obrigatório do navegador.
+
+Blockers
 de workspace e resultados de sandbox são componentes de apresentação isolados.
 O editor de facts de cenário também é um componente único reutilizado na criação
 e na correção: ele projeta os descritores governados como controles tipados e

@@ -381,18 +381,27 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
   });
 
   it('asks before discarding a changed scenario edit', () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    component.scenarios.set([{ id: 'scenario-A', name: 'Allow request' }] as any);
     component.editingScenarioId.set('scenario-A');
     component.editingScenarioDirty.set(true);
 
     component.cancelScenarioEdit();
 
-    expect(confirm).toHaveBeenCalled();
+    expect(component.governedConfirmation()).toEqual(expect.objectContaining({
+      title: 'Alterações ainda não salvas',
+      target: 'Allow request',
+      confirmLabel: 'Descartar alterações',
+      cancelLabel: 'Continuar editando'
+    }));
     expect(component.editingScenarioId()).toBe('scenario-A');
+
+    component.confirmGovernedOperation();
+
+    expect(component.editingScenarioId()).toBeNull();
+    expect(component.editingScenarioDirty()).toBe(false);
   });
 
   it('protects a dirty scenario when switching scenarios or decisions', () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     component.select(decision('A'));
     capabilities.A[0].next({
       workspaceId: 'workspace-A', availableActions: ['VIEW', 'MANAGE_SCENARIOS'], blockers: []
@@ -403,14 +412,40 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     ] as any);
     component.editScenario('scenario-A');
     component.markScenarioEditDirty();
-    confirm.mockClear();
 
     component.editScenario('scenario-B');
+
+    expect(component.governedConfirmation()?.target).toBe('A');
+    component.cancelGovernedOperation();
+    expect(component.editingScenarioId()).toBe('scenario-A');
+
     component.select(decision('B'));
 
-    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(component.governedConfirmation()?.target).toBe('A');
     expect(component.editingScenarioId()).toBe('scenario-A');
     expect(component.selected()?.key).toBe('A');
+
+    component.confirmGovernedOperation();
+
+    expect(component.selected()?.key).toBe('B');
+    expect(component.editingScenarioId()).toBeNull();
+  });
+
+  it('uses the governed confirmation before resetting a changed rule draft', () => {
+    component.select(decision('A'));
+    component.authoringOpen.set(true);
+    component.draftCondition.set({ '===': [1, 2] });
+
+    component.resetDraft();
+
+    expect(component.governedConfirmation()).toEqual(expect.objectContaining({
+      title: 'Alterações ainda não salvas', target: 'A'
+    }));
+    expect(component.draftCondition()).toEqual({ '===': [1, 2] });
+
+    component.confirmGovernedOperation();
+
+    expect(component.draftCondition()).toEqual({ '===': [1, 1] });
   });
 
   it('hydrates and serializes governed facts when editing an existing scenario', () => {
@@ -514,6 +549,26 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     component.returnToCatalog();
 
     expect(component.narrowDetailOpen()).toBe(false);
+    expect(component.selected()?.key).toBe('A');
+  });
+
+  it('only returns to the narrow catalog after explicitly discarding local work', () => {
+    component.select(decision('A'));
+    component.authoringOpen.set(true);
+    component.draftCondition.set({ '===': [1, 2] });
+    component.narrowDetailOpen.set(true);
+
+    component.returnToCatalog();
+
+    expect(component.narrowDetailOpen()).toBe(true);
+    expect(component.authoringOpen()).toBe(true);
+    expect(component.governedConfirmation()?.confirmLabel).toBe('Descartar alterações');
+
+    component.confirmGovernedOperation();
+
+    expect(component.narrowDetailOpen()).toBe(false);
+    expect(component.authoringOpen()).toBe(false);
+    expect(component.draftCondition()).toEqual({ '===': [1, 1] });
     expect(component.selected()?.key).toBe('A');
   });
 

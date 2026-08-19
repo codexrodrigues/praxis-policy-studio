@@ -441,7 +441,17 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   returnToCatalog(): void {
-    if (!this.confirmDraftDiscard()) return;
+    if (this.hasUnsavedWork()) {
+      this.openUnsavedWorkConfirmation(
+        this.selected()?.name ?? this.i18n.text('localChanges'),
+        () => this.completeReturnToCatalog());
+      return;
+    }
+    this.completeReturnToCatalog();
+  }
+
+  private completeReturnToCatalog(): void {
+    if (this.hasUnsavedWork()) this.discardUnsavedWorkState();
     this.narrowDetailOpen.set(false);
     requestAnimationFrame(() => {
       const search = this.host.nativeElement.querySelector<HTMLInputElement>('.search input');
@@ -450,13 +460,18 @@ export class CatalogWorkspaceComponent implements OnInit {
     });
   }
 
-  select(decision: DecisionSummary, forceReload = false, revealOnNarrow = true): void {
+  select(decision: DecisionSummary, forceReload = false, revealOnNarrow = true, discardConfirmed = false): void {
     if (decision.key === this.selected()?.key && !forceReload) {
       if (revealOnNarrow) this.narrowDetailOpen.set(true);
       this.revealSelectedDecision();
       return;
     }
-    if ((forceReload || decision.key !== this.selected()?.key) && !this.confirmUnsavedWorkDiscard()) return;
+    if (!discardConfirmed && (forceReload || decision.key !== this.selected()?.key) && this.hasUnsavedWork()) {
+      this.openUnsavedWorkConfirmation(
+        this.selected()?.name ?? this.i18n.text('localChanges'),
+        () => this.select(decision, forceReload, revealOnNarrow, true));
+      return;
+    }
     const selectionRevision = ++this.selectionRevision;
     this.selected.set(decision);
     this.narrowDetailOpen.set(revealOnNarrow);
@@ -708,7 +723,15 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   closeAuthoring(): void {
-    if (!this.confirmDraftDiscard()) return;
+    if (this.draftChanged()) {
+      this.openUnsavedWorkConfirmation(
+        this.selected()?.name ?? this.i18n.text('localDraft'),
+        () => this.completeCloseAuthoring());
+      return;
+    }
+    this.completeCloseAuthoring();
+  }
+  private completeCloseAuthoring(): void {
     this.resetDraftState();
     this.authoringOpen.set(false);
   }
@@ -718,7 +741,12 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
   updateEditorState(state: RuleBuilderState): void { this.editorState.set(state); }
   resetDraft(): void {
-    if (this.draftChanged() && !window.confirm(this.i18n.text('discardChanges'))) return;
+    if (this.draftChanged()) {
+      this.openUnsavedWorkConfirmation(
+        this.selected()?.name ?? this.i18n.text('localDraft'),
+        () => this.resetDraftState());
+      return;
+    }
     this.resetDraftState();
   }
 
@@ -1077,8 +1105,17 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   editScenario(scenarioId: string): void {
     if (!this.hasWorkspaceAction('MANAGE_SCENARIOS') || this.authoringBusy()) return;
-    if (scenarioId !== this.editingScenarioId() && this.editingScenarioDirty()
-      && !window.confirm(this.i18n.text('discardChanges'))) return;
+    if (scenarioId !== this.editingScenarioId() && this.editingScenarioDirty()) {
+      const current = this.scenarios().find(item => item.id === this.editingScenarioId());
+      this.openUnsavedWorkConfirmation(
+        current?.name ?? this.i18n.text('scenarioLocalChanges'),
+        () => this.beginScenarioEdit(scenarioId));
+      return;
+    }
+    this.beginScenarioEdit(scenarioId);
+  }
+
+  private beginScenarioEdit(scenarioId: string): void {
     const scenario = this.scenarios().find(item => item.id === scenarioId);
     if (!scenario) return;
     this.editingScenarioId.set(scenarioId);
@@ -1090,7 +1127,17 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   cancelScenarioEdit(): void {
-    if (this.editingScenarioDirty() && !window.confirm(this.i18n.text('discardChanges'))) return;
+    if (this.editingScenarioDirty()) {
+      const scenario = this.scenarios().find(item => item.id === this.editingScenarioId());
+      this.openUnsavedWorkConfirmation(
+        scenario?.name ?? this.i18n.text('scenarioLocalChanges'),
+        () => this.completeCancelScenarioEdit());
+      return;
+    }
+    this.completeCancelScenarioEdit();
+  }
+
+  private completeCancelScenarioEdit(): void {
     this.editingScenarioId.set(null);
     this.editingScenarioDirty.set(false);
     this.editingScenarioFactDraft.set({});
@@ -1650,17 +1697,31 @@ export class CatalogWorkspaceComponent implements OnInit {
     event.returnValue = '';
   }
 
-  private confirmDraftDiscard(): boolean {
-    return !this.authoringOpen() || !this.draftChanged()
-      || window.confirm(this.i18n.text('discardChanges'));
-  }
-
   private hasUnsavedWork(): boolean {
     return (this.authoringOpen() && this.draftChanged()) || this.editingScenarioDirty();
   }
 
-  private confirmUnsavedWorkDiscard(): boolean {
-    return !this.hasUnsavedWork() || window.confirm(this.i18n.text('discardChanges'));
+  private discardUnsavedWorkState(): void {
+    if (this.authoringOpen() && this.draftChanged()) {
+      this.resetDraftState();
+      this.authoringOpen.set(false);
+    }
+    if (this.editingScenarioDirty()) {
+      this.editingScenarioId.set(null);
+      this.editingScenarioDirty.set(false);
+      this.editingScenarioFactDraft.set({});
+    }
+  }
+
+  private openUnsavedWorkConfirmation(target: string, execute: () => void): void {
+    this.governedConfirmation.set({
+      title: this.i18n.text('unsavedWorkTitle'),
+      message: this.i18n.text('discardChanges'),
+      target,
+      confirmLabel: this.i18n.text('discardLocalChanges'),
+      cancelLabel: this.i18n.text('keepEditing'),
+      execute
+    });
   }
 
   private revealSelectedDecision(): void {
