@@ -226,18 +226,23 @@ continua deliberadamente separado do authoring autônomo.
 
 ## Corte UX de navegação e linguagem — 2026-08-18
 
-O corte posterior à beta.15 remove a navegação documental dos comandos
-`Entender`, `Regra`, `Testar`, `Operar` e `Histórico`. Esses comandos agora movem
-foco e rolagem dentro da workstation sem alterar a URL, recarregar
-`app-config.json`, invalidar a seleção ou fechar o editor. A regressão é coberta
-no E2E desktop/narrow junto do round-trip de edição, cenário tipado, sandbox e
-ETag.
+O corte posterior à beta.15 substitui a página técnica longa por modos de trabalho
+exclusivos: `Entender`, `Regra`, `Testar`, `Operar` e `Histórico`. Cada comando
+materializa somente o painel necessário e move o foco dentro da workstation sem
+alterar a URL, recarregar `app-config.json`, invalidar a seleção, recriar o
+workspace ou fechar o editor. Ao trocar de modo, o draft governado permanece em
+memória; ao trocar de decisão, a interface volta deliberadamente para `Entender`.
+A regressão é coberta no E2E desktop/narrow junto do round-trip de edição,
+cenário tipado, sandbox e ETag, e por teste unitário dedicado à preservação do
+draft entre modos.
 
 O mesmo corte:
 
 - explicita quando a decisão aberta ficou fora do filtro local;
 - prioriza visualmente `Criar rascunho`/`Editar regra` e mantém a explicação por
   IA como ação consultiva;
+- mantém feedback de comandos junto à navegação de tarefas, para que salvar ou
+  falhar não produza uma mensagem oculta em outro modo;
 - substitui a afirmação ampla “evidência técnica verificada” por “estrutura
   técnica disponível”;
 - apresenta `FAIL_CLOSED` em linguagem humana e move operações, contrato do host

@@ -42,9 +42,12 @@ Abra `http://localhost:4302/catalog`.
 ### Jornada da interface
 
 A decisão selecionada é organizada pelas tarefas `Entender`, `Regra`, `Testar`,
-`Operar` e `Histórico`. A interface usa linguagem de negócio na superfície
-principal e mantém IDs, status brutos e referências do Config em detalhes
-técnicos. `Testar` só fica navegável quando existe um workspace governado; a UI
+`Operar` e `Histórico`. Cada tarefa abre apenas a superfície de trabalho
+correspondente, preservando a decisão, o workspace e alterações locais enquanto
+o operador alterna entre compreender, editar e testar. A interface usa linguagem
+de negócio na superfície principal e mantém IDs, status brutos e referências do
+Config em detalhes técnicos. `Testar` só fica navegável quando existe um
+workspace governado; a UI
 explica essa dependência sem transformar ausência de capability em novo login.
 A suíte de navegador comprova em desktop e narrow que a navegação interna não
 recarrega a aplicação, o editor permanece aberto, um cenário tipado pode ser criado
@@ -53,7 +56,7 @@ Axe no corpus hermético.
 O mesmo fluxo altera visualmente o limite governado de `3000` para `2750`, salva
 o draft por `PUT` com `If-Match`, recebe a nova revisão e continua a jornada sem
 perder o workspace. Outcomes, operações e estados continuam canônicos no
-transporte, mas são traduzidos para linguagem humana na superfície principal.
+transporte e recebem rótulos humanos somente na apresentação.
 
 A ordem de avaliação pertence ao conjunto de decisões declarado pela projeção e
 nunca ao tamanho do catálogo filtrado ou paginado. Por isso, precedência não é

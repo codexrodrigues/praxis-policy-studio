@@ -244,6 +244,7 @@ test('distinguishes an unauthenticated session and preserves keyboard access', a
 test('shows capability-limited operational proof without exposing a command', async ({ page }, testInfo) => {
   await mockGovernedBackend(page, false);
   await page.goto('/catalog');
+  await page.getByRole('button', { name: 'Testar regra', exact: true }).click();
 
   await expect(page.getByRole('heading', { name: 'O valor solicitado deve respeitar o limite do programa.' })).toBeVisible();
   const capabilityMessage = page.getByText('Sua sessão não possui a capability necessária para executar esta prova.');
@@ -259,6 +260,7 @@ test('shows capability-limited operational proof without exposing a command', as
 test('confirms the operation and explains a stale workspace ETag', async ({ page }, testInfo) => {
   await mockGovernedBackend(page, true);
   await page.goto('/catalog');
+  await page.getByRole('button', { name: 'Testar regra', exact: true }).click();
   const modes = page.getByLabel('Operação do cenário');
   await modes.nth(0).selectOption('CREATE');
   await modes.nth(1).selectOption('UPDATE');

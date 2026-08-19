@@ -322,7 +322,11 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(component.decisions().map(item => item.key)).toEqual(['A', 'B']);
   });
 
-  it('moves focus within the workstation without changing browser navigation', () => {
+  it('activates the requested work mode and moves focus without changing browser navigation', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      return window.setTimeout(() => callback(performance.now()), 0);
+    });
     const host = TestBed.inject(ElementRef).nativeElement as HTMLElement;
     const target = document.createElement('section');
     target.id = 'decision-rule';
@@ -332,9 +336,25 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     host.append(target);
 
     component.navigateToSection('decision-rule');
+    vi.runAllTimers();
 
+    expect(component.activeMode()).toBe('rule');
     expect(target.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
     expect(target.focus).toHaveBeenCalledWith({ preventScroll: true });
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('preserves the governed draft while the operator changes work modes', () => {
+    component.select({ ...decision('A'), workspaceId: 'workspace-A' });
+    component.authoringOpen.set(true);
+    component.draftCondition.set({ '<=': [{ var: 'request.requestedAmount' }, 2750] });
+
+    component.activeMode.set('test');
+    component.activeMode.set('rule');
+
+    expect(component.authoringOpen()).toBe(true);
+    expect(component.draftCondition()).toEqual({ '<=': [{ var: 'request.requestedAmount' }, 2750] });
   });
 
   it('fails locally when expected output is invalid JSON', () => {
