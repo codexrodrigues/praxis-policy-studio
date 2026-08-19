@@ -1,5 +1,6 @@
 import '@angular/compiler';
 import { ElementRef } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { BrowserTestingModule, platformBrowserTesting } from '@angular/platform-browser/testing';
 import { of, Subject } from 'rxjs';
@@ -386,6 +387,87 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(component.editingScenarioId()).toBe('scenario-A');
   });
 
+  it('protects a dirty scenario when switching scenarios or decisions', () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    component.select(decision('A'));
+    capabilities.A[0].next({
+      workspaceId: 'workspace-A', availableActions: ['VIEW', 'MANAGE_SCENARIOS'], blockers: []
+    });
+    component.scenarios.set([
+      { id: 'scenario-A', facts: {}, scenarioKey: 'A', name: 'A' },
+      { id: 'scenario-B', facts: {}, scenarioKey: 'B', name: 'B' }
+    ] as any);
+    component.editScenario('scenario-A');
+    component.markScenarioEditDirty();
+    confirm.mockClear();
+
+    component.editScenario('scenario-B');
+    component.select(decision('B'));
+
+    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(component.editingScenarioId()).toBe('scenario-A');
+    expect(component.selected()?.key).toBe('A');
+  });
+
+  it('hydrates and serializes governed facts when editing an existing scenario', () => {
+    component.select({
+      ...decision('A'),
+      facts: [{ path: 'request.amount', valueType: 'number', nullable: false,
+        label: 'Amount', description: 'Requested amount', providerRef: 'host:request',
+        evidenceRefs: [], sensitivity: 'NON_SENSITIVE', redaction: 'NONE' }]
+    });
+    capabilities.A[0].next({
+      workspaceId: 'workspace-A', availableActions: ['VIEW', 'MANAGE_SCENARIOS'], blockers: []
+    });
+    component.scenarios.set([{
+      id: 'scenario-A', facts: { request: { amount: 500 } }, scenarioKey: 'A', name: 'A'
+    }] as any);
+
+    component.editScenario('scenario-A');
+    expect(component.editingScenarioFactDisplayValue('request.amount')).toBe('500');
+
+    component.setEditingScenarioFactValue(component.selected()!.facts[0], '750');
+    expect(JSON.parse(component.editingScenarioFactsJson())).toEqual({ request: { amount: 750 } });
+    expect(component.editingScenarioDirty()).toBe(true);
+  });
+
+  it('ignores a workspace mutation response after the selected decision changes', () => {
+    const response = new Subject<any>();
+    createWorkspace.mockReturnValue(response.asObservable());
+    component.select({
+      ...decision('A'), workspaceId: undefined, workspaceEtag: undefined,
+      availableDefinitionActions: ['CREATE_NEW_VERSION']
+    });
+    component.createWorkspace();
+    component.select(decision('B'));
+
+    response.next({
+      id: 'workspace-A', ruleKey: 'A', status: 'OPEN', etag: 'late-etag', revision: 1,
+      condition: { '===': [9, 9] }, parameters: {}
+    });
+
+    expect(component.selected()?.key).toBe('B');
+    expect(component.draftCondition()).toEqual(decision('B').condition);
+    expect(component.authoringBusy()).toBe(false);
+  });
+
+  it('preserves local state and requests reauthentication when a command receives 401', () => {
+    const response = new Subject<any>();
+    createWorkspace.mockReturnValue(response.asObservable());
+    component.select({
+      ...decision('A'), workspaceId: undefined, workspaceEtag: undefined,
+      availableDefinitionActions: ['CREATE_NEW_VERSION']
+    });
+    component.createWorkspace();
+
+    response.error(new HttpErrorResponse({ status: 401 }));
+
+    expect(component.selected()?.key).toBe('A');
+    expect(component.authenticationRequired()).toBe(true);
+    expect(component.sessionActive()).toBe(false);
+    expect(component.authoringFeedback()).toContain('sessão expirou');
+  });
+
   it('returns to the narrow catalog without discarding the governed selection', () => {
     component.select(decision('A'));
 
@@ -571,6 +653,37 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(component.workspaceStatusLabel('SUBMITTED')).toBe('Em revisão');
     expect(component.comparisonLabel('CANDIDATE_MATCH')).toBe('Resultado esperado confirmado');
     expect(component.comparisonLabel('CANDIDATE_MISMATCH')).toBe('Resultado diferente do esperado');
+    expect(component.workspaceBlockerLabel('ACTIVE_SCENARIO_REQUIRED'))
+      .toBe('Cadastre e ative ao menos um cenário antes de solicitar revisão.');
+    expect(component.workspaceBlockerLabel('FUTURE_BLOCKER'))
+      .toContain('ainda não reconhece');
+  });
+
+  it('does not present a partial candidate result as an overall pass', () => {
+    const base = {
+      scenarioId: 'scenario-A', scenarioKey: 'A', expectedDecision: 'ALLOW',
+      candidateDecision: 'ALLOW', activeDecision: 'DENY', comparison: 'CANDIDATE_MISMATCH',
+      candidateMatchesExpected: true, activeMatchesExpected: false,
+      candidateReasonCodes: [], activeReasonCodes: []
+    };
+    expect(component.sandboxResultPassed(base)).toBe(false);
+    expect(component.sandboxResultPassed({
+      ...base, activeDecision: 'ALLOW', comparison: 'CANDIDATE_MATCH', activeMatchesExpected: true
+    })).toBe(true);
+  });
+
+  it('compares the local authoring candidate instead of the last saved workspace condition', () => {
+    component.select({
+      ...decision('A'),
+      condition: { '<=': [{ var: 'amount' }, 3000] },
+      workspaceCondition: { '<=': [{ var: 'amount' }, 2900] }
+    });
+    component.authoringOpen.set(true);
+    component.draftCondition.set({ '<=': [{ var: 'amount' }, 2750] });
+
+    expect(component.semanticDiff()).toContainEqual(expect.objectContaining({
+      path: '$.<=[1]', baseline: 3000, candidate: 2750
+    }));
   });
 
   it('governs review rationale as reactive state and rejects blank review commands', () => {

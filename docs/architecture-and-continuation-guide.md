@@ -177,13 +177,13 @@ Config publicar a capability correta.
 | caso neutro publicado | valida snapshot, Neon e cadeia operacional | `quickstart-payroll-reactive-determinations.v1.json` |
 | leitura Config | implementada no slice | service, detalhe, testes e prova live documentada |
 | sessão de desenvolvimento | implementada | `auth-session.service.ts` |
-| capabilities | parciais | workspace, snapshots e staged rollout possuem ações server-owned; publicação, criação de rollout e rollout-policy ainda requerem catálogos próprios |
+| capabilities | implementadas nas operações correntes | workspace, definitions, snapshots, publicação, criação de rollout e rollout-policy consomem ações principal-specific server-owned; novos comandos devem manter a mesma regra |
 | inspeção | parcial | catálogo e `decision-inspection.ts`; falta causalidade runtime |
 | editor | implementado para condição focal | Visual Builder; parâmetros/outcomes/RuleSet completo ausentes |
-| catálogo de facts | implementado no beta.15 sobre Core rc.35 | Config valida e projeta tipos, nulabilidade, i18n, sensibilidade e redaction; `@praxisui/core` é o cliente público e o Studio deriva o formulário de cenário sem duplicar o contrato |
+| catálogo de facts | implementado no `main` pós-beta.15 sobre Core rc.38 | Config valida e projeta tipos, nulabilidade, i18n, sensibilidade e redaction; `@praxisui/core` é o cliente público e o Studio deriva criação e edição tipadas sem duplicar o contrato |
 | persistência | workspace concorrente com ETag | `ProjectionCatalogService` e testes de integração |
 | simulação | candidate × active, transporte V58 e action host V60 implementados; consumo UI parcial | cenários/Test Runs do Config, sandbox host-owned, baseline independente, reserva idempotente e quatro resultados comprovados no Neon; ainda faltam precondition metadata-driven, Studio, Oracle e gates posteriores |
-| publicação/ativação/rollback | parcialmente implementados | readiness/materializações, snapshot e staged rollout; actions de publicação, criação de rollout e rollout-policy precisam ser server-owned |
+| publicação/ativação/rollback | parcialmente implementados | readiness/materializações, snapshot e staged rollout já usam actions server-owned; faltam prova corporativa contínua, diálogos contextuais e telemetria operacional madura |
 | assistente de decisões | discovery e explicação read-only implementados sobre runtime existente | Config/`@praxisui/ai` resolvem intenção, projetam identidades seguras e atestam a versão explicada; falta catálogo multi-domínio e causalidade runtime |
 | autoridade Java/produção | não alterada pelo Studio | projeção e docs de evidência |
 
