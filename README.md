@@ -132,8 +132,12 @@ Operações críticas de snapshot e rollout usam um diálogo contextual próprio
 com alvo e consequência visíveis antes do comando. O diálogo não concede
 capability: ao confirmar, o Studio revalida o estado local publicado pelo
 servidor e o backend continua revalidando principal, ETag e lifecycle. Blockers
-de workspace e resultados de sandbox são componentes de apresentação isolados,
-reduzindo o acoplamento do workspace sem criar novos contratos.
+de workspace e resultados de sandbox são componentes de apresentação isolados.
+O editor de facts de cenário também é um componente único reutilizado na criação
+e na correção: ele projeta os descritores governados como controles tipados e
+emite alterações de valor/null, enquanto parsing, payload canônico, persistência,
+ETag e capabilities permanecem no orquestrador. Essa fronteira reduz duplicação
+sem promover um contrato local concorrente ao Config ou ao Core.
 
 No perfil `dev`, o Quickstart publica pelo serviço canônico as sete condições
 JSON Logic editáveis do caso de referência. O seed é idempotente, permanece em

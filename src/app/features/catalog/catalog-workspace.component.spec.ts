@@ -428,7 +428,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     }] as any);
 
     component.editScenario('scenario-A');
-    expect(component.editingScenarioFactDisplayValue('request.amount')).toBe('500');
+    expect(component.editingScenarioFactDraft()['request.amount']).toBe(500);
 
     component.setEditingScenarioFactValue(component.selected()!.facts[0], '750');
     expect(JSON.parse(component.editingScenarioFactsJson())).toEqual({ request: { amount: 750 } });

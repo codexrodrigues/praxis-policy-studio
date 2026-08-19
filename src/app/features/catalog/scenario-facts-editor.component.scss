@@ -1,0 +1,30 @@
+:host { display: block; min-width: 0; }
+
+label { display: grid; gap: .3rem; font-size: .78rem; font-weight: 700; }
+
+input,
+select {
+  min-width: 0;
+  border: 1px solid var(--pax-color-outline-variant, #8c9ca4);
+  border-radius: .5rem;
+  padding: .65rem;
+  background: var(--pax-color-surface, #fff);
+  color: inherit;
+  font: inherit;
+}
+
+.scenario-fact-grid,
+.scenario-fact-field { display: grid; gap: 1rem; }
+
+.scenario-fact-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.scenario-fact-field { align-content: start; gap: .4rem; min-width: 0; }
+.scenario-fact-field > small { color: var(--pax-color-on-surface-variant, #455a64); font-size: .72rem; line-height: 1.4; }
+.scenario-fact-null { display: flex; align-items: center; justify-content: start; font-weight: 500; }
+.scenario-fact-null input { min-width: auto; }
+.scenario-facts-preview { margin-top: 1rem; }
+.scenario-facts-preview summary { cursor: pointer; color: var(--pax-color-primary, #005f73); font-weight: 700; }
+.scenario-facts-preview pre { max-height: 14rem; overflow: auto; padding: .75rem; background: var(--pax-color-surface-container-low, #f3f6f7); }
+
+@media (max-width: 48rem) {
+  .scenario-fact-grid { grid-template-columns: 1fr; }
+}

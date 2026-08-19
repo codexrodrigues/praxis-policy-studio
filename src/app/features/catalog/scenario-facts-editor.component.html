@@ -1,0 +1,50 @@
+<fieldset class="scenario-fact-editor">
+  <legend>{{ i18n.text('scenarioFacts') }}</legend>
+  <div class="scenario-fact-grid">
+    @for (fact of facts(); track fact.path) {
+      <div class="scenario-fact-field">
+        <label>
+          <span>{{ fact.label }}</span>
+          @switch (fact.valueType) {
+            @case ('boolean') {
+              <select [disabled]="isNull(fact.path)" [value]="displayValue(fact.path)"
+                (change)="valueChanged.emit({ fact, value: $any($event.target).value === 'true' })">
+                <option value="false">{{ i18n.text('booleanFalse') }}</option>
+                <option value="true">{{ i18n.text('booleanTrue') }}</option>
+              </select>
+            }
+            @case ('number') {
+              <input type="number" inputmode="decimal" [required]="!fact.nullable"
+                [disabled]="isNull(fact.path)" [value]="displayValue(fact.path)"
+                (input)="valueChanged.emit({ fact, value: $any($event.target).value })">
+            }
+            @case ('date') {
+              <input type="date" [required]="!fact.nullable" [disabled]="isNull(fact.path)"
+                [value]="displayValue(fact.path)"
+                (input)="valueChanged.emit({ fact, value: $any($event.target).value })">
+            }
+            @default {
+              <input type="text" [required]="!fact.nullable" [disabled]="isNull(fact.path)"
+                [value]="displayValue(fact.path)"
+                (input)="valueChanged.emit({ fact, value: $any($event.target).value })">
+            }
+          }
+        </label>
+        <small>{{ fact.description }} · <code>{{ fact.path }}</code></small>
+        @if (fact.nullable) {
+          <label class="scenario-fact-null">
+            <input type="checkbox" [checked]="isNull(fact.path)"
+              (change)="nullChanged.emit({ fact, useNull: $any($event.target).checked })">
+            <span>{{ i18n.text('scenarioFactNull') }}</span>
+          </label>
+        }
+      </div>
+    }
+  </div>
+  @if (preview()) {
+    <details class="scenario-facts-preview">
+      <summary>{{ i18n.text('scenarioFactsPreview') }}</summary>
+      <pre><code>{{ preview() }}</code></pre>
+    </details>
+  }
+</fieldset>

@@ -49,6 +49,7 @@ import {
 } from './governed-confirmation-dialog.component';
 import { PolicySandboxResultsComponent } from './policy-sandbox-results.component';
 import { WorkspaceBlockersComponent } from './workspace-blockers.component';
+import { ScenarioFactsEditorComponent } from './scenario-facts-editor.component';
 
 interface PendingOperationalCommand {
   readonly workspaceId: string;
@@ -73,7 +74,8 @@ type DecisionWorkMode = 'understand' | 'rule' | 'test' | 'operate' | 'history';
     DecisionDiscoveryComponent,
     GovernedConfirmationDialogComponent,
     PolicySandboxResultsComponent,
-    WorkspaceBlockersComponent
+    WorkspaceBlockersComponent,
+    ScenarioFactsEditorComponent
   ],
   providers: [
     ProjectionCatalogService,
@@ -1041,15 +1043,6 @@ export class CatalogWorkspaceComponent implements OnInit {
     });
   }
 
-  scenarioFactIsNull(path: string): boolean {
-    return this.scenarioFactDraft()[path] === null;
-  }
-
-  scenarioFactDisplayValue(path: string): string {
-    const value = this.scenarioFactDraft()[path];
-    return Array.isArray(value) ? value.join(', ') : value == null ? '' : String(value);
-  }
-
   scenarioFactsForSubmit(): string {
     return this.selected()?.facts.length ? this.scenarioFactsJson() : this.scenarioFactsFallback();
   }
@@ -1119,15 +1112,6 @@ export class CatalogWorkspaceComponent implements OnInit {
       return next;
     });
     this.editingScenarioDirty.set(true);
-  }
-
-  editingScenarioFactIsNull(path: string): boolean {
-    return this.editingScenarioFactDraft()[path] === null;
-  }
-
-  editingScenarioFactDisplayValue(path: string): string {
-    const value = this.editingScenarioFactDraft()[path];
-    return Array.isArray(value) ? value.join(', ') : value == null ? '' : String(value);
   }
 
   editingScenarioFactsJson(): string {
