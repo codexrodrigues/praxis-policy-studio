@@ -176,6 +176,7 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly scenarioFactsJson = computed(() => JSON.stringify(this.scenarioFactsPayload(), null, 2));
   readonly activeScenarios = computed(() => this.scenarios().filter(item => item.status === 'ACTIVE'));
   readonly editingScenarioId = signal<string | null>(null);
+  readonly editingScenarioDirty = signal(false);
   readonly reviews = signal<readonly DomainRuleWorkspaceReview[]>([]);
   readonly reviewRationaleValue = signal('');
   readonly workspaceCapabilities = signal<DomainRuleWorkspaceCapabilities | null>(null);
@@ -457,6 +458,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.operationalActionError.set(false);
     this.operationalScenarioModes.set({});
     this.editingScenarioId.set(null);
+    this.editingScenarioDirty.set(false);
     this.operationalConfirmationOpen.set(false);
     this.snapshotFeedback.set(null);
     this.snapshotFeedbackError.set(false);
@@ -680,6 +682,8 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   openAuthoringAndFocus(): void {
     this.openAuthoring();
+    if (!this.authoringOpen()) return;
+    this.activeMode.set('rule');
     requestAnimationFrame(() => this.host.nativeElement.querySelector<HTMLElement>('.draft-workspace')?.focus());
   }
 
@@ -1044,12 +1048,17 @@ export class CatalogWorkspaceComponent implements OnInit {
   editScenario(scenarioId: string): void {
     if (!this.hasWorkspaceAction('MANAGE_SCENARIOS') || this.authoringBusy()) return;
     this.editingScenarioId.set(scenarioId);
+    this.editingScenarioDirty.set(false);
     this.clearAuthoringMessage();
   }
 
   cancelScenarioEdit(): void {
+    if (this.editingScenarioDirty() && !window.confirm(this.i18n.text('discardChanges'))) return;
     this.editingScenarioId.set(null);
+    this.editingScenarioDirty.set(false);
   }
+
+  markScenarioEditDirty(): void { this.editingScenarioDirty.set(true); }
 
   updateScenario(
     scenario: DomainRuleTestScenario,
@@ -1110,6 +1119,7 @@ export class CatalogWorkspaceComponent implements OnInit {
         this.sandboxIdempotencyKey = null;
         this.sandboxEvaluatedAtUtc = null;
         this.editingScenarioId.set(null);
+        this.editingScenarioDirty.set(false);
         this.authoringBusy.set(false);
         this.authoringFeedback.set(this.i18n.text('scenarioUpdated'));
         this.loadLifecycle();
@@ -1493,6 +1503,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.operationalActionError.set(false);
     this.operationalScenarioModes.set({});
     this.editingScenarioId.set(null);
+    this.editingScenarioDirty.set(false);
     this.operationalConfirmationOpen.set(false);
     this.sandboxRun.set(null);
     this.sandboxIdempotencyKey = null;

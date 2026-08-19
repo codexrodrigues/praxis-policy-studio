@@ -357,6 +357,35 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(component.draftCondition()).toEqual({ '<=': [{ var: 'request.requestedAmount' }, 2750] });
   });
 
+  it('opens authoring in the rule mode even when the operator was testing', () => {
+    const host = TestBed.inject(ElementRef).nativeElement as HTMLElement;
+    const editor = document.createElement('section');
+    editor.className = 'draft-workspace';
+    editor.tabIndex = -1;
+    editor.focus = vi.fn();
+    host.append(editor);
+    component.select(decision('A'));
+    component.workspaceCapabilities.set({ availableActions: ['VIEW'], blockers: [] } as any);
+    component.activeMode.set('test');
+
+    component.openAuthoringAndFocus();
+
+    expect(component.authoringOpen()).toBe(true);
+    expect(component.activeMode()).toBe('rule');
+    expect(editor.focus).toHaveBeenCalled();
+  });
+
+  it('asks before discarding a changed scenario edit', () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    component.editingScenarioId.set('scenario-A');
+    component.editingScenarioDirty.set(true);
+
+    component.cancelScenarioEdit();
+
+    expect(confirm).toHaveBeenCalled();
+    expect(component.editingScenarioId()).toBe('scenario-A');
+  });
+
   it('returns to the narrow catalog without discarding the governed selection', () => {
     component.select(decision('A'));
 
