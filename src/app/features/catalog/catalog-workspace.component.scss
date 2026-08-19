@@ -58,7 +58,8 @@ h1 { font-size: 1.35rem; letter-spacing: -.02em; }
 .decision-navigation strong { font-size: .85rem; }
 .decision-navigation small { min-width: 0; color: var(--workspace-muted); overflow-wrap: anywhere; }
 .navigation-unavailable { opacity: .58; }
-.work-mode-feedback { margin: 0; padding: .75rem 1rem; border-left: 3px solid var(--workspace-primary); background: var(--workspace-surface-low); }
+.work-mode-feedback,
+.task-feedback { margin: 0; padding: .75rem 1rem; border-left: 3px solid var(--workspace-primary); background: var(--workspace-surface-low); }
 .work-mode-panel[hidden] { display: none; }
 .selection-outside-filter { display: grid; gap: .65rem; margin-top: .75rem; padding: .85rem; background: var(--pax-color-secondary-container, #d9e9ef); color: var(--pax-color-on-secondary-container, #1d343d); border-radius: .55rem; font-size: .8rem; line-height: 1.4; }
 .anchored-section { scroll-margin-top: 6rem; }
