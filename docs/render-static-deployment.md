@@ -14,8 +14,8 @@ URL do ambiente. O build continua produzindo o mesmo app Angular e materializa o
 
 A homologação oficial está publicada em
 `https://praxis-policy-studio-homolog.onrender.com` (serviço Render
-`srv-da0fbqlbedkc73ald6e0`) e aponta para o Quickstart homologado
-`https://praxis-enterprise-proof-sandbox-v2.onrender.com`. A URL e o identificador
+`srv-da0fbqlbedkc73ald6e0`) e aponta para o Quickstart público canônico
+`https://praxis-api-quickstart.onrender.com`. A URL e o identificador
 do serviço são evidência operacional; não são contrato de produto nem endpoint de
 produção.
 
@@ -33,6 +33,22 @@ publicar a origin exata do site em CORS e no filtro de Origin do Config.
 Este deployment é uma superfície de homologação. Ele não substitui IdP/BFF
 corporativo, não transforma o login do Quickstart em IAM de produção e não muda
 tenant, environment, capabilities, ETag ou segregação de funções no browser.
+
+## Migração para o Quickstart canônico em 2026-08-26
+
+O deploy Render `dep-da7ggr142hec73bo2qr0` materializou
+`POLICY_STUDIO_CONFIG_API_BASE_URL=https://praxis-api-quickstart.onrender.com`.
+O log do build registrou
+`POLICY_STUDIO_STATIC_DEPLOYMENT_OK backend=https://praxis-api-quickstart.onrender.com`
+e o `app-config.json` publicado confirmou `mode=remote` com essa mesma origin.
+
+Antes da migração, o Quickstart público foi validado com a origin exata do Studio:
+catálogo estrutural `200`, headers CORS `Access-Control-Allow-Origin` e
+`Access-Control-Expose-Headers: ETag, X-Schema-Hash, X-Data-Version`, preflight de
+Config `200` e liveness `UP`. O serviço temporário
+`praxis-enterprise-proof-sandbox-v2` deixa de ser dependência do Policy Studio; sua
+suspensão continua condicionada à auditoria de todos os demais consumidores
+publicados.
 
 ## Prova publicada de 2026-08-15
 
