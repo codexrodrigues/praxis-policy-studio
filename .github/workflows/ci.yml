@@ -1,15 +1,8 @@
 name: CI
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-  workflow_dispatch:
-
+'on':
+  workflow_dispatch: {}
 permissions:
   contents: read
-
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -30,3 +23,6 @@ jobs:
           POLICY_STUDIO_CONFIG_API_BASE_URL: https://quickstart.example
       - run: npx playwright install --with-deps chromium
       - run: npm run e2e
+concurrency:
+  group: release-validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true

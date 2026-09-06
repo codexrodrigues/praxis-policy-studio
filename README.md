@@ -347,3 +347,7 @@ Na prova operacional, uma tentativa conserva `Idempotency-Key` e `evaluatedAtUtc
 depois de falha incerta. O par só é rotacionado após receipt confirmado, mudança
 de workspace ou alteração da matriz cenário/operação; assim, retry do browser não
 repete DML quando a resposta se perde depois do commit.
+
+## Política de CI e publicação
+
+Validação local durante desenvolvimento; Actions apenas no fechamento necessário de versões. Consulte [ACTIONS-RELEASE-POLICY.md](ACTIONS-RELEASE-POLICY.md) para gatilhos, gates e recuperação.
