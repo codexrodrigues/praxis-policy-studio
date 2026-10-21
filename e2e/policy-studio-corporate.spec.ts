@@ -378,3 +378,204 @@ test('preserves the governed workspace while editing, adding a typed scenario, a
   expect(violations.violations).toEqual([]);
   await page.screenshot({ path: testInfo.outputPath('authoring-sandbox-result.png'), fullPage: false });
 });
+
+
+test('keeps incompatible snapshot history visible without offering runtime operations', async ({ page }, testInfo) => {
+  await mockGovernedBackend(page, false);
+  const historical = {
+    snapshotKey: 'historical-contract-1.4', ruleSetKey: 'extraordinary-grant-eligibility', ruleSetVersion: 1,
+    publicationRevision: 1, snapshotContentHash: 'A'.repeat(64), publishedBy: 'publisher',
+    publishedAtUtc: '2026-10-20T12:00:00Z', active: true,
+    governanceState: 'RUNTIME_INCOMPATIBLE', availableAction: 'UNAVAILABLE'
+  };
+  const commands: string[] = [];
+  page.on('request', request => {
+    if (request.method() !== 'GET' && new URL(request.url()).pathname.includes('/snapshots')) {
+      commands.push(request.url());
+    }
+  });
+  await page.route('**/api/**/snapshots**', route => {
+    const path = new URL(route.request().url()).pathname;
+    const json = (body: unknown) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+    if (path.endsWith('/snapshots/head/status')) return json({
+      ruleSetKey: historical.ruleSetKey, activeSnapshotKey: historical.snapshotKey,
+      ruleSetVersion: 1, publicationRevision: 1, activationRevision: 2,
+      headEtag: '"historical-head"', executionReady: false, governanceState: 'RUNTIME_INCOMPATIBLE'
+    });
+    if (path.endsWith('/snapshots')) return json([
+      historical, { ...historical, snapshotKey: 'historical-candidate', active: false, publicationRevision: 2 }
+    ]);
+    if (path.endsWith('/rollouts')) return json({
+      ruleSetKey: historical.ruleSetKey, rollouts: [], availableActions: ['CREATE_ROLLOUT']
+    });
+    if (path.endsWith('/rollout-policies')) return json({
+      ruleSetKey: historical.ruleSetKey, activePolicy: null, versions: [], availableActions: []
+    });
+    if (path.endsWith('/execution-summary') || path.endsWith('/host-status-summary')) {
+      return route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
+    }
+    return route.fallback();
+  });
+  await page.goto('/catalog');
+  if (testInfo.project.name === 'narrow') {
+    await page.getByRole('button', { name: /O valor solicitado deve respeitar o limite do programa/ }).click();
+  }
+  await page.getByRole('button', { name: /^Operar/ }).click();
+  const cockpit = page.locator('pax-snapshot-cockpit');
+  await expect(cockpit.getByText('Incompatível com o runtime atual', { exact: true }).first()).toBeVisible();
+  await expect(cockpit.getByText('Não pronto', { exact: true })).toBeVisible();
+  await expect(cockpit.getByText('historical-contract-1.4', { exact: true }).first()).toBeVisible();
+  await expect(cockpit.getByText('O histórico íntegro foi preservado para auditoria.', { exact: false }).first()).toBeVisible();
+  await expect(cockpit.getByRole('button', { name: /Ativar esta versão|Reverter para esta versão|Iniciar rollout/ })).toHaveCount(0);
+  expect(commands).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  for (const version of await cockpit.locator('.snapshot-version-list > article').all()) {
+    const bounds = await version.boundingBox();
+    expect(bounds?.height).toBeLessThan(600);
+  }
+  await cockpit.screenshot({ path: testInfo.outputPath('incompatible-history.png') });
+});
+
+for (const hasExistingHead of [false, true]) {
+  test(`activates a published candidate through governed ${hasExistingHead ? 'existing-head' : 'bootstrap'} rollout`, async ({ page }, testInfo) => {
+    await mockGovernedBackend(page, false);
+    const candidateKey = 'published-candidate';
+    const oldHeadKey = 'previous-active-snapshot';
+    let oldHeadEtag = '"previous-head-7"';
+    const ruleSetKey = 'extraordinary-grant-eligibility';
+    let created = false;
+    let activated = false;
+    const commands: string[] = [];
+    const policy = {
+      policyId: 'required-policy-1', ruleSetKey, policyKey: 'host-quorum', policyVersion: 1,
+      status: 'ACTIVE', enforcementMode: 'REQUIRED', minimumFreshProbes: 1, minimumReadyRatio: 1,
+      blockOnIncompatible: true, staleAfterSeconds: 120, maximumRolloutAgeSeconds: 900,
+      createdBy: 'policy-author', createdAt: '2026-10-21T12:00:00Z', approvedBy: 'reviewer',
+      approvedAt: '2026-10-21T12:01:00Z', activatedBy: 'operator', activatedAt: '2026-10-21T12:02:00Z',
+      availableActions: []
+    };
+    const rollout = {
+      rolloutId: 'governed-rollout-1', ruleSetKey, candidateSnapshotKey: candidateKey,
+      candidateContentHash: 'B'.repeat(64), expectedActiveSnapshotKey: hasExistingHead ? oldHeadKey : null,
+      expectedHeadEtag: hasExistingHead ? oldHeadEtag : null,
+      policyKey: policy.policyKey, policyVersion: 1, enforcementMode: 'REQUIRED', status: 'READY',
+      createdAtUtc: '2026-10-21T12:03:00Z', expiresAtUtc: null
+    };
+    await page.route('**/api/**/snapshots**', route => {
+      const request = route.request();
+      const path = new URL(request.url()).pathname;
+      const json = (body: unknown, status = 200, headers?: Record<string, string>) => route.fulfill({
+        status, contentType: 'application/json', body: JSON.stringify(body), headers
+      });
+      const assertHeadCondition = () => {
+        const headers = request.headers();
+        expect(headers['if-match']).toBe(hasExistingHead ? oldHeadEtag : undefined);
+        expect(headers['if-none-match']).toBe(hasExistingHead ? undefined : '*');
+      };
+      if (path.endsWith('/snapshots/rollouts') && request.method() === 'POST') {
+        assertHeadCondition();
+        expect(request.postDataJSON()).toEqual({ candidateSnapshotKey: candidateKey });
+        commands.push('create-rollout');
+        created = true;
+        return json(rollout, 201);
+      }
+      if (path.endsWith(`/snapshots/${candidateKey}/activate`) && request.method() === 'POST') {
+        assertHeadCondition();
+        expect(request.headers()['x-rule-rollout-id']).toBe(rollout.rolloutId);
+        expect(created).toBe(true);
+        commands.push('activate-candidate');
+        activated = true;
+        return json({ snapshot: { snapshotKey: candidateKey }, snapshotContentHash: 'B'.repeat(64),
+          headEtag: '"selected-head-8"', activationRevision: 8, activationType: 'ACTIVATED' });
+      }
+      if (path.endsWith('/snapshots/head/status')) {
+        if (!hasExistingHead && !activated) return json({}, 404, { 'Cache-Control': 'no-store' });
+        return json({ ruleSetKey, activeSnapshotKey: activated ? candidateKey : oldHeadKey,
+          ruleSetVersion: activated ? 2 : 1, publicationRevision: activated ? 2 : 1,
+          activationRevision: activated ? 8 : 7, headEtag: activated ? '"selected-head-8"' : oldHeadEtag,
+          executionReady: true, governanceState: 'READY' });
+      }
+      if (path.endsWith('/snapshots')) return json([{
+        snapshotKey: candidateKey, ruleSetKey, ruleSetVersion: 2, publicationRevision: 2,
+        snapshotContentHash: 'B'.repeat(64), publishedBy: 'publisher', publishedAtUtc: '2026-10-21T12:02:30Z',
+        active: activated, governanceState: 'READY',
+        availableAction: activated ? 'ACTIVE' : hasExistingHead ? 'ACTIVATE' : 'CREATE_ROLLOUT'
+      }]);
+      if (path.endsWith('/rollouts')) return json({ ruleSetKey,
+        rollouts: created && !activated ? [{ rollout, expectedHeadCurrent: true, expired: false,
+          readiness: { rolloutId: rollout.rolloutId, ruleSetKey, candidateSnapshotKey: candidateKey,
+            status: 'READY', enforcementMode: 'REQUIRED', minimumFreshProbes: 1, minimumReadyRatio: 1,
+            totalProbes: 1, readyProbes: 1, incompatibleProbes: 0, unavailableProbes: 0, staleProbes: 0,
+            activationReady: true, staleBeforeUtc: '2026-10-21T12:01:00Z' },
+          availableActions: ['ACTIVATE_CANDIDATE'] }] : [],
+        availableActions: created ? [] : ['CREATE_ROLLOUT'] });
+      if (path.endsWith('/rollout-policies')) return json({ ruleSetKey, activationRevision: 1,
+        headEtag: '"policy-head-1"', activePolicy: policy, versions: [policy], availableActions: [] });
+      if (path.endsWith('/timeline')) return json([]);
+      if (path.endsWith('/execution-summary') || path.endsWith('/host-status-summary')) return json({}, 404);
+      return route.fallback();
+    });
+    await page.goto('/catalog');
+    if (testInfo.project.name === 'narrow') {
+      await page.getByRole('button', { name: /O valor solicitado deve respeitar o limite do programa/ }).click();
+    }
+    await page.getByRole('button', { name: /^Operar/ }).click();
+    const cockpit = page.locator('pax-snapshot-cockpit');
+    const head = cockpit.locator('.snapshot-head');
+    if (hasExistingHead) await expect(head.getByText(oldHeadKey, { exact: true })).toBeVisible();
+    else await expect(cockpit.getByText('Nenhum snapshot está ativo para este RuleSet.', { exact: true })).toBeVisible();
+    await expect(cockpit.getByText('host-quorum', { exact: true })).toBeVisible();
+    expect(commands).toEqual([]);
+    await cockpit.getByRole('button', { name: `Iniciar rollout · ${candidateKey}`, exact: true }).click();
+    if (hasExistingHead) {
+      // Inject a concurrent head observation while the real confirmation is open.
+      // No authority is calculated here; the test exercises the consumer's stale-view guard.
+      oldHeadEtag = '"concurrent-head-8"';
+      rollout.expectedHeadEtag = oldHeadEtag;
+      await page.evaluate(headEtag => {
+        const workspace = Reflect.get(window, 'ng').getComponent(document.querySelector('pax-catalog-workspace'));
+        workspace.snapshotHead.set({ ...workspace.snapshotHead(), headEtag });
+      }, oldHeadEtag);
+      await page.getByRole('dialog').getByRole('button', { name: 'Iniciar rollout', exact: true }).click();
+      await expect(cockpit.getByRole('alert').filter({ hasText: 'O estado mudou.' })).toBeVisible();
+      expect(commands).toEqual([]);
+      await cockpit.getByRole('button', { name: `Iniciar rollout · ${candidateKey}`, exact: true }).click();
+    }
+    await page.getByRole('dialog').screenshot({ path: testInfo.outputPath('rollout-confirmation.png') });
+    const confirmCreate = page.getByRole('dialog').getByRole('button', { name: 'Iniciar rollout', exact: true });
+    await confirmCreate.focus();
+    await page.keyboard.press('Enter');
+    await expect(cockpit.getByRole('button', { name: 'Promover candidato', exact: true })).toBeVisible();
+    expect(commands).toEqual(['create-rollout']);
+    if (hasExistingHead) await expect(head.getByText(oldHeadKey, { exact: true })).toBeVisible();
+    else await expect(head).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ path: testInfo.outputPath('published-candidate-before-activation.png'), fullPage: true });
+    await cockpit.getByRole('button', { name: 'Promover candidato', exact: true }).click();
+    if (!hasExistingHead) {
+      // Simulate a Config catalog observation withdrawing activation during confirmation.
+      await page.evaluate(() => {
+        const workspace = Reflect.get(window, 'ng').getComponent(document.querySelector('pax-catalog-workspace'));
+        const catalog = workspace.rolloutCatalog();
+        workspace.rolloutCatalog.set({ ...catalog, rollouts: catalog.rollouts.map((item: object) => ({ ...item, availableActions: [] })) });
+      });
+      await page.getByRole('dialog').getByRole('button', { name: 'Promover candidato', exact: true }).click();
+      await expect(cockpit.getByRole('alert').filter({ hasText: 'O estado mudou.' })).toBeVisible();
+      expect(commands).toEqual(['create-rollout']);
+      await page.evaluate(() => {
+        const workspace = Reflect.get(window, 'ng').getComponent(document.querySelector('pax-catalog-workspace'));
+        const catalog = workspace.rolloutCatalog();
+        workspace.rolloutCatalog.set({ ...catalog, rollouts: catalog.rollouts.map((item: object) => ({ ...item, availableActions: ['ACTIVATE_CANDIDATE'] })) });
+      });
+      await cockpit.getByRole('button', { name: 'Promover candidato', exact: true }).click();
+    }
+    await page.getByRole('dialog').getByRole('button', { name: 'Promover candidato', exact: true }).click();
+    await expect(head.getByText(candidateKey, { exact: true })).toBeVisible();
+    await expect(head.getByText('"selected-head-8"', { exact: true })).toBeVisible();
+    expect(commands).toEqual(['create-rollout', 'activate-candidate']);
+    await expect(cockpit.getByRole('button', { name: /Iniciar rollout|Promover candidato/ })).toHaveCount(0);
+  });
+}

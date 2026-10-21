@@ -1528,25 +1528,40 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   createRollout(candidateSnapshotKey: string): void {
-    if (this.runtime.state().kind !== 'ready' || !this.snapshotHead()?.headEtag || this.rolloutBusy()
-      || !this.rolloutCatalog()?.availableActions.includes('CREATE_ROLLOUT')) return;
+    if (this.runtime.state().kind !== 'ready' || this.rolloutBusy()
+      || !this.canCreateSnapshotRollout(candidateSnapshotKey)) return;
+    const expectedHeadEtag = this.snapshotHead()?.headEtag ?? null;
     this.openGovernedConfirmation(
       this.i18n.text('confirmStartRollout'),
       candidateSnapshotKey,
       this.i18n.text('startRollout'),
-      () => this.executeCreateRollout(candidateSnapshotKey)
+      () => this.executeCreateRollout(candidateSnapshotKey, expectedHeadEtag)
     );
   }
 
-  private executeCreateRollout(candidateSnapshotKey: string): void {
+  private canCreateSnapshotRollout(candidateSnapshotKey: string): boolean {
+    if (this.snapshotsLoading() || this.snapshotsError()
+      || !this.rolloutCatalog()?.availableActions.includes('CREATE_ROLLOUT')) return false;
+    const candidate = this.snapshotVersions().find(item => item.snapshotKey === candidateSnapshotKey);
+    if (!candidate || candidate.active || candidate.governanceState !== 'READY') return false;
+    return this.snapshotHead() === null
+      ? candidate.availableAction === 'CREATE_ROLLOUT'
+      : !!this.snapshotHead()?.headEtag
+        && (candidate.availableAction === 'ACTIVATE' || candidate.availableAction === 'ROLLBACK');
+  }
+
+  private executeCreateRollout(candidateSnapshotKey: string, expectedHeadEtag: string | null): void {
     const state = this.runtime.state();
-    const headEtag = this.snapshotHead()?.headEtag;
-    if (state.kind !== 'ready' || !headEtag || this.rolloutBusy()
-      || !this.rolloutCatalog()?.availableActions.includes('CREATE_ROLLOUT')
-      || !this.snapshotVersions().some(item => item.snapshotKey === candidateSnapshotKey && !item.active)) return;
+    if (state.kind !== 'ready' || this.rolloutBusy()) return;
+    if ((this.snapshotHead()?.headEtag ?? null) !== expectedHeadEtag
+      || !this.canCreateSnapshotRollout(candidateSnapshotKey)) {
+      this.rolloutFeedbackError.set(true);
+      this.rolloutFeedback.set(this.i18n.text('snapshotStateChanged'));
+      return;
+    }
     this.rolloutBusy.set(true);
     this.clearRolloutFeedback();
-    this.catalog.createRollout(candidateSnapshotKey, headEtag, state.config).subscribe({
+    this.catalog.createRollout(candidateSnapshotKey, expectedHeadEtag, state.config).subscribe({
       next: () => {
         this.rolloutBusy.set(false);
         this.rolloutFeedback.set(this.i18n.text('rolloutStarted'));
@@ -1588,20 +1603,30 @@ export class CatalogWorkspaceComponent implements OnInit {
   activateRollout(item: DomainRuleRolloutCatalogItem): void {
     if (this.runtime.state().kind !== 'ready' || this.rolloutBusy()
       || !item.availableActions.includes('ACTIVATE_CANDIDATE')) return;
+    const expectedRollout = { ...item.rollout };
     this.openGovernedConfirmation(
       this.i18n.text('confirmPromoteCandidate'),
       item.rollout.candidateSnapshotKey,
       this.i18n.text('promoteCandidate'),
-      () => this.executeActivateRollout(item)
+      () => this.executeActivateRollout(expectedRollout)
     );
   }
 
-  private executeActivateRollout(item: DomainRuleRolloutCatalogItem): void {
+  private executeActivateRollout(expectedRollout: DomainRuleRolloutCatalogItem['rollout']): void {
     const state = this.runtime.state();
     const currentItem = this.rolloutCatalog()?.rollouts
-      .find(candidate => candidate.rollout.rolloutId === item.rollout.rolloutId);
-    if (state.kind !== 'ready' || this.rolloutBusy()
-      || !currentItem?.availableActions.includes('ACTIVATE_CANDIDATE')) return;
+      .find(candidate => candidate.rollout.rolloutId === expectedRollout.rolloutId);
+    if (state.kind !== 'ready' || this.rolloutBusy()) return;
+    if (!currentItem?.availableActions.includes('ACTIVATE_CANDIDATE')
+      || currentItem.rollout.ruleSetKey !== expectedRollout.ruleSetKey
+      || currentItem.rollout.candidateSnapshotKey !== expectedRollout.candidateSnapshotKey
+      || currentItem.rollout.candidateContentHash !== expectedRollout.candidateContentHash
+      || currentItem.rollout.expectedActiveSnapshotKey !== expectedRollout.expectedActiveSnapshotKey
+      || currentItem.rollout.expectedHeadEtag !== expectedRollout.expectedHeadEtag) {
+      this.rolloutFeedbackError.set(true);
+      this.rolloutFeedback.set(this.i18n.text('snapshotStateChanged'));
+      return;
+    }
     this.rolloutBusy.set(true);
     this.clearRolloutFeedback();
     this.catalog.activateRolloutCandidate(currentItem, state.config).subscribe({
@@ -1631,7 +1656,9 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   operateSnapshot(version: DomainRuleSnapshotVersion): void {
     if (this.runtime.state().kind !== 'ready' || !this.snapshotHead()?.headEtag || this.snapshotBusy()
+      || version.governanceState !== 'READY'
       || (version.availableAction !== 'ACTIVATE' && version.availableAction !== 'ROLLBACK')) return;
+    const expectedHeadEtag = this.snapshotHead()!.headEtag;
     const confirmationKey = version.availableAction === 'ROLLBACK'
       ? 'confirmSnapshotRollback'
       : 'confirmSnapshotActivation';
@@ -1639,17 +1666,23 @@ export class CatalogWorkspaceComponent implements OnInit {
       this.i18n.text(confirmationKey),
       version.snapshotKey,
       this.i18n.text(version.availableAction === 'ROLLBACK' ? 'rollbackSnapshot' : 'activateSnapshot'),
-      () => this.executeOperateSnapshot(version)
+      () => this.executeOperateSnapshot(version, expectedHeadEtag)
     );
   }
 
-  private executeOperateSnapshot(version: DomainRuleSnapshotVersion): void {
+  private executeOperateSnapshot(version: DomainRuleSnapshotVersion, expectedHeadEtag: string): void {
     const state = this.runtime.state();
     const headEtag = this.snapshotHead()?.headEtag;
     const currentVersion = this.snapshotVersions()
       .find(item => item.snapshotKey === version.snapshotKey);
-    if (state.kind !== 'ready' || !headEtag || this.snapshotBusy()
-      || (currentVersion?.availableAction !== 'ACTIVATE' && currentVersion?.availableAction !== 'ROLLBACK')) return;
+    if (state.kind !== 'ready' || this.snapshotBusy()) return;
+    if (!headEtag || headEtag !== expectedHeadEtag
+      || currentVersion?.governanceState !== 'READY'
+      || (currentVersion.availableAction !== 'ACTIVATE' && currentVersion.availableAction !== 'ROLLBACK')) {
+      this.snapshotFeedbackError.set(true);
+      this.snapshotFeedback.set(this.i18n.text('snapshotStateChanged'));
+      return;
+    }
     this.snapshotBusy.set(true);
     this.snapshotFeedback.set(null);
     this.snapshotFeedbackError.set(false);

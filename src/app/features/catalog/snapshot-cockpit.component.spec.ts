@@ -66,7 +66,7 @@ describe('SnapshotCockpitComponent', () => {
       snapshotKey: 'candidate-2', ruleSetKey: 'benefit-rules', ruleSetVersion: 2,
       publicationRevision: 2, snapshotContentHash: 'A'.repeat(64), publishedBy: 'publisher',
       publishedAtUtc: '2026-08-13T12:00:00Z', active: false,
-      governanceState: 'READY', availableAction: 'UNAVAILABLE'
+      governanceState: 'READY', availableAction: 'ACTIVATE'
     };
     Object.defineProperty(component, 'rolloutCatalog', {
       configurable: true,
@@ -80,8 +80,33 @@ describe('SnapshotCockpitComponent', () => {
         ruleSetKey: 'benefit-rules', rollouts: [], availableActions: ['CREATE_ROLLOUT']
       })
     });
+    expect(component.canCreateRollout(version)).toBe(false);
+    expect(component.canCreateRollout({ ...version, availableAction: 'CREATE_ROLLOUT' })).toBe(true);
+    Object.defineProperty(component, 'head', {
+      value: () => ({ headEtag: 'head-1' })
+    });
     expect(component.canCreateRollout(version)).toBe(true);
+    expect(component.canCreateRollout({ ...version, availableAction: 'CREATE_ROLLOUT' })).toBe(false);
     expect(component.canCreateRollout({ ...version, active: true })).toBe(false);
+    expect(component.canCreateRollout({ ...version, availableAction: 'UNAVAILABLE' })).toBe(false);
+    for (const governanceState of ['RUNTIME_INCOMPATIBLE', 'REPUBLICATION_REQUIRED', 'INVALID'] as const) {
+      const unavailable = { ...version, governanceState, availableAction: 'UNAVAILABLE' as const };
+      expect(component.canCreateRollout(unavailable)).toBe(false);
+      expect(component.actionLabel(unavailable)).toContain('indisponível');
+      // Even contradictory stale actions cannot make a non-ready version operational.
+      expect(component.canCreateRollout({ ...unavailable, availableAction: 'ACTIVATE' })).toBe(false);
+      expect(component.actionLabel({ ...unavailable, availableAction: 'ACTIVE', active: true }))
+        .toContain('indisponível');
+    }
+  });
+
+  it('explains runtime incompatibility and preserved audit history in both locales', () => {
+    const component = TestBed.runInInjectionContext(() => new SnapshotCockpitComponent());
+    expect(component.i18n.text('snapshotRuntimeIncompatible')).toContain('runtime atual');
+    expect(component.i18n.text('snapshotRuntimeIncompatibleHint')).toContain('auditoria');
+    component.i18n.locale.set('en-US');
+    expect(component.i18n.text('snapshotRuntimeIncompatible')).toContain('current runtime');
+    expect(component.i18n.text('snapshotRuntimeIncompatibleHint')).toContain('preserved for audit');
   });
 
   it('projects stable snapshot blocker codes through localized product copy', () => {
