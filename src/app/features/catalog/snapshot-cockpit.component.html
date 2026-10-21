@@ -19,10 +19,18 @@
         <div><dt>{{ i18n.text('ruleSetVersion') }}</dt><dd>{{ currentHead.ruleSetVersion }}</dd></div>
         <div><dt>{{ i18n.text('publicationRevision') }}</dt><dd>{{ currentHead.publicationRevision }}</dd></div>
         <div><dt>{{ i18n.text('activationRevision') }}</dt><dd>{{ currentHead.activationRevision }}</dd></div>
-        <div><dt>{{ i18n.text('governanceState') }}</dt><dd>{{ currentHead.governanceState }}</dd></div>
+        <div><dt>{{ i18n.text('governanceState') }}</dt><dd>{{ currentHead.governanceState === 'RUNTIME_INCOMPATIBLE' ? i18n.text('snapshotRuntimeIncompatible') : currentHead.governanceState }}</dd></div>
         <div class="snapshot-etag"><dt>{{ i18n.text('headEtag') }}</dt><dd><code>{{ currentHead.headEtag }}</code></dd></div>
       </dl>
+      @if (currentHead.governanceState === 'RUNTIME_INCOMPATIBLE') {
+        <p class="state-message" role="status">{{ i18n.text('snapshotRuntimeIncompatibleHint') }}</p>
+      }
       <small class="authority-note">{{ i18n.text('etagBoundary') }}</small>
+
+    } @else {
+      <p class="empty snapshot-empty">{{ i18n.text('noSnapshotHead') }}</p>
+      <p class="authority-note">{{ i18n.text('snapshotPublicationBoundary') }}</p>
+    }
       <section class="rollout-policy" aria-labelledby="staged-rollout-title">
         <header>
           <div>
@@ -168,6 +176,7 @@
           <p [class.state-message]="rolloutPolicyFeedbackError()" [attr.role]="rolloutPolicyFeedbackError() ? 'alert' : 'status'">{{ rolloutPolicyFeedback() }}</p>
         }
       </section>
+    @if (head(); as currentHead) {
       <section class="execution-observations" aria-labelledby="host-status-title">
         <header>
           <div>
@@ -242,8 +251,6 @@
           <p class="empty">{{ i18n.text('noExecutionObservations') }}</p>
         }
       </section>
-    } @else {
-      <p class="empty snapshot-empty">{{ i18n.text('noSnapshotHead') }}</p>
     }
 
     <div class="snapshot-version-list">
@@ -256,15 +263,18 @@
           <dl>
             <div><dt>{{ i18n.text('ruleSetVersion') }}</dt><dd>{{ version.ruleSetVersion }}</dd></div>
             <div><dt>{{ i18n.text('publicationRevision') }}</dt><dd>{{ version.publicationRevision }}</dd></div>
-            <div><dt>{{ i18n.text('governanceState') }}</dt><dd>{{ version.governanceState }}</dd></div>
+            <div><dt>{{ i18n.text('governanceState') }}</dt><dd>{{ version.governanceState === 'RUNTIME_INCOMPATIBLE' ? i18n.text('snapshotRuntimeIncompatible') : version.governanceState }}</dd></div>
             <div><dt>{{ i18n.text('contentHash') }}</dt><dd><code>{{ version.snapshotContentHash }}</code></dd></div>
           </dl>
-          @if (version.availableAction === 'ACTIVATE' || version.availableAction === 'ROLLBACK') {
+          @if (version.governanceState === 'READY' && (version.availableAction === 'ACTIVATE' || version.availableAction === 'ROLLBACK')) {
             <button type="button" [disabled]="busy() || !head()?.headEtag" (click)="operate.emit(version)">
               {{ actionLabel(version) }}
             </button>
           } @else {
             <span class="snapshot-action-state">{{ actionLabel(version) }}</span>
+          }
+          @if (version.governanceState === 'RUNTIME_INCOMPATIBLE') {
+            <p class="state-message">{{ i18n.text('snapshotRuntimeIncompatibleHint') }}</p>
           }
         </article>
       } @empty {

@@ -1,4 +1,5 @@
 import '@angular/compiler';
+import type { DomainRuleRolloutCatalogItem, DomainRuleSnapshotVersion } from '@praxisui/core';
 import { ElementRef } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
@@ -37,6 +38,15 @@ function decision(key: string): DecisionSummary {
   };
 }
 
+function snapshotVersion(overrides: Partial<DomainRuleSnapshotVersion> = {}): DomainRuleSnapshotVersion {
+  return {
+    snapshotKey: 'candidate-1', ruleSetKey: 'test-rules', ruleSetVersion: 1,
+    publicationRevision: 1, snapshotContentHash: 'A'.repeat(64), publishedBy: 'publisher',
+    publishedAtUtc: '2026-10-21T10:00:00Z', active: false,
+    governanceState: 'READY', availableAction: 'ACTIVATE', ...overrides
+  };
+}
+
 describe('CatalogWorkspaceComponent selection isolation', () => {
   const timelines = { A: [] as Subject<any>[], B: [] as Subject<any>[] };
   const lifecycles = { A: [] as Subject<any>[], B: [] as Subject<any>[] };
@@ -48,6 +58,9 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
   const updateScenario = vi.fn();
   const reviewWorkspace = vi.fn();
   const cancelRollout = vi.fn();
+  const activateRolloutCandidate = vi.fn();
+  const createRollout = vi.fn();
+  const operateSnapshot = vi.fn();
   let sandboxRuns: Subject<any>[];
   let runSandbox: ReturnType<typeof vi.fn>;
   const operationalTestAction = vi.fn();
@@ -79,6 +92,9 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     updateScenario.mockReset();
     reviewWorkspace.mockReset();
     cancelRollout.mockReset();
+    activateRolloutCandidate.mockReset();
+    createRollout.mockReset();
+    operateSnapshot.mockReset();
     operationalTestAction.mockReset();
     runOperationalTest.mockReset();
     logoutSession.mockReset();
@@ -112,6 +128,9 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
         updateScenario,
         reviewWorkspace,
         cancelRollout,
+        activateRolloutCandidate,
+        createRollout,
+        operateSnapshot,
         runSandbox
       } }
     ] });
@@ -506,6 +525,165 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(component.authenticationRequired()).toBe(true);
     expect(component.sessionActive()).toBe(false);
     expect(component.authoringFeedback()).toContain('sessão expirou');
+  });
+
+  it('does not offer snapshot or rollout operations for non-ready history, even when active', () => {
+    component.snapshotHead.set({ headEtag: 'head-1' } as any);
+    component.rolloutCatalog.set({ availableActions: ['CREATE_ROLLOUT'], rollouts: [] } as any);
+    for (const governanceState of ['RUNTIME_INCOMPATIBLE', 'REPUBLICATION_REQUIRED', 'INVALID'] as const) {
+      for (const active of [false, true]) {
+        const version = snapshotVersion({
+          snapshotKey: 'historical-1', governanceState, active, availableAction: 'UNAVAILABLE'
+        });
+        component.snapshotVersions.set([version]);
+        component.createRollout(version.snapshotKey);
+        component.operateSnapshot(version);
+        expect(component.governedConfirmation()).toBeNull();
+      }
+    }
+    expect(createRollout).not.toHaveBeenCalled();
+    expect(operateSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('starts a server-authorized bootstrap rollout using the observed absence', () => {
+    component.rolloutCatalog.set({ availableActions: ['CREATE_ROLLOUT'], rollouts: [] } as any);
+    component.snapshotVersions.set([snapshotVersion({ availableAction: 'CREATE_ROLLOUT' })]);
+    createRollout.mockReturnValue(of({ rolloutId: 'bootstrap-1' }));
+
+    component.createRollout('candidate-1');
+    expect(component.governedConfirmation()?.target).toBe('candidate-1');
+    component.confirmGovernedOperation();
+
+    expect(createRollout).toHaveBeenCalledWith('candidate-1', null, config);
+    expect(component.snapshotHead()).toBeNull();
+  });
+
+  it('does not reinterpret a missing head while its read is loading or failed', () => {
+    component.rolloutCatalog.set({ availableActions: ['CREATE_ROLLOUT'], rollouts: [] } as any);
+    component.snapshotVersions.set([snapshotVersion({ availableAction: 'CREATE_ROLLOUT' })]);
+    component.snapshotsLoading.set(true);
+    component.createRollout('candidate-1');
+    expect(component.governedConfirmation()).toBeNull();
+    component.snapshotsLoading.set(false);
+    component.snapshotsError.set(true);
+    component.createRollout('candidate-1');
+    expect(component.governedConfirmation()).toBeNull();
+    expect(createRollout).not.toHaveBeenCalled();
+  });
+
+  it('does not replace confirmed absence with a head that appeared during confirmation', () => {
+    component.rolloutCatalog.set({ availableActions: ['CREATE_ROLLOUT'], rollouts: [] } as any);
+    component.snapshotVersions.set([snapshotVersion({ availableAction: 'CREATE_ROLLOUT' })]);
+    component.createRollout('candidate-1');
+    expect(component.governedConfirmation()).not.toBeNull();
+    component.snapshotHead.set({ headEtag: 'new-head' } as any);
+    component.snapshotVersions.set([snapshotVersion()]);
+
+    component.confirmGovernedOperation();
+
+    expect(createRollout).not.toHaveBeenCalled();
+    expect(component.rolloutFeedbackError()).toBe(true);
+    expect(component.rolloutFeedback()).toBe('O estado mudou. Revise o catálogo antes de confirmar novamente.');
+  });
+
+  it('does not refresh a confirmed existing head token for rollout or activation', () => {
+    component.snapshotHead.set({ headEtag: 'head-1' } as any);
+    component.rolloutCatalog.set({ availableActions: ['CREATE_ROLLOUT'], rollouts: [] } as any);
+    component.snapshotVersions.set([snapshotVersion()]);
+    component.createRollout('candidate-1');
+    component.snapshotHead.set({ headEtag: 'head-2' } as any);
+    component.confirmGovernedOperation();
+    expect(createRollout).not.toHaveBeenCalled();
+    expect(component.rolloutFeedbackError()).toBe(true);
+    expect(component.rolloutFeedback()).toContain('O estado mudou.');
+
+    component.operateSnapshot(snapshotVersion());
+    component.snapshotHead.set({ headEtag: 'head-3' } as any);
+    component.confirmGovernedOperation();
+    expect(operateSnapshot).not.toHaveBeenCalled();
+    expect(component.snapshotFeedbackError()).toBe(true);
+    expect(component.snapshotFeedback()).toBe('O estado mudou. Revise o catálogo antes de confirmar novamente.');
+  });
+
+  it('revalidates candidate availability after rollout confirmation', () => {
+    component.snapshotHead.set({ headEtag: 'head-1' } as any);
+    component.rolloutCatalog.set({ availableActions: ['CREATE_ROLLOUT'], rollouts: [] } as any);
+    const candidate = snapshotVersion();
+    component.snapshotVersions.set([candidate]);
+    component.createRollout(candidate.snapshotKey);
+    expect(component.governedConfirmation()?.target).toBe(candidate.snapshotKey);
+    component.snapshotVersions.set([{
+      ...candidate, governanceState: 'RUNTIME_INCOMPATIBLE', availableAction: 'UNAVAILABLE'
+    }]);
+
+    component.confirmGovernedOperation();
+
+    expect(createRollout).not.toHaveBeenCalled();
+    expect(component.rolloutBusy()).toBe(false);
+  });
+
+  it('revalidates snapshot availability after activation confirmation', () => {
+    component.snapshotHead.set({ headEtag: 'head-1' } as any);
+    const candidate = snapshotVersion();
+    component.snapshotVersions.set([candidate]);
+    component.operateSnapshot(candidate);
+    expect(component.governedConfirmation()?.target).toBe(candidate.snapshotKey);
+    component.snapshotVersions.set([{
+      ...candidate, governanceState: 'RUNTIME_INCOMPATIBLE', availableAction: 'UNAVAILABLE'
+    }]);
+
+    component.confirmGovernedOperation();
+
+    expect(operateSnapshot).not.toHaveBeenCalled();
+    expect(component.snapshotBusy()).toBe(false);
+  });
+
+  function readyBootstrapRollout(): DomainRuleRolloutCatalogItem {
+    return {
+      rollout: {
+        rolloutId: 'bootstrap-1', ruleSetKey: 'test-rules', candidateSnapshotKey: 'candidate-1',
+        candidateContentHash: 'A'.repeat(64), expectedActiveSnapshotKey: null, expectedHeadEtag: null,
+        policyKey: 'host-quorum', policyVersion: 1, enforcementMode: 'REQUIRED', status: 'READY',
+        createdAtUtc: '2026-10-21T12:00:00Z', expiresAtUtc: null
+      },
+      readiness: {
+        rolloutId: 'bootstrap-1', ruleSetKey: 'test-rules', candidateSnapshotKey: 'candidate-1',
+        status: 'READY', enforcementMode: 'REQUIRED', minimumFreshProbes: 1, minimumReadyRatio: 1,
+        totalProbes: 1, readyProbes: 1, incompatibleProbes: 0, unavailableProbes: 0, staleProbes: 0,
+        activationReady: true, staleBeforeUtc: '2026-10-21T11:58:00Z'
+      },
+      expectedHeadCurrent: true, expired: false, availableActions: ['ACTIVATE_CANDIDATE']
+    };
+  }
+
+  it.each(['action', 'missing', 'rolloutId', 'ruleSetKey', 'candidateSnapshotKey', 'candidateContentHash',
+    'expectedActiveSnapshotKey', 'expectedHeadEtag'] as const)(
+    'rejects rollout activation when the confirmed %s changes and explains the conflict', field => {
+      const item = readyBootstrapRollout();
+      component.rolloutCatalog.set({ ruleSetKey: 'test-rules', availableActions: [], rollouts: [item] });
+      component.activateRollout(item);
+      expect(component.governedConfirmation()?.target).toBe('candidate-1');
+      if (field === 'action') item.availableActions = [];
+      else if (field === 'missing') component.rolloutCatalog.set({ ruleSetKey: 'test-rules', availableActions: [], rollouts: [] });
+      else item.rollout[field] = 'changed-after-confirmation';
+
+      component.confirmGovernedOperation();
+
+      expect(activateRolloutCandidate).not.toHaveBeenCalled();
+      expect(component.rolloutFeedbackError()).toBe(true);
+      expect(component.rolloutFeedback()).toBe('O estado mudou. Revise o catálogo antes de confirmar novamente.');
+      expect(component.rolloutBusy()).toBe(false);
+    }
+  );
+
+  it('activates only the unchanged confirmed bootstrap rollout identity', () => {
+    const item = readyBootstrapRollout();
+    component.rolloutCatalog.set({ ruleSetKey: 'test-rules', availableActions: [], rollouts: [item] });
+    activateRolloutCandidate.mockReturnValue(new Subject().asObservable());
+    component.activateRollout(item);
+    component.confirmGovernedOperation();
+    expect(activateRolloutCandidate).toHaveBeenCalledWith(item, config);
+    expect(component.rolloutBusy()).toBe(true);
   });
 
   it('requires the contextual governed dialog before cancelling a rollout', () => {

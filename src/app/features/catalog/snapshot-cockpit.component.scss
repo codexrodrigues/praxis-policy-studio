@@ -26,6 +26,7 @@ p { margin: 0; }
 .snapshot-version-identity strong, .snapshot-version-identity small { overflow-wrap: anywhere; }
 .snapshot-version-list dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem 1rem; margin: 0; }
 .snapshot-version-list dl div { min-width: 0; }
+.snapshot-version-list .state-message { grid-column: 1 / -1; }
 .snapshot-action-state { color: var(--pax-color-on-surface-variant, #52636a); font-size: .78rem; font-weight: 700; }
 .snapshot-prerequisites { display: grid; gap: .25rem; padding-top: .5rem; border-top: 1px dashed var(--pax-color-outline-variant, #b9c6cb); }
 .rollout-policy { display: grid; gap: 1rem; margin-top: .5rem; padding-block: 1rem; border-block: 1px solid var(--pax-color-outline-variant, #b9c6cb); }

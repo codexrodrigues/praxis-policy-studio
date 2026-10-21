@@ -71,9 +71,11 @@ export class SnapshotCockpitComponent {
   ];
 
   actionLabel(version: DomainRuleSnapshotVersion): string {
+    if (version.governanceState !== 'READY') return this.i18n.text('snapshotUnavailable');
     if (version.availableAction === 'ACTIVATE') return this.i18n.text('activateSnapshot');
     if (version.availableAction === 'ROLLBACK') return this.i18n.text('rollbackSnapshot');
     if (version.availableAction === 'ACTIVE') return this.i18n.text('activeSnapshot');
+    if (version.availableAction === 'CREATE_ROLLOUT') return this.i18n.text('startRollout');
     return this.i18n.text('snapshotUnavailable');
   }
 
@@ -100,6 +102,10 @@ export class SnapshotCockpitComponent {
 
   canCreateRollout(version: DomainRuleSnapshotVersion): boolean {
     return !version.active
+      && version.governanceState === 'READY'
+      && (this.head() === null
+        ? version.availableAction === 'CREATE_ROLLOUT'
+        : version.availableAction === 'ACTIVATE' || version.availableAction === 'ROLLBACK')
       && (this.rolloutCatalog()?.availableActions.includes('CREATE_ROLLOUT') ?? false);
   }
 

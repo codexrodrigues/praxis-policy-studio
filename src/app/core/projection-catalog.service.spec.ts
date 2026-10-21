@@ -3,7 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { BrowserTestingModule, platformBrowserTesting } from '@angular/platform-browser/testing';
-import { API_URL } from '@praxisui/core';
+import { API_URL, type ResourceActionCatalogItem } from '@praxisui/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ProjectionCatalogService } from './projection-catalog.service';
 
@@ -233,7 +233,7 @@ describe('ProjectionCatalogService', () => {
       mode: 'remote' as const, configApiBaseUrl: '', locale: 'en-US' as const,
       projectionPath: '/projections/reference.json', initialDecisionKey: null
     };
-    const action = {
+    const action: ResourceActionCatalogItem = {
       id: 'record-operational-test-run',
       resourceKey: 'human-resources.extraordinary-benefit-requests',
       scope: 'COLLECTION' as const,
@@ -242,11 +242,11 @@ describe('ProjectionCatalogService', () => {
       operationId: 'recordOperationalTestRun',
       path: '/api/quickstart/extraordinary-benefit-requests/policy-studio/operational-test-runs',
       method: 'POST',
-      availability: { allowed: true, reasonCode: 'ALLOWED', reasons: [] },
+      availability: { allowed: true, reason: null, metadata: {} },
       order: 10,
       tags: ['policy-studio', 'operational-proof'],
       execution: {
-        interaction: { mode: 'CONFIRM' as const, risk: 'HIGH' as const, confirmationRequired: true, reversible: true },
+        interaction: { mode: 'CONFIRM' as const, riskLevel: 'HIGH' as const, confirmationRequired: true, reversible: true },
         preconditions: {
           idempotencyKey: 'REQUIRED' as const, correlationId: 'REQUIRED' as const,
           resourceVersion: 'REQUIRED' as const, resourceVersionTransport: 'IF_MATCH' as const,
@@ -259,8 +259,8 @@ describe('ProjectionCatalogService', () => {
       }
     };
 
-    let discovered: typeof action | null = null;
-    service.operationalTestAction(action.resourceKey, config).subscribe(value => discovered = value as typeof action);
+    let discovered: ResourceActionCatalogItem | null = null;
+    service.operationalTestAction(action.resourceKey, config).subscribe(value => discovered = value);
     const discovery = http.expectOne(request =>
       request.url === '/schemas/actions'
       && request.params.get('resource') === action.resourceKey);
@@ -368,8 +368,8 @@ describe('ProjectionCatalogService', () => {
     const versions = http.expectOne(request => request.url.endsWith('/domain-rules/snapshots'));
     expect(versions.request.params.get('ruleSetKey')).toBe('benefit rules');
     expect(versions.request.params.get('limit')).toBe('50');
-    versions.flush([{ snapshotKey: 'snapshot-1', availableAction: 'ACTIVATE' }]);
-    expect(cockpit).toEqual({ head: null, versions: [{ snapshotKey: 'snapshot-1', availableAction: 'ACTIVATE' }] });
+    versions.flush([{ snapshotKey: 'snapshot-1', availableAction: 'CREATE_ROLLOUT' }]);
+    expect(cockpit).toEqual({ head: null, versions: [{ snapshotKey: 'snapshot-1', availableAction: 'CREATE_ROLLOUT' }] });
 
     service.operateSnapshot({ snapshotKey: 'snapshot 1', availableAction: 'ACTIVATE' }, 'head-7', config).subscribe();
     const activate = http.expectOne('/api/praxis/config/domain-rules/snapshots/snapshot%201/activate');
@@ -382,6 +382,48 @@ describe('ProjectionCatalogService', () => {
     expect(rollback.request.method).toBe('POST');
     expect(rollback.request.headers.get('If-Match')).toBe('"head-8"');
     rollback.flush({ activationType: 'ROLLED_BACK', headEtag: 'head-9' });
+  });
+
+  it.each([401, 403, 500])('does not reinterpret a head HTTP %i failure as bootstrap absence', status => {
+    const config = {
+      mode: 'remote' as const, configApiBaseUrl: '', locale: 'en-US' as const,
+      projectionPath: '/projections/reference.json', initialDecisionKey: null
+    };
+    const values: unknown[] = [];
+    const failures: unknown[] = [];
+    service.snapshotCockpit('benefit-rules', config).subscribe({
+      next: value => values.push(value), error: error => failures.push(error)
+    });
+    const head = http.expectOne(request => request.url.endsWith('/domain-rules/snapshots/head/status'));
+    http.expectOne(request => request.url.endsWith('/domain-rules/snapshots')).flush([]);
+    head.flush({}, { status, statusText: 'Unavailable' });
+    expect(values).toEqual([]);
+    expect(failures).toEqual([expect.objectContaining({ status })]);
+  });
+
+  it('transports bootstrap absence and the actual rollout identity without selecting a head at publication', () => {
+    const config = {
+      mode: 'remote' as const, configApiBaseUrl: '', locale: 'en-US' as const,
+      projectionPath: '/projections/reference.json', initialDecisionKey: null
+    };
+    service.createRollout('candidate-1', null, config).subscribe();
+    const create = http.expectOne('/api/praxis/config/domain-rules/snapshots/rollouts');
+    expect(create.request.headers.get('If-None-Match')).toBe('*');
+    expect(create.request.headers.has('If-Match')).toBe(false);
+    expect(create.request.body).toEqual({ candidateSnapshotKey: 'candidate-1' });
+    create.flush({ rolloutId: 'bootstrap-1', expectedActiveSnapshotKey: null, expectedHeadEtag: null });
+
+    service.activateRolloutCandidate({ rollout: {
+      rolloutId: 'bootstrap-1', ruleSetKey: 'benefit-rules', candidateSnapshotKey: 'candidate-1',
+      candidateContentHash: 'A'.repeat(64), expectedActiveSnapshotKey: null, expectedHeadEtag: null,
+      policyKey: 'required-policy', policyVersion: 1, enforcementMode: 'REQUIRED', status: 'READY',
+      createdAtUtc: '2026-10-21T12:00:00Z', expiresAtUtc: null
+    } }, config).subscribe();
+    const activate = http.expectOne('/api/praxis/config/domain-rules/snapshots/candidate-1/activate');
+    expect(activate.request.headers.get('If-None-Match')).toBe('*');
+    expect(activate.request.headers.has('If-Match')).toBe(false);
+    expect(activate.request.headers.get('X-Rule-Rollout-ID')).toBe('bootstrap-1');
+    activate.flush({ activationType: 'ACTIVATED', headEtag: 'head-1' });
   });
 
   it('loads the redacted execution summary through the public Core client', () => {

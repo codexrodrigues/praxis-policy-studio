@@ -564,7 +564,7 @@ export class ProjectionCatalogService {
 
   createRollout(
     candidateSnapshotKey: string,
-    headEtag: string,
+    headEtag: string | null,
     config: PolicyStudioRuntimeConfig
   ): Observable<DomainRuleRollout> {
     return this.domainRules.createRollout(
