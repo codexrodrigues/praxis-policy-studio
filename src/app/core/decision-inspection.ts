@@ -29,6 +29,10 @@ export function formatDecisionExpression(value: unknown): string | null {
     const joiner = operator === 'or' ? ' OU ' : ' E ';
     return raw.map(item => `(${formatDecisionExpression(item) ?? '?'})`).join(joiner);
   }
+  if (operator === '*' && Array.isArray(raw) && raw.length >= 2) {
+    const operands = raw.map(formatDecisionExpression);
+    return operands.every(operand => operand !== null) ? `(${operands.join(' * ')})` : null;
+  }
   if (binaryOperators.has(operator) && Array.isArray(raw) && raw.length >= 2) {
     const left = formatDecisionExpression(raw[0]) ?? '?';
     const right = raw[1] === null ? 'nulo' : (formatDecisionExpression(raw[1]) ?? '?');

@@ -60,7 +60,7 @@ describe('SnapshotCockpitComponent', () => {
     })).toBe('ACTIVE');
   });
 
-  it('creates rollout controls only from the rollout catalog action', () => {
+  it('requires the server version action and a successful head read for bootstrap rollout controls', () => {
     const component = TestBed.runInInjectionContext(() => new SnapshotCockpitComponent());
     const version: DomainRuleSnapshotVersion = {
       snapshotKey: 'candidate-2', ruleSetKey: 'benefit-rules', ruleSetVersion: 2,
@@ -82,6 +82,11 @@ describe('SnapshotCockpitComponent', () => {
     });
     expect(component.canCreateRollout(version)).toBe(false);
     expect(component.canCreateRollout({ ...version, availableAction: 'CREATE_ROLLOUT' })).toBe(true);
+    for (const state of ['loading', 'loadError', 'rolloutLoading', 'rolloutError'] as const) {
+      Object.defineProperty(component, state, { configurable: true, value: () => true });
+      expect(component.canCreateRollout({ ...version, availableAction: 'CREATE_ROLLOUT' })).toBe(false);
+      Object.defineProperty(component, state, { configurable: true, value: () => false });
+    }
     Object.defineProperty(component, 'head', {
       value: () => ({ headEtag: 'head-1' })
     });

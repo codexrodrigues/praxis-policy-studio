@@ -6,7 +6,7 @@
     {
       "path": "src/main/java/com/example/praxis/apiquickstart/rulelab/ExtraordinaryGrantRuleSetFactory.java",
       "kind": "RULESET_DEFINITION",
-      "sha256": "5EB0A86B32E86E4471EA770BE9FD1C620C8BAA3A2B31287058FE68520E049964"
+      "sha256": "92C6F8B1638ACA70E75268E736BE3599C2BA7BE51A3E85530BC9C9BAFFA153C5"
     },
     {
       "path": "src/test/resources/rule-lab/rule-lab-golden-suite.json",
@@ -207,7 +207,7 @@
       "bindingRefs": [
         {
           "bindingKey": "grant.amount-parameters",
-          "source": "PRODUCT",
+          "source": "CUSTOMER",
           "executorType": "JSON_LOGIC",
           "order": 80
         }

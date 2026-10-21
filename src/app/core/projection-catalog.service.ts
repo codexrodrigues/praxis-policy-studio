@@ -26,6 +26,7 @@ import {
   type DomainRuleSnapshotActivation,
   type DomainRuleExecutionSummary,
   type DomainRuleFactCatalog,
+  type DomainRuleParameterCatalog,
   type DomainRuleHostStatusSummary,
   type DomainRuleRolloutPolicy,
   type DomainRuleRolloutPolicyCatalog,
@@ -97,7 +98,7 @@ export class ProjectionCatalogService {
         const workspace = this.latestWorkspace(workspaces, candidate.ruleKey);
         if (!projection || !decision) {
           return this.catalogSummary(candidate, index, catalog.length, locale,
-            definitionCapability?.availableActions ?? [], factCatalog);
+            definitionCapability?.availableActions ?? [], factCatalog, definition, workspace);
         }
         const conditionFactPaths = collectFactPaths(definition?.condition);
         if (conditionFactPaths.some(factPath => !decision.factPaths.includes(factPath))) {
@@ -184,7 +185,9 @@ export class ProjectionCatalogService {
     total: number,
     locale: SupportedLocale,
     availableDefinitionActions: DecisionSummary['availableDefinitionActions'],
-    factCatalog?: DomainRuleFactCatalog
+    factCatalog?: DomainRuleFactCatalog,
+    definition?: DomainRuleDefinition,
+    workspace?: DomainRuleChangeWorkspace
   ): DecisionSummary {
     const context = candidate.contextKey?.trim() || candidate.resourceKey?.trim() || 'domain-decisions';
     return {
@@ -210,15 +213,22 @@ export class ProjectionCatalogService {
       configDefinitionId: candidate.definitionId,
       configVersion: candidate.version,
       configStatus: candidate.status,
-      expression: null,
-      condition: null,
-      factPaths: factCatalog?.facts.map(fact => fact.path) ?? [],
+      workspaceId: workspace?.id,
+      workspaceStatus: workspace?.status,
+      workspaceEtag: workspace?.etag,
+      workspaceRevision: workspace?.revision,
+      promotedDefinitionId: workspace?.promotedDefinitionId ?? null,
+      workspaceCondition: workspace?.condition ?? null,
+      workspaceParameters: workspace?.parameters ?? {},
+      expression: formatDecisionExpression(definition?.condition),
+      condition: definition?.condition ?? null,
+      factPaths: factCatalog?.facts.map(fact => fact.path) ?? collectFactPaths(definition?.condition),
       facts: this.decisionFacts(factCatalog, locale),
-      nullSemantics: null,
-      operationKeys: [],
-      hostContractVersion: null,
+      nullSemantics: this.stringValue(definition?.parameters, 'nullSemantics'),
+      operationKeys: this.stringArrayValue(definition?.parameters, 'operationKeys') ?? [],
+      hostContractVersion: this.stringValue(definition?.parameters, 'hostContractVersion'),
       evidence: [],
-      draftLifecycle: null
+      draftLifecycle: this.stringValue(definition?.governance, 'lifecycleBoundary')
     };
   }
 
@@ -272,6 +282,10 @@ export class ProjectionCatalogService {
       evidence: projection.sourceArtifacts,
       draftLifecycle: null
     }));
+  }
+
+  parameters(definitionId: string, config: PolicyStudioRuntimeConfig): Observable<DomainRuleParameterCatalog> {
+    return this.domainRules.getDefinitionParameters(definitionId, this.requestOptions(config));
   }
 
   createWorkspace(

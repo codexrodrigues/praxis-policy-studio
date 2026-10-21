@@ -142,6 +142,10 @@ async function governedResponse(
     }]
   });
   if (path.endsWith('/definitions')) return json([definition]);
+  if (path.endsWith(`/definitions/${definition.id}/parameters`)) return json({
+    definitionId: definition.id, ruleKey: definition.ruleKey, definitionVersion: definition.version,
+    schemaVersion: 'praxis.domain-rule-parameter-catalog.v1', templateKey: null, templateVersion: null, parameters: []
+  });
   if (path.endsWith(`/definitions/${definition.id}/facts`)) return json({
     definitionId: definition.id,
     ruleKey: definition.ruleKey,
@@ -216,9 +220,9 @@ async function governedResponse(
       operationId: 'runOperationalProof',
       path: '/api/human-resources/extraordinary-benefit-requests/actions/run-policy-studio-operational-test',
       method: 'POST', order: 1, tags: ['policy-studio', 'operational-proof'],
-      availability: { allowed: operationalAllowed, reasonCode: operationalAllowed ? 'ALLOWED' : 'FORBIDDEN', reasons: [] },
+      availability: { allowed: operationalAllowed, reason: operationalAllowed ? 'ALLOWED' : 'FORBIDDEN' },
       execution: {
-        interaction: { mode: 'CONFIRM', risk: 'HIGH', confirmationRequired: true, reversible: true },
+        interaction: { mode: 'CONFIRM', riskLevel: 'HIGH', confirmationRequired: true, reversible: true },
         preconditions: {
           idempotencyKey: 'REQUIRED', correlationId: 'REQUIRED', resourceVersion: 'REQUIRED',
           resourceVersionTransport: 'IF_MATCH',
@@ -232,6 +236,8 @@ async function governedResponse(
   if (path.endsWith('/actions/run-policy-studio-operational-test') && request.method() === 'POST') {
     return json({ code: 'PRECONDITION_FAILED', message: 'Workspace ETag is stale.' }, 412);
   }
+  if (path.endsWith('/snapshots/rollouts')) return json({ ruleSetKey: 'extraordinary-grant-eligibility', rollouts: [], availableActions: [] });
+  if (path.endsWith('/snapshots/rollout-policies')) return json({}, 404);
   if (path.endsWith('/snapshots/head/status')) return json({}, 404);
   if (path.endsWith('/snapshots')) return json([]);
   return json([]);
@@ -579,3 +585,167 @@ for (const hasExistingHead of [false, true]) {
     await expect(cockpit.getByRole('button', { name: /Iniciar rollout|Promover candidato/ })).toHaveCount(0);
   });
 }
+
+
+for (const locale of ['pt-BR', 'en-US'] as const) {
+test(`round-trips typed rule parameters with immutable structure and current ETag (${locale})`, async ({ page }, testInfo) => {
+  await mockGovernedBackend(page, false);
+  const english = locale === 'en-US';
+  const labels = english
+    ? { edit: 'Edit rule', value: 'Declared value', save: 'Save governed draft', close: 'Close',
+        saved: 'Draft saved with concurrency control.', max: 'The value exceeds the allowed maximum.' }
+    : { edit: 'Editar regra', value: 'Valor declarado', save: 'Salvar draft governado', close: 'Fechar',
+        saved: 'Draft salvo com controle de concorrência.', max: 'O valor está acima do máximo permitido.' };
+  // The English case proves catalog-owned templates without a domain projection.
+  if (english) await page.route('**/app-config.json', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify({ mode: 'remote', configApiBaseUrl: '',
+      locale, projectionPath: null, initialDecisionKey: definition.ruleKey })
+  }));
+  const parameterMetadata = { nullSemantics: 'FAIL_CLOSED', productRef: 'benefit-policy' };
+  let savedValues: Record<string, unknown> = { limit: 3000 };
+  let revision = 4;
+  const ruleParameters = [
+    { name: 'limit', type: 'NUMBER', required: true, nullable: true, readOnly: false, unit: 'BRL',
+      defaultValue: 3000, minimum: 0, maximum: 5000, declaredValue: 3000, effectiveValue: 3000, origin: 'DECLARED' },
+    { name: 'label', type: 'STRING', required: false, nullable: false, readOnly: false,
+      defaultValue: '', effectiveValue: '', allowedValues: ['', 'STANDARD'], origin: 'DEFAULT' },
+    { name: 'policyCode', type: 'STRING', required: false, nullable: false, readOnly: true,
+      defaultValue: 'STANDARD', effectiveValue: 'STANDARD', allowedValues: ['STANDARD'], origin: 'DEFAULT' }
+  ];
+  await page.route(`**/definitions/${definition.id}/parameters`, route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify({
+      definitionId: definition.id, ruleKey: definition.ruleKey, definitionVersion: 1,
+      schemaVersion: 'praxis.domain-rule-parameter-catalog.v1', templateKey: 'benefit:limit', templateVersion: '1',
+      parameters: ruleParameters
+    })
+  }));
+  const currentWorkspace = () => ({ ...workspace, revision, etag: `workspace-etag-${revision}`,
+    parameters: { ...parameterMetadata, parameterValues: savedValues },
+    condition: revision > 4 ? { '<=': [{ var: 'request.requestedAmount' }, 2750] } : definition.condition });
+  await page.route('**/domain-rules/workspaces', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify([currentWorkspace()])
+  }));
+  await page.route('**/workspaces/workspace-1/draft', async route => {
+    expect(route.request().headers()['if-match']).toBe(`"workspace-etag-${revision}"`);
+    const body = route.request().postDataJSON();
+    expect(body.condition).toBeNull();
+    expect(body.parameters).toEqual({ ...parameterMetadata, parameterValues: { limit: 2750, label: '' } });
+    savedValues = body.parameters.parameterValues;
+    revision += 1;
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+      ...currentWorkspace(), condition: { '<=': [{ var: 'request.requestedAmount' }, 2750] }
+    }) });
+  });
+  await page.goto('/catalog');
+  if (testInfo.project.name === 'narrow') {
+    await page.getByRole('button', { name: english ? /grant.amount-parameters/ : /O valor solicitado deve respeitar o limite do programa/ }).click();
+  }
+  await page.getByRole('button', { name: labels.edit, exact: true }).click();
+  const editor = page.locator('.draft-workspace');
+  await expect(editor.locator('pax-local-draft-workspace')).toHaveCount(0);
+  const limit = editor.getByRole('group', { name: 'limit (BRL)' });
+  const value = limit.getByRole('spinbutton', { name: labels.value });
+  await expect(value).toHaveValue('3000');
+  await expect(editor.getByRole('group', { name: 'policyCode' }).getByRole('combobox')).toBeDisabled();
+  await value.fill('5001');
+  await expect(editor.getByRole('alert')).toHaveText(labels.max);
+  await expect(page.getByRole('button', { name: labels.save })).toBeDisabled();
+  await value.fill('2750');
+  const label = editor.getByRole('group', { name: 'label', exact: true });
+  await label.getByRole('combobox', { name: english ? 'Value origin' : 'Origem do valor' }).selectOption('VALUE');
+  const labelValue = label.getByRole('combobox', { name: labels.value });
+  await labelValue.selectOption('STANDARD');
+  await labelValue.selectOption({ label: english ? 'Empty string' : 'Texto vazio' });
+  await expect(labelValue).toHaveValue('');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await editor.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('rule-parameters.png') });
+  await page.getByRole('button', { name: labels.save }).click();
+  await expect(page.getByText(labels.saved)).toBeVisible();
+  await editor.getByRole('button', { name: labels.close, exact: true }).click();
+  await page.getByRole('button', { name: labels.edit, exact: true }).click();
+  await expect(editor.getByRole('spinbutton', { name: labels.value })).toHaveValue('2750');
+  await page.reload();
+  if (testInfo.project.name === 'narrow') {
+    await page.getByRole('button', { name: english ? /grant.amount-parameters/ : /O valor solicitado deve respeitar o limite do programa/ }).click();
+  }
+  await page.getByRole('button', { name: labels.edit, exact: true }).click();
+  await expect(page.locator('.draft-workspace').getByRole('spinbutton', { name: labels.value })).toHaveValue('2750');
+});
+}
+
+test('keeps first publication inactive and stages bootstrap only from server actions and verified head absence', async ({ page }, testInfo) => {
+  await mockGovernedBackend(page, false);
+  let staged = false;
+  let activationCommands = 0;
+  page.on('request', request => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname.endsWith('/activate')) activationCommands += 1;
+  });
+  await page.route('**/domain-rules/snapshots?**', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify([{
+      snapshotKey: 'published-without-head', ruleSetKey: 'extraordinary-grant-eligibility', ruleSetVersion: 2,
+      publicationRevision: 2, snapshotContentHash: 'A'.repeat(64), publishedBy: 'publisher',
+      publishedAtUtc: '2026-10-21T12:00:00Z', active: false,
+      governanceState: 'READY', availableAction: 'CREATE_ROLLOUT'
+    }])
+  }));
+  await page.route('**/domain-rules/snapshots/rollout-policies?**', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify({
+      ruleSetKey: 'extraordinary-grant-eligibility', activationRevision: 1, headEtag: 'policy-head',
+      versions: [], activePolicy: { policyKey: 'required-quorum', policyVersion: 1, enforcementMode: 'REQUIRED',
+        minimumFreshProbes: 1, minimumReadyRatio: 1, blockOnIncompatible: true, staleAfterSeconds: 120 },
+      availableActions: []
+    })
+  }));
+  await page.route('**/domain-rules/snapshots/rollouts?**', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify({
+      ruleSetKey: 'extraordinary-grant-eligibility', availableActions: ['CREATE_ROLLOUT'],
+      rollouts: staged ? [{ rollout: { rolloutId: 'first-rollout', candidateSnapshotKey: 'published-without-head',
+        expectedHeadEtag: null, expectedActiveSnapshotKey: null, enforcementMode: 'REQUIRED' },
+        readiness: { status: 'BLOCKED', activationReady: false, readyProbes: 0, totalProbes: 0, incompatibleProbes: 0, staleProbes: 0 },
+        expectedHeadCurrent: true, expired: false, availableActions: ['CANCEL'] }] : []
+    })
+  }));
+  await page.route('**/domain-rules/snapshots/rollouts', async route => {
+    expect(route.request().method()).toBe('POST');
+    expect(route.request().headers()['if-none-match']).toBe('*');
+    expect(route.request().headers()['if-match']).toBeUndefined();
+    expect(route.request().postDataJSON()).toEqual({ candidateSnapshotKey: 'published-without-head' });
+    staged = true;
+    await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({
+      rolloutId: 'first-rollout', candidateSnapshotKey: 'published-without-head',
+      expectedHeadEtag: null, expectedActiveSnapshotKey: null
+    }) });
+  });
+  await page.goto('/catalog');
+  if (testInfo.project.name === 'narrow') {
+    await page.getByRole('button', { name: /O valor solicitado deve respeitar o limite do programa/ }).click();
+  }
+  await page.getByRole('button', { name: /^Operar/ }).click();
+  const cockpit = page.locator('pax-snapshot-cockpit');
+  await expect(cockpit.getByText('Nenhum snapshot está ativo para este RuleSet.')).toBeVisible();
+  await expect(cockpit.getByText('required-quorum', { exact: true })).toBeVisible();
+  await expect(cockpit.getByRole('button', { name: /Iniciar rollout/ })).toBeEnabled();
+  await expect(cockpit.getByRole('button', { name: 'Ativar snapshot', exact: true })).toHaveCount(0);
+  await cockpit.getByRole('button', { name: /Iniciar rollout/ }).click();
+  expect(staged).toBe(false);
+  await page.getByRole('dialog').getByRole('button', { name: 'Iniciar rollout', exact: true }).click();
+  await expect(cockpit.getByText('BLOCKED · REQUIRED')).toBeVisible();
+  await expect(cockpit.getByText('Nenhum snapshot está ativo para este RuleSet.')).toBeVisible();
+  expect(activationCommands).toBe(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await cockpit.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('bootstrap-published-inactive.png') });
+
+  await page.route('**/snapshots/head/status?**', route => route.fulfill({ status: 500, contentType: 'application/json', body: '{}' }));
+  await page.reload();
+  if (testInfo.project.name === 'narrow') {
+    await page.getByRole('button', { name: /O valor solicitado deve respeitar o limite do programa/ }).click();
+  }
+  await page.getByRole('button', { name: /^Operar/ }).click();
+  await expect(cockpit.getByRole('button', { name: /Iniciar rollout/ })).toHaveCount(0);
+  await expect(cockpit.getByText('Nenhum snapshot está ativo para este RuleSet.')).toHaveCount(0);
+  await expect(cockpit.getByRole('button', { name: 'Tentar carregar snapshots novamente', exact: true })).toBeVisible();
+});

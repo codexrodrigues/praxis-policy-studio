@@ -106,7 +106,7 @@
       </span>
       <div class="decision-actions" [attr.aria-label]="i18n.text('decisionActions')">
         @if (current.workspaceId && current.authoringSupported && hasWorkspaceAction('VIEW')) {
-          <button type="button" class="primary-action" [disabled]="!current.condition || authoringBusy()" (click)="openAuthoringAndFocus()">
+          <button type="button" class="primary-action" [disabled]="!current.condition || authoringBusy() || parameterCatalogState() !== 'ready'" (click)="openAuthoringAndFocus()">
             {{ i18n.text('editRule') }}
           </button>
         } @else if (!current.workspaceId && current.authoringSupported && hasDefinitionAction('CREATE_NEW_VERSION')) {
@@ -211,6 +211,17 @@
         </div>
       </header>
 
+      @if (parameterCatalogState() === 'loading') {
+        <p role="status">{{ i18n.text('parametersLoading') }}</p>
+      } @else if (parameterCatalogState() !== 'ready') {
+        <p role="alert">{{ i18n.text(parameterCatalogState() === 'authentication' ? 'parametersAuthenticationRequired'
+          : parameterCatalogState() === 'forbidden' ? 'parametersPermissionLimited' : 'parametersLoadFailed') }}</p>
+        <button type="button" class="quiet-button" (click)="loadParameters()">{{ i18n.text('parametersRetry') }}</button>
+      } @else if (parameterized() && !authoringOpen()) {
+        <pax-rule-parameters [parameters]="parameterCatalog()!.parameters" [drafts]="parameterDrafts()"
+          [errors]="parameterErrors()" [disabled]="true" />
+      }
+
       <div class="inspection-grid">
         <section class="condition-panel">
           <p class="inspection-label">{{ i18n.text('condition') }}</p>
@@ -290,19 +301,26 @@
         <header>
           <div>
             <p class="section-label">{{ i18n.text('localDraft') }}</p>
-            <h3 id="draft-workspace-title">{{ current.name }}</h3>
+            <h2 id="draft-workspace-title">{{ current.name }}</h2>
             <p>{{ i18n.text('localDraftBoundary') }}</p>
           </div>
           <button type="button" class="quiet-button" (click)="closeAuthoring()">{{ i18n.text('close') }}</button>
         </header>
-        @defer (when authoringOpen()) {
-        <pax-local-draft-workspace
-          [config]="authoringConfig"
-          [condition]="editorCondition()"
-          (conditionChanged)="updateDraft($event)"
-          (stateChanged)="updateEditorState($event)" />
-        } @placeholder {
-          <p>{{ i18n.text('loading') }}</p>
+        @if (parameterized()) {
+          <pax-rule-parameters [parameters]="parameterCatalog()!.parameters" [drafts]="parameterDrafts()"
+            [errors]="parameterErrors()" [disabled]="authoringBusy() || !hasWorkspaceAction('UPDATE_DRAFT')"
+            (draftChange)="updateParameter($event)" />
+          <p>{{ i18n.text('parameterConditionDerived') }}</p>
+        } @else {
+          @defer (when authoringOpen()) {
+            <pax-local-draft-workspace
+              [config]="authoringConfig"
+              [condition]="editorCondition()"
+              (conditionChanged)="updateDraft($event)"
+              (stateChanged)="updateEditorState($event)" />
+          } @placeholder {
+            <p>{{ i18n.text('loading') }}</p>
+          }
         }
         <div class="draft-compare" aria-label="Comparação entre condição carregada e draft local">
           <section>
@@ -316,12 +334,12 @@
         </div>
         <footer>
           <div>
-            <strong>{{ editorState()?.validationErrors?.length ?? 0 }} {{ i18n.text('validationIssues') }}</strong>
+            <strong>{{ parameterized() ? parameterErrorCount() : editorState()?.validationErrors?.length ?? 0 }} {{ i18n.text('validationIssues') }}</strong>
             <small>{{ draftChanged() ? i18n.text('unsavedLocalChanges') : i18n.text('unchangedDraft') }}</small>
           </div>
           <div class="authoring-actions">
             <button type="button" class="quiet-button" (click)="resetDraft()">{{ i18n.text('resetDraft') }}</button>
-            <button type="button" [disabled]="authoringBusy() || !hasWorkspaceAction('UPDATE_DRAFT') || !draftChanged() || !!editorState()?.validationErrors?.length" (click)="saveGovernedDraft()">
+            <button type="button" [disabled]="authoringBusy() || !hasWorkspaceAction('UPDATE_DRAFT') || !draftChanged() || hasParameterErrors() || parameterCatalogState() !== 'ready' || !!editorState()?.validationErrors?.length" (click)="saveGovernedDraft()">
               {{ i18n.text('saveDraft') }}
             </button>
           </div>
@@ -458,7 +476,7 @@
         <small class="authority-note">{{ i18n.text('serverAuthorizesActions') }}</small>
       </section>
 
-      @if (current.promotedDefinitionId) {
+      @if (current.promotedDefinitionId && !parameterized() && parameterCatalogState() === 'ready') {
         <section class="publication-workspace work-mode-panel" aria-labelledby="publication-title" [hidden]="activeMode() !== 'operate'">
           <header>
             <div>
@@ -501,6 +519,7 @@
         <p class="section-label" id="decision-execution-title">{{ i18n.text('execution') }}</p>
         <p>{{ i18n.text('executionBoundary') }}</p>
       </header>
+    @if (parameterized()) { <p class="authority-note">{{ i18n.text('parameterSnapshotBoundary') }}</p> }
     @if (runtime.mode() === 'remote') {
       <pax-snapshot-cockpit
         [ruleSetKey]="current.ruleSetKey"

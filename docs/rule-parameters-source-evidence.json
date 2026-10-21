@@ -1,0 +1,116 @@
+{
+  "kind": "rule-parameters-source-candidate",
+  "capturedAtUtc": "2026-10-21T12:18:51Z",
+  "node": "v22.22.2",
+  "npm": "10.9.7",
+  "angular": {
+    "baseline": "60988853dfaadf5a0d818e37a112cde42806ce24",
+    "files": {
+      "projects/praxis-core/src/lib/models/domain-rule.model.ts": "75c7ba916f4d624ba0ee214df86bdb899b10574cfe51679f162ea9bc31674b23",
+      "projects/praxis-core/src/lib/services/domain-rule.service.spec.ts": "2c3180e7c253bf58efd907129c135c1918ebca6625c6c9043f06bd37a064f348",
+      "projects/praxis-core/src/lib/services/domain-rule.service.ts": "b4173f9eff3e8f99f9eab57a054fc2b42c5b38357edbc2f50df0c86b36d257fe"
+    }
+  },
+  "studio": {
+    "baseline": "37593cd70f1cf485d15b593fa6e1ea7f09ef1d4e",
+    "files": {
+      "e2e/policy-studio-corporate.spec.ts": "51dae1a28d689f7164e391ff7a763c725cc8cbf2108fd07fac57d7ee1323998a",
+      "package-lock.json": "0335a3d8a6ac51cbf4da46f0cd0febbe908c24eca8864f5dc35d1bf93303bc12",
+      "package.json": "de2ca132d9441317da60bfe43968b233a94a15ff85a5082e3c69da19bb30c2ac",
+      "src/app/core/decision-inspection.spec.ts": "7f084c81bf5d74a5c9c4d9c8d06ce98b0498e51b7f01e0bb940ff61f85a23d7e",
+      "src/app/core/decision-inspection.ts": "22c1a85f416a0542b98ec695380f33cfc6618a2204fabd7a1e31771703699e5a",
+      "src/app/core/i18n.ts": "36051ab75a7014b813b1a4079f4a4032c598781d01f76464bd8366282dfddc11",
+      "src/app/core/projection-catalog.service.spec.ts": "4a5298cfeeb3e6e4358e7c9561c3430b3b13ec2848535141b8536197d3655a14",
+      "src/app/core/projection-catalog.service.ts": "3ae1386abebd384a667943a585b71148083f4af1c48cc9d12a2e9525b1db116d",
+      "src/app/features/catalog/catalog-workspace.component.html": "b370626cf755bab0607c6685da97776b776fad9c0da74502aa05b8bbe87290bc",
+      "src/app/features/catalog/catalog-workspace.component.spec.ts": "48164be9fe76dad8692e89f635cf64c9d3270493cbba4f077238f5708a8332af",
+      "src/app/features/catalog/catalog-workspace.component.ts": "5bffb6bf204227e8def32614ba5ba1de783d85e3732cde0f83ac2354fee91a88",
+      "src/app/features/catalog/rule-parameter-draft.spec.ts": "fc3ec3a992ab446a450f15c0435a1d4dbe59bd78b14d9a303211157322fc757f",
+      "src/app/features/catalog/rule-parameter-draft.ts": "45c175031c8632f13376ae66f1f9d8d42a39fb15544c681efa3fcd515f00a651",
+      "src/app/features/catalog/rule-parameters.component.ts": "f964583980b5b184926b5f81af5f6cfd6e9706d4ea5506fd1c4f4c9d61cfd06d"
+    }
+  },
+  "packages": [
+    {
+      "package": "@praxisui/ai",
+      "version": "10.0.0-rc.34",
+      "file": "praxisui-ai-10.0.0-rc.34.tgz",
+      "sha256": "4e4fca91586d9a5f1fcda08807e4ee8139ebc2bcf80c0947dc97c432ac629ec7",
+      "installedBytesMatchTarball": true
+    },
+    {
+      "package": "@praxisui/core",
+      "version": "10.0.0-rc.34",
+      "file": "praxisui-core-10.0.0-rc.34.tgz",
+      "sha256": "6889a54819e3758cf1984faec6989731492af391f76c1b376f697a9b13c801fa",
+      "installedBytesMatchTarball": true
+    },
+    {
+      "package": "@praxisui/cron-builder",
+      "version": "10.0.0-rc.34",
+      "file": "praxisui-cron-builder-10.0.0-rc.34.tgz",
+      "sha256": "9c739071e86f3c3f6438320a53c6ae5a38e85f102bf8edd85aa8682f7d2b2f38",
+      "installedBytesMatchTarball": true
+    },
+    {
+      "package": "@praxisui/dynamic-fields",
+      "version": "10.0.0-rc.34",
+      "file": "praxisui-dynamic-fields-10.0.0-rc.34.tgz",
+      "sha256": "bc066a9fdeec9916f0b8183ce6cb5f9d43dbadf7442b6278ffb4faa7267ad7a8",
+      "installedBytesMatchTarball": true
+    },
+    {
+      "package": "@praxisui/metadata-editor",
+      "version": "10.0.0-rc.34",
+      "file": "praxisui-metadata-editor-10.0.0-rc.34.tgz",
+      "sha256": "d01aca09020826c9da7f6ddd1168d5f598138c4c98a8781adef7a6f32ada61af",
+      "installedBytesMatchTarball": true
+    },
+    {
+      "package": "@praxisui/settings-panel",
+      "version": "10.0.0-rc.34",
+      "file": "praxisui-settings-panel-10.0.0-rc.34.tgz",
+      "sha256": "2e4053b52508988fe7eccc97b25bcfa19e786e66a6ba55232285e6d984d78dbd",
+      "installedBytesMatchTarball": true
+    },
+    {
+      "package": "@praxisui/visual-builder",
+      "version": "10.0.0-rc.34",
+      "file": "praxisui-visual-builder-10.0.0-rc.34.tgz",
+      "sha256": "106be49b63591efa67ac28f3b2de7b98966a44846b2640a64509f0d63a0eb30a",
+      "installedBytesMatchTarball": true
+    }
+  ],
+  "validation": {
+    "coreServiceSpecs": "32 passed",
+    "coreFocalBuild": "ng build praxis-core --configuration production passed",
+    "studioUnit": "Final full suite: 20 files, 121 tests passed",
+    "studioBrowser": "6 passed; desktop/narrow PT projected + EN generic; AXE; save/reopen/reload; typed empty-string enumeration; mocked Config",
+    "realPersistence": "Not proven by this consumer package; coordinated Config/Quickstart Neon gate required",
+    "adoption": "Blocked until coherent published packages contain new Core API; registry lock alone is insufficient",
+    "http": "generate:llm-surface + verify:manifest passed (153 examples, 4 schemas, 5 capability cases); shared parser GET/header/no-body check passed; no network call",
+    "studioFinalBuild": "npm run lint and npm run build passed after snapshot-only publication guard"
+  },
+  "http": {
+    "baseline": "ca03e995947437c20a2a3c77992a03cef50981e6",
+    "files": {
+      "LLM_SURFACE.md": "84b4a167b592dd7a09b195c5eeb47ec216eb253b3a484df6d456a30b2b0b5447",
+      "examples.manifest.json": "3c5808782f06dfce04ce98b16a5371cba900b97e2fc98ac817cda6660de70fa0",
+      "http/config/domain_rules_definition_parameters.http": "f1ef87807fb458906c19b3927cabc058da96ae31f1baad4d0281ba6188b2e9ca",
+      "smoke/generate-llm-surface.mjs": "82716d0989236d45ce5ddeec6522a2c6174b8edf5750de760dd6d9ec58ac391f"
+    }
+  },
+  "logs": {
+    "coreBuild": "027151baa28b8d447b0ec6ec16f473941233e0703b7983bdb613888ea501183d",
+    "coreServiceSpecs": "8ab6369c225a149c7022ba1a923d9ca9eb4c47054387c0e4d5d8ecf53aa21390",
+    "studioFinalBuild": "cb368d115290203c92798dca01ae9c385eabb1af325a23a1f84346fd1512508d",
+    "studioUnit": "5c9484c64029d89d213a0a0599fd8e511b0414028d5d77858ef4b0df890eaf96",
+    "studioBrowser": "7684522cb54d1ce343bde6a0f3c8ffcfe672f1d9319462b0c5341585a7e24006"
+  },
+  "screenshots": {
+    "test-results/policy-studio-corporate-ro-1df6b-ure-and-current-ETag-pt-BR--desktop/rule-parameters.png": "59dc74740b5dcb99c6d444a0aac5574e027ff6befc7f630c7255f7dc49803482",
+    "test-results/policy-studio-corporate-ro-1df6b-ure-and-current-ETag-pt-BR--narrow/rule-parameters.png": "01b5548288bec92b192bdaae889a59ce40dfa86d4086b6b15972e9667378143f",
+    "test-results/policy-studio-corporate-ro-df734-ure-and-current-ETag-en-US--desktop/rule-parameters.png": "5aacf03df1e8531fc6360bf15bfd2add58cb765e9f26c41552e36d21fcc55189",
+    "test-results/policy-studio-corporate-ro-df734-ure-and-current-ETag-en-US--narrow/rule-parameters.png": "aad8bd3069c6f0f0cce7cb80e5d88853d6fd5b7ca17dc6c1c8e292e3be36e109"
+  }
+}

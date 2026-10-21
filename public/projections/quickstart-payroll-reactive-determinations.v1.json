@@ -6,7 +6,7 @@
     {
       "path": "src/main/java/com/example/praxis/apiquickstart/config/PayrollReactiveDeterminationRuleSet.java",
       "kind": "RULESET_DEFINITION",
-      "sha256": "AD1F6FC0166480CDD75F0B1228EE5336EE2451A0177B50B5B1E4880E7216AFEA"
+      "sha256": "4F09600D4401E722484A43D566C37FA2402A981EE1D4B637EB2E75211E10054E"
     },
     {
       "path": "src/main/java/com/example/praxis/apiquickstart/config/ReactiveDeterminationPilotConfiguration.java",
@@ -16,7 +16,7 @@
     {
       "path": "docs/REACTIVE-DETERMINATION-PILOT.md",
       "kind": "OPERATIONAL_BOUNDARY",
-      "sha256": "9923A3DD44CAB374CF9B852BCCAD53981D25CE6558B01B8AC1FE8E3C05A65007"
+      "sha256": "711FB2FD89231DD65793290AE9DCA6FB8E30B5096D623AA56E5097A9FED6B991"
     },
     {
       "path": "scripts/verify-reactive-determinations-published-runtime.sh",

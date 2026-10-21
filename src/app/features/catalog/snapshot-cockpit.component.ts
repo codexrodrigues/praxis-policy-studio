@@ -101,7 +101,8 @@ export class SnapshotCockpitComponent {
   }
 
   canCreateRollout(version: DomainRuleSnapshotVersion): boolean {
-    return !version.active
+    return !this.loading() && !this.loadError() && !this.rolloutLoading() && !this.rolloutError()
+      && !version.active
       && version.governanceState === 'READY'
       && (this.head() === null
         ? version.availableAction === 'CREATE_ROLLOUT'

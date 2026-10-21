@@ -1,0 +1,720 @@
+{
+  "kind": "prospective-rc36-release-proof",
+  "capturedAtUtc": "2026-10-21T13:34:37Z",
+  "angular": {
+    "commit": "667e6d7d51f869b439e8a9926739b9e8fdd64002",
+    "base": "1c797be9d325208fcf3c8161d52e3dc632776caa",
+    "prManifestVersion": "10.0.0-rc.35",
+    "candidateVersion": "10.0.0-rc.36",
+    "temporaryHelper": "node projects/tools/bump-version.js 10.0.0-rc.36",
+    "manifestsRestoredByteForByte": true,
+    "files": {
+      "projects/praxis-core/README.md": "a34aa6bc53dd274b4f1fced164b28333e1db4413f0c519bd8601ed9670c57b8d",
+      "projects/praxis-core/src/lib/models/domain-rule.model.ts": "b1ed669003a187432e41f8d9b32cb2a8c71b72d7f43b35e9ac8328ed87434c63",
+      "projects/praxis-core/src/lib/services/domain-rule.service.spec.ts": "5d33afd7136ae3c43a72380b6aed48bc63d618c340c4125618fc786104579ca1",
+      "projects/praxis-core/src/lib/services/domain-rule.service.ts": "c8d8b47ce3437f0164bd58076ecbbffc6748a4c7354f339c155a70489bec30c4"
+    }
+  },
+  "configRegistryClone": {
+    "commit": "640d0c4f3d2975f3692d5c3d738da83e01fb21eb",
+    "exclusiveDisposable": true,
+    "workflowPinChanged": false
+  },
+  "packages": [
+    {
+      "package": "@praxisui/ai",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-ai.tgz",
+      "sha256": "a221b1b3bbbb2564cb7f9cf16a3c62de9d09ffe9faa8fbdc2c2b4f15dd5eddcf",
+      "installedPayloadCompared": true
+    },
+    {
+      "package": "@praxisui/charts",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-charts.tgz",
+      "sha256": "dac926b002b5658f520a8bb913e730a379f69b24509faf8a6326b7d01d7ee760",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/core",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-core.tgz",
+      "sha256": "ebd5de822542d719042ecfa3949f484d4f85f2a1ca9f9fa00184e8c63758bf68",
+      "installedPayloadCompared": true
+    },
+    {
+      "package": "@praxisui/cron-builder",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-cron-builder.tgz",
+      "sha256": "00def16139561372910837f83b758c4a3d5167d0e1663bad912918b751623e9b",
+      "installedPayloadCompared": true
+    },
+    {
+      "package": "@praxisui/crud",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-crud.tgz",
+      "sha256": "ddfff1b9633b5fa842f9ee8ff070ce1344667ce8ed51c46e9725a3f5b8762c33",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/dialog",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-dialog.tgz",
+      "sha256": "27c5a2a471c6c1a7c2dfd878fc71c49d40df9e6ab53d8e7cd1f6cf97028125f6",
+      "installedPayloadCompared": true
+    },
+    {
+      "package": "@praxisui/dynamic-fields",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-dynamic-fields.tgz",
+      "sha256": "e4378f079c54f4d3c1018dd319017ddc1d0dcd634f2c55fcc176626321fe502d",
+      "installedPayloadCompared": true
+    },
+    {
+      "package": "@praxisui/dynamic-form",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-dynamic-form.tgz",
+      "sha256": "e41aba4d79ede2de87d7c81a9bc006b422fc26d26722f6684c6bebe2f7bbf2d4",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/editorial-forms",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-editorial-forms.tgz",
+      "sha256": "bf007ffe3a8536604df7affb44fe466553d5b145df28d960a48194b50841d6de",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/expansion",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-expansion.tgz",
+      "sha256": "31055112d970f6c9628ed42d1de16533308c9464d7625743cbb904dc18409363",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/files-upload",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-files-upload.tgz",
+      "sha256": "1438c529e16c20a819650fc2a215f1cdd7e345b2a124afb34a4ca7785ef5070a",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/list",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-list.tgz",
+      "sha256": "112268c688f3354e0f2e256cbbbbd538f3d8dcfa6158cc7402a0b97cbe9c489f",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/manual-form",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-manual-form.tgz",
+      "sha256": "c7ff3adbcee83660013179d5b220b54098583f9a94e8640c71774028dc6deea6",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/metadata-editor",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-metadata-editor.tgz",
+      "sha256": "ef3ce4c5d5f6fdf006aad2eb4eaacc026611ebae05cd52eef73e85a400ef6af9",
+      "installedPayloadCompared": true
+    },
+    {
+      "package": "@praxisui/page-builder",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-page-builder.tgz",
+      "sha256": "59425b307f829e8860a7b3a08a1d5515ead35fe9213c70631374afe13d0ba12e",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/rich-content",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-rich-content.tgz",
+      "sha256": "9ba6b778b2962892f58ebb8b06c4ce493409c3c3b6c84945f54906d263bebc7e",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/settings-panel",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-settings-panel.tgz",
+      "sha256": "40c1565ebad8ba0e5403a83397b906b0fb52b146e8a4ed463137e40ed018a022",
+      "installedPayloadCompared": true
+    },
+    {
+      "package": "@praxisui/stepper",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-stepper.tgz",
+      "sha256": "77dd01574802e43dfd6ac50966c8039873e9c2dbdec6e59bbb6eb93a921baf4c",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/table-rule-builder",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-table-rule-builder.tgz",
+      "sha256": "b9412082fa19beda70c58c5654124a51a8b18bf25d58397a1897eca2966007d6",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/table",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-table.tgz",
+      "sha256": "c52854925b0b97d07c81a4903515fab35119c96f47d2bfc6038885a182a48281",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/tabs",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-tabs.tgz",
+      "sha256": "a039a69fc3fe2bac155cb7eff39214c256da9fe60ba2964b2f1c80ca7bf31b07",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/visual-builder",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-visual-builder.tgz",
+      "sha256": "8084ca57c0b9249fc6f85dd90e3c12cd5cf58c144e6034e9f4273439ea9c1f4c",
+      "installedPayloadCompared": true
+    }
+  ],
+  "logs": {
+    "coreSpecs": {
+      "path": "/tmp/rule-parameters-core-rebased-spec.log",
+      "sha256": "8536acba50b73269322f7d0749e39265a647960821d797314c183a6f55f720f8"
+    },
+    "coreBuild": {
+      "path": "/tmp/rule-parameters-core-rebased-build.log",
+      "sha256": "632873ce5315a6a6f960a3a92052c7dbe11f11a8d957f1e42c1c976942c4f9a7"
+    },
+    "prospectivePreflight": {
+      "path": "/tmp/rule-parameters-angular-release-preflight36.log",
+      "sha256": "18af114be2ce6720872176db872b6a6e14aec9ac4c4ed816cc13f4210c68d51a"
+    },
+    "prospectiveDocRefresh": {
+      "path": "/tmp/rule-parameters-angular-release-core-doc-rebuild36.log",
+      "sha256": "d2861361b200543d3254fa061d73306c3dda6873e0d3fb4230afd7cab482ad3f"
+    },
+    "prospectiveVersionDiff": {
+      "path": "/tmp/rule-parameters-angular-version36-diff.patch",
+      "sha256": "197fe32a7972b946c2ab2b260d56d437a6f0c9e1933aed275f30487ba14ee5ab"
+    },
+    "studioBuild": {
+      "path": "/tmp/rule-parameters-studio-bootstrap-build.log",
+      "sha256": "e8f16a4b76e876bd8156bd1ef03d4401813299e65a264c8c66d6591effe9ad5e"
+    },
+    "studioBrowser": {
+      "path": "/tmp/rule-parameters-studio-bootstrap-e2e.log",
+      "sha256": "63ce505e66be9f8b1e46d615597ca4b9a6a3b1f6e870818ca96f1f5bf6ecf863"
+    }
+  },
+  "validation": {
+    "coreServiceTests": 34,
+    "prospectivePreflight": "22 builds/packages/tarballs passed; AI authoring contracts20/20 passed; public version36 free",
+    "studioUnit": "20 files,128 tests passed against eight candidate packages",
+    "studioBrowser": "8 passed; desktop/narrow; parametersPT/EN; generic catalog; save/reopen/reload; bootstrap404vs500; no inferred activation; AXE",
+    "historicalProof": "rule-parameters-source-evidence.json remains unchanged; its rc34 hashes are not current release proof"
+  },
+  "publishedAdoption": {
+    "version": "10.0.0-rc.36",
+    "angularPr": "https://github.com/codexrodrigues/praxis-ui-angular/pull/621",
+    "publishRun": "https://github.com/codexrodrigues/praxis-ui-angular/actions/runs/39609796030",
+    "postflight": {
+      "run": 39609796030,
+      "attempt": 2,
+      "jobId": 119266707388,
+      "conclusion": "success",
+      "allPackages": 22,
+      "gates": "public metadata + rc channel + sealed integrity + clean install + exports/entrypoints"
+    },
+    "studioLock": {
+      "sha256": "8c55e78dea12f2aee342d1b44e3ef69ffd422a5fe041a99e68943ac356713506",
+      "manifestSha256": "9f95fa704d40b0575b78ab29911b2ff0b62dcdf2599fef106f4b7f01f75fe1e8",
+      "exactDirectPins": 7,
+      "registry": "https://registry.npmjs.org/",
+      "consumedPraxisPackages": [
+        {
+          "name": "@praxisui/ai",
+          "version": "10.0.0-rc.36",
+          "resolved": "https://registry.npmjs.org/@praxisui/ai/-/ai-10.0.0-rc.36.tgz",
+          "integrity": "sha512-jxm14Oz8qSm9vydbGzo4y11p7x/jFAa6Tp9lc5G+F2xsi+ZS37JPVFLkAtQzdx5liWNReCI6THW9HspxschrFg==",
+          "matchesOfficialManifest": true,
+          "installedFilesByteCompared": 5,
+          "symlink": false
+        },
+        {
+          "name": "@praxisui/core",
+          "version": "10.0.0-rc.36",
+          "resolved": "https://registry.npmjs.org/@praxisui/core/-/core-10.0.0-rc.36.tgz",
+          "integrity": "sha512-uf2z9qNhAVFYWvieFJsJOIJHF+UzTDV/z5nDXUJSwpDvyAIm743YrUJb7heskJAOV9cz9wBSIg7q+e55fYF5Qg==",
+          "matchesOfficialManifest": true,
+          "installedFilesByteCompared": 13,
+          "symlink": false
+        },
+        {
+          "name": "@praxisui/cron-builder",
+          "version": "10.0.0-rc.36",
+          "resolved": "https://registry.npmjs.org/@praxisui/cron-builder/-/cron-builder-10.0.0-rc.36.tgz",
+          "integrity": "sha512-BWYcdF7trPfkUgV8EingF2Sh29ksbzsAYmGcFL40/7wCq1rIdgFZbMerkvbm6bqoEtjCk8SjD3hIiBuVFDU55A==",
+          "matchesOfficialManifest": true,
+          "installedFilesByteCompared": 6,
+          "symlink": false
+        },
+        {
+          "name": "@praxisui/dialog",
+          "version": "10.0.0-rc.36",
+          "resolved": "https://registry.npmjs.org/@praxisui/dialog/-/dialog-10.0.0-rc.36.tgz",
+          "integrity": "sha512-6BMrgVS3naSwHwpKRfbz7bcSOwqOSa0C9mrK1zZk7U/wV8NBHzOmjM1iUkc2/Kaeue+PtiytmTZHN87Cyx1Nsg==",
+          "matchesOfficialManifest": true,
+          "installedFilesByteCompared": 6,
+          "symlink": false
+        },
+        {
+          "name": "@praxisui/dynamic-fields",
+          "version": "10.0.0-rc.36",
+          "resolved": "https://registry.npmjs.org/@praxisui/dynamic-fields/-/dynamic-fields-10.0.0-rc.36.tgz",
+          "integrity": "sha512-4al17VG2l8sNb+usmVDF+J28kY8Lp8j/hx0v446Lkf5qgaVSWpsQRqsTN4mCofkWxjNyZKMeogart6DA8CPvMg==",
+          "matchesOfficialManifest": true,
+          "installedFilesByteCompared": 164,
+          "symlink": false
+        },
+        {
+          "name": "@praxisui/metadata-editor",
+          "version": "10.0.0-rc.36",
+          "resolved": "https://registry.npmjs.org/@praxisui/metadata-editor/-/metadata-editor-10.0.0-rc.36.tgz",
+          "integrity": "sha512-RbFrolyO0oYuDeFniG5OLOg3bRmGahSs4lFcOh1wCjsa+94pAnijL76+SMf/eFQxxnoXsGZtRFPz57akzYGWkA==",
+          "matchesOfficialManifest": true,
+          "installedFilesByteCompared": 6,
+          "symlink": false
+        },
+        {
+          "name": "@praxisui/settings-panel",
+          "version": "10.0.0-rc.36",
+          "resolved": "https://registry.npmjs.org/@praxisui/settings-panel/-/settings-panel-10.0.0-rc.36.tgz",
+          "integrity": "sha512-jamgBwbpqsChF4siULr/wxYLFI372zviQ4I5rmqEJkkphr9t2oxMWI0JQ6q5G6GrOGxEsJMriFHYh6YYMKX63w==",
+          "matchesOfficialManifest": true,
+          "installedFilesByteCompared": 6,
+          "symlink": false
+        },
+        {
+          "name": "@praxisui/visual-builder",
+          "version": "10.0.0-rc.36",
+          "resolved": "https://registry.npmjs.org/@praxisui/visual-builder/-/visual-builder-10.0.0-rc.36.tgz",
+          "integrity": "sha512-7Ut2FSmZ8Td03yldyTidBiHHBegOj1OuhEWninAT9QICYAHOP06Oerk+FljAaYK8MIaE4JlD0s6Nk4Uxk0HHqA==",
+          "matchesOfficialManifest": true,
+          "installedFilesByteCompared": 6,
+          "symlink": false
+        }
+      ],
+      "cleanNpmCi": "passed"
+    },
+    "studioDeploy": "pending authorized merge; Render main autoDeploy commit=yes",
+    "angularReleaseCommit": "cf27f5b89480a34a299fa6d3c591bfa9776a99b4",
+    "studioValidation": {
+      "capturedAtUtc": "2026-10-21T14:05:17.181163+00:00",
+      "sourceCheckpoint": "a686a55 plus package.json/package-lock and release evidence only",
+      "lint": "passed",
+      "unit": "20 files,142 tests passed",
+      "projectionCount": 3,
+      "localRuntime": "passed official4302/8088",
+      "staticBuild": "passed with official CI placeholder HTTPSorigin",
+      "browser": "14 intercepted desktop/narrow cases passed, PT/EN parameters+save/reopen/reload, READY bootstrap/existing-head+BLOCKED/error+incompatible history, AXE",
+      "logs": {
+        "/tmp/rule-parameters-studio-registry-install36.log": "94067c65f699b2158a4d39019a485725594e31f0f42c62d49549b20b30da1d0d",
+        "/tmp/rule-parameters-studio-ci-public36.log": "4a34d78c93a7bf10ab1aaad11ed82e2e80050ea7ee296f3d810845462162079c",
+        "/tmp/rule-parameters-studio-public36-gates.log": "f729ef8817d6981d0fa928a7db2a9996a1510d3173c586801c01a6f92fa0d0a7",
+        "/tmp/rule-parameters-studio-public36-e2e.log": "a7541fbd85048d16afce0b1dd3eec6da6d1ec3c764a68f7d01a61d70b6e21864",
+        "/tmp/rule-parameters-angular36-postflight-recovery.log": "83d5ab3203e32cecbc8ff4db78d62fc5cd01b7cb1bbd0a00f4666f8e17af83b4"
+      },
+      "files": {
+        "e2e/policy-studio-corporate.spec.ts": "11632ebf4afe20776402b31c27d19c96447ea70ede6e99368e807ef8be6ceacc",
+        "src/app/core/decision-inspection.spec.ts": "7f084c81bf5d74a5c9c4d9c8d06ce98b0498e51b7f01e0bb940ff61f85a23d7e",
+        "src/app/core/decision-inspection.ts": "22c1a85f416a0542b98ec695380f33cfc6618a2204fabd7a1e31771703699e5a",
+        "src/app/core/i18n.ts": "8b47c47b21e13a8bed7725fa405c0cc422f9a37611a8e0c097585c5c4d71cde9",
+        "src/app/core/projection-catalog.service.spec.ts": "cc04af23bb11f502e1ca689d4d5347859a3bbb38f219111df4ecca41b60ea919",
+        "src/app/core/projection-catalog.service.ts": "1776ddfc538d21d7770b3206ea65b681eab8b8f3c32516e02cf02c501fa67360",
+        "src/app/features/catalog/catalog-workspace.component.html": "b370626cf755bab0607c6685da97776b776fad9c0da74502aa05b8bbe87290bc",
+        "src/app/features/catalog/catalog-workspace.component.spec.ts": "5d77494582e606e1186816811cd30c5b2e4febd3bd881ea20ffe5f77cf48e245",
+        "src/app/features/catalog/catalog-workspace.component.ts": "021d29ae4b20ed8478e5c680145d16f96e615792d1e461102d35cb8fae95ff60",
+        "src/app/features/catalog/rule-parameter-draft.spec.ts": "fc3ec3a992ab446a450f15c0435a1d4dbe59bd78b14d9a303211157322fc757f",
+        "src/app/features/catalog/rule-parameter-draft.ts": "45c175031c8632f13376ae66f1f9d8d42a39fb15544c681efa3fcd515f00a651",
+        "src/app/features/catalog/rule-parameters.component.ts": "f964583980b5b184926b5f81af5f6cfd6e9706d4ea5506fd1c4f4c9d61cfd06d",
+        "src/app/features/catalog/snapshot-cockpit.component.spec.ts": "6e40e3621c658d7a327fdde3f0cc08805ccdfebb3938092d6d6dc65eeaef3374",
+        "src/app/features/catalog/snapshot-cockpit.component.ts": "3c8c8b58f40c9a429754ff917a0f816876bf17eddebabc71eb942c26a20a0fce"
+      },
+      "screenshots": {
+        "test-results/policy-studio-corporate-ro-df734-ure-and-current-ETag-en-US--desktop/rule-parameters.png": "5aacf03df1e8531fc6360bf15bfd2add58cb765e9f26c41552e36d21fcc55189",
+        "test-results/policy-studio-corporate-ac-a0148--governed-bootstrap-rollout-desktop/published-candidate-before-activation.png": "3205fa85fb493c3e4858547639e24820d00c87374146841af916c35f0250f7b3",
+        "test-results/policy-studio-corporate-ac-a0148--governed-bootstrap-rollout-desktop/rollout-confirmation.png": "3b6788dc01bbfce5bb0385bc495750d32b6a2ae8ce8d5c90d1f27c174a12732a",
+        "test-results/policy-studio-corporate-ac-baea6-erned-existing-head-rollout-desktop/published-candidate-before-activation.png": "b4a4ee3cbddd0de9652a9fdd2845ff107ab5c6f5d8e710d2fc3c5a420d569b3a",
+        "test-results/policy-studio-corporate-ac-baea6-erned-existing-head-rollout-desktop/rollout-confirmation.png": "46b999d0ac0b8ba01035f611b3d35bed4f5038e4f0a90f745fb667d5b9e67b57",
+        "test-results/policy-studio-corporate-ke-74916-s-and-verified-head-absence-narrow/bootstrap-published-inactive.png": "d438cf6f4fee47d76d0adec7fc72d6c0417c139a2dbbbc3120d68808f7d42332",
+        "test-results/policy-studio-corporate-pr-5b8c7-rio-and-running-the-sandbox-desktop/authoring-sandbox-result.png": "387f8af924c8ba8ab01b9b790004df8833b3bb49d30ebf06a58c2513f8b0a47e",
+        "test-results/policy-studio-corporate-ke-2213a-offering-runtime-operations-narrow/incompatible-history.png": "dd42882b7b59dcb41be4ae6de4d1f78eb4b2285d8be0b7ab895d01dada48025a",
+        "test-results/policy-studio-corporate-ro-1df6b-ure-and-current-ETag-pt-BR--narrow/rule-parameters.png": "01b5548288bec92b192bdaae889a59ce40dfa86d4086b6b15972e9667378143f",
+        "test-results/policy-studio-corporate-ro-df734-ure-and-current-ETag-en-US--narrow/rule-parameters.png": "299fcbd5f34c98472da6712b0704248594af8590b69abc0e8bb10d78e49de828",
+        "test-results/policy-studio-corporate-ro-1df6b-ure-and-current-ETag-pt-BR--desktop/rule-parameters.png": "59dc74740b5dcb99c6d444a0aac5574e027ff6befc7f630c7255f7dc49803482",
+        "test-results/policy-studio-corporate-ac-a0148--governed-bootstrap-rollout-narrow/published-candidate-before-activation.png": "e5cb021eaeec6bbab9a4dae37b3f385fcf8ac6cb3e78158bf8d4b4aa2e7500a4",
+        "test-results/policy-studio-corporate-ac-a0148--governed-bootstrap-rollout-narrow/rollout-confirmation.png": "3f2ec451e432fb7368279f3cd99ccc9e2a4d155526cd7d4358f260d9042e65cf",
+        "test-results/policy-studio-corporate-ac-baea6-erned-existing-head-rollout-narrow/published-candidate-before-activation.png": "74b638e4513c4befabb76efadd2424b7cde3e6f0b631846472a61b31d051b06e",
+        "test-results/policy-studio-corporate-ac-baea6-erned-existing-head-rollout-narrow/rollout-confirmation.png": "29523827486dd60f7c38ae0d2e580f3076d595f005b45245190695eddec8780c",
+        "test-results/policy-studio-corporate-ke-2213a-offering-runtime-operations-desktop/incompatible-history.png": "23c3bdfc8156a74ceedd72c3d7622101f04f3600b61d46159e4074a6ac6af265",
+        "test-results/policy-studio-corporate-pr-5b8c7-rio-and-running-the-sandbox-narrow/authoring-sandbox-result.png": "2cf62107f8a69b2aa550304f35839809bd4b85a3861e097b5453352fe007a9e3",
+        "test-results/policy-studio-corporate-ke-74916-s-and-verified-head-absence-desktop/bootstrap-published-inactive.png": "3e6fc1a062740320ec4ea27e276ba6393dbec3f653d00242571e4f0bfc62140b"
+      }
+    },
+    "studioPr": "https://github.com/codexrodrigues/praxis-policy-studio/pull/60"
+  },
+  "screenshots": {
+    "test-results/policy-studio-corporate-ke-74916-s-and-verified-head-absence-desktop/bootstrap-published-inactive.png": "325ef19d7700c37dce1ba68c161cae8dd55603f1441f6e6f8445f067ba079074",
+    "test-results/policy-studio-corporate-ke-74916-s-and-verified-head-absence-narrow/bootstrap-published-inactive.png": "45ac820fdedc711551d4317434078cdbdd6ee05a19ba2677b5115aa8db97ce9d",
+    "test-results/policy-studio-corporate-pr-5b8c7-rio-and-running-the-sandbox-desktop/authoring-sandbox-result.png": "387f8af924c8ba8ab01b9b790004df8833b3bb49d30ebf06a58c2513f8b0a47e",
+    "test-results/policy-studio-corporate-pr-5b8c7-rio-and-running-the-sandbox-narrow/authoring-sandbox-result.png": "2cf62107f8a69b2aa550304f35839809bd4b85a3861e097b5453352fe007a9e3",
+    "test-results/policy-studio-corporate-ro-1df6b-ure-and-current-ETag-pt-BR--desktop/rule-parameters.png": "dde99ce1f3f1ecdcf90081cb2654657491dd0fd27b16141538ee6a650b92cb0a",
+    "test-results/policy-studio-corporate-ro-1df6b-ure-and-current-ETag-pt-BR--narrow/rule-parameters.png": "01b5548288bec92b192bdaae889a59ce40dfa86d4086b6b15972e9667378143f",
+    "test-results/policy-studio-corporate-ro-df734-ure-and-current-ETag-en-US--desktop/rule-parameters.png": "5aacf03df1e8531fc6360bf15bfd2add58cb765e9f26c41552e36d21fcc55189",
+    "test-results/policy-studio-corporate-ro-df734-ure-and-current-ETag-en-US--narrow/rule-parameters.png": "299fcbd5f34c98472da6712b0704248594af8590b69abc0e8bb10d78e49de828"
+  },
+  "studioRebasedCandidate": {
+    "capturedAtUtc": "2026-10-21T13:41:39.926924+00:00",
+    "base": "f427d70517062814b3d9e7657a36c7b961d71203",
+    "checkpoint": "d73b3d2",
+    "manifestAndLock": "unchanged from main rc35; node_modules prospective source36",
+    "validation": {
+      "lint": "passed",
+      "unit": "20files142tests passed",
+      "build": "passed",
+      "browser": "14 intercepted cases passed: desktop/narrow parametersPT/EN, authoring, incompatible history, READY bootstrap/existing-head and BLOCKED bootstrap404vs500, AXE"
+    },
+    "logs": {
+      "/tmp/rule-parameters-studio-rebased-build.log": "70727622111e9bb8c893cc4a974776f9e1c484b6d903e285662466fa12de3167",
+      "/tmp/rule-parameters-studio-rebased-e2e.log": "6d48a31917b18fc51bd93427f4831d1d4d84841813ee5aad1de512215376eda2"
+    },
+    "files": {
+      "e2e/policy-studio-corporate.spec.ts": "11632ebf4afe20776402b31c27d19c96447ea70ede6e99368e807ef8be6ceacc",
+      "src/app/core/decision-inspection.spec.ts": "7f084c81bf5d74a5c9c4d9c8d06ce98b0498e51b7f01e0bb940ff61f85a23d7e",
+      "src/app/core/decision-inspection.ts": "22c1a85f416a0542b98ec695380f33cfc6618a2204fabd7a1e31771703699e5a",
+      "src/app/core/i18n.ts": "8b47c47b21e13a8bed7725fa405c0cc422f9a37611a8e0c097585c5c4d71cde9",
+      "src/app/core/projection-catalog.service.spec.ts": "cc04af23bb11f502e1ca689d4d5347859a3bbb38f219111df4ecca41b60ea919",
+      "src/app/core/projection-catalog.service.ts": "1776ddfc538d21d7770b3206ea65b681eab8b8f3c32516e02cf02c501fa67360",
+      "src/app/features/catalog/catalog-workspace.component.html": "b370626cf755bab0607c6685da97776b776fad9c0da74502aa05b8bbe87290bc",
+      "src/app/features/catalog/catalog-workspace.component.spec.ts": "5d77494582e606e1186816811cd30c5b2e4febd3bd881ea20ffe5f77cf48e245",
+      "src/app/features/catalog/catalog-workspace.component.ts": "021d29ae4b20ed8478e5c680145d16f96e615792d1e461102d35cb8fae95ff60",
+      "src/app/features/catalog/rule-parameter-draft.spec.ts": "fc3ec3a992ab446a450f15c0435a1d4dbe59bd78b14d9a303211157322fc757f",
+      "src/app/features/catalog/rule-parameter-draft.ts": "45c175031c8632f13376ae66f1f9d8d42a39fb15544c681efa3fcd515f00a651",
+      "src/app/features/catalog/rule-parameters.component.ts": "f964583980b5b184926b5f81af5f6cfd6e9706d4ea5506fd1c4f4c9d61cfd06d",
+      "src/app/features/catalog/snapshot-cockpit.component.spec.ts": "6e40e3621c658d7a327fdde3f0cc08805ccdfebb3938092d6d6dc65eeaef3374",
+      "src/app/features/catalog/snapshot-cockpit.component.ts": "3c8c8b58f40c9a429754ff917a0f816876bf17eddebabc71eb942c26a20a0fce"
+    },
+    "screenshots": {
+      "test-results/policy-studio-corporate-ro-df734-ure-and-current-ETag-en-US--desktop/rule-parameters.png": "5aacf03df1e8531fc6360bf15bfd2add58cb765e9f26c41552e36d21fcc55189",
+      "test-results/policy-studio-corporate-ac-a0148--governed-bootstrap-rollout-desktop/published-candidate-before-activation.png": "3205fa85fb493c3e4858547639e24820d00c87374146841af916c35f0250f7b3",
+      "test-results/policy-studio-corporate-ac-a0148--governed-bootstrap-rollout-desktop/rollout-confirmation.png": "3b6788dc01bbfce5bb0385bc495750d32b6a2ae8ce8d5c90d1f27c174a12732a",
+      "test-results/policy-studio-corporate-ac-baea6-erned-existing-head-rollout-desktop/published-candidate-before-activation.png": "b4a4ee3cbddd0de9652a9fdd2845ff107ab5c6f5d8e710d2fc3c5a420d569b3a",
+      "test-results/policy-studio-corporate-ac-baea6-erned-existing-head-rollout-desktop/rollout-confirmation.png": "46b999d0ac0b8ba01035f611b3d35bed4f5038e4f0a90f745fb667d5b9e67b57",
+      "test-results/policy-studio-corporate-ke-74916-s-and-verified-head-absence-narrow/bootstrap-published-inactive.png": "d438cf6f4fee47d76d0adec7fc72d6c0417c139a2dbbbc3120d68808f7d42332",
+      "test-results/policy-studio-corporate-pr-5b8c7-rio-and-running-the-sandbox-desktop/authoring-sandbox-result.png": "387f8af924c8ba8ab01b9b790004df8833b3bb49d30ebf06a58c2513f8b0a47e",
+      "test-results/policy-studio-corporate-ke-2213a-offering-runtime-operations-narrow/incompatible-history.png": "dd42882b7b59dcb41be4ae6de4d1f78eb4b2285d8be0b7ab895d01dada48025a",
+      "test-results/policy-studio-corporate-ro-1df6b-ure-and-current-ETag-pt-BR--narrow/rule-parameters.png": "ae9b978df8dfaa3b5ee58aa4438a4e9ad216ccaa03492fbd609378a72b5f953c",
+      "test-results/policy-studio-corporate-ro-df734-ure-and-current-ETag-en-US--narrow/rule-parameters.png": "299fcbd5f34c98472da6712b0704248594af8590b69abc0e8bb10d78e49de828",
+      "test-results/policy-studio-corporate-ro-1df6b-ure-and-current-ETag-pt-BR--desktop/rule-parameters.png": "dde99ce1f3f1ecdcf90081cb2654657491dd0fd27b16141538ee6a650b92cb0a",
+      "test-results/policy-studio-corporate-ac-a0148--governed-bootstrap-rollout-narrow/published-candidate-before-activation.png": "e5cb021eaeec6bbab9a4dae37b3f385fcf8ac6cb3e78158bf8d4b4aa2e7500a4",
+      "test-results/policy-studio-corporate-ac-a0148--governed-bootstrap-rollout-narrow/rollout-confirmation.png": "3f2ec451e432fb7368279f3cd99ccc9e2a4d155526cd7d4358f260d9042e65cf",
+      "test-results/policy-studio-corporate-ac-baea6-erned-existing-head-rollout-narrow/published-candidate-before-activation.png": "74b638e4513c4befabb76efadd2424b7cde3e6f0b631846472a61b31d051b06e",
+      "test-results/policy-studio-corporate-ac-baea6-erned-existing-head-rollout-narrow/rollout-confirmation.png": "29523827486dd60f7c38ae0d2e580f3076d595f005b45245190695eddec8780c",
+      "test-results/policy-studio-corporate-ke-2213a-offering-runtime-operations-desktop/incompatible-history.png": "23c3bdfc8156a74ceedd72c3d7622101f04f3600b61d46159e4074a6ac6af265",
+      "test-results/policy-studio-corporate-pr-5b8c7-rio-and-running-the-sandbox-narrow/authoring-sandbox-result.png": "2cf62107f8a69b2aa550304f35839809bd4b85a3861e097b5453352fe007a9e3",
+      "test-results/policy-studio-corporate-ke-74916-s-and-verified-head-absence-desktop/bootstrap-published-inactive.png": "3e6fc1a062740320ec4ea27e276ba6393dbec3f653d00242571e4f0bfc62140b"
+    }
+  },
+  "officialArtifactCustody": {
+    "capturedAtUtc": "2026-10-21T13:53:52.227Z",
+    "source": "GitHub official sealed artifact",
+    "run": 39609796030,
+    "artifactId": 12350063875,
+    "artifactName": "release-packages-cf27f5b89480a34a299fa6d3c591bfa9776a99b4",
+    "artifactDigest": "sha256:343b5b57f252b222359f9f855f8fe4f4c5188ad79a5d2d59f52bda0ffd07c81c",
+    "releaseSha": "cf27f5b89480a34a299fa6d3c591bfa9776a99b4",
+    "version": "10.0.0-rc.36",
+    "manifestSha256": "a897e185416794e857eb697457ec72a27d7b2bef203ec17b2407b1e6aef3dbbb",
+    "sealedVerified": {
+      "count": 22,
+      "sha256": true,
+      "sha512": true,
+      "canonicalVerifier": "tools/release-packages.mjs verify"
+    },
+    "packages": [
+      {
+        "name": "@praxisui/ai",
+        "filename": "praxisui-ai-10.0.0-rc.36.tgz",
+        "sha256": "c9d1e607779081dd6f9233508618dca7a29c832ec5bbb0ac2034767f5af02e35",
+        "integrity": "sha512-jxm14Oz8qSm9vydbGzo4y11p7x/jFAa6Tp9lc5G+F2xsi+ZS37JPVFLkAtQzdx5liWNReCI6THW9HspxschrFg=="
+      },
+      {
+        "name": "@praxisui/charts",
+        "filename": "praxisui-charts-10.0.0-rc.36.tgz",
+        "sha256": "b2fadcbc4f16ec9b90e4ef47e829ccc83237a819209ba2bcd3b7e812595a8cd2",
+        "integrity": "sha512-vOqjINoRdsotIO2ZEE2ihUUGndB/4e51PjXOmv95szXkLZGgtZkMShkoEn7SZmoyio0TxyouzVq4f8c1OpIA2w=="
+      },
+      {
+        "name": "@praxisui/core",
+        "filename": "praxisui-core-10.0.0-rc.36.tgz",
+        "sha256": "4cd4ae2cf1c2ff3188c4b54fa91e588ab520af11a1375f1324dd1fb2878a00e1",
+        "integrity": "sha512-uf2z9qNhAVFYWvieFJsJOIJHF+UzTDV/z5nDXUJSwpDvyAIm743YrUJb7heskJAOV9cz9wBSIg7q+e55fYF5Qg=="
+      },
+      {
+        "name": "@praxisui/cron-builder",
+        "filename": "praxisui-cron-builder-10.0.0-rc.36.tgz",
+        "sha256": "410dc33b269983f2e21739aac1731f91d35a10e33b7531263eb5a6da7ae650ed",
+        "integrity": "sha512-BWYcdF7trPfkUgV8EingF2Sh29ksbzsAYmGcFL40/7wCq1rIdgFZbMerkvbm6bqoEtjCk8SjD3hIiBuVFDU55A=="
+      },
+      {
+        "name": "@praxisui/crud",
+        "filename": "praxisui-crud-10.0.0-rc.36.tgz",
+        "sha256": "9c6194e6b9f5f43d4ab7fdbac2f36a01a791301bd45f5f3c5d2afb16f2451022",
+        "integrity": "sha512-uhJ6iqgwf5LfTpoEWaWk9zLJJndwtn5ChyWIDL6+pO565H+/IkrZozujDF2/0xT5VFK8T2oiya4Kr0otq5M2PQ=="
+      },
+      {
+        "name": "@praxisui/dialog",
+        "filename": "praxisui-dialog-10.0.0-rc.36.tgz",
+        "sha256": "759625bbba9842f3ffe22dc4b6d65d4bb54e1032acf2684ff00f616cc0bbd69d",
+        "integrity": "sha512-6BMrgVS3naSwHwpKRfbz7bcSOwqOSa0C9mrK1zZk7U/wV8NBHzOmjM1iUkc2/Kaeue+PtiytmTZHN87Cyx1Nsg=="
+      },
+      {
+        "name": "@praxisui/dynamic-fields",
+        "filename": "praxisui-dynamic-fields-10.0.0-rc.36.tgz",
+        "sha256": "a5e58cb52ade8847fe1e8ff9c8388f610883c95c35f7d799156ae58853d5c2e8",
+        "integrity": "sha512-4al17VG2l8sNb+usmVDF+J28kY8Lp8j/hx0v446Lkf5qgaVSWpsQRqsTN4mCofkWxjNyZKMeogart6DA8CPvMg=="
+      },
+      {
+        "name": "@praxisui/dynamic-form",
+        "filename": "praxisui-dynamic-form-10.0.0-rc.36.tgz",
+        "sha256": "8fd3406aed64473150163739fd82e2f7ec7c05d34502f477102a94e6144b22b1",
+        "integrity": "sha512-650wOA0d2DVxT5lDSdiM69QlNXU6NNS+2VwZaTBITfky7FhQAPJlI6aGj+CaUmsDaHNErBynJH+7PJuVoEevVw=="
+      },
+      {
+        "name": "@praxisui/editorial-forms",
+        "filename": "praxisui-editorial-forms-10.0.0-rc.36.tgz",
+        "sha256": "2494bc7828317e495fc0a93d08d1b679bca0a2196f05716e36121c7e1ba89ec5",
+        "integrity": "sha512-rC0VZqR/Lo4rqZluvmmAm0HaEWZg0ovuQqZU7VyCsak5Ci3C7mddyCdDrCj25q4JYMcde/W+IsC4qB7jI19mPA=="
+      },
+      {
+        "name": "@praxisui/expansion",
+        "filename": "praxisui-expansion-10.0.0-rc.36.tgz",
+        "sha256": "b12f57c7fc4b80aef900d283094413636e55fb8af5e75f1fb5abdde2f198a944",
+        "integrity": "sha512-RXyKzUnVkxm+l13xggW5cUKIUWIkZogqqPSZDqxbECd3jgwSvJ1WHtVBdEB70wul+nqTUrGNaYhFoqfRU/ZJgA=="
+      },
+      {
+        "name": "@praxisui/files-upload",
+        "filename": "praxisui-files-upload-10.0.0-rc.36.tgz",
+        "sha256": "2f5001c3c69bc07c7fd0a0312926fdaa1b36c2faa52e1dea041c7460246a2dea",
+        "integrity": "sha512-HKmXyAzRznuK2ukAPzN4ckTsxgKtTxlIlt6yHUi5Rulvz8U9R6a+yhuUAKDCItQ+XLf2y2zVoJYIivXCyCmPDw=="
+      },
+      {
+        "name": "@praxisui/list",
+        "filename": "praxisui-list-10.0.0-rc.36.tgz",
+        "sha256": "f6f0ab2fc988bdd4024fad1d35b1dc6d69d60741099ee1862f7068f05f35c470",
+        "integrity": "sha512-SXtJZ/6RYeHNUBoU6YOolVLlQeQFRcUGRBOUmxYlHMqVkn03SN87FSHt7TjYJ3U8pofPwmd8eATt56MjbSovHg=="
+      },
+      {
+        "name": "@praxisui/manual-form",
+        "filename": "praxisui-manual-form-10.0.0-rc.36.tgz",
+        "sha256": "e92ea5b78237a0384e5881444cbeb28c2aa5ee71b187017cae027b14093f92ff",
+        "integrity": "sha512-xUYq0MaFngwmfL0M1dlrkf+p5Xy9PJL500fHhKxjX4TmdzupQMwovCBj7Crl12ANvEpDXXRN2PAUOEdOC6FObQ=="
+      },
+      {
+        "name": "@praxisui/metadata-editor",
+        "filename": "praxisui-metadata-editor-10.0.0-rc.36.tgz",
+        "sha256": "944d1be706d218715c523ae997e7df107ef8058ebb12197de4c97805a371a46b",
+        "integrity": "sha512-RbFrolyO0oYuDeFniG5OLOg3bRmGahSs4lFcOh1wCjsa+94pAnijL76+SMf/eFQxxnoXsGZtRFPz57akzYGWkA=="
+      },
+      {
+        "name": "@praxisui/page-builder",
+        "filename": "praxisui-page-builder-10.0.0-rc.36.tgz",
+        "sha256": "c004cf9de26f5a0d9f9a61f93113e6d7191071c95c72b7e6275dd87436918713",
+        "integrity": "sha512-H/zczM2u8tS8CQxwaTV3De+vXKxHciShPSGTVUOeSSl2V+j3rl3/uJSeMdRF2GUf61divmYCi4nQHhlA6kLI6Q=="
+      },
+      {
+        "name": "@praxisui/rich-content",
+        "filename": "praxisui-rich-content-10.0.0-rc.36.tgz",
+        "sha256": "73b223b28babc84c09dc0bf8872a17b75a6cdb01cbb61667ddce3c2a45f25436",
+        "integrity": "sha512-CSyHcapYFlOmEu5JdbnRXMRaNXfUDGpf0Z7nYLNMSqZuePPtbmDYzqFpyE1O/i4/iJDonobM46KtQIqHaTX3Yw=="
+      },
+      {
+        "name": "@praxisui/settings-panel",
+        "filename": "praxisui-settings-panel-10.0.0-rc.36.tgz",
+        "sha256": "79e7da7493359cd42110ed45e217700c64fa8637dd633b2e3880a02fd24467d6",
+        "integrity": "sha512-jamgBwbpqsChF4siULr/wxYLFI372zviQ4I5rmqEJkkphr9t2oxMWI0JQ6q5G6GrOGxEsJMriFHYh6YYMKX63w=="
+      },
+      {
+        "name": "@praxisui/stepper",
+        "filename": "praxisui-stepper-10.0.0-rc.36.tgz",
+        "sha256": "aa5a0b55fe74e3c99378290fa6a90e759baaa539635ed18e58efa94050be4fee",
+        "integrity": "sha512-vmwJElFCXYQxdEzSemrj02qwBwcK5xL9i9xaj4nSTCO4FGGLSZrvK4JN4+MTjteFg6MoHs2u4a5tOnif6/OUGw=="
+      },
+      {
+        "name": "@praxisui/table",
+        "filename": "praxisui-table-10.0.0-rc.36.tgz",
+        "sha256": "39e5b224dfc82baa2643417181ba7e9d7c4da07d71e6aa6b1e8ba7b01ecefce8",
+        "integrity": "sha512-tJ2gf158lqHCOFnTkzTCOSzoBri3FdX/t3rIq2fXVk1LyyP2DQYcWzxSgsGkxE2tV5sD6T7ugepIFZoR+qqVgg=="
+      },
+      {
+        "name": "@praxisui/table-rule-builder",
+        "filename": "praxisui-table-rule-builder-10.0.0-rc.36.tgz",
+        "sha256": "f358443b2235d820708bccabe2a24141f598310e363a13a3f82ebe2c6523e3c0",
+        "integrity": "sha512-wJOOEws0mGG+Dt8lOowqiSKXRRjrKQ/lpTlxR2HrX/sSe2gN0Fbb8bfbNi8rgr8H7vYUNb1UkcVlhAzqrxUOQw=="
+      },
+      {
+        "name": "@praxisui/tabs",
+        "filename": "praxisui-tabs-10.0.0-rc.36.tgz",
+        "sha256": "7d09a06ebd0a228be331f46c1e842773f946c18dc065d0067f7de79810bb8d46",
+        "integrity": "sha512-irXOxtTq8fyksBZijE4ZozoOh3iy3QbWIuNYHXX2JzMw5obh0ftrI0mei57MR39UNQsVu//fY8daPWzN8c0H6Q=="
+      },
+      {
+        "name": "@praxisui/visual-builder",
+        "filename": "praxisui-visual-builder-10.0.0-rc.36.tgz",
+        "sha256": "de8d5dc9bbb2bafcf0928e986ea06af8c1c6fa2e56fd8566d9a1f3aac242cda2",
+        "integrity": "sha512-7Ut2FSmZ8Td03yldyTidBiHHBegOj1OuhEWninAT9QICYAHOP06Oerk+FljAaYK8MIaE4JlD0s6Nk4Uxk0HHqA=="
+      }
+    ],
+    "initialRegistryCheck": {
+      "capturedAtUtc": "2026-10-21T13:53:52.227Z",
+      "ready": 21,
+      "pending": [
+        {
+          "name": "@praxisui/settings-panel",
+          "httpStatus": 200,
+          "versionPresent": false,
+          "rcTag": "10.0.0-rc.35",
+          "integrityMatches": false,
+          "ready": false
+        }
+      ]
+    }
+  },
+  "npmPropagationDiagnostic": {
+    "capturedAtUtc": "2026-10-21T14:00:12.807Z",
+    "release": "cf27f5b89480a34a299fa6d3c591bfa9776a99b4",
+    "version": "10.0.0-rc.36",
+    "package": "@praxisui/settings-panel",
+    "expected": {
+      "name": "@praxisui/settings-panel",
+      "filename": "praxisui-settings-panel-10.0.0-rc.36.tgz",
+      "sha256": "79e7da7493359cd42110ed45e217700c64fa8637dd633b2e3880a02fd24467d6",
+      "integrity": "sha512-jamgBwbpqsChF4siULr/wxYLFI372zviQ4I5rmqEJkkphr9t2oxMWI0JQ6q5G6GrOGxEsJMriFHYh6YYMKX63w=="
+    },
+    "publication": {
+      "acceptedAtUtc": "2026-10-21T13:47:38.3176729Z",
+      "message": "Your package is being processed and may take a few minutes to become available.",
+      "log": "/tmp/rule-parameters-angular36-release.log",
+      "lines": "2967-2988"
+    },
+    "postflight": "first attempt failed after propagation timeout; no republish or new release",
+    "metadata": [
+      {
+        "name": "fullPackument",
+        "url": "https://registry.npmjs.org/%40praxisui%2Fsettings-panel",
+        "accept": "application/json",
+        "status": 200,
+        "headers": {
+          "date": "Wed, 21 Oct 2026 14:00:12 GMT",
+          "etag": "W/\"61c89db6d47aebbf359a8c7502bb5523\"",
+          "cache-control": "public, max-age=300",
+          "cf-cache-status": "HIT",
+          "cf-ray": "a4e0c98319464c8a-GIG",
+          "content-type": "application/json"
+        },
+        "rcTag": "10.0.0-rc.36",
+        "versionPresent": true,
+        "integrityMatches": true,
+        "versionTarball": "https://registry.npmjs.org/@praxisui/settings-panel/-/settings-panel-10.0.0-rc.36.tgz",
+        "knownTarball": "https://registry.npmjs.org/@praxisui/settings-panel/-/settings-panel-10.0.0-rc.36.tgz"
+      },
+      {
+        "name": "installPackument",
+        "url": "https://registry.npmjs.org/%40praxisui%2Fsettings-panel",
+        "accept": "application/vnd.npm.install-v1+json",
+        "status": 200,
+        "headers": {
+          "date": "Wed, 21 Oct 2026 14:00:12 GMT",
+          "etag": "W/\"638d2f165192ff1ccba0e9e12d1bd301\"",
+          "cache-control": "public, max-age=300",
+          "cf-cache-status": "HIT",
+          "cf-ray": "a4e0c9831f1aca14-GIG",
+          "content-type": "application/vnd.npm.install-v1+json"
+        },
+        "rcTag": "10.0.0-rc.36",
+        "versionPresent": true,
+        "integrityMatches": true,
+        "versionTarball": "https://registry.npmjs.org/@praxisui/settings-panel/-/settings-panel-10.0.0-rc.36.tgz",
+        "knownTarball": "https://registry.npmjs.org/@praxisui/settings-panel/-/settings-panel-10.0.0-rc.36.tgz"
+      },
+      {
+        "name": "version",
+        "url": "https://registry.npmjs.org/%40praxisui%2Fsettings-panel/10.0.0-rc.36",
+        "accept": "application/json",
+        "status": 200,
+        "headers": {
+          "date": "Wed, 21 Oct 2026 14:00:12 GMT",
+          "cf-cache-status": "DYNAMIC",
+          "cf-ray": "a4e0c9831e81c802-GIG",
+          "content-type": "application/json"
+        },
+        "versionPresent": true,
+        "integrityMatches": true,
+        "versionTarball": "https://registry.npmjs.org/@praxisui/settings-panel/-/settings-panel-10.0.0-rc.36.tgz"
+      }
+    ],
+    "tarball": {
+      "url": "https://registry.npmjs.org/@praxisui/settings-panel/-/settings-panel-10.0.0-rc.36.tgz",
+      "urlSource": "version metadata",
+      "status": 200,
+      "headers": {
+        "date": "Wed, 21 Oct 2026 14:00:13 GMT",
+        "etag": "\"025f2823d801f033feaf2cfbf9932035\"",
+        "cache-control": "public, must-revalidate, max-age=31557600",
+        "cf-cache-status": "HIT",
+        "cf-ray": "a4e0c9873d0e4c8a-GIG",
+        "content-type": "application/octet-stream"
+      },
+      "bytes": 97515,
+      "sha256": "79e7da7493359cd42110ed45e217700c64fa8637dd633b2e3880a02fd24467d6",
+      "sha256Matches": true,
+      "integrity": "sha512-jamgBwbpqsChF4siULr/wxYLFI372zviQ4I5rmqEJkkphr9t2oxMWI0JQ6q5G6GrOGxEsJMriFHYh6YYMKX63w==",
+      "integrityMatches": true
+    },
+    "reportSha256": "9825f55db17263708ed64b2e3e282f02ff82cbfd57cc0a4b4809e87a70faf461"
+  },
+  "lockOnlyIntegration": {
+    "pr": "https://github.com/codexrodrigues/praxis-policy-studio/pull/61",
+    "mainCommit": "66aefe8e68d1e91abd7cd131f543885833af35cd",
+    "featureRebaseSourceHead": "0f37fe0",
+    "previousValidatedFeatureHead": "3451fc71e96b036c144d5f1bea40b9e0f1ca366d",
+    "srcE2eAndManifestsUnchanged": true,
+    "publishedGateHashesRechecked": true,
+    "unit142AndBrowser14RetainedWithoutRerun": true,
+    "featureDiffContainsNoManifests": true,
+    "renderReadOnlyObservation": {
+      "capturedAtUtc": "2026-10-21T14:16:48.453375+00:00",
+      "serviceId": "srv-da0fbqlbedkc73ald6e0",
+      "returnedDeploys": 11,
+      "targetCommit": "66aefe8e68d1e91abd7cd131f543885833af35cd",
+      "targetDeployObserved": false,
+      "latestObservedDeploy": {
+        "commit": {
+          "createdAt": "2026-08-19T11:32:22Z",
+          "id": "bcd14b8e420cc9388dc3515a434d42544db62df2",
+          "message": "test: excluir worktrees auxiliares do vitest"
+        },
+        "createdAt": "2026-08-26T15:38:20.662312Z",
+        "finishedAt": "2026-08-26T15:39:00.835932Z",
+        "id": "dep-da7ggr142hec73bo2qr0",
+        "startedAt": "2026-08-26T15:38:20.660164Z",
+        "status": "live",
+        "trigger": "manual",
+        "updatedAt": "2026-08-26T15:39:00.836146Z"
+      },
+      "rawSha256": "17a66f8b44e49847c4b37fee9b7239e5fd751f34afc85d8c910700cc6ce7f465",
+      "controlPlaneMutated": false,
+      "limitation": "No deployment of the merged lock commit was observed. Configured auto-deploy is not proof that this commit deployed."
+    }
+  }
+}
