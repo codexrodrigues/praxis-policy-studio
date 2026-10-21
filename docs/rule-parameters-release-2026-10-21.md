@@ -8,6 +8,8 @@ rewrite the rc.34 source/tarball hashes in `rule-parameters-source-evidence.json
 
 - Angular source candidate: `667e6d7d5`, rebased onto `1c797be9d` (rc.35), with
   parameter catalog model/client/spec and canonical Core documentation.
+- Angular source PR [#621](https://github.com/codexrodrigues/praxis-ui-angular/pull/621)
+  was independently reviewed and merged as `7365e83acf3e7f5323d70fe8ab892f6144c630c8`.
 - Prospective cohort: all 22 `@praxisui/*` packages at `10.0.0-rc.36`, npm channel
   `rc`. `latest` remains on the stable 9.x line.
 - The unrelated rc.35 train finished successfully, including public npm
@@ -54,7 +56,15 @@ Core rc.35 already separates immutable snapshot publication
 key/version and content hash. Studio consumes neither that host receipt nor a
 snapshot publication command, and does not synthesize an active head from them.
 
-The cockpit now shows policies and staged rollout without an active head. A
+Studio `main` integrated that bootstrap materialization in PR #59, commit
+`f427d70517062814b3d9e7657a36c7b961d71203`, alongside published rc.35 adoption.
+Our checkpoint `feb3f6c` was rebased onto that commit as `d73b3d2`; duplicate
+bootstrap handlers and tests were removed. Manifest and lock were retained byte
+for byte from the new main until published rc.36 is verified. The current delta
+adds parameter editing and blocks rollout controls/commands while the rollout
+catalog itself is loading or failed, preserving main's confirmed-token checks.
+
+The cockpit shows policies and staged rollout without an active head. A
 successful head read returning 404, a per-version `CREATE_ROLLOUT` action and the
 rollout catalog action jointly permit the bootstrap command. Loading, denied or
 failed head reads, unavailable versions and stale confirmation actions remain
@@ -66,8 +76,9 @@ recompute quorum, policy authority or readiness.
 
 ## Integration and publication gates still to close
 
-1. Independent review and merge of the Angular source PR, followed by the official
-   rc.36 prepare/publication/postflight run. No local npm publication.
+1. Angular source review/merge is complete. Official rc.36 preparation was
+   dispatched in run `39609740850`; publication and public postflight remain
+   coordinated by the root task. No local npm publication.
 2. Update the seven Studio dependencies to the exact published rc.36 and generate
    the lock from the public registry. Run clean `npm ci`, lint, unit tests, static
    build and focused desktop/narrow browser proof from that registry install.

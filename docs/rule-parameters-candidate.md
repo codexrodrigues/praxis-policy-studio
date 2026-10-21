@@ -43,17 +43,20 @@ include parameters. A numerical formatting-only change does not invalidate gover
 evidence. The expression formatter displays multiplication in ratio conditions
 without evaluating facts in the browser.
 
-## Dependency and adoption gate
+## Historical rc.34 source dependency gate
 
-Studio's former seven direct `@praxisui/*` dependencies were `9.0.5-rc.38`. Current
-Angular main is `10.0.0-rc.34`. The manifest/lock now align that cohort, including
+This section records the initial source-only proof; current adoption is recorded
+in [the release log](rule-parameters-release-2026-10-21.md).
+
+Studio's former seven direct `@praxisui/*` dependencies were `9.0.5-rc.38`. At that proof,
+Angular main was `10.0.0-rc.34`. The candidate manifest/lock aligned that cohort, including
 canonical action fixture fields `interaction.riskLevel` and `availability.reason`.
 
 The new Core method is a **source candidate**, not a claim about the already
 published `10.0.0-rc.34` package. Tests use tarballs packed from the isolated Angular
 source tree and installed into the isolated Studio tree. This work does not publish
 packages. Adoption requires a published coherent cohort containing the new Core API
-and an updated exact version/lock in Studio; a clean registry install of the current
+and an updated exact version/lock in Studio; a clean registry install of that historical
 lock alone does not prove this candidate.
 
 Source validation recipe (run from the assigned Angular/Studio worktrees):

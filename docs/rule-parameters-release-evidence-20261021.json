@@ -215,8 +215,8 @@
   },
   "publishedAdoption": {
     "version": null,
-    "angularPr": null,
-    "publishRun": null,
+    "angularPr": "https://github.com/codexrodrigues/praxis-ui-angular/pull/621",
+    "publishRun": "https://github.com/codexrodrigues/praxis-ui-angular/actions/runs/39609796030",
     "postflight": null,
     "studioLock": "pending publication",
     "studioDeploy": "pending authorized merge; Render main autoDeploy commit=yes"
@@ -230,5 +230,57 @@
     "test-results/policy-studio-corporate-ro-1df6b-ure-and-current-ETag-pt-BR--narrow/rule-parameters.png": "01b5548288bec92b192bdaae889a59ce40dfa86d4086b6b15972e9667378143f",
     "test-results/policy-studio-corporate-ro-df734-ure-and-current-ETag-en-US--desktop/rule-parameters.png": "5aacf03df1e8531fc6360bf15bfd2add58cb765e9f26c41552e36d21fcc55189",
     "test-results/policy-studio-corporate-ro-df734-ure-and-current-ETag-en-US--narrow/rule-parameters.png": "299fcbd5f34c98472da6712b0704248594af8590b69abc0e8bb10d78e49de828"
+  },
+  "studioRebasedCandidate": {
+    "capturedAtUtc": "2026-10-21T13:41:39.926924+00:00",
+    "base": "f427d70517062814b3d9e7657a36c7b961d71203",
+    "checkpoint": "d73b3d2",
+    "manifestAndLock": "unchanged from main rc35; node_modules prospective source36",
+    "validation": {
+      "lint": "passed",
+      "unit": "20files142tests passed",
+      "build": "passed",
+      "browser": "14 intercepted cases passed: desktop/narrow parametersPT/EN, authoring, incompatible history, READY bootstrap/existing-head and BLOCKED bootstrap404vs500, AXE"
+    },
+    "logs": {
+      "/tmp/rule-parameters-studio-rebased-build.log": "70727622111e9bb8c893cc4a974776f9e1c484b6d903e285662466fa12de3167",
+      "/tmp/rule-parameters-studio-rebased-e2e.log": "6d48a31917b18fc51bd93427f4831d1d4d84841813ee5aad1de512215376eda2"
+    },
+    "files": {
+      "e2e/policy-studio-corporate.spec.ts": "11632ebf4afe20776402b31c27d19c96447ea70ede6e99368e807ef8be6ceacc",
+      "src/app/core/decision-inspection.spec.ts": "7f084c81bf5d74a5c9c4d9c8d06ce98b0498e51b7f01e0bb940ff61f85a23d7e",
+      "src/app/core/decision-inspection.ts": "22c1a85f416a0542b98ec695380f33cfc6618a2204fabd7a1e31771703699e5a",
+      "src/app/core/i18n.ts": "8b47c47b21e13a8bed7725fa405c0cc422f9a37611a8e0c097585c5c4d71cde9",
+      "src/app/core/projection-catalog.service.spec.ts": "cc04af23bb11f502e1ca689d4d5347859a3bbb38f219111df4ecca41b60ea919",
+      "src/app/core/projection-catalog.service.ts": "1776ddfc538d21d7770b3206ea65b681eab8b8f3c32516e02cf02c501fa67360",
+      "src/app/features/catalog/catalog-workspace.component.html": "b370626cf755bab0607c6685da97776b776fad9c0da74502aa05b8bbe87290bc",
+      "src/app/features/catalog/catalog-workspace.component.spec.ts": "5d77494582e606e1186816811cd30c5b2e4febd3bd881ea20ffe5f77cf48e245",
+      "src/app/features/catalog/catalog-workspace.component.ts": "021d29ae4b20ed8478e5c680145d16f96e615792d1e461102d35cb8fae95ff60",
+      "src/app/features/catalog/rule-parameter-draft.spec.ts": "fc3ec3a992ab446a450f15c0435a1d4dbe59bd78b14d9a303211157322fc757f",
+      "src/app/features/catalog/rule-parameter-draft.ts": "45c175031c8632f13376ae66f1f9d8d42a39fb15544c681efa3fcd515f00a651",
+      "src/app/features/catalog/rule-parameters.component.ts": "f964583980b5b184926b5f81af5f6cfd6e9706d4ea5506fd1c4f4c9d61cfd06d",
+      "src/app/features/catalog/snapshot-cockpit.component.spec.ts": "6e40e3621c658d7a327fdde3f0cc08805ccdfebb3938092d6d6dc65eeaef3374",
+      "src/app/features/catalog/snapshot-cockpit.component.ts": "3c8c8b58f40c9a429754ff917a0f816876bf17eddebabc71eb942c26a20a0fce"
+    },
+    "screenshots": {
+      "test-results/policy-studio-corporate-ro-df734-ure-and-current-ETag-en-US--desktop/rule-parameters.png": "5aacf03df1e8531fc6360bf15bfd2add58cb765e9f26c41552e36d21fcc55189",
+      "test-results/policy-studio-corporate-ac-a0148--governed-bootstrap-rollout-desktop/published-candidate-before-activation.png": "3205fa85fb493c3e4858547639e24820d00c87374146841af916c35f0250f7b3",
+      "test-results/policy-studio-corporate-ac-a0148--governed-bootstrap-rollout-desktop/rollout-confirmation.png": "3b6788dc01bbfce5bb0385bc495750d32b6a2ae8ce8d5c90d1f27c174a12732a",
+      "test-results/policy-studio-corporate-ac-baea6-erned-existing-head-rollout-desktop/published-candidate-before-activation.png": "b4a4ee3cbddd0de9652a9fdd2845ff107ab5c6f5d8e710d2fc3c5a420d569b3a",
+      "test-results/policy-studio-corporate-ac-baea6-erned-existing-head-rollout-desktop/rollout-confirmation.png": "46b999d0ac0b8ba01035f611b3d35bed4f5038e4f0a90f745fb667d5b9e67b57",
+      "test-results/policy-studio-corporate-ke-74916-s-and-verified-head-absence-narrow/bootstrap-published-inactive.png": "d438cf6f4fee47d76d0adec7fc72d6c0417c139a2dbbbc3120d68808f7d42332",
+      "test-results/policy-studio-corporate-pr-5b8c7-rio-and-running-the-sandbox-desktop/authoring-sandbox-result.png": "387f8af924c8ba8ab01b9b790004df8833b3bb49d30ebf06a58c2513f8b0a47e",
+      "test-results/policy-studio-corporate-ke-2213a-offering-runtime-operations-narrow/incompatible-history.png": "dd42882b7b59dcb41be4ae6de4d1f78eb4b2285d8be0b7ab895d01dada48025a",
+      "test-results/policy-studio-corporate-ro-1df6b-ure-and-current-ETag-pt-BR--narrow/rule-parameters.png": "ae9b978df8dfaa3b5ee58aa4438a4e9ad216ccaa03492fbd609378a72b5f953c",
+      "test-results/policy-studio-corporate-ro-df734-ure-and-current-ETag-en-US--narrow/rule-parameters.png": "299fcbd5f34c98472da6712b0704248594af8590b69abc0e8bb10d78e49de828",
+      "test-results/policy-studio-corporate-ro-1df6b-ure-and-current-ETag-pt-BR--desktop/rule-parameters.png": "dde99ce1f3f1ecdcf90081cb2654657491dd0fd27b16141538ee6a650b92cb0a",
+      "test-results/policy-studio-corporate-ac-a0148--governed-bootstrap-rollout-narrow/published-candidate-before-activation.png": "e5cb021eaeec6bbab9a4dae37b3f385fcf8ac6cb3e78158bf8d4b4aa2e7500a4",
+      "test-results/policy-studio-corporate-ac-a0148--governed-bootstrap-rollout-narrow/rollout-confirmation.png": "3f2ec451e432fb7368279f3cd99ccc9e2a4d155526cd7d4358f260d9042e65cf",
+      "test-results/policy-studio-corporate-ac-baea6-erned-existing-head-rollout-narrow/published-candidate-before-activation.png": "74b638e4513c4befabb76efadd2424b7cde3e6f0b631846472a61b31d051b06e",
+      "test-results/policy-studio-corporate-ac-baea6-erned-existing-head-rollout-narrow/rollout-confirmation.png": "29523827486dd60f7c38ae0d2e580f3076d595f005b45245190695eddec8780c",
+      "test-results/policy-studio-corporate-ke-2213a-offering-runtime-operations-desktop/incompatible-history.png": "23c3bdfc8156a74ceedd72c3d7622101f04f3600b61d46159e4074a6ac6af265",
+      "test-results/policy-studio-corporate-pr-5b8c7-rio-and-running-the-sandbox-narrow/authoring-sandbox-result.png": "2cf62107f8a69b2aa550304f35839809bd4b85a3861e097b5453352fe007a9e3",
+      "test-results/policy-studio-corporate-ke-74916-s-and-verified-head-absence-desktop/bootstrap-published-inactive.png": "3e6fc1a062740320ec4ea27e276ba6393dbec3f653d00242571e4f0bfc62140b"
+    }
   }
 }
