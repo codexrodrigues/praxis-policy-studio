@@ -682,5 +682,39 @@
       "integrityMatches": true
     },
     "reportSha256": "9825f55db17263708ed64b2e3e282f02ff82cbfd57cc0a4b4809e87a70faf461"
+  },
+  "lockOnlyIntegration": {
+    "pr": "https://github.com/codexrodrigues/praxis-policy-studio/pull/61",
+    "mainCommit": "66aefe8e68d1e91abd7cd131f543885833af35cd",
+    "featureRebaseSourceHead": "0f37fe0",
+    "previousValidatedFeatureHead": "3451fc71e96b036c144d5f1bea40b9e0f1ca366d",
+    "srcE2eAndManifestsUnchanged": true,
+    "publishedGateHashesRechecked": true,
+    "unit142AndBrowser14RetainedWithoutRerun": true,
+    "featureDiffContainsNoManifests": true,
+    "renderReadOnlyObservation": {
+      "capturedAtUtc": "2026-10-21T14:16:48.453375+00:00",
+      "serviceId": "srv-da0fbqlbedkc73ald6e0",
+      "returnedDeploys": 11,
+      "targetCommit": "66aefe8e68d1e91abd7cd131f543885833af35cd",
+      "targetDeployObserved": false,
+      "latestObservedDeploy": {
+        "commit": {
+          "createdAt": "2026-08-19T11:32:22Z",
+          "id": "bcd14b8e420cc9388dc3515a434d42544db62df2",
+          "message": "test: excluir worktrees auxiliares do vitest"
+        },
+        "createdAt": "2026-08-26T15:38:20.662312Z",
+        "finishedAt": "2026-08-26T15:39:00.835932Z",
+        "id": "dep-da7ggr142hec73bo2qr0",
+        "startedAt": "2026-08-26T15:38:20.660164Z",
+        "status": "live",
+        "trigger": "manual",
+        "updatedAt": "2026-08-26T15:39:00.836146Z"
+      },
+      "rawSha256": "17a66f8b44e49847c4b37fee9b7239e5fd751f34afc85d8c910700cc6ce7f465",
+      "controlPlaneMutated": false,
+      "limitation": "No deployment of the merged lock commit was observed. Configured auto-deploy is not proof that this commit deployed."
+    }
   }
 }

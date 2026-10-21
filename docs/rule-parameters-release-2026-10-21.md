@@ -160,3 +160,22 @@ The [Studio PR #60](https://github.com/codexrodrigues/praxis-policy-studio/pull/
 awaits final independent review and coordinated backend admission before merge.
 Historical rc.34 and prospective rc.36 evidence remain separately identified;
 the published adoption evidence is under `publishedAdoption` in the JSON record.
+
+## Separate lock integration and feature rebase
+
+The isolated registry adoption was independently reviewed and merged through
+[PR #61](https://github.com/codexrodrigues/praxis-policy-studio/pull/61) as
+`66aefe8e68d1e91abd7cd131f543885833af35cd`. Its fresh main-baseline proof was
+123 unit tests and six G2 browser cases. The parameter feature PR was then rebased
+onto that main: its diff no longer contains the package manifest or lock. Source,
+browser tests and public dependency bytes are identical to the previously
+validated feature tree, so its 142-unit/14-browser evidence remains valid without
+another run.
+
+A read-only Render query after this merge returned 11 deployments for the Studio
+service and no deployment of `66aefe8`. The latest returned deployment was
+`dep-da7ggr142hec73bo2qr0`, live at commit
+`bcd14b8e420cc9388dc3515a434d42544db62df2`, created on 26 August with a manual
+trigger. The configured auto-deploy setting is not proof of a current deployment.
+No service setting or deployment was changed by this inspection; deployment of
+the new lock or the still-pending parameter feature is not claimed.
