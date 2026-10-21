@@ -6,6 +6,8 @@ import { DecisionTimelineEvent } from './catalog.fixture';
 import { RuntimeConfigService } from '../../core/runtime-config.service';
 import { HttpErrorResponse } from '@angular/common/http';
 import type { RuleBuilderConfig, RuleBuilderState } from '@praxisui/visual-builder';
+import { RuleParametersComponent } from './rule-parameters.component';
+import { parameterDrafts, resolveParameterDrafts, type RuleParameterDraft, type RuleParameterDrafts } from './rule-parameter-draft';
 import { LocalDraftWorkspaceComponent } from '../authoring/local-draft-workspace.component';
 import { canonicalDecisionExpression, composeDecisionCondition, editableDecisionCondition, formatDecisionExpression } from '../../core/decision-inspection';
 import { AuthSessionService } from '../../core/auth-session.service';
@@ -18,6 +20,7 @@ import {
   type ApiUrlConfig,
   type DomainRuleChangeWorkspace,
   type DomainRuleDecision,
+  type DomainRuleParameterCatalog,
   type DomainRuleDefinitionAction,
   type DomainRuleExecutionSummary,
   type DomainRuleHostStatusSummary,
@@ -68,6 +71,7 @@ type DecisionWorkMode = 'understand' | 'rule' | 'test' | 'operate' | 'history';
   selector: 'pax-catalog-workspace',
   imports: [
     LocalDraftWorkspaceComponent,
+    RuleParametersComponent,
     SnapshotCockpitComponent,
     DecisionExplanationComponent,
     DecisionDiscoveryComponent,
@@ -247,6 +251,7 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly rolloutFeedbackError = signal(false);
   private catalogLoadRevision = 0;
   private selectionRevision = 0;
+  private parameterLoadRevision = 0;
   private timelineLoadRevision = 0;
   private lifecycleLoadRevision = 0;
   private scenariosLoadRevision = 0;
@@ -263,10 +268,23 @@ export class CatalogWorkspaceComponent implements OnInit {
   private pendingOperationalCommand: PendingOperationalCommand | null = null;
   readonly draftCondition = signal<unknown | null>(null);
   readonly editorState = signal<RuleBuilderState | null>(null);
+  readonly parameterCatalog = signal<DomainRuleParameterCatalog | null>(null);
+  readonly parameterCatalogState = signal<'ready' | 'loading' | 'failed' | 'authentication' | 'forbidden'>('ready');
+  readonly parameterDrafts = signal<RuleParameterDrafts>({});
+  readonly parameterized = computed(() => !!this.parameterCatalog()?.templateKey);
+  readonly parameterResolution = computed(() => resolveParameterDrafts(
+    this.parameterCatalog()?.parameters ?? [], this.parameterDrafts()));
+  readonly parameterErrors = computed(() => this.parameterResolution().errors);
+  readonly parameterErrorCount = computed(() => Object.keys(this.parameterErrors()).length);
+  readonly hasParameterErrors = computed(() => this.parameterErrorCount() > 0);
+  readonly parametersChanged = computed(() => this.parameterized() && (this.hasParameterErrors()
+    || JSON.stringify(this.parameterResolution().values) !== JSON.stringify(resolveParameterDrafts(
+      this.parameterCatalog()?.parameters ?? [], this.loadedParameterDrafts()).values)));
+
   readonly originalExpression = computed(() => formatDecisionExpression(this.selected()?.condition));
   readonly draftExpression = computed(() => formatDecisionExpression(this.draftCondition()));
   readonly editorCondition = computed(() => editableDecisionCondition(this.draftCondition()));
-  readonly draftChanged = computed(() => canonicalDecisionExpression(
+  readonly draftChanged = computed(() => this.parametersChanged() || canonicalDecisionExpression(
     this.selected()?.workspaceCondition ?? this.selected()?.condition) !==
     canonicalDecisionExpression(this.draftCondition()));
   readonly semanticDiff = computed(() => semanticDecisionDiff(
@@ -481,7 +499,9 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.narrowDetailOpen.set(revealOnNarrow);
     this.activeMode.set('understand');
     this.authoringOpen.set(false);
-    this.draftCondition.set(decision.condition);
+    this.draftCondition.set(decision.workspaceCondition ?? decision.condition);
+    this.parameterCatalog.set(null);
+    this.parameterDrafts.set({});
     this.editorState.set(null);
     this.timeline.set([]);
     this.sandboxRun.set(null);
@@ -504,6 +524,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.snapshotFeedback.set(null);
     this.snapshotFeedbackError.set(false);
     this.snapshotBlockers.set([]);
+    this.loadParameters(selectionRevision);
     this.loadTimeline(selectionRevision);
     this.loadLifecycle(selectionRevision);
     this.loadScenarios(selectionRevision);
@@ -512,6 +533,63 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.loadOperationalTestAction(selectionRevision);
     this.loadSnapshots();
     this.revealSelectedDecision();
+  }
+
+  loadParameters(selectionRevision = this.selectionRevision): void {
+    const loadRevision = ++this.parameterLoadRevision;
+    const state = this.runtime.state();
+    const decision = this.selected();
+    const definitionId = decision?.configDefinitionId;
+    if (state.kind !== 'ready' || state.config.mode !== 'remote' || !definitionId) {
+      this.parameterCatalogState.set('ready');
+      return;
+    }
+    this.parameterCatalogState.set('loading');
+    this.catalog.parameters(definitionId, state.config).subscribe({
+      next: catalog => {
+        if (loadRevision !== this.parameterLoadRevision || !this.isCurrentDefinition(selectionRevision, definitionId)) return;
+        if (catalog.definitionId !== definitionId || catalog.ruleKey !== decision.key
+          || catalog.definitionVersion !== decision.configVersion
+          || catalog.schemaVersion !== 'praxis.domain-rule-parameter-catalog.v1') {
+          this.parameterCatalogState.set('failed');
+          return;
+        }
+        this.parameterCatalog.set(catalog);
+        if (catalog.templateKey) {
+          // A governed template makes parameters authorable; Config capabilities
+          // still control every view/mutation. A domain projection is enrichment.
+          const materialize = (item: DecisionSummary): DecisionSummary => item.configDefinitionId === definitionId
+            ? { ...item, authoringSupported: true } : item;
+          this.allDecisions.update(items => items.map(materialize));
+          this.selected.update(item => item ? materialize(item) : item);
+        }
+        this.parameterDrafts.set(this.loadedParameterDrafts());
+        this.parameterCatalogState.set('ready');
+      },
+      error: (error: unknown) => {
+        if (loadRevision !== this.parameterLoadRevision || !this.isCurrentDefinition(selectionRevision, definitionId)) return;
+        this.parameterCatalogState.set(error instanceof HttpErrorResponse && error.status === 401
+          ? 'authentication' : error instanceof HttpErrorResponse && error.status === 403 ? 'forbidden' : 'failed');
+      }
+    });
+  }
+
+  private loadedParameterDrafts(): RuleParameterDrafts {
+    const decision = this.selected();
+    const values = decision?.workspaceId ? this.parameterValues(decision.workspaceParameters) : undefined;
+    return parameterDrafts(this.parameterCatalog()?.parameters ?? [], values);
+  }
+
+  private parameterValues(parameters?: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+    const values = parameters?.['parameterValues'];
+    return values && typeof values === 'object' && !Array.isArray(values) ? values as Record<string, unknown> : {};
+  }
+
+  updateParameter(change: { name: string; draft: RuleParameterDraft }): void {
+    const parameter = this.parameterCatalog()?.parameters.find(item => item.name === change.name);
+    if (!parameter || parameter.readOnly || !this.hasWorkspaceAction('UPDATE_DRAFT')
+      || this.authoringBusy() || (change.draft.mode === 'NULL' && !parameter.nullable)) return;
+    this.parameterDrafts.update(drafts => ({ ...drafts, [change.name]: change.draft }));
   }
 
   loadTimeline(selectionRevision = this.selectionRevision): void {
@@ -715,8 +793,10 @@ export class CatalogWorkspaceComponent implements OnInit {
   openAuthoring(): void {
     if (this.authoringOpen()) return;
     const decision = this.selected();
-    if (!decision?.authoringSupported || !decision.condition || !this.hasWorkspaceAction('VIEW')) return;
+    if (!decision?.authoringSupported || !decision.condition || !this.hasWorkspaceAction('VIEW')
+      || this.parameterCatalogState() !== 'ready') return;
     this.draftCondition.set(decision.workspaceCondition ?? decision.condition);
+    this.parameterDrafts.set(this.loadedParameterDrafts());
     this.editorState.set(null);
     this.authoringOpen.set(true);
   }
@@ -742,6 +822,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.authoringOpen.set(false);
   }
   updateDraft(condition: unknown): void {
+    if (this.parameterized()) return;
     const source = this.selected()?.workspaceCondition ?? this.selected()?.condition;
     this.draftCondition.set(composeDecisionCondition(source, condition));
   }
@@ -784,7 +865,8 @@ export class CatalogWorkspaceComponent implements OnInit {
     const state = this.runtime.state();
     const decision = this.selected();
     if (state.kind !== 'ready' || !decision?.workspaceId || !decision.workspaceEtag
-      || !this.hasWorkspaceAction('UPDATE_DRAFT') || this.authoringBusy()) return;
+      || !this.hasWorkspaceAction('UPDATE_DRAFT') || this.authoringBusy()
+      || this.parameterCatalogState() !== 'ready' || this.hasParameterErrors()) return;
     this.authoringBusy.set(true);
     this.clearAuthoringMessage();
     const commandRevision = this.selectionRevision;
@@ -793,8 +875,9 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.catalog.saveWorkspaceDraft({
       id: decision.workspaceId,
       etag: decision.workspaceEtag,
-      parameters: { ...(decision.workspaceParameters ?? {}) }
-    }, this.draftCondition(), state.config).subscribe({
+      parameters: { ...(decision.workspaceParameters ?? {}),
+        ...(this.parameterized() ? { parameterValues: this.parameterResolution().values } : {}) }
+    }, this.parameterized() ? null : this.draftCondition(), state.config).subscribe({
       next: workspace => {
         if (!this.isCurrentCommand(commandRevision, commandRuleKey, commandWorkspaceId)) {
           this.authoringBusy.set(false);
@@ -1401,7 +1484,8 @@ export class CatalogWorkspaceComponent implements OnInit {
     const state = this.runtime.state();
     const current = this.selected();
     const definitionId = current?.promotedDefinitionId;
-    if (state.kind !== 'ready' || !definitionId || this.authoringBusy()) return;
+    if (state.kind !== 'ready' || !definitionId || this.authoringBusy()
+      || this.parameterized() || this.parameterCatalogState() !== 'ready') return;
     this.authoringBusy.set(true);
     this.clearAuthoringMessage();
     const commandRevision = this.selectionRevision;
@@ -1425,6 +1509,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     const current = this.selected();
     const definitionId = current?.promotedDefinitionId;
     if (state.kind !== 'ready' || !definitionId || this.authoringBusy()
+      || this.parameterized() || this.parameterCatalogState() !== 'ready'
       || this.publicationReadiness()?.readiness !== 'ready_to_publish'
       || !this.hasDefinitionAction('PUBLISH')) return;
     this.authoringBusy.set(true);
@@ -1540,7 +1625,7 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   private canCreateSnapshotRollout(candidateSnapshotKey: string): boolean {
-    if (this.snapshotsLoading() || this.snapshotsError()
+    if (this.snapshotsLoading() || this.snapshotsError() || this.rolloutLoading() || this.rolloutError()
       || !this.rolloutCatalog()?.availableActions.includes('CREATE_ROLLOUT')) return false;
     const candidate = this.snapshotVersions().find(item => item.snapshotKey === candidateSnapshotKey);
     if (!candidate || candidate.active || candidate.governanceState !== 'READY') return false;
@@ -1787,6 +1872,7 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   private clearSelection(): void {
     ++this.selectionRevision;
+    ++this.parameterLoadRevision;
     ++this.timelineLoadRevision;
     ++this.lifecycleLoadRevision;
     ++this.scenariosLoadRevision;
@@ -1798,6 +1884,9 @@ export class CatalogWorkspaceComponent implements OnInit {
     ++this.rolloutLoadRevision;
     ++this.hostStatusLoadRevision;
     ++this.executionSummaryLoadRevision;
+    this.parameterCatalog.set(null);
+    this.parameterCatalogState.set('ready');
+    this.parameterDrafts.set({});
     this.selected.set(null);
     this.narrowDetailOpen.set(false);
     this.authoringOpen.set(false);
@@ -1832,6 +1921,7 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   private resetDraftState(): void {
+    this.parameterDrafts.set(this.loadedParameterDrafts());
     this.draftCondition.set(this.selected()?.workspaceCondition ?? this.selected()?.condition ?? null);
     this.editorState.set(null);
   }
@@ -1851,6 +1941,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     const current = this.selected();
     if (current?.key === workspace.ruleKey) this.selected.set(patch(current));
     this.draftCondition.set(workspace.condition ?? null);
+    this.parameterDrafts.set(this.loadedParameterDrafts());
     this.sandboxRun.set(null);
     this.sandboxIdempotencyKey = null;
     this.sandboxEvaluatedAtUtc = null;

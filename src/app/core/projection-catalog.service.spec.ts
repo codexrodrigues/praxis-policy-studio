@@ -72,6 +72,23 @@ describe('ProjectionCatalogService', () => {
     TestBed.resetTestingModule();
   });
 
+  it('reads the selected definition parameter catalog through Core and configured headers', () => {
+    let catalog: unknown;
+    service.parameters('definition/one', {
+      mode: 'remote', configApiBaseUrl: 'https://config.example', locale: 'en-US',
+      projectionPath: null, initialDecisionKey: null
+    }).subscribe(value => catalog = value);
+    const request = http.expectOne('https://config.example/api/praxis/config/domain-rules/definitions/definition%2Fone/parameters');
+    expect(request.request.method).toBe('GET');
+    const response = {
+      definitionId: 'definition/one', ruleKey: 'grant.amount', definitionVersion: 1,
+      schemaVersion: 'praxis.domain-rule-parameter-catalog.v1', templateKey: null,
+      templateVersion: null, parameters: []
+    };
+    request.flush(response);
+    expect(catalog).toEqual(response);
+  });
+
   it('uses the bounded catalog and selects the highest governed version', () => {
     let decisions: readonly import('../features/catalog/catalog.fixture').DecisionSummary[] = [];
     service.load('en-US', {
@@ -147,7 +164,10 @@ describe('ProjectionCatalogService', () => {
       mode: 'remote', configApiBaseUrl: '', locale: 'en-US', projectionPath: null, initialDecisionKey: null
     }).subscribe(value => decisions = value);
 
-    http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([]);
+    http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([{
+      id: 'workspace-payroll', ruleKey: 'hr.payroll.net-salary', status: 'OPEN', etag: 'payroll-etag', revision: 3,
+      condition: { '<=': [{ var: 'amount' }, 2000] }, parameters: { parameterValues: { limit: 2000 }, productRef: 'product:payroll' }
+    }]);
     http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities').flush({
       tenantId: 'default', environment: 'dev', definitions: []
     });
@@ -161,7 +181,8 @@ describe('ProjectionCatalogService', () => {
           ruleType: 'selection_eligibility', status: 'draft', contextKey: 'procurement',
           resourceKey: 'procurement.suppliers' }] });
     http.expectOne('/api/praxis/config/domain-rules/definitions/hr-v1').flush({
-      id: 'hr-v1', ruleKey: 'hr.payroll.net-salary', version: 1, status: 'approved'
+      id: 'hr-v1', ruleKey: 'hr.payroll.net-salary', version: 1, status: 'approved',
+      condition: { '<=': [{ var: 'amount' }, 3000] }, parameters: { nullSemantics: 'FAIL_CLOSED' }
     });
     http.expectOne('/api/praxis/config/domain-rules/definitions/hr-v1/facts')
       .flush(factCatalog('hr-v1', 'hr.payroll.net-salary'));
@@ -174,6 +195,10 @@ describe('ProjectionCatalogService', () => {
     expect(decisions.map(decision => decision.domain)).toEqual(['hr.payroll', 'procurement']);
     expect(decisions.map(decision => decision.configDefinitionId)).toEqual(['hr-v1', 'proc-v2']);
     expect(decisions.every(decision => decision.authoringSupported === false)).toBe(true);
+    expect(decisions[0]?.condition).toEqual({ '<=': [{ var: 'amount' }, 3000] });
+    expect(decisions[0]?.workspaceEtag).toBe('payroll-etag');
+    expect(decisions[0]?.workspaceParameters).toEqual({ parameterValues: { limit: 2000 }, productRef: 'product:payroll' });
+    expect(decisions[0]?.nullSemantics).toBe('FAIL_CLOSED');
   });
 
   it('keeps the remote catalog available when optional projection enrichment fails', () => {

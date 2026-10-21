@@ -15,6 +15,12 @@ describe('decision inspection projection', () => {
     );
   });
 
+  it('formats a governed ratio threshold without evaluating or replacing runtime facts', () => {
+    const ratio = { '<=': [{ var: 'request.requestedAmount' }, { '*': [{ var: 'program.maxAmount' }, 0.8] }] };
+    expect(formatDecisionExpression(ratio)).toBe('request.requestedAmount <= (program.maxAmount * 0.8)');
+    expect(collectFactPaths(ratio)).toEqual(['program.maxAmount', 'request.requestedAmount']);
+  });
+
   it('extracts stable fact paths from the condition', () => {
     expect(collectFactPaths(condition)).toEqual([
       'regraFrequenciaCommand.quantidadeMaximaDias',

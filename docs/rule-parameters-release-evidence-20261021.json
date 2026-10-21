@@ -1,0 +1,234 @@
+{
+  "kind": "prospective-rc36-release-proof",
+  "capturedAtUtc": "2026-10-21T13:34:37Z",
+  "angular": {
+    "commit": "667e6d7d51f869b439e8a9926739b9e8fdd64002",
+    "base": "1c797be9d325208fcf3c8161d52e3dc632776caa",
+    "prManifestVersion": "10.0.0-rc.35",
+    "candidateVersion": "10.0.0-rc.36",
+    "temporaryHelper": "node projects/tools/bump-version.js 10.0.0-rc.36",
+    "manifestsRestoredByteForByte": true,
+    "files": {
+      "projects/praxis-core/README.md": "a34aa6bc53dd274b4f1fced164b28333e1db4413f0c519bd8601ed9670c57b8d",
+      "projects/praxis-core/src/lib/models/domain-rule.model.ts": "b1ed669003a187432e41f8d9b32cb2a8c71b72d7f43b35e9ac8328ed87434c63",
+      "projects/praxis-core/src/lib/services/domain-rule.service.spec.ts": "5d33afd7136ae3c43a72380b6aed48bc63d618c340c4125618fc786104579ca1",
+      "projects/praxis-core/src/lib/services/domain-rule.service.ts": "c8d8b47ce3437f0164bd58076ecbbffc6748a4c7354f339c155a70489bec30c4"
+    }
+  },
+  "configRegistryClone": {
+    "commit": "640d0c4f3d2975f3692d5c3d738da83e01fb21eb",
+    "exclusiveDisposable": true,
+    "workflowPinChanged": false
+  },
+  "packages": [
+    {
+      "package": "@praxisui/ai",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-ai.tgz",
+      "sha256": "a221b1b3bbbb2564cb7f9cf16a3c62de9d09ffe9faa8fbdc2c2b4f15dd5eddcf",
+      "installedPayloadCompared": true
+    },
+    {
+      "package": "@praxisui/charts",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-charts.tgz",
+      "sha256": "dac926b002b5658f520a8bb913e730a379f69b24509faf8a6326b7d01d7ee760",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/core",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-core.tgz",
+      "sha256": "ebd5de822542d719042ecfa3949f484d4f85f2a1ca9f9fa00184e8c63758bf68",
+      "installedPayloadCompared": true
+    },
+    {
+      "package": "@praxisui/cron-builder",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-cron-builder.tgz",
+      "sha256": "00def16139561372910837f83b758c4a3d5167d0e1663bad912918b751623e9b",
+      "installedPayloadCompared": true
+    },
+    {
+      "package": "@praxisui/crud",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-crud.tgz",
+      "sha256": "ddfff1b9633b5fa842f9ee8ff070ce1344667ce8ed51c46e9725a3f5b8762c33",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/dialog",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-dialog.tgz",
+      "sha256": "27c5a2a471c6c1a7c2dfd878fc71c49d40df9e6ab53d8e7cd1f6cf97028125f6",
+      "installedPayloadCompared": true
+    },
+    {
+      "package": "@praxisui/dynamic-fields",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-dynamic-fields.tgz",
+      "sha256": "e4378f079c54f4d3c1018dd319017ddc1d0dcd634f2c55fcc176626321fe502d",
+      "installedPayloadCompared": true
+    },
+    {
+      "package": "@praxisui/dynamic-form",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-dynamic-form.tgz",
+      "sha256": "e41aba4d79ede2de87d7c81a9bc006b422fc26d26722f6684c6bebe2f7bbf2d4",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/editorial-forms",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-editorial-forms.tgz",
+      "sha256": "bf007ffe3a8536604df7affb44fe466553d5b145df28d960a48194b50841d6de",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/expansion",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-expansion.tgz",
+      "sha256": "31055112d970f6c9628ed42d1de16533308c9464d7625743cbb904dc18409363",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/files-upload",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-files-upload.tgz",
+      "sha256": "1438c529e16c20a819650fc2a215f1cdd7e345b2a124afb34a4ca7785ef5070a",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/list",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-list.tgz",
+      "sha256": "112268c688f3354e0f2e256cbbbbd538f3d8dcfa6158cc7402a0b97cbe9c489f",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/manual-form",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-manual-form.tgz",
+      "sha256": "c7ff3adbcee83660013179d5b220b54098583f9a94e8640c71774028dc6deea6",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/metadata-editor",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-metadata-editor.tgz",
+      "sha256": "ef3ce4c5d5f6fdf006aad2eb4eaacc026611ebae05cd52eef73e85a400ef6af9",
+      "installedPayloadCompared": true
+    },
+    {
+      "package": "@praxisui/page-builder",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-page-builder.tgz",
+      "sha256": "59425b307f829e8860a7b3a08a1d5515ead35fe9213c70631374afe13d0ba12e",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/rich-content",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-rich-content.tgz",
+      "sha256": "9ba6b778b2962892f58ebb8b06c4ce493409c3c3b6c84945f54906d263bebc7e",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/settings-panel",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-settings-panel.tgz",
+      "sha256": "40c1565ebad8ba0e5403a83397b906b0fb52b146e8a4ed463137e40ed018a022",
+      "installedPayloadCompared": true
+    },
+    {
+      "package": "@praxisui/stepper",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-stepper.tgz",
+      "sha256": "77dd01574802e43dfd6ac50966c8039873e9c2dbdec6e59bbb6eb93a921baf4c",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/table-rule-builder",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-table-rule-builder.tgz",
+      "sha256": "b9412082fa19beda70c58c5654124a51a8b18bf25d58397a1897eca2966007d6",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/table",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-table.tgz",
+      "sha256": "c52854925b0b97d07c81a4903515fab35119c96f47d2bfc6038885a182a48281",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/tabs",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-tabs.tgz",
+      "sha256": "a039a69fc3fe2bac155cb7eff39214c256da9fe60ba2964b2f1c80ca7bf31b07",
+      "installedPayloadCompared": false
+    },
+    {
+      "package": "@praxisui/visual-builder",
+      "version": "10.0.0-rc.36",
+      "tarball": "praxis-visual-builder.tgz",
+      "sha256": "8084ca57c0b9249fc6f85dd90e3c12cd5cf58c144e6034e9f4273439ea9c1f4c",
+      "installedPayloadCompared": true
+    }
+  ],
+  "logs": {
+    "coreSpecs": {
+      "path": "/tmp/rule-parameters-core-rebased-spec.log",
+      "sha256": "8536acba50b73269322f7d0749e39265a647960821d797314c183a6f55f720f8"
+    },
+    "coreBuild": {
+      "path": "/tmp/rule-parameters-core-rebased-build.log",
+      "sha256": "632873ce5315a6a6f960a3a92052c7dbe11f11a8d957f1e42c1c976942c4f9a7"
+    },
+    "prospectivePreflight": {
+      "path": "/tmp/rule-parameters-angular-release-preflight36.log",
+      "sha256": "18af114be2ce6720872176db872b6a6e14aec9ac4c4ed816cc13f4210c68d51a"
+    },
+    "prospectiveDocRefresh": {
+      "path": "/tmp/rule-parameters-angular-release-core-doc-rebuild36.log",
+      "sha256": "d2861361b200543d3254fa061d73306c3dda6873e0d3fb4230afd7cab482ad3f"
+    },
+    "prospectiveVersionDiff": {
+      "path": "/tmp/rule-parameters-angular-version36-diff.patch",
+      "sha256": "197fe32a7972b946c2ab2b260d56d437a6f0c9e1933aed275f30487ba14ee5ab"
+    },
+    "studioBuild": {
+      "path": "/tmp/rule-parameters-studio-bootstrap-build.log",
+      "sha256": "e8f16a4b76e876bd8156bd1ef03d4401813299e65a264c8c66d6591effe9ad5e"
+    },
+    "studioBrowser": {
+      "path": "/tmp/rule-parameters-studio-bootstrap-e2e.log",
+      "sha256": "63ce505e66be9f8b1e46d615597ca4b9a6a3b1f6e870818ca96f1f5bf6ecf863"
+    }
+  },
+  "validation": {
+    "coreServiceTests": 34,
+    "prospectivePreflight": "22 builds/packages/tarballs passed; AI authoring contracts20/20 passed; public version36 free",
+    "studioUnit": "20 files,128 tests passed against eight candidate packages",
+    "studioBrowser": "8 passed; desktop/narrow; parametersPT/EN; generic catalog; save/reopen/reload; bootstrap404vs500; no inferred activation; AXE",
+    "historicalProof": "rule-parameters-source-evidence.json remains unchanged; its rc34 hashes are not current release proof"
+  },
+  "publishedAdoption": {
+    "version": null,
+    "angularPr": null,
+    "publishRun": null,
+    "postflight": null,
+    "studioLock": "pending publication",
+    "studioDeploy": "pending authorized merge; Render main autoDeploy commit=yes"
+  },
+  "screenshots": {
+    "test-results/policy-studio-corporate-ke-74916-s-and-verified-head-absence-desktop/bootstrap-published-inactive.png": "325ef19d7700c37dce1ba68c161cae8dd55603f1441f6e6f8445f067ba079074",
+    "test-results/policy-studio-corporate-ke-74916-s-and-verified-head-absence-narrow/bootstrap-published-inactive.png": "45ac820fdedc711551d4317434078cdbdd6ee05a19ba2677b5115aa8db97ce9d",
+    "test-results/policy-studio-corporate-pr-5b8c7-rio-and-running-the-sandbox-desktop/authoring-sandbox-result.png": "387f8af924c8ba8ab01b9b790004df8833b3bb49d30ebf06a58c2513f8b0a47e",
+    "test-results/policy-studio-corporate-pr-5b8c7-rio-and-running-the-sandbox-narrow/authoring-sandbox-result.png": "2cf62107f8a69b2aa550304f35839809bd4b85a3861e097b5453352fe007a9e3",
+    "test-results/policy-studio-corporate-ro-1df6b-ure-and-current-ETag-pt-BR--desktop/rule-parameters.png": "dde99ce1f3f1ecdcf90081cb2654657491dd0fd27b16141538ee6a650b92cb0a",
+    "test-results/policy-studio-corporate-ro-1df6b-ure-and-current-ETag-pt-BR--narrow/rule-parameters.png": "01b5548288bec92b192bdaae889a59ce40dfa86d4086b6b15972e9667378143f",
+    "test-results/policy-studio-corporate-ro-df734-ure-and-current-ETag-en-US--desktop/rule-parameters.png": "5aacf03df1e8531fc6360bf15bfd2add58cb765e9f26c41552e36d21fcc55189",
+    "test-results/policy-studio-corporate-ro-df734-ure-and-current-ETag-en-US--narrow/rule-parameters.png": "299fcbd5f34c98472da6712b0704248594af8590b69abc0e8bb10d78e49de828"
+  }
+}

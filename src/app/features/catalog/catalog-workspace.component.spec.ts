@@ -54,12 +54,15 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
   const reviews = { A: [] as Subject<any>[], B: [] as Subject<any>[] };
   const capabilities = { A: [] as Subject<any>[], B: [] as Subject<any>[] };
   const createWorkspace = vi.fn();
+  const createRollout = vi.fn();
+  const saveWorkspaceDraft = vi.fn();
+  const parameters = vi.fn();
+  const runtimeState = vi.fn();
   const createScenario = vi.fn();
   const updateScenario = vi.fn();
   const reviewWorkspace = vi.fn();
   const cancelRollout = vi.fn();
   const activateRolloutCandidate = vi.fn();
-  const createRollout = vi.fn();
   const operateSnapshot = vi.fn();
   let sandboxRuns: Subject<any>[];
   let runSandbox: ReturnType<typeof vi.fn>;
@@ -88,12 +91,15 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
       return subject.asObservable();
     });
     createWorkspace.mockReset();
+    createRollout.mockReset();
+    saveWorkspaceDraft.mockReset();
+    parameters.mockReset();
+    runtimeState.mockReturnValue({ kind: 'ready', config });
     createScenario.mockReset();
     updateScenario.mockReset();
     reviewWorkspace.mockReset();
     cancelRollout.mockReset();
     activateRolloutCandidate.mockReset();
-    createRollout.mockReset();
     operateSnapshot.mockReset();
     operationalTestAction.mockReset();
     runOperationalTest.mockReset();
@@ -114,7 +120,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
       PolicyStudioI18n,
       { provide: ElementRef, useValue: new ElementRef(document.createElement('div')) },
       { provide: AuthSessionService, useValue: { logout: logoutSession } },
-      { provide: RuntimeConfigService, useValue: { state: () => ({ kind: 'ready', config }), mode: () => 'fixture' } },
+      { provide: RuntimeConfigService, useValue: { state: runtimeState, mode: () => 'fixture' } },
       { provide: ProjectionCatalogService, useValue: {
         timeline: (id: string) => stream(timelines, id),
         lifecycle: (id: string) => stream(lifecycles, id),
@@ -124,12 +130,14 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
         operationalTestAction,
         runOperationalTest,
         createWorkspace,
+        createRollout,
+        saveWorkspaceDraft,
+        parameters,
         createScenario,
         updateScenario,
         reviewWorkspace,
         cancelRollout,
         activateRolloutCandidate,
-        createRollout,
         operateSnapshot,
         runSandbox
       } }
@@ -140,6 +148,110 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     TestBed.resetTestingModule();
+  });
+
+  function parameterizedDecision(): DecisionSummary {
+    return { ...decision('A'), workspaceParameters: {
+      parameterValues: { limit: 3000 }, nullSemantics: 'FAIL_CLOSED', metadata: { source: 'product' }
+    } };
+  }
+
+  function allowParameterEditing(): void {
+    capabilities.A[0].next({ workspaceId: 'workspace-A', availableActions: ['VIEW', 'UPDATE_DRAFT'], blockers: [] });
+    component.parameterCatalog.set({ definitionId: 'definition-A', ruleKey: 'A', definitionVersion: 1,
+      schemaVersion: 'praxis.domain-rule-parameter-catalog.v1', templateKey: 'product:limit', templateVersion: '1',
+      parameters: [{ name: 'limit', type: 'NUMBER', required: true, nullable: true, readOnly: false,
+        defaultValue: 3000, minimum: 0, maximum: 5000, origin: 'DECLARED', declaredValue: 3000, effectiveValue: 3000 }] });
+    component.openAuthoring();
+  }
+
+  it('ignores stale parameter catalogs and fails closed on denied or mismatched catalogs', () => {
+    const first = new Subject<unknown>();
+    const second = new Subject<unknown>();
+    parameters.mockReturnValueOnce(first).mockReturnValueOnce(second);
+    component.select({ ...decision('A'), configVersion: 1 });
+    runtimeState.mockReturnValue({ kind: 'ready', config: { ...config, mode: 'remote' } });
+    component.loadParameters();
+    runtimeState.mockReturnValue({ kind: 'ready', config });
+    component.select({ ...decision('B'), configVersion: 1 });
+    runtimeState.mockReturnValue({ kind: 'ready', config: { ...config, mode: 'remote' } });
+    component.loadParameters();
+    first.next({ definitionId: 'definition-A', ruleKey: 'A', definitionVersion: 1,
+      schemaVersion: 'praxis.domain-rule-parameter-catalog.v1', templateKey: null, templateVersion: null, parameters: [] });
+    expect(component.parameterCatalog()).toBeNull();
+    expect(component.parameterCatalogState()).toBe('loading');
+    second.error(new HttpErrorResponse({ status: 403 }));
+    expect(component.parameterCatalogState()).toBe('forbidden');
+    parameters.mockReturnValue(of({ definitionId: 'definition-B', ruleKey: 'B', definitionVersion: 2,
+      schemaVersion: 'praxis.domain-rule-parameter-catalog.v1', templateKey: null, templateVersion: null, parameters: [] }));
+    component.loadParameters();
+    expect(component.parameterCatalogState()).toBe('failed');
+    expect(component.parameterCatalog()).toBeNull();
+  });
+
+  it('saves parameters with the current ETag and immutable metadata, then reopens the server-derived draft', () => {
+    const current = parameterizedDecision();
+    component.allDecisions.set([current]);
+    component.select(current);
+    allowParameterEditing();
+    component.updateDraft({ '===': [9, 9] });
+    expect(component.draftCondition()).toEqual(current.condition);
+    component.updateParameter({ name: 'limit', draft: { mode: 'VALUE', text: '2750' } });
+    expect(component.draftChanged()).toBe(true);
+    saveWorkspaceDraft.mockReturnValue(of({ id: 'workspace-A', ruleKey: 'A', status: 'OPEN', revision: 2,
+      etag: 'etag-2', parameters: { ...current.workspaceParameters, parameterValues: { limit: 2750 } },
+      condition: { '<=': [{ var: 'amount' }, 2750] } }));
+    component.saveGovernedDraft();
+    expect(saveWorkspaceDraft).toHaveBeenCalledWith({ id: 'workspace-A', etag: 'etag-A',
+      parameters: { parameterValues: { limit: 2750 }, nullSemantics: 'FAIL_CLOSED', metadata: { source: 'product' } }
+    }, null, config);
+    expect(component.selected()?.workspaceEtag).toBe('etag-2');
+    expect(component.draftCondition()).toEqual({ '<=': [{ var: 'amount' }, 2750] });
+    expect(component.draftChanged()).toBe(false);
+    component.closeAuthoring();
+    component.openAuthoring();
+    expect(component.parameterDrafts()['limit']).toEqual({ mode: 'VALUE', text: '2750' });
+  });
+
+  it('protects unsaved parameter changes and preserves explicit null versus omission', () => {
+    component.select(parameterizedDecision());
+    allowParameterEditing();
+    component.updateParameter({ name: 'limit', draft: { mode: 'NULL', text: '' } });
+    expect(component.parameterResolution().values).toEqual({ limit: null });
+    component.select(decision('B'));
+    expect(component.selected()?.key).toBe('A');
+    expect(component.governedConfirmation()).not.toBeNull();
+    component.updateParameter({ name: 'limit', draft: { mode: 'DEFAULT', text: '' } });
+    expect(component.parameterResolution().values).toEqual({});
+    expect(component.draftChanged()).toBe(true);
+  });
+
+  it('does not send parameterized rules through generic publication even if a stale capability offers it', () => {
+    component.select({ ...parameterizedDecision(), promotedDefinitionId: 'promoted-A', availableDefinitionActions: ['PUBLISH'] });
+    allowParameterEditing();
+    component.publicationReadiness.set({ result: 'VALID', readiness: 'ready_to_publish', existingCoverage: [],
+      predictedMaterializations: [], requiredApprovals: [], warnings: [], recommendedAction: null });
+    component.inspectPublicationReadiness();
+    component.publishGovernedDefinition();
+    expect(component.authoringBusy()).toBe(false);
+    // The catalog stub deliberately has no generic publication methods: calling
+    // either generic endpoint would fail this test.
+  });
+
+  it('blocks invalid and readonly parameter changes and failed catalog saves', () => {
+    component.select(parameterizedDecision());
+    allowParameterEditing();
+    component.updateParameter({ name: 'limit', draft: { mode: 'VALUE', text: '9000' } });
+    component.saveGovernedDraft();
+    expect(component.parameterErrors()['limit']).toBe('parameterAboveMaximum');
+    expect(saveWorkspaceDraft).not.toHaveBeenCalled();
+    component.parameterCatalog.update(catalog => ({ ...catalog!, parameters: catalog!.parameters.map(item => ({ ...item, readOnly: true })) }));
+    component.updateParameter({ name: 'limit', draft: { mode: 'VALUE', text: '1000' } });
+    expect(component.parameterDrafts()['limit'].text).toBe('9000');
+    component.parameterCatalogState.set('failed');
+    component.authoringOpen.set(false);
+    component.openAuthoring();
+    expect(component.authoringOpen()).toBe(false);
   });
 
   it('ignores timeline, lifecycle, scenario, review and error responses from a previous selection', () => {
@@ -566,6 +678,14 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(component.governedConfirmation()).toBeNull();
     component.snapshotsLoading.set(false);
     component.snapshotsError.set(true);
+    component.createRollout('candidate-1');
+    expect(component.governedConfirmation()).toBeNull();
+    component.snapshotsError.set(false);
+    component.rolloutLoading.set(true);
+    component.createRollout('candidate-1');
+    expect(component.governedConfirmation()).toBeNull();
+    component.rolloutLoading.set(false);
+    component.rolloutError.set(true);
     component.createRollout('candidate-1');
     expect(component.governedConfirmation()).toBeNull();
     expect(createRollout).not.toHaveBeenCalled();
