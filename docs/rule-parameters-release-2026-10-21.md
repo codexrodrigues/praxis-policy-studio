@@ -10,7 +10,7 @@ rewrite the rc.34 source/tarball hashes in `rule-parameters-source-evidence.json
   parameter catalog model/client/spec and canonical Core documentation.
 - Angular source PR [#621](https://github.com/codexrodrigues/praxis-ui-angular/pull/621)
   was independently reviewed and merged as `7365e83acf3e7f5323d70fe8ab892f6144c630c8`.
-- Prospective cohort: all 22 `@praxisui/*` packages at `10.0.0-rc.36`, npm channel
+- Published cohort: all 22 `@praxisui/*` packages at `10.0.0-rc.36`, npm channel
   `rc`. `latest` remains on the stable 9.x line.
 - The unrelated rc.35 train finished successfully, including public npm
   postflight, in GitHub run `39604746143`.
@@ -76,12 +76,15 @@ recompute quorum, policy authority or readiness.
 
 ## Integration and publication gates still to close
 
-1. Angular source review/merge is complete. Official rc.36 preparation was
-   dispatched in run `39609740850`; publication and public postflight remain
-   coordinated by the root task. No local npm publication.
-2. Update the seven Studio dependencies to the exact published rc.36 and generate
-   the lock from the public registry. Run clean `npm ci`, lint, unit tests, static
-   build and focused desktop/narrow browser proof from that registry install.
+1. Angular source review/merge and official rc.36 preparation run `39609740850`
+   are complete. Publication run [39609796030](https://github.com/codexrodrigues/praxis-ui-angular/actions/runs/39609796030/attempts/2)
+   passed public install/channel/integrity/exports checks for all 22 packages after
+   the failed-postflight-only recovery. No local npm publication.
+2. The seven Studio dependencies and registry lock now pin the exact published
+   rc.36. Clean `npm ci`, lint, 142 unit tests, projection/runtime checks and static
+   build passed. The lock integrity and every installed package file match the
+   official manifest/tarballs for all eight consumed Praxis packages, including
+   transitive `@praxisui/dialog`. Focused browser validation is recorded below.
 3. Independent review and merge of the Studio consumer. Do not tag a Studio release
    merely to mark a source commit; retain its documented release process.
 4. Canonical skill integration and selective local sync are coordinated separately
@@ -103,3 +106,57 @@ state and accessibility. They do not prove real parameter persistence or host
 activation. The coordinated Config/Quickstart remote Neon proof owns those claims.
 Actual published npm artifact identities, final lock integrity, workflow/PR links
 and homolog deployment identity must be appended when those gates complete.
+
+## Official artifact custody and npm propagation
+
+The official rc.36 artifact from publication run `39609796030` was downloaded as
+`release-packages-cf27f5b89480a34a299fa6d3c591bfa9776a99b4` (artifact
+`12350063875`). The canonical verifier checked all 22 tarballs against SHA-256,
+SHA-512 and repository/version/commit identity. The sealed manifest SHA-256 is
+`a897e185416794e857eb697457ec72a27d7b2bef203ec17b2407b1e6aef3dbbb`.
+These official artifacts are distinct from the prospective local source packs.
+
+The first public postflight timed out after ten minutes solely because
+`@praxisui/settings-panel` had not propagated. The publication log records its
+accepted publication at `2026-10-21T13:47:38.3176729Z`, with npm's processing
+notice and a successful publish result. This was not an authorization failure;
+no republish or new release was performed.
+
+At `2026-10-21T14:00:12Z`, a single diagnostic round found settings-panel rc.36 in
+both full and install packuments with channel `rc` and the sealed integrity. The
+version endpoint and its metadata-provided tarball returned HTTP 200. The tarball
+was 97,515 bytes; SHA-256 and SHA-512 matched the official manifest. Only the failed
+public postflight job was selected for rerun, preserving the successful build and
+22 package publications. The recovery attempt passed the complete public postflight. Studio adoption
+then used the registry artifacts; no local pack substituted for that install.
+
+## Published consumer adoption
+
+Studio's seven direct `@praxisui/*` dependencies are exactly `10.0.0-rc.36`; the
+transitive dialog package is on the same cohort. The lock resolves only public npm
+URLs for those packages and its SHA-512 values match the official sealed manifest.
+A clean `npm ci` replaced the prospective source installation. Each file from all
+eight installed Praxis packages was compared byte for byte with the official
+sealed tarballs, without source links or local tarball resolutions.
+
+The published-registry validation runs the official static-build gate with its CI
+HTTPS placeholder origin (`https://quickstart.example`). That build check does not
+claim to contact the real host or deploy Studio. The consumer PR remains subject
+to independent final review and backend sequencing before its main-branch merge.
+
+Final consumer gates from the clean public registry install passed: lint, 20 unit
+files / 142 tests, all three projections, official local runtime configuration,
+static production build, and 14 focused intercepted browser cases. Desktop and
+narrow cases cover parameter editing in PT/EN, immutable template structure,
+save/reopen/reload, ordinary workspace authoring, incompatible snapshot history,
+READY bootstrap and existing-head activation, and BLOCKED bootstrap plus head
+error handling. AXE checks passed. These remain consumer contract/UI proofs, not
+real backend persistence/activation or Neon evidence.
+
+The final registry lock SHA-256 is
+`8c55e78dea12f2aee342d1b44e3ef69ffd422a5fe041a99e68943ac356713506`.
+Only the root dependency entry and the eight Praxis entries changed from rc.35.
+The [Studio PR #60](https://github.com/codexrodrigues/praxis-policy-studio/pull/60)
+awaits final independent review and coordinated backend admission before merge.
+Historical rc.34 and prospective rc.36 evidence remain separately identified;
+the published adoption evidence is under `publishedAdoption` in the JSON record.
