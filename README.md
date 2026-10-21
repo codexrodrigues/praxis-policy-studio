@@ -76,14 +76,24 @@ O complemento operacional corrente está no
 [handoff V61](docs/ergon-handoff-v61.md): ele registra a cadeia de discovery
 cross-resource consumida pelo Studio e preserva a prova Neon do V60 sem a
 confundir com evidência Oracle.
-O `main` posterior ao beta.15 usa a cadeia Contracts beta.4, Config rc.128,
-Metadata rc.127, Quickstart rc.43 e `@praxisui/*` rc.38. Como essas mudanças
-ainda não possuem uma nova tag do Studio, beta.15 não deve ser usado como nome
-do corte corrente. O corte consome o
-catálogo canônico de facts por definição e deriva inputs tipados de cenário,
-mantendo JSON somente como preview/fallback legado. A prova de navegador
-desktop/narrow, teclado e axe usa backend hermético; ela não substitui a prova
-integrada com Quickstart/Neon e personas reais.
+A baseline auditada em 19/08/2026 usava Contracts beta.4, Config rc.128,
+Metadata rc.127, Quickstart rc.43 e `@praxisui/*` rc.38. Essas coordenadas são
+históricas e não descrevem as dependências atuais da UI. O código posterior à
+tag beta.15 continua sem uma nova tag do Studio; beta.15 não deve ser usado
+como nome do corte corrente.
+
+A adoção G2 fixa os sete pacotes diretos `@praxisui/*` em `10.0.0-rc.35`, com
+`dialog` na mesma versão pelo grafo normal de peers e lockfile. A instalação
+pelo npm público, `npm ci`, lint, 123 testes, checks de projeções e runtime
+local, build e seis E2E desktop/narrow passaram com esses pacotes publicados.
+O cockpit apresenta histórico incompatível, publicação sem seleção de head e
+bootstrap governado por rollout, preservando as ações e precondições do Config.
+A prova de navegador cobre transporte e UX com backend hermético, teclado e axe;
+a prova dos novos contratos por HTTP real com Config/host continua como gate
+separado. Essa validação local não substitui Quickstart/Neon ou personas reais.
+
+O Studio consome o catálogo canônico de facts por definição e deriva inputs
+tipados de cenário, mantendo JSON somente como preview/fallback legado.
 Na composição de snapshot, o Config devolve blockers governados tipados e o
 Studio os apresenta por códigos estáveis em pt-BR/en-US. A UI não interpreta nem
 expõe a mensagem técnica do backend como contrato de produto.
