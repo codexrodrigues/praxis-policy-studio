@@ -82,10 +82,13 @@ históricas e não descrevem as dependências atuais da UI. O código posterior 
 tag beta.15 continua sem uma nova tag do Studio; beta.15 não deve ser usado
 como nome do corte corrente.
 
-A adoção G2 fixa os sete pacotes diretos `@praxisui/*` em `10.0.0-rc.35`, com
+A adoção G2 fixa os sete pacotes diretos `@praxisui/*` em `10.0.0-rc.36`, com
 `dialog` na mesma versão pelo grafo normal de peers e lockfile. A instalação
 pelo npm público, `npm ci`, lint, 123 testes, checks de projeções e runtime
 local, build e seis E2E desktop/narrow passaram com esses pacotes publicados.
+As oito integridades do lock e os arquivos instalados correspondem ao manifesto
+selado da [publicação rc.36](https://github.com/codexrodrigues/praxis-ui-angular/actions/runs/39609796030/attempts/2).
+A prova de adoção usa a UI integrada em `f427d705`, com instalação limpa do registry.
 O cockpit apresenta histórico incompatível, publicação sem seleção de head e
 bootstrap governado por rollout, preservando as ações e precondições do Config.
 A prova de navegador cobre transporte e UX com backend hermético, teclado e axe;
