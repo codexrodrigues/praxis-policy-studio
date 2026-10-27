@@ -138,4 +138,24 @@ describe('DecisionExplanationService', () => {
       expect(events).toEqual([{ kind: 'failed', reason }]);
     }
   });
+
+  it('projects observable progress phases and sequence numbers before the terminal result', () => {
+    const streamEvents = vi.fn().mockReturnValue(of(
+      { kind: 'turn-started', streamId: 'stream-1' },
+      { kind: 'stream-event', event: { type: 'tool_call', seq: 1, payload: {} } },
+      { kind: 'stream-event', event: { type: 'assistant_delta', seq: 2, payload: {} } },
+      result()
+    ));
+    const service = new DecisionExplanationService({ streamEvents } as unknown as AgenticAuthoringTurnClientService);
+    const events: unknown[] = [];
+
+    service.explain(request).subscribe(event => events.push(event));
+
+    expect(events).toEqual([
+      { kind: 'progress', phase: 'connecting' },
+      { kind: 'progress', phase: 'inspecting_evidence', eventSeq: 1 },
+      { kind: 'progress', phase: 'synthesizing', eventSeq: 2 },
+      expect.objectContaining({ kind: 'completed', canApply: false })
+    ]);
+  });
 });

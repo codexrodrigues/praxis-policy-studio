@@ -3,8 +3,9 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { BrowserTestingModule, platformBrowserTesting } from '@angular/platform-browser/testing';
-import { API_URL, type ResourceActionCatalogItem } from '@praxisui/core';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { API_URL, DomainRuleService, type ResourceActionCatalogItem } from '@praxisui/core';
+import { of } from 'rxjs';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProjectionCatalogService } from './projection-catalog.service';
 
 TestBed.initTestEnvironment(BrowserTestingModule, platformBrowserTesting());
@@ -201,31 +202,6 @@ describe('ProjectionCatalogService', () => {
 
     expect(decisions).toHaveLength(1);
     expect(decisions[0]?.configDefinitionId).toBe('rule-1');
-  });
-
-  it('keeps the catalog available when a compatible Config deployment has no fact-catalog endpoint', () => {
-    let decisions: readonly import('../features/catalog/catalog.fixture').DecisionSummary[] = [];
-    service.load('en-US', {
-      mode: 'remote', configApiBaseUrl: '', locale: 'en-US', projectionPath: null, initialDecisionKey: null
-    }).subscribe(value => decisions = value);
-
-    http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([]);
-    http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities').flush({
-      tenantId: 'default', environment: 'dev', definitions: []
-    });
-    http.expectOne(request => request.url.endsWith('/definitions/catalog')).flush({
-      schemaVersion: 'praxis-domain-rule-catalog.v1', page: 0, limit: 12, hasMore: false,
-      candidates: [{ definitionId: 'rule-optional-facts', ruleKey: 'hr.leave.eligibility', version: 1,
-        ruleType: 'selection_eligibility', status: 'active', contextKey: 'hr.leave' }]
-    });
-    http.expectOne('/api/praxis/config/domain-rules/definitions/rule-optional-facts').flush({
-      id: 'rule-optional-facts', ruleKey: 'hr.leave.eligibility', version: 1, status: 'active'
-    });
-    http.expectOne('/api/praxis/config/domain-rules/definitions/rule-optional-facts/facts')
-      .flush({}, { status: 404, statusText: 'Not Found' });
-
-    expect(decisions).toHaveLength(1);
-    expect(decisions[0]?.facts).toEqual([]);
   });
 
   it('discovers one operational command semantically and executes its published protocol', () => {
@@ -593,6 +569,444 @@ describe('ProjectionCatalogService', () => {
       publicationStatus: 'published', publicationReadiness: 'ready_to_publish',
       materializations: [{ id: 'materialization-1' }],
       explainability: { publicationDiagnostics: { materializationOutcomes: [{ resolution: 'created' }] } }
+    });
+  });
+
+  it('preserves canonical condition, workspace, parameter catalog, and authoring support for non-projection remote definitions', () => {
+    const config = {
+      mode: 'remote' as const, configApiBaseUrl: '', locale: 'en-US' as const,
+      projectionPath: '/projections/missing.json', initialDecisionKey: null
+    };
+    let summaries: unknown[] = [];
+
+    service.load('en-US', config).subscribe(value => { summaries = [...value]; });
+    http.expectOne('/projections/missing.json').flush(
+      { message: 'Not found' }, { status: 404, statusText: 'Not Found' }
+    );
+    http.expectOne('/api/praxis/config/domain-rules/definitions/catalog?page=0&limit=12')
+      .flush({
+        page: 0, limit: 12, hasMore: false, candidates: [{
+          definitionId: 'definition-hr',
+          ruleKey: 'hr.payroll.retroactive_limit',
+          version: 3,
+          ruleType: 'validation',
+          status: 'active',
+          contextKey: 'hr.payroll',
+          resourceKey: 'hr.payroll-runs',
+          serviceKey: 'hr-service',
+          updatedAt: '2026-08-14T00:00:00Z'
+        }]
+      });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities')
+      .flush({
+        tenantId: 'tenant-a', environment: 'dev', definitions: [{
+          definitionId: 'definition-hr',
+          ruleKey: 'hr.payroll.retroactive_limit',
+          version: 3,
+          status: 'active',
+          availableActions: [{ action: 'CREATE_CHANGE_WORKSPACE', allowed: true, reasonCode: null }]
+        }]
+      });
+    http.expectOne('/api/praxis/config/domain-rules/workspaces')
+      .flush([{
+        id: 'workspace-hr',
+        ruleKey: 'hr.payroll.retroactive_limit',
+        status: 'DRAFT',
+        revision: 2,
+        etag: 'W/"hr-2"',
+        condition: { '<=': [{ var: 'retroactiveDays' }, 60] },
+        parameters: {
+          parameterValues: { maxRetroactiveDays: 60 },
+          validationPolicy: { effect: 'BLOCK', message: 'Retroactive limit exceeded' }
+        },
+        updatedAt: '2026-08-14T01:00:00Z'
+      }]);
+    http.expectOne('/api/praxis/config/domain-rules/definitions/definition-hr')
+      .flush({
+        id: 'definition-hr',
+        ruleKey: 'hr.payroll.retroactive_limit',
+        version: 3,
+        ruleType: 'validation',
+        status: 'active',
+        serviceKey: 'hr-service',
+        condition: { '<=': [{ var: 'retroactiveDays' }, 30] },
+        definition: {
+          parameterTemplate: {
+            templateKey: 'hr.payroll.retroactive_limit.template',
+            templateVersion: '1.0.0',
+            parameters: [{
+              name: 'maxRetroactiveDays',
+              label: 'Maximum retroactive days',
+              type: 'INTEGER',
+              required: true,
+              nullable: false,
+              readOnly: false,
+              defaultValue: 30,
+              minimum: 1,
+              maximum: 365,
+              unit: 'days'
+            }]
+          }
+        },
+        parameters: {
+          nullSemantics: 'FAIL_CLOSED',
+          operationKeys: ['calculatePayroll'],
+          hostContractVersion: '1.0.0',
+          parameterValues: { maxRetroactiveDays: 30 },
+          validationPolicy: { effect: 'BLOCK', message: 'Retroactive limit exceeded' }
+        },
+        governance: { lifecycleBoundary: 'domain_rule_change_workspace' }
+      });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/definition-hr/facts')
+      .flush({
+        definitionId: 'definition-hr',
+        ruleKey: 'hr.payroll.retroactive_limit',
+        version: 3,
+        schemaVersion: 'praxis.domain-rule-fact-catalog.v1',
+        facts: [{
+          path: 'retroactiveDays',
+          valueType: 'number',
+          nullable: false,
+          labels: { 'en-US': 'Retroactive days' },
+          descriptions: { 'en-US': 'Days in retroactive window.' },
+          providerRef: 'payroll.input',
+          evidenceRefs: [],
+          sensitivity: 'NON_SENSITIVE',
+          redaction: 'NONE'
+        }]
+      });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/definition-hr/parameters')
+      .flush({
+        definitionId: 'definition-hr',
+        ruleKey: 'hr.payroll.retroactive_limit',
+        version: 3,
+        schemaVersion: 'praxis.domain-rule-parameter-catalog.v1',
+        templateKey: 'hr.payroll.retroactive_limit.template',
+        templateVersion: '1.0.0',
+        parameters: [{
+          name: 'maxRetroactiveDays',
+          type: 'INTEGER',
+          required: true,
+          nullable: false,
+          readOnly: false,
+          defaultValue: 30,
+          declaredValue: 30,
+          effectiveValue: 30,
+          origin: 'DECLARED',
+          minimum: 1,
+          maximum: 365,
+          unit: 'days'
+        }]
+      });
+
+    expect(summaries).toEqual([expect.objectContaining({
+      key: 'hr.payroll.retroactive_limit',
+      authoringSupported: true,
+      reviewStatus: 'CONFIG_GOVERNED',
+      workspaceId: 'workspace-hr',
+      workspaceStatus: 'DRAFT',
+      workspaceEtag: 'W/"hr-2"',
+      workspaceRevision: 2,
+      condition: { '<=': [{ var: 'retroactiveDays' }, 30] },
+      expression: 'retroactiveDays <= 30',
+      nullSemantics: 'FAIL_CLOSED',
+      operationKeys: ['calculatePayroll'],
+      hostContractVersion: '1.0.0',
+      draftLifecycle: 'domain_rule_change_workspace',
+      ruleType: 'validation',
+      parameterCatalog: expect.objectContaining({
+        templateKey: 'hr.payroll.retroactive_limit.template',
+        parameters: [expect.objectContaining({
+          name: 'maxRetroactiveDays',
+          label: 'Maximum retroactive days',
+          type: 'INTEGER',
+          declaredValue: 60,
+          effectiveValue: 60,
+          origin: 'DECLARED',
+          minimum: 1,
+          maximum: 365
+        })]
+      })
+    })]);
+  });
+
+  it('materializes server factCatalog, reasonCode, localized labels, and evidence when no static projection exists', () => {
+    const config = {
+      mode: 'remote' as const, configApiBaseUrl: '', locale: 'pt-BR' as const,
+      projectionPath: null, initialDecisionKey: null
+    };
+    let summaries: readonly import('../features/catalog/catalog.fixture').DecisionSummary[] = [];
+
+    service.load('pt-BR', config).subscribe(value => { summaries = value; });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/catalog?page=0&limit=12').flush({
+      page: 0, limit: 12, hasMore: false, candidates: [{
+        definitionId: 'def-auth',
+        ruleKey: 'request.authorization-integrity',
+        version: 1,
+        ruleType: 'selection_eligibility',
+        status: 'draft',
+        contextKey: 'extraordinary-assistance',
+        resourceKey: 'extraordinary-grant-eligibility',
+        serviceKey: 'praxis-api-quickstart',
+        updatedAt: '2026-08-14T00:00:00Z'
+      }]
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities').flush({
+      tenantId: 'desenv', environment: 'local', definitions: []
+    });
+    http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([]);
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-auth').flush({
+      id: 'def-auth',
+      ruleKey: 'request.authorization-integrity',
+      version: 1,
+      ruleType: 'selection_eligibility',
+      status: 'draft',
+      serviceKey: 'praxis-api-quickstart',
+      condition: {
+        and: [
+          { '!==': [{ var: 'actor.permissions' }, null] },
+          { in: ['benefit:request', { var: 'actor.permissions' }] }
+        ]
+      },
+      definition: {
+        falseReasonCode: 'REQUEST_NOT_AUTHORIZED',
+        labels: { 'pt-BR': 'Integridade da autorização', 'en-US': 'Authorization integrity' },
+        descriptions: { 'pt-BR': 'A solicitação deve partir de um ator autorizado.' },
+        operationalResourceKey: 'human-resources.extraordinary-benefit-requests',
+        requiredFactPaths: ['actor.permissions']
+      },
+      parameters: {
+        nullSemantics: 'FAIL_CLOSED',
+        operationKeys: ['evaluate-extraordinary-grant'],
+        hostContractVersion: 'quickstart/1.0'
+      },
+      governance: {
+        lifecycleBoundary: 'REFERENCE_DRAFT_ONLY',
+        sourceKind: 'QUICKSTART_RULE_LAB'
+      }
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-auth/facts').flush(
+      factCatalog('def-auth', 'request.authorization-integrity', [{
+        path: 'actor.permissions',
+        valueType: 'string-array',
+        nullable: false,
+        labels: { 'pt-BR': 'Permissões do ator', 'en-US': 'Actor permissions' },
+        descriptions: { 'pt-BR': 'Permissões efetivas usadas pelo guard protegido.' },
+        providerRef: 'ExtraordinaryBenefitEvaluationService.actor.permissions',
+        evidenceRefs: ['ExtraordinaryGrantRuleSetFactory.java'],
+        sensitivity: 'SECRET',
+        redaction: 'OMIT'
+      }])
+    );
+
+    expect(summaries).toEqual([expect.objectContaining({
+      key: 'request.authorization-integrity',
+      code: 'REQUEST_NOT_AUTHORIZED',
+      name: 'Integridade da autorização',
+      meaning: 'A solicitação deve partir de um ator autorizado.',
+      ruleSetKey: 'extraordinary-grant-eligibility',
+      resourceKey: 'human-resources.extraordinary-benefit-requests',
+      baselineAuthority: 'QUICKSTART_RULE_LAB',
+      authoringSupported: true,
+      evidenceCount: 1,
+      evidence: [{ path: 'ExtraordinaryGrantRuleSetFactory.java', kind: 'FACT_PROVIDER_EVIDENCE' }],
+      expression: '(actor.permissions !== nulo) E (benefit:request in actor.permissions)',
+      factPaths: ['actor.permissions'],
+      facts: [expect.objectContaining({
+        path: 'actor.permissions',
+        label: 'Permissões do ator',
+        sensitivity: 'SECRET',
+        redaction: 'OMIT'
+      })]
+    })]);
+  });
+
+  it('fails closed on condition authoring without aborting the catalog when a non-projection definition returns an empty fact catalog', () => {
+    const config = {
+      mode: 'remote' as const, configApiBaseUrl: '', locale: 'pt-BR' as const,
+      projectionPath: null, initialDecisionKey: null
+    };
+    let summaries: readonly import('../features/catalog/catalog.fixture').DecisionSummary[] = [];
+
+    service.load('pt-BR', config).subscribe(value => { summaries = value; });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/catalog?page=0&limit=12').flush({
+      page: 0, limit: 12, hasMore: false, candidates: [{
+        definitionId: 'def-legacy-ui',
+        ruleKey: 'human-resources.funcionarios.dynamic-page-lab.rule.visual-guidance',
+        version: 1,
+        ruleType: 'visual_guidance',
+        status: 'active',
+        contextKey: 'human-resources',
+        resourceKey: 'human-resources.funcionarios',
+        serviceKey: 'praxis-api-quickstart',
+        updatedAt: '2026-08-14T00:00:00Z'
+      }]
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities').flush({
+      tenantId: 'desenv', environment: 'local', definitions: []
+    });
+    http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([]);
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-legacy-ui').flush({
+      id: 'def-legacy-ui',
+      ruleKey: 'human-resources.funcionarios.dynamic-page-lab.rule.visual-guidance',
+      version: 1,
+      ruleType: 'visual_guidance',
+      status: 'active',
+      serviceKey: 'praxis-api-quickstart',
+      condition: { '==': [{ var: 'cargo' }, 'ANALISTA'] }
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-legacy-ui/facts').flush(
+      factCatalog('def-legacy-ui', 'human-resources.funcionarios.dynamic-page-lab.rule.visual-guidance', [])
+    );
+
+    expect(summaries).toEqual([expect.objectContaining({
+      key: 'human-resources.funcionarios.dynamic-page-lab.rule.visual-guidance',
+      authoringSupported: false,
+      reviewStatus: 'CATALOG_IDENTITY_ONLY',
+      factPaths: ['cargo'],
+      facts: []
+    })]);
+  });
+
+  it('creates definitions and prepares, approves, and publishes snapshot compositions through Core and the canonical Policy Studio RuleSet candidate endpoints', () => {
+    const config = {
+      mode: 'remote' as const, configApiBaseUrl: '', locale: 'en-US' as const,
+      projectionPath: '/projections/reference.json', initialDecisionKey: null
+    };
+
+    service.createDefinition({
+      ruleKey: 'procurement.po_approval.urgent_override',
+      version: 1,
+      ruleType: 'approval_policy',
+      status: 'draft',
+      contextKey: 'procurement',
+      resourceKey: 'procurement.purchase-orders',
+      serviceKey: 'procurement-service',
+      parameters: { approvalPolicy: { effect: 'BLOCK' } }
+    }, config).subscribe();
+    const createDef = http.expectOne('/api/praxis/config/domain-rules/definitions');
+    expect(createDef.request.method).toBe('POST');
+    createDef.flush({ id: 'def-new', ruleKey: 'procurement.po_approval.urgent_override', version: 1, status: 'draft' });
+
+    service.prepareRuleSetCandidate('procurement.po_approval', {
+      promotedDefinitionId: 'def-1',
+      validFromUtc: '2026-08-14T00:00:00Z',
+      validUntilUtc: '2026-12-31T23:59:59Z'
+    }, config).subscribe();
+    const prepareCandidate = http.expectOne('/api/praxis/policy-studio/rule-sets/procurement.po_approval/candidate');
+    expect(prepareCandidate.request.method).toBe('POST');
+    expect(prepareCandidate.request.body).toEqual({
+      promotedDefinitionId: 'def-1',
+      validFromUtc: '2026-08-14T00:00:00Z',
+      validUntilUtc: '2026-12-31T23:59:59Z'
+    });
+    prepareCandidate.flush({
+      ruleSetKey: 'procurement.po_approval',
+      ruleSetVersion: 2,
+      compositionDigest: 'sha256:comp-1',
+      implementationCatalogDigest: 'sha256:impl-1',
+      currentHeadEtag: '"head-1"',
+      sources: [{ ruleKey: 'procurement.po_approval.urgent_override', definitionId: 'def-1', version: 1 }],
+      authorizedActions: ['PREPARE', 'APPROVE']
+    });
+
+    const candidateCommand = {
+      promotedDefinitionId: 'def-1',
+      validFromUtc: '2026-08-14T00:00:00Z',
+      validUntilUtc: '2026-12-31T23:59:59Z',
+      expectedCompositionDigest: 'sha256:comp-1'
+    };
+    service.approveRuleSetCandidate('procurement.po_approval', candidateCommand, config).subscribe();
+    const approveCandidate = http.expectOne('/api/praxis/policy-studio/rule-sets/procurement.po_approval/candidate/approvals');
+    expect(approveCandidate.request.method).toBe('POST');
+    approveCandidate.flush({
+      approvalKey: 'app-1',
+      role: 'checker',
+      actorRef: 'checker-1',
+      decidedAtUtc: '2026-08-14T00:01:00Z',
+      evidenceHash: 'sha256:ev-1'
+    });
+
+    service.publishRuleSetCandidate('procurement.po_approval', candidateCommand, '"head-1"', config).subscribe();
+    const publishCandidate = http.expectOne('/api/praxis/policy-studio/rule-sets/procurement.po_approval/candidate/publish');
+    expect(publishCandidate.request.method).toBe('POST');
+    expect(publishCandidate.request.headers.get('If-Match')).toBe('"head-1"');
+    publishCandidate.flush({
+      snapshotKey: 'snap-2',
+      ruleSetKey: 'procurement.po_approval',
+      ruleSetVersion: 2,
+      snapshotContentHash: 'sha256:snap-2'
+    });
+
+    service.publishRuleSetCandidate('procurement.po_approval', candidateCommand, null, config).subscribe();
+    const publishFirstCandidate = http.expectOne('/api/praxis/policy-studio/rule-sets/procurement.po_approval/candidate/publish');
+    expect(publishFirstCandidate.request.headers.get('If-None-Match')).toBe('*');
+    publishFirstCandidate.flush({
+      snapshotKey: 'snap-1',
+      ruleSetKey: 'procurement.po_approval',
+      ruleSetVersion: 1,
+      snapshotContentHash: 'sha256:snap-1'
+    });
+
+    expect(() =>
+      service.publishRuleSetCandidate('procurement.po_approval', candidateCommand, 'W/"weak-head"', config)
+    ).toThrow('Strong entity tag is required');
+  });
+
+  it('delegates RuleSet candidate operations to DomainRuleService when available on the runtime service', () => {
+    const config = {
+      mode: 'remote' as const, configApiBaseUrl: 'http://localhost:8088', locale: 'en-US' as const,
+      projectionPath: '/projections/reference.json', initialDecisionKey: null
+    };
+    const domainRules = TestBed.inject(DomainRuleService) as unknown as Record<string, unknown>;
+    const prepareSpy = vi.fn(() => of({
+      ruleSetKey: 'procurement.po_approval',
+      ruleSetVersion: 2,
+      compositionDigest: 'sha256:comp-core',
+      implementationCatalogDigest: 'sha256:impl-core',
+      currentHeadEtag: '"head-core"',
+      sources: [],
+      authorizedActions: ['PREPARE', 'APPROVE']
+    }));
+    const approveSpy = vi.fn(() => of({
+      approvalKey: 'app-core',
+      role: 'checker',
+      actorRef: 'checker-core',
+      decidedAtUtc: '2026-08-14T00:01:00Z',
+      evidenceHash: 'sha256:ev-core'
+    }));
+    const publishSpy = vi.fn(() => of({
+      snapshotKey: 'snap-core',
+      ruleSetKey: 'procurement.po_approval',
+      ruleSetVersion: 2,
+      snapshotContentHash: 'sha256:snap-core'
+    }));
+    domainRules['prepareRuleSetCandidate'] = prepareSpy;
+    domainRules['approveRuleSetCandidate'] = approveSpy;
+    domainRules['publishRuleSetCandidate'] = publishSpy;
+
+    const candidateRequest = {
+      promotedDefinitionId: 'def-core',
+      validFromUtc: '2026-08-14T00:00:00Z',
+      validUntilUtc: null
+    };
+    service.prepareRuleSetCandidate('procurement.po_approval', candidateRequest, config).subscribe();
+    expect(prepareSpy).toHaveBeenCalledWith('procurement.po_approval', candidateRequest, {
+      apiUrlEntry: { baseUrl: 'http://localhost:8088' }
+    });
+
+    const candidateCommand = {
+      ...candidateRequest,
+      expectedCompositionDigest: 'sha256:comp-core'
+    };
+    service.approveRuleSetCandidate('procurement.po_approval', candidateCommand, config).subscribe();
+    expect(approveSpy).toHaveBeenCalledWith('procurement.po_approval', candidateCommand, {
+      apiUrlEntry: { baseUrl: 'http://localhost:8088' }
+    });
+
+    service.publishRuleSetCandidate('procurement.po_approval', candidateCommand, '"head-core"', config).subscribe();
+    expect(publishSpy).toHaveBeenCalledWith('procurement.po_approval', candidateCommand, '"head-core"', {
+      apiUrlEntry: { baseUrl: 'http://localhost:8088' }
     });
   });
 });

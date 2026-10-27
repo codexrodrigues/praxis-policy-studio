@@ -1,10 +1,10 @@
 <a class="skip-link" href="#main-content">{{ i18n.text('skip') }}</a>
 <header class="product-bar">
-  <a class="brand" routerLink="/catalog" aria-label="Praxis Policy Studio — catálogo">
+  <a class="brand" routerLink="/catalog" [attr.aria-label]="i18n.text('productCatalogLink')">
     <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
     <strong>{{ i18n.text('product') }}</strong>
   </a>
-  <nav aria-label="Navegação principal">
+  <nav [attr.aria-label]="i18n.text('primaryNavigation')">
     <a routerLink="/catalog" aria-current="page"><span class="glyph" aria-hidden="true">⌘</span>{{ i18n.text('catalog') }}</a>
   </nav>
   <div class="context">

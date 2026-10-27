@@ -28,8 +28,17 @@ export interface DecisionExplanationEvidence {
   readonly sourceRefCount: number;
 }
 
+export type DecisionExplanationProgressPhase =
+  | 'connecting'
+  | 'inspecting_evidence'
+  | 'synthesizing';
+
 export type DecisionExplanationEvent =
-  | { readonly kind: 'progress' }
+  | {
+      readonly kind: 'progress';
+      readonly phase?: DecisionExplanationProgressPhase;
+      readonly eventSeq?: number;
+    }
   | {
       readonly kind: 'completed';
       readonly message: string;
@@ -86,10 +95,18 @@ export class DecisionExplanationService {
     event: AgenticAuthoringTurnClientEvent,
     request: DecisionExplanationRequest
   ): DecisionExplanationEvent | null {
-    if (event.kind !== 'stream-event') return { kind: 'progress' };
+    if (event.kind !== 'stream-event') return { kind: 'progress', phase: 'connecting' };
     if (event.event.type === 'cancelled') return { kind: 'failed', reason: 'cancelled' };
     if (event.event.type === 'error') return { kind: 'failed', reason: 'failed' };
-    if (event.event.type !== 'result') return { kind: 'progress' };
+    if (event.event.type !== 'result') {
+      const eventType = String(event.event.type ?? '');
+      const phase: DecisionExplanationProgressPhase =
+        eventType.includes('tool') || eventType === 'status'
+          ? 'inspecting_evidence'
+          : 'synthesizing';
+      const seq = typeof event.event.seq === 'number' ? event.event.seq : undefined;
+      return { kind: 'progress', phase, ...(seq !== undefined ? { eventSeq: seq } : {}) };
+    }
 
     const payload = this.object(event.event.payload);
     if (!payload) return { kind: 'failed', reason: 'failed' };

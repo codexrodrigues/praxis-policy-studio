@@ -20,6 +20,7 @@ export class DecisionDiscoveryComponent implements OnDestroy {
   @Input({ required: true }) config!: PolicyStudioRuntimeConfig;
   @Input({ required: true }) decisions: readonly DecisionSummary[] = [];
   @Output() readonly decisionSelected = new EventEmitter<DecisionSummary>();
+  @Output() readonly candidateSelected = new EventEmitter<DecisionDiscoveryCandidate>();
 
   private readonly discovery = inject(DecisionDiscoveryService);
   private subscription: Subscription | null = null;
@@ -67,7 +68,13 @@ export class DecisionDiscoveryComponent implements OnDestroy {
 
   select(candidate: DecisionDiscoveryCandidate): void {
     const decision = this.matchingDecision(candidate);
-    if (decision) this.decisionSelected.emit(decision);
+    if (decision) {
+      this.decisionSelected.emit(decision);
+      return;
+    }
+    if (this.canResolveExternalCandidate(candidate)) {
+      this.candidateSelected.emit(candidate);
+    }
   }
 
   matchingDecision(candidate: DecisionDiscoveryCandidate): DecisionSummary | null {
@@ -75,6 +82,16 @@ export class DecisionDiscoveryComponent implements OnDestroy {
       decision.configDefinitionId === candidate.definitionId
       && decision.key === candidate.ruleKey
       && decision.configVersion === candidate.version) ?? null;
+  }
+
+  isStaleCandidate(candidate: DecisionDiscoveryCandidate): boolean {
+    if (this.matchingDecision(candidate)) return false;
+    return this.decisions.some(decision =>
+      decision.key === candidate.ruleKey || decision.configDefinitionId === candidate.definitionId);
+  }
+
+  canResolveExternalCandidate(candidate: DecisionDiscoveryCandidate): boolean {
+    return !this.matchingDecision(candidate) && !this.isStaleCandidate(candidate);
   }
 
   failureMessage(reason: Extract<DecisionDiscoveryEvent, { kind: 'failed' }>['reason']): string {

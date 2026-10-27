@@ -105,11 +105,12 @@ exibida e executada apenas quando o client público recebe
 `ruleKey` e versão exatos da definição. Metadata da projeção nunca é tratada como
 autorização.
 
-Depois que o workspace existe, save, cenários, Test Run, submit, review e promoção
-usam `availableActions` e ETag server-owned. Publicação ainda é apresentada a partir
-do readiness; create rollout e comandos de rollout-policy ainda são derivados do
-lifecycle. Essas lacunas exigem actions próprias no Config, não condicionais novas
-no browser.
+Depois que o workspace existe, save, cenários, Test Run, submit, review, promoção,
+publicação (`PUBLISH`), criação de rollout (`CREATE_ROLLOUT`) e comandos de
+rollout-policy (`CREATE_POLICY_VERSION`, `APPROVE`, `ACTIVATE`) usam
+`availableActions` principal-specific e ETag server-owned (fechados no corte V63).
+Qualquer comando futuro deve exigir action própria no Config, nunca condicionais
+inferidas no browser.
 
 ### 3.4 Sessão
 
@@ -170,21 +171,21 @@ Config publicar a capability correta.
 | Capacidade | Estado | Evidência local |
 | --- | --- | --- |
 | shell e rota | implementados | `src/app`, testes e build |
-| i18n | parcial | catálogo usa resources, mas ainda existem literais pt/en no chrome |
-| contrato de projeção | implementado | `domain-projection.ts` e checker Node |
+| i18n | implementado (`pt-BR` e `en-US`) | `src/app/core/i18n.ts`, `app.component.html` e todos os templates de catálogo/authoring |
+| contrato de projeção | implementado | `domain-projection.ts` (`TECHNICAL_DRAFT_READY`, `REFERENCE_IMPLEMENTED`, `G4_SOURCE_CANDIDATE`) e checker Node |
 | pacote RN-013 | 14 decisões versionadas | `public/projections/ergonx-rn013.v1.json` |
 | corpus neutro amplo | valida composição e variedade semântica | `quickstart-benefit-eligibility.v1.json` |
-| caso neutro publicado | valida snapshot, Neon e cadeia operacional | `quickstart-payroll-reactive-determinations.v1.json` |
+| caso neutro publicado | valida snapshot, Neon e cadeia operacional | `quickstart-payroll-reactive-determinations.v1.json` (sincronizado com Quickstart G4 `quickstart/2.0`) |
 | leitura Config | implementada no slice | service, detalhe, testes e prova live documentada |
-| sessão de desenvolvimento | implementada | `auth-session.service.ts` |
+| sessão de desenvolvimento | implementada | `auth-session.service.ts` e limpeza completa em `401` / logout |
 | capabilities | implementadas nas operações correntes | workspace, definitions, snapshots, publicação, criação de rollout e rollout-policy consomem ações principal-specific server-owned; novos comandos devem manter a mesma regra |
-| inspeção | parcial | catálogo e `decision-inspection.ts`; falta causalidade runtime |
-| editor | implementado para condição focal | Visual Builder; parâmetros/outcomes/RuleSet completo ausentes |
-| catálogo de facts | implementado no `main` pós-beta.15 sobre Core rc.38 | Config valida e projeta tipos, nulabilidade, i18n, sensibilidade e redaction; `@praxisui/core` é o cliente público e o Studio deriva criação e edição tipadas sem duplicar o contrato |
-| persistência | workspace concorrente com ETag | `ProjectionCatalogService` e testes de integração |
-| simulação | candidate × active, transporte V58 e action host V60 implementados; consumo UI parcial | cenários/Test Runs do Config, sandbox host-owned, baseline independente, reserva idempotente e quatro resultados comprovados no Neon; ainda faltam precondition metadata-driven, Studio, Oracle e gates posteriores |
-| publicação/ativação/rollback | parcialmente implementados | readiness/materializações, snapshot e staged rollout já usam actions server-owned; faltam prova corporativa contínua, diálogos contextuais e telemetria operacional madura |
-| assistente de decisões | discovery e explicação read-only implementados sobre runtime existente | Config/`@praxisui/ai` resolvem intenção, projetam identidades seguras e atestam a versão explicada; falta catálogo multi-domínio e causalidade runtime |
+| inspeção | implementada | catálogo, `decision-inspection.ts`, postura de maturidade/4-olhos/autoridade (`buildDecisionMaturityPosture`), auditoria de sensibilidade/redaction e correlação causal de execução/SLO (`buildExecutionCorrelationSummary`) |
+| editor | implementado para condição, parâmetros, políticas operacionais e composição de RuleSet | Visual Builder, representações por intenção (`tree`, `table`, `expression`), `DecisionParametersEditorComponent`, `DecisionCreateFormComponent`, `buildSuggestedDraftDiffProposals` e composição de `RuleSet` no `SnapshotCockpitComponent` |
+| catálogo de facts | implementado no `main` pós-beta.15 sobre Core rc.38 | Config valida e projeta tipos (incluindo `array<number>`), nulabilidade, i18n, sensibilidade e redaction; `@praxisui/core` é o cliente público e o Studio deriva criação e edição tipadas sem duplicar o contrato |
+| persistência | workspace concorrente com ETag e recuperação assistida | `ProjectionCatalogService`, `reloadGovernedEvidence` (`409`/`412`/`428`) e testes de integração |
+| simulação | candidate × active, transporte V58, action host V60 e sugestões tipadas implementados | cenários/Test Runs do Config, sugestões assistidas (`ALLOW`/`DENY` em `buildSuggestedScenarioTemplates`), sandbox host-owned, baseline independente, reserva idempotente e quatro resultados comprovados no Neon; permanecem externos o adapter Ergon real e a prova Oracle |
+| publicação/ativação/rollback | implementados com confirmação governada e recibo vinculado | readiness/materializações, matriz de gates SoD/ETag (`buildGovernanceGateSummary`), recibo vinculado (`governance-bound-receipt`), comandos delegados (`requestDelegatedGateCommand`), snapshot, rollback governado e staged rollout |
+| assistente de decisões | discovery on-demand, fases observáveis de explicação e propostas consultivas implementados | Config/`@praxisui/ai` resolvem intenção, `loadDiscoveredCandidate` carrega decisões multi-domínio sob demanda, `DecisionExplanationProgressPhase` expõe fases intermediárias e propostas de cenários/diffs passam pelo mesmo fluxo humano |
 | autoridade Java/produção | não alterada pelo Studio | projeção e docs de evidência |
 
 O termo “implementado” acima significa código e prova no escopo indicado. Não
@@ -281,16 +282,13 @@ fronteira da IA está em [ADR 0002 — Policy Assistant](adr/0002-policy-assista
 
 ## 10. Dívidas e riscos conhecidos
 
-- o catálogo carrega um único `projectionPath`; não existe discovery multi-pacote;
-- apenas um slice focal está editável;
+- o catálogo remoto navega o catálogo paginado do Config e resolve candidatos externos sob demanda (`loadDiscoveredCandidate`), usando `projectionPath` apenas como enriquecimento opcional;
+- o authoring suporta condições (`tree`, `table`, `expression`), parâmetros e políticas operacionais (`ALLOW`/`BLOCK`), além da composição de `RuleSet` no `SnapshotCockpitComponent`;
 - comparison candidate × active, baseline independente por resultado, idempotência
-  do Test Run e action remota host-owned consumida por discovery existem; Oracle ainda é lacuna;
-- workspace usa actions server-owned, mas Definition create, publicação, create
-  rollout e rollout-policy ainda não possuem consumo completo de capabilities;
-- a role leitora foi alinhada no Config; a cadeia corporate multi-persona ainda
-  precisa de prova integrada no corte publicado;
-- a V58 governa `SUBMIT`/`PROMOTE` por política opt-in; publication, snapshot e
-  activation ainda precisam vincular e revalidar o mesmo receipt;
+  do Test Run e action remota host-owned consumida por discovery existem; a prova Oracle/HADES no ambiente corporativo ainda é lacuna externa;
+- workspace, definitions, publicação, create rollout e rollout-policy consomem capabilities principal-specific server-owned e matriz de gates SoD/ETag (`buildGovernanceGateSummary`);
+- a suíte E2E hermética cobre a jornada 4-olhos (`author` → `reviewer` → `publisher`/`operator`), recuperação de conflito (`409`/`412`/`428`) e rollback governado; a repetição integrada contra o Quickstart/Neon live depende da janela operacional;
+- a V58 governa `SUBMIT`/`PROMOTE` por política opt-in e o Studio exibe o recibo vinculado (`governance-bound-receipt`) na matriz de gates e no diagnóstico causal; o enforcement server-side do receipt até a ativação final pertence ao Config;
 - o corte Quickstart V61 hospeda a action descoberta pelo Studio; o V60 preserva
   a prova HTTP/Neon e a explicação consultiva do Config;
   isso não transforma o host em owner da projeção de evidência;

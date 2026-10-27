@@ -116,4 +116,17 @@ describe('DecisionExplanationComponent', () => {
     expect(component.state()).toEqual({ kind: 'failed', reason: 'failed' });
     vi.useRealTimers();
   });
+
+  it('surfaces observable progress phase labels before terminal completion', () => {
+    const component = TestBed.runInInjectionContext(() => new DecisionExplanationComponent(TestBed.inject(PolicyStudioI18n)));
+    component.decision = decision();
+    component.config = config;
+    component.explain();
+
+    explanationEvents.next({ kind: 'progress', phase: 'inspecting_evidence', eventSeq: 2 });
+    expect(component.progressPhaseLabel(component.state())).toContain('Inspecionando evidências');
+
+    explanationEvents.next({ kind: 'progress', phase: 'synthesizing', eventSeq: 3 });
+    expect(component.progressPhaseLabel(component.state())).toContain('Sintetizando explicação');
+  });
 });

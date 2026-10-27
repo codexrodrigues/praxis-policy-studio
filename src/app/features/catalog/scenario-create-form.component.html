@@ -1,4 +1,24 @@
 <form #form class="scenario-form" (submit)="$event.preventDefault(); createRequested.emit({ key: key.value, name: name.value, factsJson: facts().length ? factsJson() : fallbackJson(), expectedDecision: decision.value, expectedOutputJson: output.value, expectedReasonCodes: reasons.value, expectedEffectIntents: effects.value, form })">
+  @if (suggestions().length) {
+    <div class="scenario-suggestions" data-testid="scenario-suggestions">
+      <div class="scenario-suggestions__header">
+        <strong>{{ i18n.text('suggestedScenarioTemplatesTitle') }}</strong>
+        <p>{{ i18n.text('suggestedScenarioTemplatesHint') }}</p>
+      </div>
+      <div class="scenario-suggestions__actions">
+        @for (suggestion of suggestions(); track suggestion.id) {
+          <button
+            type="button"
+            class="quiet-button"
+            [attr.data-testid]="'apply-scenario-suggestion-' + suggestion.id"
+            [disabled]="busy() || !canManage()"
+            (click)="applySuggestion(suggestion, key, name, decision, reasons)">
+            {{ suggestion.id === 'ALLOW' ? i18n.text('applySuggestedAllowScenario') : i18n.text('applySuggestedDenyScenario') }}
+          </button>
+        }
+      </div>
+    </div>
+  }
   <label><span>{{ i18n.text('scenarioKey') }}</span><input #key required></label>
   <label><span>{{ i18n.text('scenarioName') }}</span><input #name required></label>
   @if (facts().length) {

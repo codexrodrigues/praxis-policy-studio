@@ -68,17 +68,35 @@ describe('DecisionDiscoveryComponent', () => {
     expect(selected).toHaveBeenCalledWith(decision);
   });
 
-  it('does not select a stale or external candidate', () => {
+  it('does not select a stale candidate when a newer version is already loaded, but emits candidateSelected for a new external ruleKey', () => {
     const component = TestBed.runInInjectionContext(() => new DecisionDiscoveryComponent(TestBed.inject(PolicyStudioI18n)));
     component.config = config;
     component.decisions = [decision];
     const selected = vi.fn();
+    const externalSelected = vi.fn();
     component.decisionSelected.subscribe(selected);
+    component.candidateSelected.subscribe(externalSelected);
     const stale = { ...candidate, version: 2 };
 
     expect(component.matchingDecision(stale)).toBeNull();
+    expect(component.isStaleCandidate(stale)).toBe(true);
+    expect(component.canResolveExternalCandidate(stale)).toBe(false);
     component.select(stale);
     expect(selected).not.toHaveBeenCalled();
+    expect(externalSelected).not.toHaveBeenCalled();
+
+    const externalCandidate = {
+      ...candidate,
+      definitionId: '9f10b712-1111-4444-8888-000000000099',
+      ruleKey: 'procurement.po_approval.urgent_override',
+      version: 1
+    };
+    expect(component.matchingDecision(externalCandidate)).toBeNull();
+    expect(component.isStaleCandidate(externalCandidate)).toBe(false);
+    expect(component.canResolveExternalCandidate(externalCandidate)).toBe(true);
+    component.select(externalCandidate);
+    expect(selected).not.toHaveBeenCalled();
+    expect(externalSelected).toHaveBeenCalledWith(externalCandidate);
   });
 
   it('requires a meaningful prompt and hides discovery in fixture mode', () => {

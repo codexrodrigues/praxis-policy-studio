@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import type {
+  DomainRuleCompositionApproval,
   DomainRuleDecision,
   DomainRuleExecutionSummary,
   DomainRuleHostStatusSummary,
@@ -15,6 +16,30 @@ import type {
   DomainRuleSnapshotVersion
 } from '@praxisui/core';
 import { PolicyStudioI18n } from '../../core/i18n';
+import {
+  buildRuleSetImpactSummary,
+  type RuleSetImpactSummary
+} from './catalog-presentation';
+import type {
+  DecisionParameterCatalog,
+  DecisionSummary,
+  RuleSetCompositionCandidate,
+  RuleSetCompositionCandidateCommand,
+  RuleSetCompositionCandidateRequest,
+  RuleSetCompositionPublication
+} from './catalog.fixture';
+
+export interface SnapshotSourceCandidate {
+  readonly definitionId: string;
+  readonly ruleKey: string;
+  readonly name: string;
+  readonly version: number;
+  readonly status: string;
+  readonly domain: string;
+  readonly operationKeys: readonly string[];
+  readonly parameterCatalog: DecisionParameterCatalog | null;
+  readonly parameterValues: Readonly<Record<string, unknown>> | null;
+}
 
 @Component({
   selector: 'pax-snapshot-cockpit',
@@ -63,9 +88,58 @@ export class SnapshotCockpitComponent {
   readonly createRollout = output<string>();
   readonly cancelRollout = output<DomainRuleRolloutCatalogItem>();
   readonly activateRollout = output<DomainRuleRolloutCatalogItem>();
+  readonly compositionCandidate = input<RuleSetCompositionCandidate | null>(null);
+  readonly compositionApproval = input<DomainRuleCompositionApproval | null>(null);
+  readonly compositionPublication = input<RuleSetCompositionPublication | null>(null);
+  readonly defaultSourceDefinitionId = input<string | null>(null);
+  readonly eligibleSources = input<readonly SnapshotSourceCandidate[]>([]);
+  readonly catalogDecisions = input<readonly DecisionSummary[]>([]);
+  readonly prepareComposition = output<RuleSetCompositionCandidateRequest>();
+  readonly approveComposition = output<RuleSetCompositionCandidateCommand>();
+  readonly publishComposition = output<RuleSetCompositionCandidateCommand>();
+  readonly compositionDraftChanged = output<void>();
   readonly i18n = inject(PolicyStudioI18n);
   readonly policyAuthoringOpen = signal(false);
   readonly policyInputError = signal(false);
+  readonly compositionOpen = signal(false);
+  readonly compositionInputError = signal(false);
+  private readonly customPromotedSelection = signal<{
+    readonly ruleSetKey: string;
+    readonly defaultSourceId: string | null;
+    readonly definitionId: string;
+  } | null>(null);
+  readonly customPromotedDefinitionId = computed(() => {
+    const selection = this.customPromotedSelection();
+    if (!selection) return null;
+    if (selection.ruleSetKey !== this.ruleSetKey() || selection.defaultSourceId !== this.defaultSourceDefinitionId()) {
+      return null;
+    }
+    const sources = this.eligibleSources();
+    if (sources.length > 0 && !sources.some(source => source.definitionId === selection.definitionId)) {
+      return null;
+    }
+    return selection.definitionId;
+  });
+  readonly effectivePromotedDefinitionId = computed(() =>
+    this.customPromotedDefinitionId()
+    ?? this.defaultSourceDefinitionId()
+    ?? this.eligibleSources()[0]?.definitionId
+    ?? ''
+  );
+  readonly canApproveCandidate = computed(() =>
+    this.compositionCandidate()?.authorizedActions.includes('APPROVE') ?? false
+  );
+  readonly canPublishCandidate = computed(() =>
+    this.compositionCandidate()?.authorizedActions.includes('PUBLISH') ?? false
+  );
+  readonly impactSummary = computed<RuleSetImpactSummary | null>(() =>
+    buildRuleSetImpactSummary(
+      this.ruleSetKey(),
+      this.catalogDecisions(),
+      this.effectivePromotedDefinitionId(),
+      this.compositionCandidate()
+    )
+  );
   readonly outcomes: readonly DomainRuleDecision[] = [
     'ALLOW', 'DENY', 'NOT_APPLICABLE', 'INCONCLUSIVE', 'TECHNICAL_ERROR'
   ];
@@ -140,5 +214,72 @@ export class SnapshotCockpitComponent {
       staleAfterSeconds: stale,
       maximumRolloutAgeSeconds: maximumAge
     });
+  }
+
+  notifyCompositionDraftChanged(): void {
+    this.compositionInputError.set(false);
+    this.compositionDraftChanged.emit();
+  }
+
+  updatePromotedDefinitionId(value: string): void {
+    this.customPromotedSelection.set({
+      ruleSetKey: this.ruleSetKey(),
+      defaultSourceId: this.defaultSourceDefinitionId(),
+      definitionId: value
+    });
+    this.notifyCompositionDraftChanged();
+  }
+
+  selectSourceCandidate(candidate: SnapshotSourceCandidate): void {
+    this.customPromotedSelection.set({
+      ruleSetKey: this.ruleSetKey(),
+      defaultSourceId: this.defaultSourceDefinitionId(),
+      definitionId: candidate.definitionId
+    });
+    this.notifyCompositionDraftChanged();
+  }
+
+  submitComposition(
+    action: 'PREPARE' | 'APPROVE' | 'PUBLISH',
+    promotedDefinitionIdRaw: string,
+    validFromUtcRaw: string,
+    validUntilUtcRaw = ''
+  ): void {
+    const promotedDefinitionId = promotedDefinitionIdRaw.trim();
+    const validFromUtc = validFromUtcRaw.trim();
+    const validUntilUtc = validUntilUtcRaw.trim() || null;
+    const invalid = !promotedDefinitionId || !validFromUtc;
+    this.compositionInputError.set(invalid);
+    if (invalid) return;
+
+    const request: RuleSetCompositionCandidateRequest = {
+      promotedDefinitionId,
+      validFromUtc,
+      validUntilUtc
+    };
+    if (action === 'PREPARE') {
+      this.prepareComposition.emit(request);
+      return;
+    }
+
+    const expectedCompositionDigest = this.compositionCandidate()?.compositionDigest?.trim();
+    if (!expectedCompositionDigest) {
+      this.compositionInputError.set(true);
+      return;
+    }
+
+    const command: RuleSetCompositionCandidateCommand = {
+      ...request,
+      expectedCompositionDigest
+    };
+
+    if (action === 'APPROVE') {
+      if (!this.canApproveCandidate()) return;
+      this.approveComposition.emit(command);
+      return;
+    }
+
+    if (!this.canPublishCandidate()) return;
+    this.publishComposition.emit(command);
   }
 }

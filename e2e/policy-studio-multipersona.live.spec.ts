@@ -93,6 +93,7 @@ test.describe('Policy Studio live multi-persona governance', () => {
     'Set all POLICY_STUDIO_LIVE_* persona credentials and start the Quickstart on the official 8088 origin.');
 
   test('anonymous browser remains outside the governed catalog', async ({ page }) => {
+    await bindLiveBackendConfig(page);
     const session = await page.request.get(apiUrl('/auth/session'));
     expect(session.status()).toBe(401);
 
@@ -106,6 +107,7 @@ test.describe('Policy Studio live multi-persona governance', () => {
 
   for (const persona of personas) {
     test(`${persona.key} sees the governed catalog without receiving another persona responsibility`, async ({ page }) => {
+      await bindLiveBackendConfig(page);
       await login(page, persona);
 
       const session = await page.request.get(apiUrl('/auth/session'));
@@ -118,6 +120,13 @@ test.describe('Policy Studio live multi-persona governance', () => {
         `${persona.key} must receive at least one governed decision, not only the empty catalog shell`
       ).not.toHaveCount(0);
       await expect(page.locator('.development-login')).toHaveCount(0);
+      await expect(page.getByTestId('decision-maturity-posture')).toBeVisible();
+      if (persona.key !== 'author') {
+        await expect(
+          page.getByRole('button', { name: 'Criar rascunho' }),
+          `${persona.key} must not receive author draft creation capability in the UI`
+        ).toHaveCount(0);
+      }
 
       const definitionsResponse = await governedRequest(page.request, { method: 'GET', path: definitions });
       expect(definitionsResponse.status(), `${persona.key} definition catalog`).toBe(200);
@@ -146,6 +155,23 @@ test.describe('Policy Studio live multi-persona governance', () => {
     });
   }
 });
+
+async function bindLiveBackendConfig(page: Page): Promise<void> {
+  if (!process.env.POLICY_STUDIO_LIVE_BACKEND_URL) return;
+  await page.route('**/app-config.json', async route => {
+    const response = await route.fetch();
+    const json = (await response.json()) as Record<string, unknown>;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...json,
+        mode: 'remote',
+        configApiBaseUrl: backendUrl
+      })
+    });
+  });
+}
 
 async function login(page: Page, persona: Persona): Promise<void> {
   const response = await page.request.post(apiUrl('/auth/login'), {

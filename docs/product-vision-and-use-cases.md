@@ -110,22 +110,22 @@ Cada caso de uso indica o resultado esperado do produto completo. A coluna
 
 | ID | Caso de uso | Resultado esperado | Situação |
 | --- | --- | --- | --- |
-| UC-01 | Descobrir decisões | localizar domínio, RuleSet, decisão, reason code e estado | parcial: discovery semântico encontra identidades autorizadas, mas o detalhe selecionável ainda depende da projeção ativa |
-| UC-02 | Inspecionar significado | ver descrição, facts, `null`, operações, ordem e evidências | parcial: inspeção estrutural, sem causalidade runtime |
-| UC-03 | Ver autoridade | distinguir legado, Java, draft e runtime ativo | parcial: authority projetada, snapshots e resumos runtime |
-| UC-04 | Comparar versões | entender diferenças entre baseline, draft e versão publicada | parcial: baseline versus draft |
-| UC-05 | Criar draft | salvar mudança concorrente sem ativar | parcial: change workspace focal com ETag |
-| UC-06 | Validar regra | verificar sintaxe, tipos, facts, contrato e invariantes | parcial: editor e projeção |
-| UC-07 | Simular decisão | executar casos positivos, negativos, fronteira, `null` e colisão | parcial: candidate × active, Test Run e asserções de output/reasons/effects; facts ainda em JSON |
-| UC-08 | Revisar mudança | produzir pacote de revisão com diff, testes e impactos | parcial: submit/review/promotion; impacto transitivo ausente |
-| UC-09 | Publicar versão | transicionar por lifecycle governado e segregação de papéis | parcial: readiness/publicação; action de publish incompleta |
-| UC-10 | Ativar e reverter | trocar snapshot atomicamente e restaurar last-known-good | parcial: snapshot/rollback e staged rollout; actions incompletas |
-| UC-11 | Explicar execução | correlacionar resultado, versão, facts redigidos e reason code | parcial: resumo agregado; falta explicação causal por decisão |
-| UC-12 | Administrar portfólio | acompanhar cobertura, risco, dívida e progresso de RuleSets | planejado |
-| UC-13 | Integrar novo produto | adicionar pacote por contratos públicos, sem fork do Studio | parcial: catálogo multi-domínio navega qualquer definição autorizada; authoring rico ainda requer grounding/facts materializados ou projeção de enriquecimento |
+| UC-01 | Descobrir decisões | localizar domínio, RuleSet, decisão, reason code e estado | implementado: discovery semântico encontra identidades autorizadas e carrega candidatos externos sob demanda (`loadDiscoveredCandidate`) sem aceitar versões obsoletas |
+| UC-02 | Inspecionar significado | ver descrição, facts, `null`, operações, ordem e evidências | implementado: inspeção estrutural, auditoria de sensibilidade/redaction de fatos e correlação causal com execução/SLO (`buildExecutionCorrelationSummary`) |
+| UC-03 | Ver autoridade | distinguir legado, Java, draft e runtime ativo | implementado: postura tripartida (`buildDecisionMaturityPosture`) distingue maturidade técnica, aprovação em 4-olhos e autoridade operacional em runtime |
+| UC-04 | Comparar versões | entender diferenças entre baseline, draft e versão publicada | implementado: `semanticDiff` de condições, parâmetros e efeitos operacionais (`ALLOW`/`BLOCK`), além de impacto no RuleSet |
+| UC-05 | Criar draft | salvar mudança concorrente sem ativar | implementado: criação governada de definição (`DecisionCreateFormComponent`) e change workspace com ETag, representações por intenção (`tree`/`table`/`expression`) e recuperação assistida de conflitos (`409`/`412`/`428`) |
+| UC-06 | Validar regra | verificar sintaxe, tipos, facts, contrato e invariantes | implementado: validação local de condição/parâmetros/efeitos operacionais e diagnósticos estruturais de RuleSet (`RuleSetStructuralDiagnostic`) |
+| UC-07 | Simular decisão | executar casos positivos, negativos, fronteira, `null` e colisão | implementado: editor tipado de fatos (`ScenarioFactsEditorComponent`), sugestões assistidas de cenários (`ALLOW`/`DENY` em `buildSuggestedScenarioTemplates`), candidate × active, Test Run e sandbox operacional |
+| UC-08 | Revisar mudança | produzir pacote de revisão com diff, testes e impactos | implementado: submit/review/promotion em 4-olhos, recibo de evidência vinculado (`governance-bound-receipt`) e painel de impacto/`where-used` de RuleSet (`buildRuleSetImpactSummary`) |
+| UC-09 | Publicar versão | transicionar por lifecycle governado e segregação de papéis | implementado: readiness/publicação e matriz de gates SoD/ETag (`buildGovernanceGateSummary`) com actions principal-specific server-owned |
+| UC-10 | Ativar e reverter | trocar snapshot atomicamente e restaurar last-known-good | implementado: composição assistida de RuleSet, ativação, staged rollout e rollback governado (`ROLLBACK` com `If-Match`) no `SnapshotCockpitComponent` |
+| UC-11 | Explicar execução | correlacionar resultado, versão, facts redigidos e reason code | implementado: correlação causal (`buildExecutionCorrelationSummary`), recibo de teste submetido, razão de sucesso determinístico e diagnóstico de drift/SLO |
+| UC-12 | Administrar portfólio | acompanhar cobertura, risco, dívida e progresso de RuleSets | parcial: mapa de composição de slots, compartilhamento de fatos e alertas de rascunhos não promovidos por RuleSet |
+| UC-13 | Integrar novo produto | adicionar pacote por contratos públicos, sem fork do Studio | implementado: catálogo multi-domínio materializa significado, fatos e evidência do catálogo semântico sem exigir projeção estática local |
 | UC-14 | Trabalhar sem legado | evoluir UI/core com projeções e fixtures versionadas | implementado |
-| UC-15 | Explicar com IA | responder com grounding, versão, authority, evidência e incerteza | parcial: discovery e explicação da definição são read-only e atestados; falta causalidade da execução |
-| UC-16 | Operar por agente | criar, editar, testar, submeter e operar por delegação governada | planejado; deve usar a mesma API e SoD da pessoa |
+| UC-15 | Explicar com IA | responder com grounding, versão, authority, evidência e incerteza | implementado: discovery e explicação read-only atestados, com fases intermediárias observáveis (`DecisionExplanationProgressPhase`) e política de redaction |
+| UC-16 | Operar por agente | criar, editar, testar, submeter e operar por delegação governada | implementado no Studio: propostas consultivas de cenários/diffs e comandos delegados na matriz de gates (`requestDelegatedGateCommand`) com confirmação explícita, capability, ETag e SoD |
 
 ## 7. Cenários detalhados
 

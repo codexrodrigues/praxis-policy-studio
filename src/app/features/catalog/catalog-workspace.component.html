@@ -1,5 +1,5 @@
 <div class="workspace" [class.decision-open]="narrowDetailOpen()">
-  <aside class="catalog-pane" aria-label="Catálogo de decisões">
+  <aside class="catalog-pane" [attr.aria-label]="i18n.text('decisionCatalogRegion')">
     <header class="pane-heading">
       <div>
         <p class="eyebrow">{{ selected()?.domain ?? i18n.text('product') }}</p>
@@ -23,7 +23,15 @@
       <pax-decision-discovery
         [config]="discoveryConfig"
         [decisions]="allDecisions()"
-        (decisionSelected)="select($event)" />
+        (decisionSelected)="select($event)"
+        (candidateSelected)="selectDiscoveredCandidate($event)" />
+    }
+
+    @if (runtime.mode() === 'remote' && sessionActive()) {
+      <pax-decision-create-form
+        [busy]="authoringBusy()"
+        (createRequested)="createGovernedDecision($event)"
+        (validationFailed)="reportDecisionCreateValidation($event)" />
     }
 
     <label class="search">
@@ -106,7 +114,7 @@
       </span>
       <div class="decision-actions" [attr.aria-label]="i18n.text('decisionActions')">
         @if (current.workspaceId && current.authoringSupported && hasWorkspaceAction('VIEW')) {
-          <button type="button" class="primary-action" [disabled]="!current.condition || authoringBusy()" (click)="openAuthoringAndFocus()">
+          <button type="button" class="primary-action" [disabled]="!canOpenAuthoring(current) || authoringBusy()" (click)="openAuthoringAndFocus()">
             {{ i18n.text('editRule') }}
           </button>
         } @else if (!current.workspaceId && current.authoringSupported && hasDefinitionAction('CREATE_NEW_VERSION')) {
@@ -159,6 +167,18 @@
     @if (authoringFeedback()) {
       <p class="work-mode-feedback" [class.state-message]="authoringError()" [attr.role]="authoringError() ? 'alert' : 'status'">{{ authoringFeedback() }}</p>
     }
+    @if (authoringConflict()) {
+      <div class="governed-actions" data-testid="conflict-recovery-bar">
+        <button
+          type="button"
+          class="quiet-button"
+          data-testid="reload-governed-evidence"
+          [disabled]="authoringBusy()"
+          (click)="reloadGovernedEvidence()">
+          {{ i18n.text('reloadGovernedEvidence') }}
+        </button>
+      </div>
+    }
 
     <div class="detail-grid anchored-section work-mode-panel" id="decision-overview" tabindex="-1" [hidden]="activeMode() !== 'understand'">
       <section class="meaning-block">
@@ -182,6 +202,30 @@
             <div><dt>{{ i18n.text('configVersion') }}</dt><dd>{{ configStatusLabel(current.configStatus) }}</dd></div>
           }
         </dl>
+        @if (maturityPosture(); as posture) {
+          <div class="decision-maturity-posture" data-testid="decision-maturity-posture">
+            <p class="section-label">{{ i18n.text('maturityPostureTitle') }}</p>
+            <dl class="facts">
+              <div data-testid="posture-technical-maturity">
+                <dt>{{ i18n.text('postureTechnicalMaturity') }}</dt>
+                <dd>{{ technicalMaturityLabel(posture.technicalMaturity) }}</dd>
+              </div>
+              <div data-testid="posture-approval-stage">
+                <dt>{{ i18n.text('postureApprovalStage') }}</dt>
+                <dd>{{ approvalStageLabel(posture.approvalStage) }}</dd>
+              </div>
+              <div data-testid="posture-operational-authority">
+                <dt>{{ i18n.text('postureOperationalAuthority') }}</dt>
+                <dd>
+                  {{ operationalAuthorityPostureLabel(posture.operationalAuthority) }}
+                  @if (posture.activeSnapshotKey) {
+                    · <code>{{ posture.activeSnapshotKey }}</code>
+                  }
+                </dd>
+              </div>
+            </dl>
+          </div>
+        }
         <details class="technical-details">
           <summary>{{ i18n.text('technicalDetails') }}</summary>
           <dl>
@@ -234,12 +278,21 @@
 
         <section class="facts-panel">
           <p class="inspection-label">{{ i18n.text('facts') }}</p>
+          @if (maturityPosture(); as posture) {
+            @if (posture.totalFacts > 0) {
+              <small class="authority-note" data-testid="fact-redaction-summary">
+                {{ i18n.text('factRedactionSummaryTitle') }}:
+                {{ posture.sensitiveFactsCount }}/{{ posture.totalFacts }} {{ i18n.text('factSensitiveCount') }} ·
+                {{ posture.redactedFactsCount }}/{{ posture.totalFacts }} {{ i18n.text('factRedactedCount') }}
+              </small>
+            }
+          }
           <ul class="fact-list">
             @for (fact of current.facts; track fact.path) {
               <li>
                 <strong>{{ fact.label }}</strong>
                 <code>{{ fact.path }}</code>
-                <small>{{ fact.description }} · {{ fact.valueType }} · {{ fact.nullable ? 'nullable' : 'obrigatório' }}</small>
+                <small>{{ fact.description }} · {{ fact.valueType }} · {{ i18n.text(fact.nullable ? 'factNullable' : 'factRequired') }} · {{ fact.sensitivity }} / {{ fact.redaction }}</small>
               </li>
             }
             @empty { <li class="inspection-empty fact-gap">{{ i18n.text('factCatalogUnavailable') }}</li> }
@@ -247,7 +300,7 @@
         </section>
       </div>
 
-      <div class="version-compare" aria-label="Comparação de autoridade e draft">
+      <div class="version-compare" [attr.aria-label]="i18n.text('authorityDraftComparison')">
         <section>
           <span class="version-kicker">{{ i18n.text('baseline') }}</span>
           <strong>{{ i18n.text('referenceBaseline') }}</strong>
@@ -290,21 +343,48 @@
         <header>
           <div>
             <p class="section-label">{{ i18n.text('localDraft') }}</p>
-            <h3 id="draft-workspace-title">{{ current.name }}</h3>
+            <h2 id="draft-workspace-title">{{ current.name }}</h2>
             <p>{{ i18n.text('localDraftBoundary') }}</p>
           </div>
           <button type="button" class="quiet-button" (click)="closeAuthoring()">{{ i18n.text('close') }}</button>
         </header>
-        @defer (when authoringOpen()) {
-        <pax-local-draft-workspace
-          [config]="authoringConfig"
-          [condition]="editorCondition()"
-          (conditionChanged)="updateDraft($event)"
-          (stateChanged)="updateEditorState($event)" />
-        } @placeholder {
-          <p>{{ i18n.text('loading') }}</p>
+        @if (draftCondition() !== null) {
+          @defer (when authoringOpen()) {
+          <pax-local-draft-workspace
+            [config]="authoringConfig"
+            [condition]="editorCondition()"
+            (conditionChanged)="updateDraft($event)"
+            (stateChanged)="updateEditorState($event)" />
+          } @placeholder {
+            <p>{{ i18n.text('loading') }}</p>
+          }
         }
-        <div class="draft-compare" aria-label="Comparação entre condição carregada e draft local">
+        @if (hasEditableParameters(current)) {
+          <pax-decision-parameters-editor
+            [parameterCatalog]="current.parameterCatalog ?? null"
+            [parameters]="draftParameters()"
+            (parametersChanged)="updateDraftParameters($event)"
+            (validationErrorsChanged)="parameterValidationErrors.set($event)" />
+        }
+        @if (suggestedDiffProposals().length) {
+          <div class="assisted-diff-proposals" data-testid="assisted-diff-proposals">
+            <p class="section-label">{{ i18n.text('assistedDiffProposalsTitle') }}</p>
+            <small class="authority-note">{{ i18n.text('assistedDiffProposalsHint') }}</small>
+            <div class="governed-actions">
+              @for (proposal of suggestedDiffProposals(); track proposal.id) {
+                <button
+                  type="button"
+                  class="quiet-button"
+                  [attr.data-testid]="'apply-diff-proposal-' + proposal.id"
+                  [disabled]="authoringBusy()"
+                  (click)="applyDiffProposal(proposal)">
+                  {{ proposal.label }}
+                </button>
+              }
+            </div>
+          </div>
+        }
+        <div class="draft-compare" [attr.aria-label]="i18n.text('loadedDraftConditionComparison')">
           <section>
             <span>{{ i18n.text('loadedCondition') }}</span>
             <code>{{ originalExpression() ?? '—' }}</code>
@@ -316,12 +396,12 @@
         </div>
         <footer>
           <div>
-            <strong>{{ editorState()?.validationErrors?.length ?? 0 }} {{ i18n.text('validationIssues') }}</strong>
+            <strong>{{ totalAuthoringValidationErrors() }} {{ i18n.text('validationIssues') }}</strong>
             <small>{{ draftChanged() ? i18n.text('unsavedLocalChanges') : i18n.text('unchangedDraft') }}</small>
           </div>
           <div class="authoring-actions">
             <button type="button" class="quiet-button" (click)="resetDraft()">{{ i18n.text('resetDraft') }}</button>
-            <button type="button" [disabled]="authoringBusy() || !hasWorkspaceAction('UPDATE_DRAFT') || !draftChanged() || !!editorState()?.validationErrors?.length" (click)="saveGovernedDraft()">
+            <button type="button" [disabled]="authoringBusy() || !hasWorkspaceAction('UPDATE_DRAFT') || !draftChanged() || totalAuthoringValidationErrors() > 0" (click)="saveGovernedDraft()">
               {{ i18n.text('saveDraft') }}
             </button>
           </div>
@@ -341,9 +421,11 @@
         <pax-scenario-create-form [facts]="current.facts" [factValues]="scenarioFactDraft()"
           [factsJson]="scenarioFactsJson()" [fallbackJson]="scenarioFactsFallback()"
           [busy]="authoringBusy()" [canManage]="hasWorkspaceAction('MANAGE_SCENARIOS')"
+          [suggestions]="suggestedScenarios()"
           (factValueChanged)="setScenarioFactValue($event.fact, $event.value)"
           (factNullChanged)="setScenarioFactNull($event.fact, $event.useNull)"
           (fallbackJsonChanged)="scenarioFactsFallback.set($event)"
+          (suggestionApplied)="applyScenarioSuggestion($event)"
           (createRequested)="createScenarioFromView($event)" />
         @if (scenarioFeedback()) {
           <p class="task-feedback" [class.state-message]="scenarioError()"
@@ -455,6 +537,49 @@
         } @else if (workspaceCapabilities(); as capabilities) {
           <pax-workspace-blockers [capabilities]="capabilities" />
         }
+        @if (governanceGateSummary(); as gateMatrix) {
+          <div class="governance-gate-summary" data-testid="governance-gate-summary">
+            <p class="section-label">{{ i18n.text('governanceGateMatrixTitle') }}</p>
+            <small class="authority-note">{{ i18n.text('governanceGateMatrixHint') }}</small>
+            @if (gateMatrix.submittedTestRunId) {
+              <small class="authority-note" data-testid="governance-bound-receipt">
+                {{ i18n.text('boundEvidenceReceipt') }}: <code>{{ gateMatrix.submittedTestRunId }}</code>
+                @if (gateMatrix.evidenceEligibility) {
+                  · <code>{{ gateMatrix.evidenceEligibility }}</code>
+                }
+              </small>
+            }
+            <dl class="facts lifecycle-grid">
+              @for (gate of gateMatrix.gates; track gate.id) {
+                <div [attr.data-testid]="'governance-gate-' + gate.id">
+                  <dt><code>{{ gate.id }}</code></dt>
+                  <dd>
+                    <strong>{{ i18n.text(gate.allowed ? 'gateStatusAuthorized' : 'gateStatusSegregatedOrBlocked') }}</strong>
+                    ·
+                    <small>{{ i18n.text(gate.etagBound ? 'gateEtagReady' : 'gateEtagMissing') }}@if (gate.etagValue) { (<code>{{ gate.etagValue }}</code>) }</small>
+                    @if (gate.reviewerRefs.length) {
+                      · <small>4-eyes: <code>{{ gate.reviewerRefs.join(', ') }}</code></small>
+                    }
+                    @if (gate.blockerCodes.length) {
+                      · <small><code>{{ gate.blockerCodes.join(', ') }}</code></small>
+                    }
+                    @if (gate.allowed && isActionableDelegatedGate(gate.id)) {
+                      ·
+                      <button
+                        type="button"
+                        class="quiet-button"
+                        [attr.data-testid]="'delegated-command-' + gate.id"
+                        [disabled]="authoringBusy() || (gate.id === 'SUBMIT' && draftChanged())"
+                        (click)="requestDelegatedGateCommand(gate.id)">
+                        {{ i18n.text('executeDelegatedGateCommand') }}
+                      </button>
+                    }
+                  </dd>
+                </div>
+              }
+            </dl>
+          </div>
+        }
         <small class="authority-note">{{ i18n.text('serverAuthorizesActions') }}</small>
       </section>
 
@@ -501,6 +626,43 @@
         <p class="section-label" id="decision-execution-title">{{ i18n.text('execution') }}</p>
         <p>{{ i18n.text('executionBoundary') }}</p>
       </header>
+      @if (executionCorrelation(); as correlation) {
+        <div class="execution-correlation-summary" data-testid="execution-correlation-summary">
+          <p class="section-label">{{ i18n.text('executionCorrelationTitle') }}</p>
+          <small class="authority-note">{{ i18n.text('executionCorrelationHint') }}</small>
+          <dl class="facts lifecycle-grid">
+            <div data-testid="correlation-slo-posture">
+              <dt>{{ i18n.text('sloPostureLabel') }}</dt>
+              <dd><strong>{{ sloPostureLabel(correlation.sloPosture) }}</strong></dd>
+            </div>
+            <div data-testid="correlation-success-ratio">
+              <dt>{{ i18n.text('runtimeSuccessRatio') }}</dt>
+              <dd>{{ correlation.successRatioPercent !== null ? (correlation.successRatioPercent + '%') : '—' }} ({{ correlation.totalObservations }})</dd>
+            </div>
+            <div data-testid="correlation-host-alignment">
+              <dt>{{ i18n.text('hostAlignmentRatio') }}</dt>
+              <dd>{{ correlation.alignedHosts }}/{{ correlation.totalHosts }}</dd>
+            </div>
+            <div data-testid="correlation-bound-receipt">
+              <dt>{{ i18n.text('boundEvidenceReceipt') }}</dt>
+              <dd>
+                @if (correlation.boundTestRunId) {
+                  <code>{{ correlation.boundTestRunId }}</code>
+                  @if (correlation.evidenceEligibility) {
+                    · <code>{{ correlation.evidenceEligibility }}</code>
+                  }
+                } @else {
+                  —
+                }
+              </dd>
+            </div>
+            <div data-testid="correlation-causal-diagnosis">
+              <dt>{{ i18n.text('causalDiagnosisLabel') }}</dt>
+              <dd>{{ causalDiagnosisLabel(correlation.causalState) }}</dd>
+            </div>
+          </dl>
+        </div>
+      }
     @if (runtime.mode() === 'remote') {
       <pax-snapshot-cockpit
         [ruleSetKey]="current.ruleSetKey"
@@ -531,6 +693,12 @@
         [rolloutBusy]="rolloutBusy()"
         [rolloutFeedback]="rolloutFeedback()"
         [rolloutFeedbackError]="rolloutFeedbackError()"
+        [compositionCandidate]="compositionCandidate()"
+        [compositionApproval]="compositionApproval()"
+        [compositionPublication]="compositionPublication()"
+        [defaultSourceDefinitionId]="defaultSnapshotSourceDefinitionId()"
+        [eligibleSources]="eligibleSnapshotSources()"
+        [catalogDecisions]="allDecisions()"
         (retry)="loadSnapshots()"
         (retryExecutionSummary)="loadExecutionSummary()"
         (retryHostStatus)="loadHostStatusSummary()"
@@ -542,7 +710,11 @@
         (createRollout)="createRollout($event)"
         (cancelRollout)="cancelRollout($event)"
         (activateRollout)="activateRollout($event)"
-        (operate)="operateSnapshot($event)" />
+        (operate)="operateSnapshot($event)"
+        (prepareComposition)="prepareSnapshotComposition($event)"
+        (approveComposition)="approveSnapshotComposition($event)"
+        (publishComposition)="publishSnapshotComposition($event)"
+        (compositionDraftChanged)="invalidateSnapshotCompositionDraft()" />
     } @else {
       <p class="empty">{{ i18n.text('executionUnavailableFixture') }}</p>
     }
@@ -556,8 +728,14 @@
       <details class="evidence-details">
         <summary>{{ current.evidenceCount }} {{ i18n.text('packageReferences') }}</summary>
         <ol>
-          @for (item of current.evidence; track item.sha256) {
-            <li><span>{{ item.kind }}</span><code>{{ item.path }}</code><small>SHA-256 {{ item.sha256.slice(0, 12) }}…</small></li>
+          @for (item of current.evidence; track item.path + ':' + item.kind) {
+            <li>
+              <span>{{ item.kind }}</span>
+              <code>{{ item.path }}</code>
+              @if (item.sha256) {
+                <small>SHA-256 {{ item.sha256.slice(0, 12) }}…</small>
+              }
+            </li>
           }
         </ol>
       </details>

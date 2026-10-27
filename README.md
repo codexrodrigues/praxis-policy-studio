@@ -13,8 +13,13 @@ imutáveis, submete para revisão independente e projeta review/promotion. O
 lifecycle também apresenta a autoridade e a elegibilidade do baseline e, quando
 o host fornece a prova V58, resume CREATE/UPDATE, mutação ou não mutação, cleanup e
 chamadas ao baseline sem expor facts, payloads ou linhas de banco.
-Não há composição de snapshot no browser: o Studio publica definições/materializações
-e opera versões de snapshot somente pelas ações e pelo ETag fornecidos pelo Config.
+Não há síntese local de `RuleSet` no browser: o Studio cria definições governadas,
+edita condições, parâmetros tipados (`/definitions/{id}/parameters`) e efeito operacional
+explícito (`BLOCK`/`ALLOW`), publica definições/materializações e opera o fluxo
+assistido de candidato de composição (`/api/praxis/policy-studio/rule-sets/{ruleSetKey}/candidate`,
+`/candidate/approvals`, `/candidate/publish`) e versões de snapshot somente pelas
+ações (`authorizedActions`), segregação de funções (4-olhos) e ETag forte fornecidos
+pelo host e pelo Config.
 
 O catálogo versiona 14 referências RN-013 e um caso neutro real do Quickstart.
 Por padrão, o desenvolvimento local abre o Rule Lab de auxílio extraordinário:
@@ -84,8 +89,8 @@ como nome do corte corrente.
 
 A adoção G2 fixa os sete pacotes diretos `@praxisui/*` em `10.0.0-rc.36`, com
 `dialog` na mesma versão pelo grafo normal de peers e lockfile. A instalação
-pelo npm público, `npm ci`, lint, 123 testes, checks de projeções e runtime
-local, build e seis E2E desktop/narrow passaram com esses pacotes publicados.
+pelo npm público, `npm ci`, lint, testes unitários, checks de projeções e runtime
+local, build e suíte E2E desktop/narrow passaram com esses pacotes publicados.
 As oito integridades do lock e os arquivos instalados correspondem ao manifesto
 selado da [publicação rc.36](https://github.com/codexrodrigues/praxis-ui-angular/actions/runs/39609796030/attempts/2).
 A prova de adoção usa a UI integrada em `f427d705`, com instalação limpa do registry.
@@ -95,8 +100,9 @@ A prova de navegador cobre transporte e UX com backend hermético, teclado e axe
 a prova dos novos contratos por HTTP real com Config/host continua como gate
 separado. Essa validação local não substitui Quickstart/Neon ou personas reais.
 
-O Studio consome o catálogo canônico de facts por definição e deriva inputs
-tipados de cenário, mantendo JSON somente como preview/fallback legado.
+O Studio consome o catálogo canônico de facts por definição (`/definitions/{id}/facts`) e deriva
+inputs tipados de cenário, mantendo o editor JSON estruturado apenas para
+preview ou para famílias de decisão sem catálogo de facts declarado.
 Na composição de snapshot, o Config devolve blockers governados tipados e o
 Studio os apresenta por códigos estáveis em pt-BR/en-US. A UI não interpreta nem
 expõe a mensagem técnica do backend como contrato de produto.
@@ -263,14 +269,19 @@ não simula readiness de rollout no browser. Essa operação será
 materializada quando o control plane publicar discovery governado de rollouts
 abertos e suas ações disponíveis para a persona humana.
 
-O Studio deliberadamente não monta o candidato de composição com as decisões
-da projeção. Essa operação exige o RuleSet completo, os IDs de origem, contrato
-do host e duas aprovações distintas. O Quickstart agora materializa esse candidato
-no compositor Java do host usando exatamente as sete definições aprovadas do caso;
-o script não reconstrói condições e o browser não recebe o grafo executável. O
-Quickstart mantém readiness local no Actuator e publica heartbeat redigido no
-Config. O Studio consome apenas o agregado server-derived de hosts alinhados,
-com snapshot em drift, runtime incompatível, indisponíveis ou com heartbeat vencido.
+O Studio deliberadamente não monta o grafo executável do `RuleSet` no navegador.
+Essa operação exige o RuleSet completo, os IDs de origem, contrato do host e duas
+aprovações distintas (`RULE_COMPOSITION_APPROVER`) segregadas do publicador
+(`RULE_SNAPSHOT_PUBLISHER`). O Quickstart materializa esse candidato no compositor
+Java do host (`/api/praxis/policy-studio/rule-sets/{ruleSetKey}/candidate`) usando
+as definições governadas elegíveis e a definição promovida opcional; o browser
+consome apenas o resumo sanitizado do candidato (`compositionDigest`,
+`implementationCatalogDigest`, `currentHeadEtag`, `sources` e `authorizedActions`),
+trata `409 STALE_RULESET_CANDIDATE` invalidando candidatos obsoletos e nunca recebe
+o grafo executável. O Quickstart mantém readiness local no Actuator e publica
+heartbeat redigido no Config. O Studio consome apenas o agregado server-derived
+de hosts alinhados, com snapshot em drift, runtime incompatível, indisponíveis ou
+com heartbeat vencido.
 
 ## Gates
 
@@ -319,12 +330,14 @@ a definição selecionada. Na descoberta, o browser envia somente o pedido em
 linguagem natural e o locale; o LLM escolhe semanticamente a tool
 `searchDomainRules`, e o Config devolve apenas identidades seguras no escopo e na
 autoridade resolvidos pelo servidor. O Studio rejeita terminais aplicáveis ou sem
-o envelope `praxis-domain-rule-search.v1`. Candidatos que não pertencem à projeção
-ativa permanecem visíveis, mas não podem ser selecionados até que o catálogo
-canônico multi-domínio os materialize.
+o envelope `praxis-domain-rule-search.v1`. Candidatos válidos descobertos fora da
+projeção inicial podem ser resolvidos e carregados sob demanda (`loadDiscoveredCandidate`)
+a partir do catálogo canônico do Config, enquanto versões obsoletas em relação ao
+catálogo carregado permanecem bloqueadas (`isStaleCandidate`).
 
 Na explicação, o browser envia
-somente `selectedDomainDecisionRef` com ID, rule key e versão. Em corporate mode,
+somente `selectedDomainDecisionRef` com ID, rule key e versão, expondo fases
+observáveis de progresso (`connecting`, `inspecting_evidence`, `synthesizing`). Em corporate mode,
 o Config exige `RULE_DEFINITION_READER` antes de enfileirar o turno, relê a
 definição no escopo do principal, aplica `governance.aiUsage` e devolve uma
 projeção sanitizada. O Studio só apresenta a resposta quando a evidência terminal
@@ -333,15 +346,17 @@ fingerprints e declara `canApply=false`; uma resposta divergente, incompleta ou
 aplicável é rejeitada. Facts runtime, tenant, atores, rationale e payloads
 materializados não são enviados ao provider nem exibidos nessa superfície.
 
-O `main` posterior ao beta.15 consome o catálogo canônico de facts por definição publicado pelo
-Config através de `@praxisui/core`. O formulário de cenário passa a ser tipado e
-grounded tanto na criação quanto na edição (tipo, nulabilidade, descrição,
-sensibilidade e redaction), mantendo o JSON canônico apenas como preview e
-fallback para definições legadas. Catálogo
-multi-domínio canônico, proposição de cenários e diff vêm nos próximos incrementos.
-Create, edit, test, submit e, depois, publish/rollout poderão ser executados por
-um agente delegado somente pelas mesmas actions, capabilities, ETag,
-confirmação, evidência e segregação de funções usadas por pessoas. Não haverá
+O `main` posterior ao beta.15 consome o catálogo canônico de facts e parâmetros por definição publicado pelo
+Config através de `@praxisui/core`. O authoring oferece representações por intenção (`tree` / Árvore visual,
+`table` / Tabela de decisão e `expression` / Expressão de domínio), propostas assistidas de diff de fronteira
+(`buildSuggestedDraftDiffProposals`), sugestões assistidas de cenários tipados (`ALLOW` / `DENY` com `expectedReasonCodes`
+em `buildSuggestedScenarioTemplates`), postura separada de maturidade técnica, estágio de aprovação e autoridade
+operacional (`buildDecisionMaturityPosture`) e auditoria de sensibilidade/redaction de fatos.
+No modo `Operar`, o Studio projeta a matriz de gates de governança, SoD (4-olhos), recibo de evidência
+vinculado (`governance-bound-receipt`) e ETag (`buildGovernanceGateSummary`), a correlação causal com execução
+e postura de SLO operacional (`buildExecutionCorrelationSummary`), a análise pré-publicação de impacto e `where-used`
+do RuleSet (`buildRuleSetImpactSummary`) e a execução delegada de comandos (`SUBMIT`, `PROMOTE`, `PUBLISH_DEFINITION`)
+mediante confirmação humana governada explícita (`requestDelegatedGateCommand`). Não há
 autoaprovação nem API privilegiada de IA.
 
 ## Execução observada

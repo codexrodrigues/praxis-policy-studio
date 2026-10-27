@@ -45,9 +45,22 @@ p { margin: 0; }
 .rollout-policy-versions small { color: var(--pax-color-on-surface-variant, #52636a); }
 .rollout-policy-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .85rem 1rem; padding: 1rem; background: var(--pax-color-surface-container, #eef3f5); }
 .rollout-policy-form label { display: grid; gap: .3rem; color: var(--pax-color-on-surface-variant, #52636a); font-size: .75rem; font-weight: 700; }
-.rollout-policy-form input, .rollout-policy-form select { min-width: 0; border: 1px solid var(--pax-color-outline, #718087); border-radius: .35rem; background: var(--pax-color-surface, #fff); color: var(--pax-color-on-surface, #172126); padding: .55rem .65rem; }
+.rollout-policy-form input, .rollout-policy-form select, .rollout-policy-form textarea { min-width: 0; border: 1px solid var(--pax-color-outline, #718087); border-radius: .35rem; background: var(--pax-color-surface, #fff); color: var(--pax-color-on-surface, #172126); padding: .55rem .65rem; font-family: inherit; }
 .rollout-policy-form .policy-checkbox { grid-template-columns: auto 1fr; align-items: center; align-self: end; }
 .rollout-policy-form button { align-self: end; }
+.snapshot-composition { display: grid; gap: .75rem; padding-top: .75rem; border-top: 1px solid var(--pax-color-outline-variant, #b9c6cb); }
+.snapshot-composition .rollout-actions,
+.snapshot-composition .snapshot-candidate-summary,
+.snapshot-composition .candidate-sources,
+.snapshot-composition [data-testid='snapshot-sod-notice'],
+.snapshot-composition [data-testid='snapshot-composition-approval'],
+.snapshot-composition [data-testid='snapshot-composition-publication'],
+.snapshot-composition .state-message { grid-column: 1 / -1; }
+.candidate-sources { display: grid; gap: .35rem; font-size: .78rem; padding: .5rem 0; border-top: 1px dashed var(--pax-color-outline-variant, #b9c6cb); }
+.candidate-sources ul { margin: 0; padding-inline-start: 1.2rem; display: grid; gap: .25rem; }
+.eligible-sources-fieldset { grid-column: 1 / -1; display: grid; gap: .4rem; margin: 0; padding: .5rem 0; border: 0; border-bottom: 1px dashed var(--pax-color-outline-variant, #b9c6cb); }
+.eligible-sources-fieldset legend { font-size: .75rem; font-weight: 700; color: var(--pax-color-on-surface-variant, #52636a); margin-bottom: .3rem; }
+.eligible-sources-fieldset .checkbox-field { display: flex; align-items: center; gap: .5rem; font-weight: 500; }
 .rollout-policy-timeline summary { cursor: pointer; font-weight: 700; }
 .rollout-policy-timeline ol { display: grid; gap: .5rem; margin: .75rem 0 0; padding-inline-start: 1.25rem; }
 .rollout-policy-timeline li { display: grid; grid-template-columns: minmax(7rem, auto) minmax(8rem, 1fr) auto; gap: .75rem; }

@@ -90,6 +90,13 @@ export class DecisionExplanationComponent implements OnChanges, OnDestroy {
     return this.i18n.text(key);
   }
 
+  progressPhaseLabel(event: DecisionExplanationEvent | { readonly kind: 'idle' }): string | null {
+    if (event.kind !== 'progress' || !event.phase) return null;
+    if (event.phase === 'connecting') return this.i18n.text('aiExplanationPhaseConnecting');
+    if (event.phase === 'inspecting_evidence') return this.i18n.text('aiExplanationPhaseInspectingEvidence');
+    return this.i18n.text('aiExplanationPhaseSynthesizing');
+  }
+
   failureMessage(reason: Extract<DecisionExplanationEvent, { kind: 'failed' }>['reason']): string {
     const key = reason === 'authentication'
       ? 'aiExplanationAuthenticationRequired'

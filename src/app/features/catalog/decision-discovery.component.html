@@ -37,14 +37,14 @@
                 <ul>
                   @for (candidate of completed.candidates; track candidate.definitionId + ':' + candidate.version) {
                     <li>
-                      @if (matchingDecision(candidate)) {
-                        <button type="button" class="candidate" (click)="select(candidate)">
+                      @if (matchingDecision(candidate) || canResolveExternalCandidate(candidate)) {
+                        <button type="button" class="candidate" [attr.data-testid]="'discovery-candidate-' + candidate.ruleKey" (click)="select(candidate)">
                           <span>
                             <strong>{{ candidate.ruleKey }}</strong>
                             <small>{{ candidate.semanticOwner || candidate.resourceKey || candidate.contextKey }}</small>
                           </span>
                           <span class="candidate-meta">
-                            v{{ candidate.version }} · {{ candidate.status || candidate.ruleType }} · {{ i18n.text('selectDiscoveredDecision') }}
+                            v{{ candidate.version }} · {{ candidate.status || candidate.ruleType }} · {{ matchingDecision(candidate) ? i18n.text('selectDiscoveredDecision') : i18n.text('loadDiscoveredDecision') }}
                           </span>
                         </button>
                       } @else {

@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PolicyStudioI18n } from '../../core/i18n';
+import type { SuggestedScenarioTemplate } from './catalog-presentation';
 import type { DecisionFact } from './catalog.fixture';
 import { ScenarioFactsEditorComponent, type ScenarioFactNullChange, type ScenarioFactValueChange } from './scenario-facts-editor.component';
 
@@ -29,12 +30,28 @@ export class ScenarioCreateFormComponent {
   readonly fallbackJson = input.required<string>();
   readonly busy = input(false);
   readonly canManage = input(false);
+  readonly suggestions = input<readonly SuggestedScenarioTemplate[]>([]);
 
   readonly factValueChanged = output<ScenarioFactValueChange>();
   readonly factNullChanged = output<ScenarioFactNullChange>();
   readonly fallbackJsonChanged = output<string>();
   readonly createRequested = output<ScenarioCreateView>();
+  readonly suggestionApplied = output<SuggestedScenarioTemplate>();
   readonly i18n = inject(PolicyStudioI18n);
+
+  applySuggestion(
+    suggestion: SuggestedScenarioTemplate,
+    keyInput: HTMLInputElement,
+    nameInput: HTMLInputElement,
+    decisionSelect: HTMLSelectElement,
+    reasonsTextarea: HTMLTextAreaElement
+  ): void {
+    keyInput.value = suggestion.scenarioKey;
+    nameInput.value = suggestion.name;
+    decisionSelect.value = suggestion.expectedDecision;
+    reasonsTextarea.value = suggestion.expectedReasonCodes.join(', ');
+    this.suggestionApplied.emit(suggestion);
+  }
 
   outcome(outcome: string): string {
     const key = ({

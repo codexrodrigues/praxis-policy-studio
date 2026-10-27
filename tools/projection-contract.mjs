@@ -19,7 +19,7 @@ export function validateProjection(projection) {
   if (new Set(keys).size !== keys.length) errors.push('DECISION_KEY_DUPLICATE');
   if (new Set(orders).size !== orders.length) errors.push('DECISION_ORDER_DUPLICATE');
   if (orders.some((order, index) => order !== index + 1)) errors.push('DECISION_ORDER_NOT_TOTAL');
-  if (decisions.some(item => !['TECHNICAL_DRAFT_READY', 'REFERENCE_IMPLEMENTED'].includes(item.semanticStatus))) {
+  if (decisions.some(item => !['TECHNICAL_DRAFT_READY', 'REFERENCE_IMPLEMENTED', 'G4_SOURCE_CANDIDATE'].includes(item.semanticStatus))) {
     errors.push('DECISION_SEMANTIC_STATUS_UNSUPPORTED');
   }
   if (decisions.some(item => !item.presentationLabel || !item.semanticSourceRef || !Array.isArray(item.factPaths))) {
@@ -28,7 +28,7 @@ export function validateProjection(projection) {
   const factSchemas = Array.isArray(projection?.factSchemas) ? projection.factSchemas : [];
   const factPaths = factSchemas.map(item => item.path);
   if (new Set(factPaths).size !== factPaths.length) errors.push('FACT_SCHEMA_PATH_DUPLICATE');
-  if (factSchemas.some(item => !item.path || !['boolean', 'string', 'number', 'date', 'string-array', 'date-array'].includes(item.valueType) ||
+  if (factSchemas.some(item => !item.path || !['boolean', 'string', 'number', 'date', 'string-array', 'date-array', 'number-array', 'array<number>'].includes(item.valueType) ||
       typeof item.nullable !== 'boolean' || !item.presentationLabel || !item.description ||
       !item.providerRef || !Array.isArray(item.evidenceRefs) || item.evidenceRefs.length === 0)) {
     errors.push('FACT_SCHEMA_INCOMPLETE');

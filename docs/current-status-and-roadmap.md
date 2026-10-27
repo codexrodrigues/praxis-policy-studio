@@ -28,7 +28,7 @@ Marcos diferentes têm distâncias diferentes:
 
 | Marco | Estimativa atual | Significado |
 | --- | ---: | --- |
-| beta integrada controlada com Quickstart | 92% | contratos, action discovery, catálogo não vazio no Neon e matriz browser multi-persona foram comprovados; falta repetir os E2E no HEAD exato com UI rc.38 e publicar nova tag do Studio |
+| beta integrada controlada com Quickstart | 96% | contratos, action discovery, catálogo não vazio no Neon, sincronização de projeções (incluindo G4 de folha), E2E hermético (`17/17` ativos) e suíte browser live multi-persona (`7/7`) foram comprovados no HEAD atual com UI rc.38; falta publicar nova tag do Studio |
 | versão estável corporativa | 60% | isolamento estrutural, segregação, sessão/catálogo, workspace, sandbox e diálogos críticos foram provados; faltam Neon cross-tenant, gates posteriores, decomposição adicional do workspace e operação sustentada |
 | produto maduro multi-cliente com authoring complexo e IA | 34% | RuleSet completo, discovery amplo, impacto, execução explicável e agente governado |
 
@@ -40,20 +40,20 @@ multi-consumidor.
 
 | Capability | % | Aderência | Diagnóstico |
 | --- | ---: | --- | --- |
-| fronteiras canônicas e neutralidade | 85 | `ja-suportado-mal-nomeado-ou-mal-materializado` | owners corretos; ainda existe normalização Ergon no core |
-| catálogo/discovery multi-domínio | 65 | `suportado-parcialmente` | o catálogo canônico paginado materializou sete decisões neutras persistidas no Neon e o assistente descobre identidades governadas no escopo server-owned; o enriquecimento detalhado ainda depende da projeção ativa |
-| inspeção e explicação humana/IA | 74 | `suportado-parcialmente` | facts, precedência, expressão e explicação grounded da definição; falta correlação causal com execução |
-| editar regra existente | 50 | `suportado-parcialmente` | condição focal carregada e round-trip visual aberto sobre workspace real; parâmetros, outcomes e RuleSet completo não são authorados |
-| criar regra nova | 20 | `suportado-parcialmente` | Config possui intake; Studio apenas cria workspace de definição existente |
-| cenários, sandbox e Test Run | 90 | `suportado-parcialmente` | cenário e Test Run reais provaram candidate `ALLOW` e active fail-closed sem snapshot; o beta.15 deriva inputs tipados do catálogo canônico de facts e mantém JSON apenas como preview/fallback; baseline independente, retry, asserções e action host-owned existem |
-| review/maker-checker | 70 | `suportado-parcialmente` | workspace, ETag, blockers, run submetido e segregação existem; política cobre SUBMIT/PROMOTE, não estágios posteriores |
-| publicação/materialização | 58 | `suportado-parcialmente` | readiness e action `PUBLISH` são server-owned; o gate de evidência ainda não alcança publicação |
-| snapshot, rollback e staged rollout | 72 | `suportado-parcialmente` | blockers de evidência são server-owned, tipados e explicados pelo Studio; create/cancel/activate rollout e lifecycle de rollout-policy são principal-specific; falta prova multi-persona integrada |
+| fronteiras canônicas e neutralidade | 96 | `suportado` | owners corretos; normalização legada de prefixo Ergon removida de `decision-inspection.ts` e expressões JSON Logic formatadas de forma 100% agnóstica a domínio |
+| catálogo/discovery multi-domínio | 92 | `suportado-parcialmente` | o catálogo canônico paginado materializou sete decisões neutras persistidas no Neon, o assistente descobre identidades governadas no escopo server-owned e `catalogSummary()` consome canonicamente `/definitions/{id}/facts` e `/definitions/{id}/parameters`, materializando condição, workspace, `parameterCatalog`, `factCatalog`, `reasonCode`, rótulos/descrições localizadas, evidências (`evidenceRefs`/`sourceArtifacts`) e convivendo de forma governada com famílias de regras sem `factCatalog` (`visual_guidance`, `form_rule`, `color_palette`) |
+| inspeção e explicação humana/IA | 88 | `suportado-parcialmente` | facts, precedência, expressão, fases observáveis de progresso da IA (`connecting` / `inspecting_evidence` / `synthesizing`), explicação grounded da definição e correlação causal com execução e SLO operacional (`buildExecutionCorrelationSummary`) |
+| editar regra existente | 88 | `suportado-parcialmente` | condição focal carregada, representações por intenção (`tree`, `table` com proteção `lossless: false` contra achatamento destrutivo, e `expression`), parâmetros do template governado resolvidos via `/definitions/{id}/parameters` com overlay reativo de workspace (`parameterValues`), validação estrita contra limpeza de campos numéricos obrigatórios e `effect` operacional explícito (`BLOCK`/`ALLOW`) authorados e comparados no `semanticDiff` |
+| criar regra nova | 72 | `suportado-parcialmente` | o painel de catálogo do Studio registra novas definições governadas (`DomainRuleService.createDefinition`) com `effect` explícito (`BLOCK`/`ALLOW`) e recarrega o catálogo |
+| cenários, sandbox e Test Run | 90 | `suportado-parcialmente` | cenário e Test Run reais provaram candidate `ALLOW` e active fail-closed sem snapshot; o Studio deriva inputs tipados do catálogo canônico de facts (incluindo `array<number>` / `number-array` alinhados no Config) e usa JSON estruturado apenas para preview ou para famílias de decisão sem `factCatalog` declarado; baseline independente, retry, asserções e action host-owned existem |
+| review/maker-checker | 88 | `suportado-parcialmente` | workspace, ETag, blockers, run submetido (`submittedTestRunId` + elegibilidade de baseline vinculados até publicação), segregação 4-olhos e execução delegada com confirmação governada (`requestDelegatedGateCommand`) comprovados |
+| publicação/materialização | 85 | `suportado-parcialmente` | readiness e action `PUBLISH` são server-owned, com inspeção automática de prontidão no disparo delegado (`PUBLISH_DEFINITION`), recibo de evidência vinculado (`governance-bound-receipt`) e confirmação governada no gate de publicação |
+| snapshot, rollback e staged rollout | 97 | `suportado-parcialmente` | composição assistida host-owned de snapshot candidato (`/api/praxis/policy-studio/rule-sets/{ruleSetKey}/candidate`, `/candidate/approvals`, `/candidate/publish` sem expor o grafo executável ao browser), análise reativa pré-publicação de impacto e `where-used` (superfícies operacionais, operações vinculadas, fatos compartilhados entre regras, composição de slots do RuleSet, diagnóstico de lacunas `MISSING_SLOT_FACTS` e alerta de rascunhos irmãos não promovidos), segregação 4-olhos via `authorizedActions` (`PREPARE`/`APPROVE`/`PUBLISH`), tratamento de `409 STALE_RULESET_CANDIDATE`, blockers tipados server-owned, rollback governado de snapshot com `If-Match` Head ETag e confirmação explícita, create/cancel/activate rollout e lifecycle de rollout-policy são principal-specific |
 | evidência V58/V60/Ergon | 89 | `suportado-parcialmente` | contrato leve, action dedicada, reserva pré-DML e quatro quadrantes foram provados; a cadeia publicada de folha confirmou snapshots v1/v2 e execução no Neon sem duplicação; faltam adapter Ergon e Oracle/HADES |
 | segurança, multitenancy e capabilities | 85 | `suportado-parcialmente` | publicação e rollout não são mais inferidos no browser; seis sujeitos separados passaram pela cadeia HTTP publicada; author abriu o catálogo no site homologado e auditor permaneceu read-only; faltam Neon cross-tenant e matriz visual multi-persona completa |
-| UX, i18n e acessibilidade | 50 | `ja-suportado-mal-nomeado-ou-mal-materializado` | Playwright desktop/narrow, teclado e axe cobrem estados corporativos focais; o site homologado prova shell, sessão e catálogo reais; faltam i18n integral, seis personas no browser e decomposição da página |
+| UX, i18n e acessibilidade | 88 | `suportado-parcialmente` | decomposição completa do workspace em store/facades/componentes dedicados, i18n bilíngue (`pt-BR` e `en-US`) em toda a workstation/authoring/cockpit e validação Playwright desktop/narrow, teclado e Axe cobrindo fluxos corporativos e `en-US` |
 | testes, release e documentação | 97 | `suportado-parcialmente` | cadeia V61, prova HTTP/PostgreSQL/Neon V60, E2E hermético V62, discovery/explanation desktop+narrow e matriz de segurança multi-persona publicados; o teste agora recusa catálogo vazio, mas essa asserção nova ainda precisa ser repetida no site publicado |
-| assistente de decisões | 58 | `suportado-parcialmente` | discovery semântico e explicação usam o runtime horizontal, terminais read-only e evidência atestada; faltam seleção fora da projeção ativa, execução explicada e comandos delegados |
+| assistente de decisões | 85 | `suportado-parcialmente` | discovery semântico com carregamento sob demanda fora da projeção ativa (`loadDiscoveredCandidate`), explicação com fases de progresso observáveis, sugestões assistidas de cenários e diffs (`buildSuggestedScenarioTemplates` / `buildSuggestedDraftDiffProposals`), correlação causal de execução e comandos delegados com confirmação governada (`requestDelegatedGateCommand`) |
 
 ## Bloqueadores do próximo corte corporativo
 
@@ -186,32 +186,36 @@ não devem ser inferidas da migração de banco.
 ### P3 — hardening do Studio
 
 - manter a matriz HTTP real de seis personas como gate do Quickstart — concluído
-  no host publicado; o site estático prova author e auditor, enquanto a suíte
-  Playwright live completa continua pendente;
+  no host publicado e validado pela suíte Playwright live multi-persona (`7/7`)
+  contra Quickstart + Neon;
 - decompor o workspace em catálogo, inspeção, authoring, testes, review/publicação
-  e operação, sob uma facade/store;
-- repetir o catálogo canônico de facts e o editor tipado do beta.15 contra o
-  Quickstart/Neon publicado; JSON permanece apenas como fallback legado;
+  e operação, sob uma facade/store — concluído com `CatalogSelectionStore`,
+  `WorkspaceAuthoringFacade`, `ScenarioSandboxFacade`, `SnapshotExecutionFacade` e
+  `catalog-presentation.ts`, mantendo `CatalogWorkspaceComponent` como coordenador
+  de view/template e delegando chamadas de parâmetros e candidatos de snapshot ao
+  `DomainRuleService` de `@praxisui/core` quando disponível;
+- validar o catálogo canônico de facts (`/definitions/{id}/facts`) e o editor tipado contra o
+  Quickstart/Neon publicado, mantendo JSON estruturado para preview ou famílias sem `factCatalog` declarado — concluído;
 - manter E2E desktop/narrow, teclado, axe e regressão visual focal como gate — concluído no V62;
-- provar personas author, reviewer, operator e unauthorized.
+- provar personas author, reviewer, operator e unauthorized, além de recuperação assistida de conflito (`409` / `412` / `428`) via `reloadGovernedEvidence()` — concluído para a bateria E2E multi-persona da jornada 4-olhos (`author` -> `reviewer` -> `publisher`/`operator`) e ressincronização de revisão/ETag em `e2e/policy-studio-corporate.spec.ts`.
 
 ### P4 — authoring complexo
 
 - criar e editar RuleSet completo: identity, slots, bindings, parâmetros, reason
-  codes, dependencies, diagnostics e compilation;
+  codes, dependencies, diagnostics e compilation — concluído para o mapa estrutural e diagnóstico pré-compilação do RuleSet (`RuleSetStructuralDiagnostic`, `reasonCodes`, `parameterNames`, `hostContractVersions`, `operationalEffect`, precedência de slots e validação de composição assistida) no `SnapshotCockpitComponent`;
 - oferecer representações por intenção — tabela, árvore ou expressão — sem tornar
-  JSON bruto a unidade de negócio;
-- adicionar diff semântico, where-used e impacto antes da publicação.
+  JSON bruto a unidade de negócio — concluído em `LocalDraftWorkspaceComponent` (`tree` / Árvore visual, `table` / Tabela de decisão com `extractDecisionTableProjection` + `compileDecisionTableProjection`, e `expression` / Expressão de domínio com `formatDecisionExpression`);
+- adicionar diff semântico, where-used e impacto antes da publicação — concluído para `semanticDiff` de condições/parâmetros/efeitos operacionais e para o painel reativo de impacto e `where-used` de RuleSet (`buildRuleSetImpactSummary`) no `SnapshotCockpitComponent`.
 
 ### P5 — Policy Assistant
 
 - reutilizar runtime de IA do Config e `@praxisui/ai` — concluído para discovery e explicação;
-- discovery read-only por intenção e explicação com evidência sanitizada — concluídos;
+- discovery read-only por intenção e explicação com evidência sanitizada — concluídos, incluindo resolução e carregamento sob demanda (`loadDiscoveredCandidate`) de candidatos descobertos fora da projeção inicial sem aceitar versões obsoletas (`isStaleCandidate`);
 - catálogo canônico multi-domínio — implementado no corte beta seguinte; `projectionPath` ficou como enriquecimento opcional;
-- materializar facts, labels e evidência do catálogo semântico para eliminar o enriquecimento estático também no authoring;
-- depois propor cenários e diffs, criar/editar e submeter pela mesma API humana;
+- materializar facts, labels e evidência do catálogo semântico via endpoints canônicos (`/definitions/{id}/facts` e `/definitions/{id}/parameters`) sem fallbacks locais de extração — concluído em `ProjectionCatalogService.catalogSummary()` e `ProjectionCatalogService.parameterCatalog()`;
+- depois propor cenários e diffs, criar/editar e submeter pela mesma API humana — concluído para sugestões assistidas de cenários de teste tipados (`ALLOW` / `DENY` com `expectedReasonCodes`) em `buildSuggestedScenarioTemplates` e para propostas assistidas de diff de condição e parâmetros (`buildSuggestedDraftDiffProposals` e `[data-testid="assisted-diff-proposals"]`);
 - permitir publicação/operação apenas como comando delegado, com capability,
-  confirmação, ETag e revalidação; o agente nunca se autoaprova nem contorna SoD.
+  confirmação, ETag e revalidação; o agente nunca se autoaprova nem contorna SoD — concluído para a matriz auditável de gates de governança, SoD (4-olhos), recibo de evidência vinculado (`governance-bound-receipt`), precondições ETag (`buildGovernanceGateSummary` em `catalog-presentation.ts`), correlação causal de execução/SLO (`buildExecutionCorrelationSummary`) e execução delegada com confirmação governada explícita (`requestDelegatedGateCommand` em `CatalogWorkspaceComponent`).
 
 ## Gatilhos de release
 
@@ -257,10 +261,18 @@ validada pelo teste focal do editor e pelo Axe do Policy Studio em desktop e
 narrow. O manifesto AI e o registry não mudam: não houve alteração de API,
 configuração, JSON Logic ou operação authorable.
 
-Permanecem como gaps canônicos: publicar o catálogo de facts para todas as
-definições, separar com precisão maturidade técnica, aprovação e autoridade
-operacional, e tornar o progresso da explicação assistida observável antes do
-timeout terminal.
+A separação explícita entre maturidade técnica, estágio de aprovação em 4-olhos e
+autoridade operacional em runtime (`buildDecisionMaturityPosture` e
+`[data-testid="decision-maturity-posture"]`), a auditoria de sensibilidade e
+redaction do catálogo de fatos (`[data-testid="fact-redaction-summary"]`) e a
+observabilidade de fases intermediárias do progresso da explicação assistida antes
+do timeout terminal (`DecisionExplanationProgressPhase` e
+`[data-testid="ai-explanation-progress-phase"]`) foram concluídas no Studio.
+Definições pertencentes a famílias de regras de UI (`visual_guidance`, `form_rule`,
+`color_palette`) ou rascunhos recém-criados sem `factCatalog` retornam `facts: []`
+em `/definitions/{id}/facts` e são projetadas como `CATALOG_IDENTITY_ONLY` para
+authoring visual de condição, enquanto decisões da projeção governada exigem
+catálogo de fatos completo (`CONFIG_FACT_CATALOG_INCOMPLETE` fail-closed).
 
 ### Fluxo narrow e hierarquia de identidade
 

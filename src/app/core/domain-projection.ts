@@ -48,7 +48,15 @@ export interface ProjectionDecisionRef {
   }[];
 }
 
-export type ProjectionFactValueType = 'boolean' | 'string' | 'number' | 'date' | 'string-array' | 'date-array';
+export type ProjectionFactValueType =
+  | 'boolean'
+  | 'string'
+  | 'number'
+  | 'date'
+  | 'string-array'
+  | 'date-array'
+  | 'number-array'
+  | 'array<number>';
 
 export interface ProjectionFactSchema {
   readonly path: string;
@@ -79,13 +87,13 @@ export function validateDomainProjection(value: unknown): DomainProjection {
   const decisions = projection.decisionRefs;
   if (new Set(decisions.map(item => item.decisionKey)).size !== decisions.length) throw new Error('PROJECTION_DECISION_DUPLICATE');
   if (decisions.some((item, index) => item.order !== index + 1)) throw new Error('PROJECTION_ORDER_INVALID');
-  if (decisions.some(item => !['TECHNICAL_DRAFT_READY', 'REFERENCE_IMPLEMENTED'].includes(item.semanticStatus))) {
+  if (decisions.some(item => !['TECHNICAL_DRAFT_READY', 'REFERENCE_IMPLEMENTED', 'G4_SOURCE_CANDIDATE'].includes(item.semanticStatus))) {
     throw new Error('PROJECTION_SEMANTIC_STATUS_UNSUPPORTED');
   }
   const factPaths = projection.factSchemas.map(item => item.path);
   if (new Set(factPaths).size !== factPaths.length) throw new Error('PROJECTION_FACT_SCHEMA_DUPLICATE');
   if (projection.factSchemas.some(item => !item.presentationLabel || !item.description || !item.providerRef ||
-      !item.evidenceRefs?.length || !['boolean', 'string', 'number', 'date', 'string-array', 'date-array'].includes(item.valueType) ||
+      !item.evidenceRefs?.length || !['boolean', 'string', 'number', 'date', 'string-array', 'date-array', 'number-array', 'array<number>'].includes(item.valueType) ||
       typeof item.nullable !== 'boolean')) {
     throw new Error('PROJECTION_FACT_SCHEMA_INVALID');
   }

@@ -19,8 +19,13 @@
 
     @switch (state().kind) {
       @case ('progress') {
-        <div class="progress" role="status" aria-live="polite">
+        <div class="progress" role="status" aria-live="polite" data-testid="ai-explanation-progress">
           <p>{{ i18n.text('explainingDecision') }}</p>
+          @if (progressPhaseLabel(state()); as phaseText) {
+            <small data-testid="ai-explanation-progress-phase">
+              {{ phaseText }}@if ($any(state()).eventSeq) { · #{{ $any(state()).eventSeq }} }
+            </small>
+          }
           <button type="button" class="quiet-button" (click)="cancel()">{{ i18n.text('cancelAiExplanation') }}</button>
         </div>
       }

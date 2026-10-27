@@ -7,9 +7,13 @@ export interface SemanticDecisionDiff {
   candidate: unknown;
 }
 
-export function semanticDecisionDiff(baseline: unknown, candidate: unknown): readonly SemanticDecisionDiff[] {
+export function semanticDecisionDiff(
+  baseline: unknown,
+  candidate: unknown,
+  rootPath = '$'
+): readonly SemanticDecisionDiff[] {
   const changes: SemanticDecisionDiff[] = [];
-  compare(baseline, candidate, '$', changes);
+  compare(baseline, candidate, rootPath, changes);
   return changes;
 }
 

@@ -302,4 +302,199 @@
     <small>{{ i18n.text('snapshotCompositionBoundary') }}</small>
     <small>{{ i18n.text('hostTelemetryBoundary') }}</small>
   </div>
+  <section class="snapshot-composition" data-testid="snapshot-composition-section">
+    <header>
+      <button
+        type="button"
+        class="quiet-button"
+        data-testid="toggle-snapshot-composition"
+        [disabled]="busy()"
+        (click)="compositionOpen.update(v => !v)">
+        {{ compositionOpen() ? i18n.text('closeSnapshotComposition') : i18n.text('composeSnapshotCandidate') }}
+      </button>
+    </header>
+    @if (compositionOpen()) {
+      <div class="rollout-policy-form" data-testid="snapshot-composition-form">
+        @if (eligibleSources().length) {
+          <fieldset class="eligible-sources-fieldset" data-testid="snapshot-eligible-sources">
+            <legend>{{ i18n.text('snapshotEligibleSources') }}</legend>
+            @for (candidate of eligibleSources(); track candidate.definitionId) {
+              <label class="checkbox-field">
+                <input
+                  type="radio"
+                  name="snapshot-promoted-source"
+                  [attr.data-testid]="'snapshot-source-candidate-' + candidate.ruleKey"
+                  [checked]="effectivePromotedDefinitionId() === candidate.definitionId"
+                  (change)="selectSourceCandidate(candidate)" />
+                <span>{{ candidate.name }} (<code>{{ candidate.ruleKey }}</code> · v{{ candidate.version }} · {{ candidate.status }})</span>
+              </label>
+            }
+          </fieldset>
+        } @else {
+          <small class="empty">{{ i18n.text('noEligibleSnapshotSources') }}</small>
+        }
+        <label>
+          <span>{{ i18n.text('snapshotPromotedDefinition') }}</span>
+          <input
+            #compPromotedId
+            type="text"
+            data-testid="snapshot-promoted-definition"
+            [value]="effectivePromotedDefinitionId()"
+            (input)="updatePromotedDefinitionId(compPromotedId.value)" />
+        </label>
+        <label>
+          <span>{{ i18n.text('snapshotValidFromUtc') }}</span>
+          <input
+            #compValidFrom
+            type="text"
+            data-testid="snapshot-composition-valid-from"
+            value="2026-08-14T00:00:00Z"
+            (input)="notifyCompositionDraftChanged()" />
+        </label>
+        <label>
+          <span>{{ i18n.text('snapshotValidUntilUtc') }}</span>
+          <input
+            #compValidUntil
+            type="text"
+            data-testid="snapshot-composition-valid-until"
+            placeholder="2026-12-31T23:59:59Z"
+            (input)="notifyCompositionDraftChanged()" />
+        </label>
+        @if (compositionInputError()) {
+          <p class="empty state-message" role="alert">{{ i18n.text('invalidSnapshotComposition') }}</p>
+        }
+        @if (impactSummary(); as impact) {
+          <div class="candidate-sources candidate-impact" data-testid="snapshot-impact-summary">
+            <strong>{{ i18n.text('snapshotImpactTitle') }}</strong>
+            <dl class="facts">
+              @if (impact.affectedSurfaces.length) {
+                <div>
+                  <dt>{{ i18n.text('snapshotAffectedSurfaces') }}</dt>
+                  <dd data-testid="snapshot-impact-surfaces"><code>{{ impact.affectedSurfaces.join(', ') }}</code></dd>
+                </div>
+              }
+              @if (impact.affectedOperations.length) {
+                <div>
+                  <dt>{{ i18n.text('snapshotAffectedOperations') }}</dt>
+                  <dd data-testid="snapshot-impact-operations"><code>{{ impact.affectedOperations.join(', ') }}</code></dd>
+                </div>
+              }
+              @if (impact.reasonCodes.length) {
+                <div>
+                  <dt>{{ i18n.text('snapshotReasonCodes') }}</dt>
+                  <dd data-testid="snapshot-impact-reason-codes"><code>{{ impact.reasonCodes.join(', ') }}</code></dd>
+                </div>
+              }
+              @if (impact.parameterNames.length) {
+                <div>
+                  <dt>{{ i18n.text('snapshotParametersSummary') }}</dt>
+                  <dd data-testid="snapshot-impact-parameters"><code>{{ impact.parameterNames.join(', ') }}</code></dd>
+                </div>
+              }
+            </dl>
+            @if (impact.sharedFacts.length) {
+              <div>
+                <small><strong>{{ i18n.text('snapshotSharedFacts') }}:</strong></small>
+                <ul data-testid="snapshot-impact-shared-facts">
+                  @for (shared of impact.sharedFacts; track shared.path) {
+                    <li>
+                      <code>{{ shared.path }}</code> → {{ shared.usedByRuleKeys.join(', ') }}
+                    </li>
+                  }
+                </ul>
+              </div>
+            }
+            <div>
+              <small><strong>{{ i18n.text('snapshotPeerDecisions') }} ({{ impact.peerDecisions.length }}):</strong></small>
+              <ul data-testid="snapshot-impact-peers">
+                @for (peer of impact.peerDecisions; track peer.key) {
+                  <li>
+                    <strong>#{{ peer.order }} {{ peer.name }}</strong> (<code>{{ peer.key }}</code> · <code>{{ peer.code }}</code> · v{{ peer.candidateVersion ?? peer.version }})
+                    · <span>{{ peer.role === 'PROMOTED_TARGET' ? i18n.text('snapshotPromotedSlotRole') : i18n.text('snapshotPeerSlotRole') }}</span>
+                    @if (peer.operationalEffect) {
+                      · <code>{{ peer.operationalEffect }}</code>
+                    }
+                    @if (peer.parameterNames.length) {
+                      · <small>{{ i18n.text('snapshotPeerParamsLabel') }}: <code>{{ peer.parameterNames.join(', ') }}</code></small>
+                    }
+                    @if (peer.sharedFactPaths.length && peer.role === 'PEER_SLOT') {
+                      · <small>{{ i18n.text('snapshotPeerSharedFactsLabel') }}: <code>{{ peer.sharedFactPaths.join(', ') }}</code></small>
+                    }
+                  </li>
+                }
+              </ul>
+            </div>
+            @if (impact.diagnostics.length) {
+              <div data-testid="snapshot-impact-diagnostics">
+                <small><strong>{{ i18n.text('snapshotStructuralDiagnostics') }} ({{ impact.diagnostics.length }}):</strong></small>
+                <ul>
+                  @for (diag of impact.diagnostics; track diag.code + ':' + diag.detail) {
+                    <li>
+                      <code>[{{ diag.severity }} · {{ diag.code }}]</code> {{ diag.detail }}
+                    </li>
+                  }
+                </ul>
+              </div>
+            }
+            @if (impact.unpromotedDraftPeers.length) {
+              <p class="state-message" role="status" data-testid="snapshot-impact-unpromoted-warning">
+                {{ i18n.text('snapshotUnpromotedDraftsWarning') }} <code>{{ impact.unpromotedDraftPeers.join(', ') }}</code>
+              </p>
+            }
+          </div>
+        }
+        @if (compositionCandidate(); as candidate) {
+          <dl class="facts snapshot-head snapshot-candidate-summary" data-testid="snapshot-candidate-summary">
+            <div><dt>{{ i18n.text('ruleSetVersion') }}</dt><dd>v{{ candidate.ruleSetVersion }}</dd></div>
+            <div><dt>{{ i18n.text('contentHash') }}</dt><dd data-testid="snapshot-composition-digest"><code>{{ candidate.compositionDigest }}</code></dd></div>
+            <div><dt>{{ i18n.text('snapshotCatalogDigest') }}</dt><dd><code>{{ candidate.implementationCatalogDigest }}</code></dd></div>
+            <div><dt>{{ i18n.text('headEtag') }}</dt><dd><code>{{ candidate.currentHeadEtag ?? 'If-None-Match: *' }}</code></dd></div>
+            <div><dt>{{ i18n.text('snapshotAuthorizedActions') }}</dt><dd><code data-testid="snapshot-authorized-actions">{{ candidate.authorizedActions.join(', ') || 'NONE' }}</code></dd></div>
+          </dl>
+          @if (candidate.sources.length) {
+            <div class="candidate-sources" data-testid="snapshot-candidate-sources">
+              <strong>{{ i18n.text('snapshotCandidateSources') }}</strong>
+              <ul>
+                @for (source of candidate.sources; track source.definitionId) {
+                  <li>
+                    <code>{{ source.ruleKey }}</code> · v{{ source.version }}@if (source.status) { ({{ source.status }}) } · <small>{{ source.definitionId }}</small>
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+          <small class="authority-note" data-testid="snapshot-sod-notice">{{ i18n.text('snapshotSodNotice') }}</small>
+        }
+        @if (compositionApproval(); as approval) {
+          <small data-testid="snapshot-composition-approval">Approval: <code>{{ approval.approvalKey }}</code> ({{ approval.actorRef }} · {{ approval.role }})</small>
+        }
+        @if (compositionPublication(); as publication) {
+          <small data-testid="snapshot-composition-publication">Snapshot: <code>{{ publication.snapshotKey }}</code> (v{{ publication.ruleSetVersion }} · <code>{{ publication.snapshotContentHash }}</code>)</small>
+        }
+        <div class="rollout-actions">
+          <button
+            type="button"
+            data-testid="prepare-snapshot-composition"
+            [disabled]="busy()"
+            (click)="submitComposition('PREPARE', compPromotedId.value, compValidFrom.value, compValidUntil.value)">
+            {{ i18n.text('prepareComposition') }}
+          </button>
+          <button
+            type="button"
+            data-testid="approve-snapshot-composition"
+            [disabled]="busy() || !canApproveCandidate()"
+            (click)="submitComposition('APPROVE', compPromotedId.value, compValidFrom.value, compValidUntil.value)">
+            {{ i18n.text('approveComposition') }}
+          </button>
+          <button
+            type="button"
+            data-testid="publish-snapshot-composition"
+            [disabled]="busy() || !canPublishCandidate()"
+            (click)="submitComposition('PUBLISH', compPromotedId.value, compValidFrom.value, compValidUntil.value)">
+            {{ i18n.text('publishCandidateSnapshot') }}
+          </button>
+        </div>
+      </div>
+    }
+  </section>
 </section>

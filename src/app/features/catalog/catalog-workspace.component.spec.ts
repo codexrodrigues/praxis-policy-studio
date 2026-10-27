@@ -11,6 +11,10 @@ import { PolicyStudioI18n } from '../../core/i18n';
 import { ProjectionCatalogService } from '../../core/projection-catalog.service';
 import { RuntimeConfigService } from '../../core/runtime-config.service';
 import type { DecisionLifecycleSummary, DecisionSummary } from './catalog.fixture';
+import { CatalogSelectionStore } from './catalog-selection.store';
+import { ScenarioSandboxFacade } from './scenario-sandbox.facade';
+import { SnapshotExecutionFacade } from './snapshot-execution.facade';
+import { WorkspaceAuthoringFacade } from './workspace-authoring.facade';
 import { CatalogWorkspaceComponent } from './catalog-workspace.component';
 
 TestBed.initTestEnvironment(BrowserTestingModule, platformBrowserTesting());
@@ -54,6 +58,14 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
   const reviews = { A: [] as Subject<any>[], B: [] as Subject<any>[] };
   const capabilities = { A: [] as Subject<any>[], B: [] as Subject<any>[] };
   const createWorkspace = vi.fn();
+  const saveWorkspaceDraft = vi.fn();
+  const createDefinition = vi.fn();
+  const prepareRuleSetCandidate = vi.fn();
+  const approveRuleSetCandidate = vi.fn();
+  const publishRuleSetCandidate = vi.fn();
+  const overlayParameterCatalog = vi.fn((catalog: any, params: any) => catalog);
+  const loadCatalog = vi.fn();
+  const snapshotCockpit = vi.fn();
   const createScenario = vi.fn();
   const updateScenario = vi.fn();
   const reviewWorkspace = vi.fn();
@@ -88,6 +100,14 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
       return subject.asObservable();
     });
     createWorkspace.mockReset();
+    saveWorkspaceDraft.mockReset();
+    createDefinition.mockReset();
+    prepareRuleSetCandidate.mockReset();
+    approveRuleSetCandidate.mockReset();
+    publishRuleSetCandidate.mockReset();
+    overlayParameterCatalog.mockClear();
+    loadCatalog.mockReset();
+    snapshotCockpit.mockReset();
     createScenario.mockReset();
     updateScenario.mockReset();
     reviewWorkspace.mockReset();
@@ -102,6 +122,8 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     logoutSession.mockReturnValue(logoutResult.asObservable());
     operationalTestAction.mockReturnValue(of(null));
     cancelRollout.mockReturnValue(of(void 0));
+    loadCatalog.mockReturnValue(of([]));
+    snapshotCockpit.mockReturnValue(of({ head: null, versions: [] }));
     createWorkspace.mockReturnValue(of({
       id: 'workspace-A', ruleKey: 'A', status: 'OPEN', etag: 'etag-new', revision: 1,
       parameters: {}
@@ -112,10 +134,21 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     });
     TestBed.configureTestingModule({ providers: [
       PolicyStudioI18n,
+      CatalogSelectionStore,
+      SnapshotExecutionFacade,
+      ScenarioSandboxFacade,
+      WorkspaceAuthoringFacade,
       { provide: ElementRef, useValue: new ElementRef(document.createElement('div')) },
       { provide: AuthSessionService, useValue: { logout: logoutSession } },
       { provide: RuntimeConfigService, useValue: { state: () => ({ kind: 'ready', config }), mode: () => 'fixture' } },
       { provide: ProjectionCatalogService, useValue: {
+        load: loadCatalog,
+        snapshotCockpit,
+        rolloutPolicyCatalog: () => of({ ruleSetKey: 'test-rules', headEtag: null, activePolicy: null, versions: [], availableActions: [] }),
+        rolloutPolicyTimeline: () => of([]),
+        rolloutCatalog: () => of({ ruleSetKey: 'test-rules', rollouts: [], availableActions: [] }),
+        hostStatusSummary: () => of(null),
+        executionSummary: () => of(null),
         timeline: (id: string) => stream(timelines, id),
         lifecycle: (id: string) => stream(lifecycles, id),
         scenarios: (id: string) => stream(scenarios, id),
@@ -124,6 +157,12 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
         operationalTestAction,
         runOperationalTest,
         createWorkspace,
+        saveWorkspaceDraft,
+        createDefinition,
+        prepareRuleSetCandidate,
+        approveRuleSetCandidate,
+        publishRuleSetCandidate,
+        overlayParameterCatalog,
         createScenario,
         updateScenario,
         reviewWorkspace,
@@ -936,9 +975,13 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
       condition: { '<=': [{ var: 'amount' }, 3000] },
       workspaceCondition: { '<=': [{ var: 'amount' }, 2900] }
     });
+    expect(component.draftCondition()).toEqual({ '<=': [{ var: 'amount' }, 2900] });
+    expect(component.draftChanged()).toBe(false);
+
     component.authoringOpen.set(true);
     component.draftCondition.set({ '<=': [{ var: 'amount' }, 2750] });
 
+    expect(component.draftChanged()).toBe(true);
     expect(component.semanticDiff()).toContainEqual(expect.objectContaining({
       path: '$.<=[1]', baseline: 3000, candidate: 2750
     }));
@@ -987,5 +1030,613 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
       scenarioKey: 'update-denied',
       evidence: expect.objectContaining({ operationMode: 'UPDATE', noMutationVerified: true })
     })]);
+  });
+
+  it('authors governed template parameters and explicit operational policy effect with semantic diff', () => {
+    const parameterizedDecision: DecisionSummary = {
+      ...decision('A'),
+      parameters: {
+        parameterValues: { maxRetroactiveDays: 30 },
+        validationPolicy: { effect: 'BLOCK', message: 'Limit exceeded' }
+      },
+      workspaceParameters: {
+        parameterValues: { maxRetroactiveDays: 30 },
+        validationPolicy: { effect: 'BLOCK', message: 'Limit exceeded' }
+      },
+      parameterCatalog: {
+        definitionId: 'definition-A',
+        ruleKey: 'A',
+        version: 1,
+        schemaVersion: 'praxis.domain-rule-parameter-catalog.v1',
+        templateKey: 'hr.retroactive.template',
+        templateVersion: '1.0.0',
+        parameters: [{
+          name: 'maxRetroactiveDays',
+          type: 'INTEGER',
+          required: true,
+          nullable: false,
+          readOnly: false,
+          defaultValue: 30,
+          declaredValue: 30,
+          effectiveValue: 30,
+          minimum: 1,
+          maximum: 365
+        }]
+      }
+    };
+    component.select(parameterizedDecision);
+    capabilities.A[0].next({
+      workspaceId: 'workspace-A', availableActions: ['VIEW', 'UPDATE_DRAFT'], blockers: []
+    });
+
+    component.openAuthoring();
+    expect(component.authoringOpen()).toBe(true);
+
+    component.updateDraftParameters({
+      parameterValues: { maxRetroactiveDays: 45 },
+      validationPolicy: { effect: 'BLOCK', message: 'Threshold exceeded' }
+    });
+    expect(component.draftChanged()).toBe(true);
+    expect(component.semanticDiff()).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        path: '$.parameters.parameterValues.maxRetroactiveDays',
+        baseline: 30,
+        candidate: 45
+      })
+    ]));
+
+    component.parameterValidationErrors.set(['maxRetroactiveDays:max:365']);
+    component.saveGovernedDraft();
+    expect(saveWorkspaceDraft).not.toHaveBeenCalled();
+
+    component.parameterValidationErrors.set([]);
+    saveWorkspaceDraft.mockReturnValue(of({
+      id: 'workspace-A',
+      ruleKey: 'A',
+      status: 'OPEN',
+      etag: 'etag-updated',
+      revision: 2,
+      condition: { '<=': [{ var: 'retroactiveDays' }, 45] },
+      parameters: {
+        parameterValues: { maxRetroactiveDays: 45 },
+        validationPolicy: { effect: 'BLOCK', message: 'Threshold exceeded' }
+      }
+    }));
+
+    component.saveGovernedDraft();
+    expect(saveWorkspaceDraft).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'workspace-A',
+        etag: 'etag-A',
+        parameters: {
+          parameterValues: { maxRetroactiveDays: 45 },
+          validationPolicy: { effect: 'BLOCK', message: 'Threshold exceeded' }
+        }
+      }),
+      null,
+      config,
+      {
+        parameterValues: { maxRetroactiveDays: 45 },
+        validationPolicy: { effect: 'BLOCK', message: 'Threshold exceeded' }
+      }
+    );
+
+    component.updateDraftParameters({
+      validationPolicy: { effect: 'ALLOW' }
+    });
+    expect(component.draftCondition()).toBeNull();
+  });
+
+  it('registers a new governed decision and prepares, approves, and publishes a candidate snapshot in remote mode', () => {
+    const remoteConfig = {
+      ...config,
+      mode: 'remote' as const,
+      configApiBaseUrl: 'http://localhost:8088'
+    };
+    vi.spyOn(component.runtime, 'state').mockReturnValue({ kind: 'ready', config: remoteConfig });
+    const createdDecision = decision('procurement.po_approval.urgent_override');
+    createDefinition.mockReturnValue(of({
+      id: 'def-urgent',
+      ruleKey: 'procurement.po_approval.urgent_override',
+      version: 1,
+      status: 'draft'
+    }));
+    loadCatalog.mockReturnValue(of([createdDecision]));
+
+    component.createGovernedDecision({
+      ruleKey: 'procurement.po_approval.urgent_override',
+      version: 1,
+      ruleType: 'approval_policy',
+      status: 'draft',
+      contextKey: 'procurement',
+      resourceKey: 'procurement.purchase-orders',
+      serviceKey: 'procurement-service',
+      parameters: { approvalPolicy: { effect: 'BLOCK' } }
+    });
+
+    expect(createDefinition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ruleKey: 'procurement.po_approval.urgent_override',
+        ruleType: 'approval_policy'
+      }),
+      remoteConfig
+    );
+    expect(component.selected()?.key).toBe('procurement.po_approval.urgent_override');
+
+    const candidateRequest = {
+      promotedDefinitionId: 'def-urgent',
+      validFromUtc: '2026-08-14T00:00:00Z',
+      validUntilUtc: null
+    };
+    prepareRuleSetCandidate.mockReturnValue(of({
+      ruleSetKey: 'test-rules',
+      ruleSetVersion: 2,
+      compositionDigest: 'sha256:comp-urgent',
+      implementationCatalogDigest: 'sha256:impl-1',
+      currentHeadEtag: '"head-1"',
+      sources: [{ ruleKey: 'procurement.po_approval.urgent_override', definitionId: 'def-urgent', version: 1 }],
+      authorizedActions: ['PREPARE', 'APPROVE', 'PUBLISH']
+    }));
+    component.prepareSnapshotComposition(candidateRequest);
+    expect(component.compositionCandidate()?.compositionDigest).toBe('sha256:comp-urgent');
+
+    const candidateCommand = {
+      ...candidateRequest,
+      expectedCompositionDigest: 'sha256:comp-urgent'
+    };
+    approveRuleSetCandidate.mockReturnValue(of({
+      approvalKey: 'approval-1',
+      role: 'checker',
+      actorRef: 'checker-1',
+      decidedAtUtc: '2026-08-14T00:01:00Z',
+      evidenceHash: 'sha256:ev-1'
+    }));
+    component.approveSnapshotComposition(candidateCommand);
+    expect(component.compositionApproval()?.approvalKey).toBe('approval-1');
+
+    publishRuleSetCandidate.mockReturnValue(of({
+      snapshotKey: 'snap-urgent-2',
+      ruleSetKey: 'test-rules',
+      ruleSetVersion: 2,
+      snapshotContentHash: 'sha256:snap-urgent-2'
+    }));
+    component.publishSnapshotComposition(candidateCommand);
+    expect(publishRuleSetCandidate).toHaveBeenCalledWith(
+      'test-rules',
+      expect.objectContaining({ expectedCompositionDigest: 'sha256:comp-urgent' }),
+      '"head-1"',
+      remoteConfig
+    );
+    expect(component.compositionPublication()?.snapshotKey).toBe('snap-urgent-2');
+
+    // Verify 409 STALE_RULESET_CANDIDATE invalidates candidate and surfaces explicit corporate notice
+    const staleStream = new Subject<any>();
+    publishRuleSetCandidate.mockReturnValueOnce(staleStream.asObservable());
+    component.publishSnapshotComposition(candidateCommand);
+    staleStream.error(new HttpErrorResponse({
+      status: 409,
+      error: { code: 'STALE_RULESET_CANDIDATE', message: 'RuleSet candidate changed' }
+    }));
+    expect(component.compositionCandidate()).toBeNull();
+    expect(component.snapshotFeedback()).toContain('Prepare um novo candidato');
+
+    component.invalidateSnapshotCompositionDraft();
+    expect(component.compositionCandidate()).toBeNull();
+    expect(component.compositionApproval()).toBeNull();
+    expect(component.compositionPublication()).toBeNull();
+    expect(component.eligibleSnapshotSources()).toEqual([
+      expect.objectContaining({
+        definitionId: 'definition-procurement.po_approval.urgent_override',
+        ruleKey: 'procurement.po_approval.urgent_override'
+      })
+    ]);
+
+    // Verify unpromoted draft definitions are excluded from eligibleSnapshotSources until promoted
+    const draftDecision: DecisionSummary = {
+      ...decision('procurement.po_approval.draft_only'),
+      configStatus: 'draft',
+      promotedDefinitionId: null
+    };
+    const promotedDecision: DecisionSummary = {
+      ...decision('procurement.po_approval.promoted_ready'),
+      configStatus: 'draft',
+      promotedDefinitionId: 'def-promoted-ready'
+    };
+    component.allDecisions.set([draftDecision, promotedDecision]);
+    component.selected.set(draftDecision);
+    expect(component.eligibleSnapshotSources().map(item => item.definitionId)).toEqual(['def-promoted-ready']);
+    expect(component.eligibleSnapshotSources()[0]?.status).toBe('approved');
+    expect(component.defaultSnapshotSourceDefinitionId()).toBe('def-promoted-ready');
+
+    // Verify 428 Precondition Required reloads snapshots and surfaces conflict message
+    const preconditionStream = new Subject<any>();
+    publishRuleSetCandidate.mockReturnValueOnce(preconditionStream.asObservable());
+    component.publishSnapshotComposition(candidateCommand);
+    preconditionStream.error(new HttpErrorResponse({
+      status: 428,
+      error: { code: 'PRECONDITION_REQUIRED', message: 'If-Match is required' }
+    }));
+    expect(component.snapshotFeedbackError()).toBe(true);
+
+    // Verify synchronous ETag validation throw resets snapshotBusy cleanly
+    publishRuleSetCandidate.mockImplementationOnce(() => {
+      throw new Error('Weak ETag is not allowed for candidate head precondition');
+    });
+    component.publishSnapshotComposition(candidateCommand);
+    expect(component.snapshotBusy()).toBe(false);
+    expect(component.snapshotFeedbackError()).toBe(true);
+
+    // Verify 401 Unauthorized expires session and flags authenticationRequired
+    const unauthorizedStream = new Subject<any>();
+    publishRuleSetCandidate.mockReturnValueOnce(unauthorizedStream.asObservable());
+    component.publishSnapshotComposition(candidateCommand);
+    unauthorizedStream.error(new HttpErrorResponse({ status: 401 }));
+    expect(component.snapshotBusy()).toBe(false);
+    expect(component.sessionActive()).toBe(false);
+    expect(component.authenticationRequired()).toBe(true);
+  });
+
+  it('recovers from 409/412 concurrency conflict by reloading governed evidence and projects governance gate matrix', () => {
+    const initialDecision: DecisionSummary = {
+      ...decision('A'),
+      workspaceStatus: 'OPEN',
+      workspaceRevision: 1,
+      workspaceEtag: 'W/"ws-rev-1"'
+    };
+    const refreshedDecision: DecisionSummary = {
+      ...initialDecision,
+      workspaceStatus: 'SUBMITTED',
+      workspaceRevision: 2,
+      workspaceEtag: 'W/"ws-rev-2"',
+      promotedDefinitionId: 'def-promoted-2',
+      availableDefinitionActions: ['PUBLISH']
+    };
+
+    component.select(initialDecision);
+    capabilities.A[0].next({
+      workspaceId: 'workspace-A',
+      workspaceStatus: 'OPEN',
+      workspaceRevision: 1,
+      availableActions: ['VIEW', 'UPDATE_DRAFT', 'SUBMIT'],
+      blockers: []
+    });
+
+    component.openAuthoring();
+    component.updateDraft({ '===': [2, 2] });
+    const conflictStream = new Subject<any>();
+    saveWorkspaceDraft.mockReturnValueOnce(conflictStream.asObservable());
+    component.saveGovernedDraft();
+    conflictStream.error(new HttpErrorResponse({ status: 412, statusText: 'Precondition Failed' }));
+
+    expect(component.authoringError()).toBe(true);
+    expect(component.authoringConflict()).toBe(true);
+    expect(component.authoringFeedback()).toContain('Recarregue as evidências');
+
+    component.activeMode.set('operate');
+    loadCatalog.mockReturnValueOnce(of([refreshedDecision]));
+    snapshotCockpit.mockReturnValueOnce(of({
+      head: {
+        ruleSetKey: 'test-rules',
+        activeSnapshotKey: 'snap-1',
+        headEtag: '"head-etag-2"'
+      },
+      versions: []
+    }));
+    vi.spyOn(component.runtime, 'state').mockReturnValue({
+      kind: 'ready',
+      config: { ...config, mode: 'remote', configApiBaseUrl: 'http://localhost:8088' }
+    });
+
+    component.reloadGovernedEvidence();
+    reviews.A[1].next([{
+      id: 'rev-1',
+      workspaceId: 'workspace-A',
+      workspaceRevision: 2,
+      reviewerRef: 'checker-1',
+      decision: 'APPROVE',
+      rationale: 'Aprovado em 4-olhos.',
+      reviewedAt: '2026-08-14T10:00:00Z'
+    }]);
+    capabilities.A[1].next({
+      workspaceId: 'workspace-A',
+      workspaceStatus: 'SUBMITTED',
+      workspaceRevision: 2,
+      availableActions: ['VIEW', 'REVIEW', 'PROMOTE'],
+      blockers: [{ action: 'SUBMIT', code: 'CURRENT_PASSING_TEST_RUN_REQUIRED' }]
+    });
+
+    expect(component.authoringConflict()).toBe(false);
+    expect(component.authoringError()).toBe(false);
+    expect(component.activeMode()).toBe('operate');
+    expect(component.selected()?.workspaceEtag).toBe('W/"ws-rev-2"');
+    expect(component.selected()?.workspaceRevision).toBe(2);
+    expect(component.authoringFeedback()).toContain('Evidências governadas, revisão e ETag ressincronizados');
+
+    const gateSummary = component.governanceGateSummary();
+    expect(gateSummary?.workspaceEtag).toBe('W/"ws-rev-2"');
+    expect(gateSummary?.snapshotHeadEtag).toBe('"head-etag-2"');
+    expect(gateSummary?.gates.find(gate => gate.id === 'SUBMIT')?.allowed).toBe(false);
+    expect(gateSummary?.gates.find(gate => gate.id === 'SUBMIT')?.blockerCodes).toEqual(['CURRENT_PASSING_TEST_RUN_REQUIRED']);
+    expect(gateSummary?.gates.find(gate => gate.id === 'REVIEW')?.allowed).toBe(true);
+    expect(gateSummary?.gates.find(gate => gate.id === 'PROMOTE')?.allowed).toBe(true);
+    expect(gateSummary?.gates.find(gate => gate.id === 'PUBLISH_DEFINITION')?.allowed).toBe(true);
+    expect(gateSummary?.gates.find(gate => gate.id === 'OPERATE_SNAPSHOT')?.allowed).toBe(true);
+    expect(gateSummary?.gates.find(gate => gate.id === 'REVIEW')?.reviewerRefs).toEqual(['checker-1']);
+
+    const posture = component.maturityPosture();
+    expect(posture?.technicalMaturity).toBe('STRUCTURAL_VERIFIED');
+    expect(posture?.approvalStage).toBe('PROMOTED_READY');
+    expect(posture?.operationalAuthority).toBe('CONFIG_ACTIVE_SNAPSHOT');
+    expect(posture?.activeSnapshotKey).toBe('snap-1');
+  });
+
+  it('generates and applies assisted draft diff proposals for numeric conditions and governed parameters', () => {
+    const parameterizedDecision: DecisionSummary = {
+      ...decision('A'),
+      condition: { '<=': [{ var: 'request.requestedAmount' }, 3000] },
+      workspaceCondition: { '<=': [{ var: 'request.requestedAmount' }, 3000] },
+      parameters: { parameterValues: { maxRetroactiveDays: 30 } },
+      workspaceParameters: { parameterValues: { maxRetroactiveDays: 30 } },
+      parameterCatalog: {
+        definitionId: 'definition-A',
+        ruleKey: 'A',
+        version: 1,
+        schemaVersion: 'praxis.domain-rule-parameter-catalog.v1',
+        templateKey: 'hr.retroactive.template',
+        templateVersion: '1.0.0',
+        parameters: [{
+          name: 'maxRetroactiveDays',
+          type: 'INTEGER',
+          required: true,
+          nullable: false,
+          readOnly: false,
+          defaultValue: 30,
+          declaredValue: 30,
+          effectiveValue: 30,
+          minimum: 1,
+          maximum: 365
+        }]
+      }
+    };
+
+    component.select(parameterizedDecision);
+    capabilities.A[0].next({
+      workspaceId: 'workspace-A',
+      availableActions: ['VIEW', 'UPDATE_DRAFT'],
+      blockers: []
+    });
+    component.openAuthoring();
+
+    const proposals = component.suggestedDiffProposals();
+    expect(proposals.map(item => item.id)).toEqual([
+      'RELAX_THRESHOLD_10',
+      'TIGHTEN_THRESHOLD_10',
+      'PARAM_maxRetroactiveDays'
+    ]);
+
+    component.applyDiffProposal(proposals[0]);
+    expect(component.draftCondition()).toEqual({ '<=': [{ var: 'request.requestedAmount' }, 3300] });
+    expect(component.draftChanged()).toBe(true);
+
+    component.applyDiffProposal(proposals[2]);
+    expect(component.draftParameters()).toEqual({
+      parameterValues: { maxRetroactiveDays: 33 }
+    });
+  });
+
+  it('computes causal execution correlation with SLO posture and requires governed confirmation for delegated gate commands', () => {
+    component.select({
+      ...decision('A'),
+      workspaceStatus: 'APPROVED',
+      workspaceEtag: 'W/"ws-rev-3"',
+      promotedDefinitionId: 'definition-A-v2',
+      availableDefinitionActions: ['PUBLISH']
+    });
+    capabilities.A[0].next({
+      workspaceId: 'workspace-A',
+      workspaceStatus: 'APPROVED',
+      workspaceRevision: 3,
+      availableActions: ['VIEW', 'PROMOTE'],
+      blockers: []
+    });
+    component.lifecycle.set({
+      workspaceStatus: 'APPROVED',
+      workspaceRevision: 3,
+      testRunCount: 1,
+      reviewCount: 1,
+      materializationCount: 0,
+      promotedDefinitionId: 'definition-A-v2',
+      submittedTestRunId: 'test-run-verified-1',
+      latestTestRun: {
+        runId: 'test-run-verified-1',
+        workspaceId: 'workspace-A',
+        workspaceRevision: 3,
+        status: 'PASSED',
+        baselineEvidence: {
+          authorityType: 'ACTIVE_SNAPSHOT',
+          eligibility: 'ELIGIBLE',
+          observedAtUtc: '2026-08-18T10:00:00Z',
+          artifactRef: 'config://snapshot/snap-1',
+          artifactDigest: 'sha256:1234567890abcdef'
+        },
+        results: []
+      } as unknown as import('@praxisui/core').DomainRuleTestRun
+    });
+    component.snapshotHead.set({
+      ruleSetKey: 'benefit-rules',
+      activeSnapshotKey: 'snap-1',
+      ruleSetVersion: 2,
+      publicationRevision: 4,
+      activationRevision: 2,
+      executionReady: true,
+      governanceState: 'READY',
+      headEtag: '"head-etag-3"'
+    });
+    component.executionSummary.set({
+      ruleSetKey: 'benefit-rules',
+      snapshotKey: 'snap-1',
+      snapshotContentHash: 'A'.repeat(64),
+      ruleSetVersion: 2,
+      totalObservations: 100,
+      distinctHosts: 2,
+      outcomeCounts: {
+        ALLOW: 80,
+        DENY: 20,
+        NOT_APPLICABLE: 0,
+        INCONCLUSIVE: 0,
+        TECHNICAL_ERROR: 0
+      },
+      firstObservedAtUtc: '2026-08-18T10:00:00Z',
+      lastObservedAtUtc: '2026-08-18T11:00:00Z'
+    });
+    component.hostStatusSummary.set({
+      ruleSetKey: 'benefit-rules',
+      expectedSnapshotKey: 'snap-1',
+      expectedSnapshotContentHash: 'A'.repeat(64),
+      expectedActivationRevision: 2,
+      expectedHostContractVersion: 'quickstart/1.0',
+      expectedEngineContractVersion: '1.4',
+      expectedJsonLogicDialectVersion: 'praxis-json-logic/1.0',
+      expectedJsonLogicCorpusSha256: 'B'.repeat(64),
+      expectedImplementationCatalogDigest: 'C'.repeat(64),
+      totalHosts: 2,
+      alignedHosts: 2,
+      snapshotDriftedHosts: 0,
+      incompatibleHosts: 0,
+      unavailableHosts: 0,
+      staleHosts: 0,
+      lastObservedAtUtc: '2026-08-18T11:00:00Z',
+      staleBeforeUtc: '2026-08-18T10:55:00Z'
+    });
+
+    const correlation = component.executionCorrelation();
+    expect(correlation?.sloPosture).toBe('HEALTHY');
+    expect(correlation?.successRatioPercent).toBe(100);
+    expect(correlation?.alignedHosts).toBe(2);
+    expect(correlation?.totalHosts).toBe(2);
+    expect(correlation?.boundTestRunId).toBe('test-run-verified-1');
+    expect(correlation?.evidenceEligibility).toBe('ELIGIBLE');
+    expect(correlation?.causalState).toBe('HEALTHY');
+
+    const promoteSpy = vi.spyOn(component, 'promoteGovernedWorkspace').mockImplementation(() => {});
+    component.requestDelegatedGateCommand('PROMOTE');
+    expect(component.governedConfirmation()?.target).toBe('A · W/"ws-rev-3"');
+    expect(promoteSpy).not.toHaveBeenCalled();
+
+    component.confirmGovernedOperation();
+    expect(promoteSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('hydrates deferred catalog candidates on demand when selected', () => {
+    const deferredDecision: DecisionSummary = {
+      ...decision('deferred.rule'),
+      order: 5,
+      configDefinitionId: 'def-deferred-5',
+      configVersion: 2,
+      configStatus: 'draft',
+      detailHydrated: false,
+      authoringSupported: false,
+      condition: null,
+      facts: []
+    };
+    const hydratedDecision: DecisionSummary = {
+      ...deferredDecision,
+      detailHydrated: true,
+      authoringSupported: true,
+      condition: { '<=': [{ var: 'benefit.value' }, 10] },
+      expression: 'benefit.value <= 10'
+    };
+    const loadDiscoveredCandidate = vi.fn(() => of(hydratedDecision));
+    (component as any).catalog.loadDiscoveredCandidate = loadDiscoveredCandidate;
+    vi.spyOn(component.runtime, 'state').mockReturnValue({
+      kind: 'ready',
+      config: { ...config, mode: 'remote', configApiBaseUrl: 'http://localhost:8088' }
+    });
+    component.allDecisions.set([decision('A'), deferredDecision]);
+
+    component.select(deferredDecision);
+
+    expect(loadDiscoveredCandidate).toHaveBeenCalledTimes(1);
+    expect(component.selected()?.detailHydrated).toBe(true);
+    expect(component.selected()?.authoringSupported).toBe(true);
+    expect(component.selected()?.expression).toBe('benefit.value <= 10');
+  });
+
+  it('automatically inspects publication readiness before publishing when readiness is null', () => {
+    const promotedDecision: DecisionSummary = {
+      ...decision('promoted.rule'),
+      promotedDefinitionId: 'def-promoted-9',
+      availableDefinitionActions: ['PUBLISH']
+    };
+    const inspectPublicationReadiness = vi.fn(() => of({
+      definitionId: 'def-promoted-9',
+      readiness: 'ready_to_publish' as const,
+      blockers: []
+    }));
+    const publishDefinition = vi.fn(() => of({
+      definitionId: 'def-promoted-9',
+      status: 'published' as const
+    }));
+    (component as any).catalog.inspectPublicationReadiness = inspectPublicationReadiness;
+    (component as any).catalog.publishDefinition = publishDefinition;
+
+    component.select(promotedDecision);
+    expect(component.publicationReadiness()).toBeNull();
+
+    component.publishGovernedDefinition();
+
+    expect(inspectPublicationReadiness).toHaveBeenCalledWith('def-promoted-9', config);
+    expect(publishDefinition).toHaveBeenCalledWith('def-promoted-9', config);
+    expect(component.publicationResult()?.status).toBe('published');
+  });
+
+  it('computes operator-aware threshold diff proposals and respects parameter min/max bounds', () => {
+    const upperBoundDecision: DecisionSummary = {
+      ...decision('upper.bound'),
+      condition: { '<=': [{ var: 'request.amount' }, 100] },
+      parameters: { parameterValues: { maxCap: 95 } },
+      parameterCatalog: {
+        definitionId: 'def-upper',
+        ruleKey: 'upper.bound',
+        version: 1,
+        schemaVersion: 'praxis.domain-rule-parameter-catalog.v1',
+        templateKey: 'upper-bound-template',
+        templateVersion: '1.0',
+        parameters: [{
+          name: 'maxCap',
+          type: 'NUMBER',
+          required: true,
+          nullable: false,
+          readOnly: false,
+          defaultValue: 95,
+          declaredValue: 95,
+          effectiveValue: 95,
+          minimum: 90,
+          maximum: 100
+        }]
+      }
+    };
+
+    component.select(upperBoundDecision);
+    const upperProposals = component.suggestedDiffProposals();
+    const relaxUpper = upperProposals.find(p => p.id === 'RELAX_THRESHOLD_10');
+    const tightenUpper = upperProposals.find(p => p.id === 'TIGHTEN_THRESHOLD_10');
+    const paramProposal = upperProposals.find(p => p.id === 'PARAM_maxCap');
+
+    // For '<=' (eligible when request.amount <= 100), relaxing the cap raises the threshold to 110; tightening lowers to 90
+    expect(relaxUpper?.condition).toEqual({ '<=': [{ var: 'request.amount' }, 110] });
+    expect(tightenUpper?.condition).toEqual({ '<=': [{ var: 'request.amount' }, 90] });
+    // Clamped to maximum=100 (95 + 9.5 -> 100)
+    expect((paramProposal?.parameters?.['parameterValues'] as any)?.maxCap).toBe(100);
+
+    const lowerBoundDecision: DecisionSummary = {
+      ...decision('lower.bound'),
+      condition: { '>=': [{ var: 'request.amount' }, 100] }
+    };
+    component.select(lowerBoundDecision);
+    const lowerProposals = component.suggestedDiffProposals();
+    // For '>=' (eligible when request.amount >= 100), relaxing the minimum lowers the threshold to 90; tightening raises to 110
+    expect(lowerProposals.find(p => p.id === 'RELAX_THRESHOLD_10')?.condition).toEqual({ '>=': [{ var: 'request.amount' }, 90] });
+    expect(lowerProposals.find(p => p.id === 'TIGHTEN_THRESHOLD_10')?.condition).toEqual({ '>=': [{ var: 'request.amount' }, 110] });
   });
 });

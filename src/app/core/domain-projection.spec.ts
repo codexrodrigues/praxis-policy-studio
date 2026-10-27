@@ -58,4 +58,14 @@ describe('validateDomainProjection', () => {
     expect(() => validateDomainProjection({ ...valid, factSchemas: [] }))
       .toThrowError('PROJECTION_FACT_SCHEMAS_REQUIRED');
   });
+
+  it('accepts G4_SOURCE_CANDIDATE semanticStatus and array<number> fact schemas', () => {
+    const g4Projection = validateDomainProjection({
+      ...valid,
+      decisionRefs: [{ ...valid.decisionRefs[0], semanticStatus: 'G4_SOURCE_CANDIDATE' }],
+      factSchemas: [{ ...valid.factSchemas[0], valueType: 'array<number>' }]
+    });
+    expect(g4Projection.decisionRefs[0].semanticStatus).toBe('G4_SOURCE_CANDIDATE');
+    expect(g4Projection.factSchemas[0].valueType).toBe('array<number>');
+  });
 });

@@ -6,17 +6,17 @@
     {
       "path": "src/main/java/com/example/praxis/apiquickstart/config/PayrollReactiveDeterminationRuleSet.java",
       "kind": "RULESET_DEFINITION",
-      "sha256": "AD1F6FC0166480CDD75F0B1228EE5336EE2451A0177B50B5B1E4880E7216AFEA"
+      "sha256": "9C890A51B90A52DE4362249389454C9EACC5FC96D49878B584433B31241DE065"
     },
     {
       "path": "src/main/java/com/example/praxis/apiquickstart/config/ReactiveDeterminationPilotConfiguration.java",
       "kind": "REACTIVE_BINDING_DEFINITION",
-      "sha256": "DD2E12202679175C4DEF8565DA5203CEBD6B3A22CCB9C8356EA3FD2D12905ECD"
+      "sha256": "EBC160F5E46119C4BF5EC1AA0D0F97F8C8E88716C02666798AAC63169F19EF9B"
     },
     {
       "path": "docs/REACTIVE-DETERMINATION-PILOT.md",
       "kind": "OPERATIONAL_BOUNDARY",
-      "sha256": "9923A3DD44CAB374CF9B852BCCAD53981D25CE6558B01B8AC1FE8E3C05A65007"
+      "sha256": "068145CF7D72C41FE17F7F6D8A8D5927A9D263671734CEAB49FFB2A633C32C22"
     },
     {
       "path": "scripts/verify-reactive-determinations-published-runtime.sh",
@@ -29,7 +29,7 @@
     "boundedContextKey": "human-resources.payroll",
     "ruleSetKey": "human-resources.payroll.reactive-determinations",
     "operationalResourceKey": "human-resources.folhas-pagamento",
-    "hostContractVersion": "quickstart/1.0",
+    "hostContractVersion": "quickstart/2.0",
     "operationKeys": [
       "determinePayrollNetSalary",
       "determinePayrollPaymentDate"
@@ -39,37 +39,39 @@
     {
       "order": 1,
       "decisionKey": "human-resources.payroll.net-salary",
-      "reasonCode": "PAYROLL_NET_SALARY_UNAVAILABLE",
-      "presentationLabel": "Determinar o salario liquido a partir do salario bruto e dos descontos.",
-      "semanticStatus": "REFERENCE_IMPLEMENTED",
-      "reviewStatus": "PUBLISHED_REFERENCE_CASE",
+      "reasonCode": "PAYROLL_DISCOUNT_EXCEEDS_AVAILABLE",
+      "presentationLabel": "Calcular os descontos totais e o salario liquido em BRL a partir de fatos aprovados.",
+      "semanticStatus": "G4_SOURCE_CANDIDATE",
+      "reviewStatus": "PENDING_OPERATIONAL_PROOF",
       "semanticSourceRef": "PayrollReactiveDeterminationRuleSet#human-resources.payroll.net-salary",
       "targetPlanRef": "REACTIVE-DETERMINATION-PILOT.md#cadeia-financeira",
-      "editable": true,
+      "editable": false,
       "stage": "DOMAIN_DECISION",
       "cardinality": "SINGLE",
       "overridePolicy": "FORBIDDEN",
       "factPaths": [
-        "payroll.salarioBruto",
-        "payroll.totalDescontos"
+        "payroll.adicionaisAprovados",
+        "payroll.descontosBase",
+        "payroll.descontosEventosAprovados",
+        "payroll.salarioBruto"
       ],
       "bindingRefs": [
         {
           "bindingKey": "human-resources.payroll.net-salary",
           "source": "PRODUCT",
-          "executorType": "JSON_LOGIC",
+          "executorType": "JAVA",
           "order": 10
         }
       ]
     },
     {
       "order": 2,
-      "decisionKey": "human-resources.payroll.payment-date",
-      "reasonCode": "PAYROLL_PAYMENT_DATE_UNAVAILABLE",
-      "presentationLabel": "Determinar a data de pagamento depois do calculo do salario liquido.",
-      "semanticStatus": "REFERENCE_IMPLEMENTED",
-      "reviewStatus": "PUBLISHED_REFERENCE_CASE",
-      "semanticSourceRef": "PayrollReactiveDeterminationRuleSet#human-resources.payroll.payment-date",
+      "decisionKey": "human-resources.payroll.calendar-eligibility",
+      "reasonCode": "PAYROLL_PERIOD_OUTSIDE_ELIGIBILITY",
+      "presentationLabel": "Verificar a elegibilidade governada da competencia para o calendario.",
+      "semanticStatus": "G4_SOURCE_CANDIDATE",
+      "reviewStatus": "PENDING_OPERATIONAL_PROOF",
+      "semanticSourceRef": "PayrollReactiveDeterminationRuleSet#human-resources.payroll.calendar-eligibility",
       "targetPlanRef": "REACTIVE-DETERMINATION-PILOT.md#cadeia-financeira",
       "editable": true,
       "stage": "DOMAIN_DECISION",
@@ -77,15 +79,40 @@
       "overridePolicy": "FORBIDDEN",
       "factPaths": [
         "payroll.ano",
-        "payroll.mes",
-        "payroll.salarioLiquido"
+        "payroll.mes"
+      ],
+      "bindingRefs": [
+        {
+          "bindingKey": "human-resources.payroll.calendar-eligibility",
+          "source": "PRODUCT",
+          "executorType": "JSON_LOGIC",
+          "order": 20
+        }
+      ]
+    },
+    {
+      "order": 3,
+      "decisionKey": "human-resources.payroll.payment-date",
+      "reasonCode": "PAYROLL_UPSTREAM_CONTRACT_INVALID",
+      "presentationLabel": "Determinar a previsao de pagamento a partir do output de salario liquido desta avaliacao.",
+      "semanticStatus": "G4_SOURCE_CANDIDATE",
+      "reviewStatus": "PENDING_OPERATIONAL_PROOF",
+      "semanticSourceRef": "PayrollReactiveDeterminationRuleSet#human-resources.payroll.payment-date",
+      "targetPlanRef": "REACTIVE-DETERMINATION-PILOT.md#cadeia-financeira",
+      "editable": false,
+      "stage": "DOMAIN_DECISION",
+      "cardinality": "SINGLE",
+      "overridePolicy": "FORBIDDEN",
+      "factPaths": [
+        "payroll.ano",
+        "payroll.mes"
       ],
       "bindingRefs": [
         {
           "bindingKey": "human-resources.payroll.payment-date",
           "source": "PRODUCT",
-          "executorType": "JSON_LOGIC",
-          "order": 20
+          "executorType": "JAVA",
+          "order": 30
         }
       ]
     }
@@ -104,11 +131,11 @@
       ]
     },
     {
-      "path": "payroll.totalDescontos",
+      "path": "payroll.descontosBase",
       "valueType": "number",
       "nullable": false,
-      "presentationLabel": "Total de descontos",
-      "description": "Soma dos descontos aplicada ao salario bruto.",
+      "presentationLabel": "Descontos base",
+      "description": "Parcela de desconto informada antes da soma dos eventos aprovados.",
       "locale": "pt-BR",
       "providerRef": "FolhasPagamentoController",
       "evidenceRefs": [
@@ -140,11 +167,23 @@
       ]
     },
     {
-      "path": "payroll.salarioLiquido",
-      "valueType": "number",
+      "path": "payroll.adicionaisAprovados",
+      "valueType": "array<number>",
       "nullable": false,
-      "presentationLabel": "Salario liquido determinado",
-      "description": "Resultado da primeira decisao e dependencia explicita da data de pagamento.",
+      "presentationLabel": "Adicionais aprovados",
+      "description": "Parcelas aprovadas que aumentam o disponivel; eventos pendentes ou rejeitados nao entram.",
+      "locale": "pt-BR",
+      "providerRef": "PayrollReactiveDeterminationRuleSet",
+      "evidenceRefs": [
+        "human-resources.payroll.net-salary"
+      ]
+    },
+    {
+      "path": "payroll.descontosEventosAprovados",
+      "valueType": "array<number>",
+      "nullable": false,
+      "presentationLabel": "Descontos de eventos aprovados",
+      "description": "Parcelas aprovadas que compoem o total de descontos; o total e output do executor.",
       "locale": "pt-BR",
       "providerRef": "PayrollReactiveDeterminationRuleSet",
       "evidenceRefs": [
@@ -175,7 +214,7 @@
         "createPayroll",
         "updatePayroll"
       ],
-      "status": "PROVED"
+      "status": "HISTORICAL_PROOF_DOES_NOT_CERTIFY_G4"
     },
     {
       "boundary": "ERGON_ORACLE_PARITY",

@@ -41,11 +41,46 @@ export interface DecisionSummary {
   readonly hostContractVersion: string | null;
   readonly evidence: readonly DecisionEvidence[];
   readonly draftLifecycle: string | null;
+  readonly ruleType?: string;
+  readonly parameters?: Readonly<Record<string, unknown>>;
+  readonly parameterCatalog?: DecisionParameterCatalog | null;
+  readonly detailHydrated?: boolean;
+}
+
+export type DecisionParameterValueType = 'STRING' | 'NUMBER' | 'INTEGER' | 'BOOLEAN';
+
+export interface DecisionParameterDescriptor {
+  readonly name: string;
+  readonly label?: string | null;
+  readonly description?: string | null;
+  readonly type: DecisionParameterValueType;
+  readonly required: boolean;
+  readonly nullable: boolean;
+  readonly readOnly: boolean;
+  readonly defaultValue?: unknown;
+  readonly declaredValue?: unknown;
+  readonly effectiveValue?: unknown;
+  readonly minimum?: number | null;
+  readonly maximum?: number | null;
+  readonly allowedValues?: readonly unknown[];
+  readonly unit?: string | null;
+  readonly origin?: string | null;
+}
+
+export interface DecisionParameterCatalog {
+  readonly definitionId: string;
+  readonly ruleKey: string;
+  readonly version: number;
+  readonly definitionVersion?: number;
+  readonly schemaVersion: string;
+  readonly templateKey: string | null;
+  readonly templateVersion: string | null;
+  readonly parameters: readonly DecisionParameterDescriptor[];
 }
 
 export interface DecisionFact {
   readonly path: string;
-  readonly valueType: 'boolean' | 'string' | 'number' | 'date' | 'string-array' | 'date-array';
+  readonly valueType: 'boolean' | 'string' | 'number' | 'date' | 'string-array' | 'date-array' | 'number-array' | 'array<number>';
   readonly nullable: boolean;
   readonly label: string;
   readonly description: string;
@@ -58,7 +93,7 @@ export interface DecisionFact {
 export interface DecisionEvidence {
   readonly path: string;
   readonly kind: string;
-  readonly sha256: string;
+  readonly sha256?: string | null;
 }
 
 export interface DecisionTimelineEvent {
@@ -117,4 +152,40 @@ export interface DecisionPublicationResult {
   readonly readiness: string | null;
   readonly materializationCount: number;
   readonly outcomes: readonly unknown[];
+}
+
+export type RuleSetCompositionAction = 'PREPARE' | 'APPROVE' | 'PUBLISH';
+
+export interface RuleSetCompositionSource {
+  readonly definitionId: string;
+  readonly ruleKey: string;
+  readonly version: number;
+  readonly status?: string | null;
+}
+
+export interface RuleSetCompositionCandidate {
+  readonly ruleSetKey: string;
+  readonly ruleSetVersion: number;
+  readonly compositionDigest: string;
+  readonly implementationCatalogDigest: string;
+  readonly currentHeadEtag: string | null;
+  readonly sources: readonly RuleSetCompositionSource[];
+  readonly authorizedActions: readonly RuleSetCompositionAction[];
+}
+
+export interface RuleSetCompositionCandidateRequest {
+  readonly promotedDefinitionId: string;
+  readonly validFromUtc: string;
+  readonly validUntilUtc?: string | null;
+}
+
+export interface RuleSetCompositionCandidateCommand extends RuleSetCompositionCandidateRequest {
+  readonly expectedCompositionDigest: string;
+}
+
+export interface RuleSetCompositionPublication {
+  readonly snapshotKey: string;
+  readonly ruleSetKey: string;
+  readonly ruleSetVersion: number;
+  readonly snapshotContentHash: string;
 }
