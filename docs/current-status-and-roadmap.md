@@ -1,12 +1,12 @@
 # Estado e roadmap do Praxis Policy Studio
 
-- Baseline de desenvolvimento validada: Studio `main@2ce1035` mais o corte local
-  de integridade corporativa, Config `0.1.0-rc.128` e Quickstart `main@5448625`,
-  com transporte, governance V58,
-  snapshot v1/v2 e cadeia de folha host-owned no Neon homologado
-- Data da auditoria: 2026-08-19
+- Baseline de desenvolvimento validada: Studio `main@05903ac` mais o corte local
+  de integridade corporativa e adoção direta de `DomainRuleService.getDefinitionParameters`,
+  Config `0.1.0-rc.128` e Quickstart `main@5448625`, com transporte, governance V58,
+  snapshot v1/v2, bootstrap rollout / guarda `RUNTIME_INCOMPATIBLE` e cadeia de folha host-owned no Neon homologado
+- Data da auditoria: 2026-10-27
 - Escopo: Studio pós-beta.15, Metadata rc.127, Config rc.128, Quickstart rc.43,
-  Contracts beta.4, `@praxisui/*` rc.38 e handoff Ergon #300
+  Contracts beta.4, `@praxisui/*` `10.0.0-rc.36` e handoff Ergon #300
 
 ## Leitura executiva
 
@@ -28,7 +28,7 @@ Marcos diferentes têm distâncias diferentes:
 
 | Marco | Estimativa atual | Significado |
 | --- | ---: | --- |
-| beta integrada controlada com Quickstart | 96% | contratos, action discovery, catálogo não vazio no Neon, sincronização de projeções (incluindo G4 de folha), E2E hermético (`17/17` ativos) e suíte browser live multi-persona (`7/7`) foram comprovados no HEAD atual com UI rc.38; falta publicar nova tag do Studio |
+| beta integrada controlada com Quickstart | 96% | contratos, action discovery, catálogo não vazio no Neon, sincronização de projeções (incluindo G4 de folha), suíte unitária (`19/19` arquivos / `146/146` testes), E2E hermético (`23/23` ativos desktop+narrow) e suíte browser live multi-persona (`7/7`) foram comprovados no HEAD atual com `@praxisui/*` `10.0.0-rc.36`; falta publicar nova tag do Studio |
 | versão estável corporativa | 60% | isolamento estrutural, segregação, sessão/catálogo, workspace, sandbox e diálogos críticos foram provados; faltam Neon cross-tenant, gates posteriores, decomposição adicional do workspace e operação sustentada |
 | produto maduro multi-cliente com authoring complexo e IA | 34% | RuleSet completo, discovery amplo, impacto, execução explicável e agente governado |
 
@@ -192,8 +192,9 @@ não devem ser inferidas da migração de banco.
   e operação, sob uma facade/store — concluído com `CatalogSelectionStore`,
   `WorkspaceAuthoringFacade`, `ScenarioSandboxFacade`, `SnapshotExecutionFacade` e
   `catalog-presentation.ts`, mantendo `CatalogWorkspaceComponent` como coordenador
-  de view/template e delegando chamadas de parâmetros e candidatos de snapshot ao
-  `DomainRuleService` de `@praxisui/core` quando disponível;
+  de view/template e delegando `getDefinitionParameters` diretamente ao
+  `DomainRuleService` de `@praxisui/core` (`10.0.0-rc.36`) e candidatos de snapshot
+  com fallback tipado enquanto aguarda publicação do próximo RC de `@praxisui/core`;
 - validar o catálogo canônico de facts (`/definitions/{id}/facts`) e o editor tipado contra o
   Quickstart/Neon publicado, mantendo JSON estruturado para preview ou famílias sem `factCatalog` declarado — concluído;
 - manter E2E desktop/narrow, teclado, axe e regressão visual focal como gate — concluído no V62;

@@ -39,6 +39,8 @@ import {
   type DomainRuleSnapshotPublicationRequest,
   type DomainRuleExecutionSummary,
   type DomainRuleFactCatalog,
+  type DomainRuleParameterCatalog,
+  type DomainRuleParameterDescriptor,
   type DomainRuleHostStatusSummary,
   type DomainRuleRolloutPolicy,
   type DomainRuleRolloutPolicyCatalog,
@@ -101,7 +103,7 @@ export class ProjectionCatalogService {
           definitionWithParameters: this.domainRules.getDefinition(candidate.definitionId, this.requestOptions(config)).pipe(
             switchMap(definition => (this.hasParameterTemplate(definition)
               ? this.fetchDefinitionParameters(candidate.definitionId, config)
-              : of<DecisionParameterCatalog | null>(null)
+              : of<DomainRuleParameterCatalog | null>(null)
             ).pipe(map(serverParameterCatalog => ({ definition, serverParameterCatalog }))))
           ),
           factCatalog: this.domainRules.getDefinitionFacts(candidate.definitionId, this.requestOptions(config))
@@ -215,7 +217,7 @@ export class ProjectionCatalogService {
       definitionWithParameters: this.domainRules.getDefinition(candidate.definitionId, options).pipe(
         switchMap(definition => (this.hasParameterTemplate(definition)
           ? this.fetchDefinitionParameters(candidate.definitionId, config)
-          : of<DecisionParameterCatalog | null>(null)
+          : of<DomainRuleParameterCatalog | null>(null)
         ).pipe(map(serverParameterCatalog => ({ definition, serverParameterCatalog }))))
       ),
       factCatalog: this.domainRules.getDefinitionFacts(candidate.definitionId, options),
@@ -278,7 +280,7 @@ export class ProjectionCatalogService {
     factCatalog?: DomainRuleFactCatalog,
     definition?: DomainRuleDefinition,
     workspace?: DomainRuleChangeWorkspace,
-    serverParameterCatalog?: DecisionParameterCatalog | null
+    serverParameterCatalog?: DomainRuleParameterCatalog | null
   ): DecisionSummary {
     const context = candidate.contextKey?.trim() || candidate.resourceKey?.trim() || 'domain-decisions';
     const definitionBody = this.record(definition?.definition);
@@ -1021,26 +1023,13 @@ export class ProjectionCatalogService {
   private fetchDefinitionParameters(
     definitionId: string,
     config: PolicyStudioRuntimeConfig
-  ): Observable<DecisionParameterCatalog> {
-    const core = this.domainRules as unknown as {
-      getDefinitionParameters?: (
-        id: string,
-        options: unknown
-      ) => Observable<DecisionParameterCatalog>;
-    };
-    if (typeof core.getDefinitionParameters === 'function') {
-      return core.getDefinitionParameters(definitionId, this.requestOptions(config));
-    }
-    const baseUrl = (config.configApiBaseUrl ?? '').replace(/\/$/, '');
-    const encodedId = encodeURIComponent(definitionId.trim());
-    return this.http.get<DecisionParameterCatalog>(
-      `${baseUrl}/api/praxis/config/domain-rules/definitions/${encodedId}/parameters`
-    );
+  ): Observable<DomainRuleParameterCatalog> {
+    return this.domainRules.getDefinitionParameters(definitionId.trim(), this.requestOptions(config));
   }
 
   private parameterCatalog(
     definition: DomainRuleDefinition | undefined,
-    serverCatalog?: DecisionParameterCatalog | null
+    serverCatalog?: DomainRuleParameterCatalog | null
   ): DecisionParameterCatalog | null {
     const template = this.record(this.record(definition?.definition)?.['parameterTemplate']);
     const rawParameters = Array.isArray(template?.['parameters'])
@@ -1061,16 +1050,16 @@ export class ProjectionCatalogService {
     return {
       definitionId: serverCatalog.definitionId,
       ruleKey: serverCatalog.ruleKey,
-      version: serverCatalog.definitionVersion ?? serverCatalog.version ?? definition?.version ?? 1,
+      version: serverCatalog.definitionVersion ?? definition?.version ?? 1,
       schemaVersion: serverCatalog.schemaVersion,
       templateKey: serverCatalog.templateKey,
       templateVersion: serverCatalog.templateVersion,
-      parameters: serverCatalog.parameters.map((param: DecisionParameterDescriptor) => {
+      parameters: serverCatalog.parameters.map((param: DomainRuleParameterDescriptor) => {
         const meta = uiMetadata.get(param.name);
         return {
           name: param.name,
-          label: meta?.label ?? param.label ?? null,
-          description: meta?.description ?? param.description ?? null,
+          label: meta?.label ?? null,
+          description: meta?.description ?? null,
           type: param.type,
           required: param.required,
           nullable: param.nullable,
