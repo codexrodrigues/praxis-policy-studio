@@ -1,6 +1,6 @@
 # Praxis Policy Studio
 
-Workstation independente da plataforma Praxis para compreender, criar, testar e operar decisões governadas. O ErgonX é o primeiro consumidor; contratos e semântica do produto permanecem neutros em relação ao domínio.
+Workstation independente da **Praxis Platform** — uma plataforma semanticamente orientada para aplicações corporativas AI-native — para compreender, criar, simular, testar e aprovar decisões governadas e políticas de negócio descritas uma vez e operadas de forma idêntica por interfaces tradicionais, interfaces generativas, agentes de IA e integrações. O ErgonX é o primeiro consumidor; contratos e semântica do produto permanecem neutros em relação ao domínio.
 
 ## Estado atual
 
