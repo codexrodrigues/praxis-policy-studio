@@ -67,7 +67,7 @@ describe('DecisionExplanationService', () => {
       definitionId: request.definitionId,
       ruleKey: request.ruleKey,
       version: 3,
-      source: 'policy-studio-selection'
+      source: 'rules-studio-selection'
     });
     expect(body.clientTurnId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
     expect(body.userPrompt).toContain('não infira semântica faltante');

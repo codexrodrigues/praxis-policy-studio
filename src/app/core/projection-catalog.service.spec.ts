@@ -336,7 +336,7 @@ describe('ProjectionCatalogService', () => {
       projectionPath: '/projections/reference.json', initialDecisionKey: null
     };
     let cockpit: { head: unknown; versions: readonly unknown[] } | null = null;
-    service.snapshotCockpit('benefit rules', config).subscribe(value => cockpit = value);
+    service.snapshotCockpit('benefit rules', 'evaluate', config).subscribe(value => cockpit = value);
 
     const head = http.expectOne(request => request.url.endsWith('/domain-rules/snapshots/head/status'));
     expect(head.request.params.get('ruleSetKey')).toBe('benefit rules');
@@ -358,6 +358,57 @@ describe('ProjectionCatalogService', () => {
     expect(rollback.request.method).toBe('POST');
     expect(rollback.request.headers.get('If-Match')).toBe('"head-8"');
     rollback.flush({ activationType: 'ROLLED_BACK', headEtag: 'head-9' });
+
+    service.withdrawSnapshotHead(
+      { ruleSetKey: 'benefit rules', operationKey: 'evaluate', reason: 'Emergency withdrawal' },
+      'head-9',
+      config
+    ).subscribe();
+    const withdraw = http.expectOne('/api/praxis/config/domain-rules/snapshots/withdrawals');
+    expect(withdraw.request.method).toBe('POST');
+    expect(withdraw.request.headers.get('If-Match')).toBe('"head-9"');
+    expect(withdraw.request.body).toEqual({
+      ruleSetKey: 'benefit rules',
+      operationKey: 'evaluate',
+      reason: 'Emergency withdrawal'
+    });
+    withdraw.flush({
+      ruleSetKey: 'benefit rules',
+      operationKey: 'evaluate',
+      lastSnapshotKey: 'snapshot 0',
+      headEtag: '"head-10"',
+      activationRevision: 3
+    });
+
+    let completeCohort: import('@praxisui/core').DomainRuleSnapshotHeadSetResponse | null = null;
+    service.snapshotHeadSet('ergon.administracao-pessoal.funcoes.chefia', [
+      'createErgonFuncaoConfianca',
+      'updateErgonFuncaoConfianca'
+    ], config).subscribe(value => completeCohort = value);
+    const headSetReq = http.expectOne(request =>
+      request.url === '/api/praxis/config/domain-rules/snapshots/head-set'
+      && request.params.get('ruleSetKey') === 'ergon.administracao-pessoal.funcoes.chefia'
+      && request.params.getAll('operationKeys')?.join(',') === 'createErgonFuncaoConfianca,updateErgonFuncaoConfianca');
+    headSetReq.flush({
+      tenantId: 'ergon',
+      environment: 'prod',
+      ruleSetKey: 'ergon.administracao-pessoal.funcoes.chefia',
+      heads: {},
+      fingerprint: 'sha256:cohort-intact'
+    });
+    expect(completeCohort).toEqual(expect.objectContaining({
+      ruleSetKey: 'ergon.administracao-pessoal.funcoes.chefia',
+      fingerprint: 'sha256:cohort-intact'
+    }));
+
+    let incompleteCohort: import('@praxisui/core').DomainRuleSnapshotHeadSetResponse | null | undefined;
+    service.snapshotHeadSet('ergon.administracao-pessoal.funcoes.chefia', [
+      'createErgonFuncaoConfianca',
+      'updateErgonFuncaoConfianca'
+    ], config).subscribe(value => incompleteCohort = value);
+    http.expectOne(request => request.url === '/api/praxis/config/domain-rules/snapshots/head-set')
+      .flush({ message: 'Not found' }, { status: 404, statusText: 'Not Found' });
+    expect(incompleteCohort).toBeNull();
   });
 
   it.each([401, 403, 500])('does not reinterpret a head HTTP %i failure as bootstrap absence', status => {
@@ -367,7 +418,7 @@ describe('ProjectionCatalogService', () => {
     };
     const values: unknown[] = [];
     const failures: unknown[] = [];
-    service.snapshotCockpit('benefit-rules', config).subscribe({
+    service.snapshotCockpit('benefit-rules', 'evaluate', config).subscribe({
       next: value => values.push(value), error: error => failures.push(error)
     });
     const head = http.expectOne(request => request.url.endsWith('/domain-rules/snapshots/head/status'));
@@ -390,6 +441,7 @@ describe('ProjectionCatalogService', () => {
     create.flush({ rolloutId: 'bootstrap-1', expectedActiveSnapshotKey: null, expectedHeadEtag: null });
 
     service.activateRolloutCandidate({ rollout: {
+        operationKey: 'evaluate',
       rolloutId: 'bootstrap-1', ruleSetKey: 'benefit-rules', candidateSnapshotKey: 'candidate-1',
       candidateContentHash: 'A'.repeat(64), expectedActiveSnapshotKey: null, expectedHeadEtag: null,
       policyKey: 'required-policy', policyVersion: 1, enforcementMode: 'REQUIRED', status: 'READY',
@@ -428,7 +480,7 @@ describe('ProjectionCatalogService', () => {
       mode: 'remote' as const, configApiBaseUrl: '', locale: 'en-US' as const,
       projectionPath: '/projections/reference.json', initialDecisionKey: null
     };
-    service.hostStatusSummary('benefit/rules', config).subscribe(summary => {
+    service.hostStatusSummary('benefit/rules', 'evaluate', config).subscribe(summary => {
       expect(summary.alignedHosts).toBe(2);
       expect(summary.incompatibleHosts).toBe(1);
     });
@@ -499,7 +551,7 @@ describe('ProjectionCatalogService', () => {
       'workspace-1', ['scenario-1'], 'policy-studio:workspace-1:command-1',
       '2026-08-14T12:00:00.000Z', config
     ).subscribe();
-    const sandbox = http.expectOne('/api/praxis/policy-studio/sandbox/runs');
+    const sandbox = http.expectOne('/api/praxis/rules-studio/sandbox/runs');
     expect(sandbox.request.body).toEqual(expect.objectContaining({
       workspaceId: 'workspace-1', scenarioIds: ['scenario-1'],
       idempotencyKey: 'policy-studio:workspace-1:command-1',
@@ -868,7 +920,7 @@ describe('ProjectionCatalogService', () => {
     })]);
   });
 
-  it('creates definitions and prepares, approves, and publishes snapshot compositions through Core and the canonical Policy Studio RuleSet candidate endpoints', () => {
+  it('creates definitions and prepares, approves, and publishes snapshot compositions through Core and the canonical Rules Studio RuleSet candidate endpoints', () => {
     const config = {
       mode: 'remote' as const, configApiBaseUrl: '', locale: 'en-US' as const,
       projectionPath: '/projections/reference.json', initialDecisionKey: null
@@ -1008,5 +1060,219 @@ describe('ProjectionCatalogService', () => {
     expect(publishSpy).toHaveBeenCalledWith('procurement.po_approval', candidateCommand, '"head-core"', {
       apiUrlEntry: { baseUrl: 'http://localhost:8088' }
     });
+  });
+
+  it('hydrates Ergon slot metadata including EXTEND_ONLY policy, 1-hop roots, and PL/SQL lineage', () => {
+    let decisions: readonly import('../features/catalog/catalog.fixture').DecisionSummary[] = [];
+    service.load('pt-BR', {
+      mode: 'remote', configApiBaseUrl: '', locale: 'pt-BR',
+      projectionPath: '/projections/reference.json', initialDecisionKey: null
+    }).subscribe(value => decisions = value);
+
+    http.expectOne('/projections/reference.json').flush(projection);
+    http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([]);
+    http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities').flush({
+      tenantId: '1', environment: 'local', definitions: []
+    });
+    http.expectOne(request => request.url.endsWith('/definitions/catalog')).flush({
+      schemaVersion: 'praxis-domain-rule-catalog.v1', page: 0, limit: 12, hasMore: false,
+      candidates: [{
+        definitionId: 'ergon-def-1',
+        ruleKey: 'ergon.administracao-pessoal.frequencias.rn013.custom-extension',
+        version: 1,
+        ruleType: 'selection_eligibility',
+        status: 'draft',
+        contextKey: 'administracao-pessoal.frequencias',
+        resourceKey: 'ergon.administracao-pessoal.frequencias.rn013',
+        serviceKey: 'praxis-ergon-showcase'
+      }]
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/ergon-def-1').flush({
+      id: 'ergon-def-1',
+      ruleKey: 'ergon.administracao-pessoal.frequencias.rn013.custom-extension',
+      version: 1,
+      status: 'draft',
+      resourceKey: 'ergon.administracao-pessoal.frequencias.rn013',
+      serviceKey: 'praxis-ergon-showcase',
+      definition: {
+        ruleSetKey: 'ergon.administracao-pessoal.frequencias.rn013',
+        operationalResourceKey: 'administracao-pessoal.frequencias',
+        slotKey: 'rn013.custom-extension',
+        presentationLabel: 'CERG-09100 — Extensão governada do órgão',
+        messagePtBr: 'Extensão governada do órgão para lançamento de frequência.',
+        decisionStage: 'POST_DECISION',
+        overridePolicy: 'EXTEND_ONLY',
+        cardinality: 'ORDERED_LIST',
+        availableRoots: ['draft', 'context', 'vinculo'],
+        conceptRoots: ['vinculo'],
+        legacyOccurrence: {
+          code: 'CERG-09100',
+          targetField: 'quantidade',
+          plsqlOrigin: 'PCK_REGRAS_FREQ.MAIN_POS',
+          plsqlLineage: 'IF v_qtd > 180 THEN PACK_HADES.TRATA_ERRO'
+        }
+      },
+      condition: { '<=': [{ var: 'draft.quantidade' }, 180] },
+      parameters: { nullSemantics: 'FAIL_CLOSED', operationKeys: ['EVALUATE'] },
+      governance: { lifecycleBoundary: 'REFERENCE_DRAFT_ONLY', sourceKind: 'ERGON_RULES_STUDIO_SEED' }
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/ergon-def-1/facts')
+      .flush(factCatalog('ergon-def-1', 'ergon.administracao-pessoal.frequencias.rn013.custom-extension'));
+
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0]?.ruleSetKey).toBe('ergon.administracao-pessoal.frequencias.rn013');
+    expect(decisions[0]?.resourceKey).toBe('administracao-pessoal.frequencias');
+    expect(decisions[0]?.slotKey).toBe('rn013.custom-extension');
+    expect(decisions[0]?.name).toBe('CERG-09100 — Extensão governada do órgão');
+    expect(decisions[0]?.meaning).toBe('Extensão governada do órgão para lançamento de frequência.');
+    expect(decisions[0]?.decisionStage).toBe('POST_DECISION');
+    expect(decisions[0]?.slotOverridePolicy).toBe('EXTEND_ONLY');
+    expect(decisions[0]?.slotCardinality).toBe('ORDERED_LIST');
+    expect(decisions[0]?.availableRoots).toEqual(['draft', 'context', 'vinculo']);
+    expect(decisions[0]?.conceptRoots).toEqual(['vinculo']);
+    expect(decisions[0]?.legacyOccurrence).toEqual({
+      code: 'CERG-09100',
+      targetField: 'quantidade',
+      plsqlOrigin: 'PCK_REGRAS_FREQ.MAIN_POS',
+      plsqlLineage: 'IF v_qtd > 180 THEN PACK_HADES.TRATA_ERRO'
+    });
+  });
+
+  it('projects FORBIDDEN product guard slots into the DAG with authoringSupported=false', () => {
+    let decisions: readonly import('../features/catalog/catalog.fixture').DecisionSummary[] = [];
+    service.load('pt-BR', {
+      mode: 'remote', configApiBaseUrl: '', locale: 'pt-BR',
+      projectionPath: '/projections/reference.json', initialDecisionKey: null
+    }).subscribe(value => decisions = value);
+
+    http.expectOne('/projections/reference.json').flush(projection);
+    http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([]);
+    http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities').flush({
+      tenantId: '1', environment: 'local', definitions: []
+    });
+    http.expectOne(request => request.url.endsWith('/definitions/catalog')).flush({
+      schemaVersion: 'praxis-domain-rule-catalog.v1', page: 0, limit: 12, hasMore: false,
+      candidates: [{
+        definitionId: 'ergon-def-guard',
+        ruleKey: 'product.ergon.rn013.erg00019',
+        version: 1,
+        ruleType: 'selection_eligibility',
+        status: 'draft',
+        contextKey: 'administracao-pessoal.regras-frequencia',
+        resourceKey: 'ergon.administracao-pessoal.regras-frequencia.rn013',
+        serviceKey: 'praxis-ergon-showcase'
+      }]
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/ergon-def-guard').flush({
+      id: 'ergon-def-guard',
+      ruleKey: 'product.ergon.rn013.erg00019',
+      version: 1,
+      status: 'draft',
+      resourceKey: 'ergon.administracao-pessoal.regras-frequencia.rn013',
+      serviceKey: 'praxis-ergon-showcase',
+      definition: {
+        ruleSetKey: 'ergon.administracao-pessoal.regras-frequencia.rn013',
+        operationalResourceKey: 'administracao-pessoal.regras-frequencia-estatutaria',
+        slotKey: 'rn013.periodo_ordem_valida',
+        presentationLabel: 'ERG-00019 — Data final anterior à inicial',
+        messagePtBr: 'Data final não pode ser anterior à data inicial.',
+        decisionStage: 'PROTECTED_GUARD',
+        overridePolicy: 'FORBIDDEN',
+        cardinality: 'SINGLE',
+        executorKind: 'JSON_LOGIC',
+        availableRoots: ['draft', 'existingOverlaps', 'tenant', 'context']
+      },
+      condition: { '<=': [{ var: 'draft.quantidade' }, 180] },
+      parameters: { nullSemantics: 'FAIL_CLOSED', operationKeys: ['validate'] },
+      governance: { lifecycleBoundary: 'REFERENCE_DRAFT_ONLY', sourceKind: 'ERGON_RULES_STUDIO_SEED' }
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/ergon-def-guard/facts')
+      .flush(factCatalog('ergon-def-guard', 'product.ergon.rn013.erg00019'));
+
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0]?.key).toBe('product.ergon.rn013.erg00019');
+    expect(decisions[0]?.decisionStage).toBe('PROTECTED_GUARD');
+    expect(decisions[0]?.slotOverridePolicy).toBe('FORBIDDEN');
+    expect(decisions[0]?.authoringSupported).toBe(false);
+    expect(decisions[0]?.reviewStatus).toBe('CATALOG_IDENTITY_ONLY');
+  });
+
+  it('hydrates at least one representative per RuleSet in large catalogs (>36 items) and propagates 1-hop ontology roots and inferred ERG codes to unhydrated siblings', () => {
+    let decisions: readonly import('../features/catalog/catalog.fixture').DecisionSummary[] = [];
+    service.load('pt-BR', {
+      mode: 'remote', configApiBaseUrl: '', locale: 'pt-BR',
+      projectionPath: null, initialDecisionKey: null
+    }).subscribe(value => decisions = value);
+
+    http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([]);
+    http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities').flush({
+      tenantId: '1', environment: 'local', definitions: []
+    });
+
+    const candidates = Array.from({ length: 38 }, (_, i) => {
+      const idx = i + 1;
+      const isSecondRuleSet = idx >= 37;
+      return {
+        definitionId: `def-${idx}`,
+        ruleKey: isSecondRuleSet
+          ? `product.ergon.freq.erg0044${idx - 30}`
+          : `product.ergon.rn013.erg083${String(idx).padStart(2, '0')}`,
+        version: 1,
+        ruleType: 'selection_eligibility',
+        status: 'draft' as const,
+        contextKey: 'administracao-pessoal.frequencias',
+        resourceKey: isSecondRuleSet
+          ? 'ergon.administracao-pessoal.frequencias.lancamento'
+          : 'ergon.administracao-pessoal.regras-frequencia.rn013',
+        serviceKey: 'praxis-ergon-showcase'
+      };
+    });
+
+    http.expectOne(request => request.url.endsWith('/definitions/catalog')).flush({
+      schemaVersion: 'praxis-domain-rule-catalog.v1',
+      page: 0,
+      limit: 12,
+      hasMore: false,
+      candidates
+    });
+
+    // First 36 items of RN-013 + item 37 (first representative of RN-017) are hydrated eagerly; item 38 remains lazy
+    for (let idx = 1; idx <= 37; idx++) {
+      const isSecondRuleSet = idx === 37;
+      http.expectOne(`/api/praxis/config/domain-rules/definitions/def-${idx}`).flush({
+        id: `def-${idx}`,
+        ruleKey: candidates[idx - 1]!.ruleKey,
+        version: 1,
+        status: 'draft',
+        resourceKey: candidates[idx - 1]!.resourceKey,
+        serviceKey: 'praxis-ergon-showcase',
+        definition: {
+          ruleSetKey: candidates[idx - 1]!.resourceKey,
+          operationalResourceKey: isSecondRuleSet
+            ? 'administracao-pessoal.frequencias'
+            : 'administracao-pessoal.regras-frequencia-estatutaria',
+          slotKey: `slot.${idx}`,
+          falseReasonCode: isSecondRuleSet ? 'ERG-00447' : `ERG-083${String(idx).padStart(2, '0')}`,
+          availableRoots: ['draft', 'tipoFrequencia', 'context'],
+          conceptRoots: ['tipoFrequencia']
+        },
+        condition: { '==': [1, 1] },
+        parameters: { nullSemantics: 'FAIL_CLOSED', operationKeys: ['validate'] },
+        governance: { lifecycleBoundary: 'REFERENCE_DRAFT_ONLY' }
+      });
+      http.expectOne(`/api/praxis/config/domain-rules/definitions/def-${idx}/facts`)
+        .flush(factCatalog(`def-${idx}`, candidates[idx - 1]!.ruleKey));
+    }
+
+    expect(decisions).toHaveLength(38);
+    const hydratedRepresentative = decisions[36]!;
+    const lazySibling = decisions[37]!;
+    expect(hydratedRepresentative.detailHydrated).toBe(true);
+    expect(lazySibling.detailHydrated).toBe(false);
+    expect(lazySibling.code).toBe('ERG-00448');
+    expect(lazySibling.ruleSetKey).toBe('ergon.administracao-pessoal.frequencias.lancamento');
+    expect(lazySibling.resourceKey).toBe('administracao-pessoal.frequencias');
+    expect(lazySibling.availableRoots).toEqual(['draft', 'tipoFrequencia', 'context']);
+    expect(lazySibling.conceptRoots).toEqual(['tipoFrequencia']);
   });
 });

@@ -1,8 +1,10 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-const outputPath = resolve('dist/praxis-policy-studio/browser/app-config.json');
-const baseUrl = deploymentOrigin(process.env.POLICY_STUDIO_CONFIG_API_BASE_URL);
+const outputPath = resolve('dist/praxis-rules-studio/browser/app-config.json');
+const baseUrl = deploymentOrigin(
+  process.env.RULES_STUDIO_CONFIG_API_BASE_URL ?? process.env.POLICY_STUDIO_CONFIG_API_BASE_URL
+);
 const current = JSON.parse(await readFile(outputPath, 'utf8'));
 
 if (current.mode !== 'remote') {

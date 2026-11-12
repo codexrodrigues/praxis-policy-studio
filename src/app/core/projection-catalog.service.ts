@@ -5,11 +5,13 @@ import { PolicyStudioRuntimeConfig, SupportedLocale } from './runtime-config';
 import { createClientRequestId } from './client-request-id';
 import { DomainProjection, validateDomainProjection } from './domain-projection';
 import {
+  DecisionLegacyOccurrence,
   DecisionLifecycleSummary,
   DecisionParameterCatalog,
   DecisionParameterDescriptor,
   DecisionParameterValueType,
   DecisionPublicationResult,
+  DecisionStageId,
   DecisionSummary,
   DecisionTimelineEvent,
   PolicySandboxRun,
@@ -17,7 +19,8 @@ import {
   RuleSetCompositionCandidate,
   RuleSetCompositionCandidateCommand,
   RuleSetCompositionCandidateRequest,
-  RuleSetCompositionPublication
+  RuleSetCompositionPublication,
+  SlotOverridePolicyId
 } from '../features/catalog/catalog.fixture';
 import { collectFactPaths, formatDecisionExpression } from './decision-inspection';
 import {
@@ -50,8 +53,11 @@ import {
   type DomainRuleRollout,
   type DomainRuleRolloutCatalog,
   type DomainRuleRolloutCatalogItem,
+  type DomainRuleSnapshotHeadSetResponse,
   type DomainRuleSnapshotHeadStatus,
   type DomainRuleSnapshotVersion,
+  type DomainRuleSnapshotWithdrawalRequest,
+  type DomainRuleSnapshotWithdrawalResponse,
   type DomainRuleTestScenario,
   type DomainRuleTestScenarioRequest,
   type DomainRuleTestRun,
@@ -88,17 +94,45 @@ export class ProjectionCatalogService {
         if (config.mode === 'fixture') {
           return of(this.fixtureSummaries(projection!, locale));
         }
+        const searchParams = typeof window !== 'undefined' && window.location?.search
+          ? new URLSearchParams(window.location.search)
+          : null;
+        const requestedDecisionKey = searchParams?.get('decisionKey')?.trim() || null;
+        const requestedBindingKey = searchParams?.get('bindingKey')?.trim() || null;
+        const requestedSlotKey = searchParams?.get('slotKey')?.trim() || null;
+        const requestedRuleSetKey = searchParams?.get('ruleSetKey')?.trim() || null;
+        const requestedResourceKey = searchParams?.get('resourceKey')?.trim() || null;
         const eagerRuleKeys = new Set<string>([
           ...(projection?.decisionRefs.map(item => item.decisionKey) ?? []),
           ...(config.initialDecisionKey ? [config.initialDecisionKey] : []),
+          ...(requestedDecisionKey ? [requestedDecisionKey] : []),
+          ...(requestedBindingKey ? [requestedBindingKey] : []),
+          ...(requestedSlotKey ? [requestedSlotKey] : []),
           ...workspaces.map(item => item.ruleKey)
         ]);
+        const matchesRequestedDeepLink = (candidate: DomainRuleCatalogCandidate): boolean =>
+          eagerRuleKeys.has(candidate.ruleKey)
+          || (!!requestedSlotKey && candidate.ruleKey.startsWith(`${requestedSlotKey}.`))
+          || (!!requestedRuleSetKey && candidate.resourceKey === requestedRuleSetKey)
+          || (!!requestedResourceKey && candidate.resourceKey === requestedResourceKey);
+        const projectionMatchesCatalog = !!projection
+          && catalog.some(candidate => projection.decisionRefs.some(ref => ref.decisionKey === candidate.ruleKey));
+        const seenRepresentativeResourceKeys = new Set<string>();
+        const isFirstRepresentativeOfResourceKey = (candidate: DomainRuleCatalogCandidate): boolean => {
+          if (candidate.status === 'retired') return false;
+          const rk = candidate.resourceKey?.trim();
+          if (!rk || seenRepresentativeResourceKeys.has(rk)) return false;
+          seenRepresentativeResourceKeys.add(rk);
+          return true;
+        };
         const eagerCandidates = catalog.length <= 12
           ? catalog
-          : projection
-            ? catalog.filter(candidate => eagerRuleKeys.has(candidate.ruleKey))
+          : projectionMatchesCatalog
+            ? catalog.filter(matchesRequestedDeepLink)
             : catalog.filter((candidate, idx) =>
-                eagerRuleKeys.has(candidate.ruleKey) || (candidate.status !== 'retired' && idx < 12));
+                matchesRequestedDeepLink(candidate)
+                || isFirstRepresentativeOfResourceKey(candidate)
+                || (candidate.status !== 'retired' && idx < 36));
         const detailReads = eagerCandidates.map(candidate => forkJoin({
           definitionWithParameters: this.domainRules.getDefinition(candidate.definitionId, this.requestOptions(config)).pipe(
             switchMap(definition => (this.hasParameterTemplate(definition)
@@ -110,6 +144,30 @@ export class ProjectionCatalogService {
         }));
         return (detailReads.length ? forkJoin(detailReads) : of([])).pipe(map(definitionDetails => {
           const details = new Map(definitionDetails.map(detail => [detail.definitionWithParameters.definition.id, detail]));
+          const ruleSetMetaByResourceKey = new Map<string, {
+            ruleSetKey: string;
+            resourceKey: string | null;
+            availableRoots: readonly string[];
+            conceptRoots: readonly string[];
+          }>();
+          for (const detail of definitionDetails) {
+            const def = detail.definitionWithParameters.definition;
+            const rk = def.resourceKey?.trim();
+            if (!rk || ruleSetMetaByResourceKey.has(rk)) continue;
+            const defBody = this.record(def.definition);
+            const paramsBody = this.record(def.parameters);
+            const slotMeta = this.extractSlotPlanMetadata(defBody, undefined);
+            ruleSetMetaByResourceKey.set(rk, {
+              ruleSetKey: this.stringValue(defBody, 'ruleSetKey')
+                ?? this.stringValue(paramsBody, 'ruleSetKey')
+                ?? rk,
+              resourceKey: this.stringValue(defBody, 'operationalResourceKey')
+                ?? this.stringValue(paramsBody, 'operationalResourceKey')
+                ?? rk,
+              availableRoots: slotMeta.availableRoots ?? [],
+              conceptRoots: slotMeta.conceptRoots ?? []
+            });
+          }
           const summaries = catalog.map((candidate, index) => {
         const detail = details.get(candidate.definitionId);
         const definition = detail?.definitionWithParameters.definition;
@@ -125,8 +183,21 @@ export class ProjectionCatalogService {
           workspace?.promotedDefinitionId ?? null
         );
         if (!projection || !decision) {
-          return this.catalogSummary(candidate, index, catalog.length, locale,
+          const baseSummary = this.catalogSummary(candidate, index, catalog.length, locale,
             availableDefinitionActions, factCatalog, definition, workspace, serverParameterCatalog);
+          const siblingMeta = candidate.resourceKey?.trim()
+            ? ruleSetMetaByResourceKey.get(candidate.resourceKey.trim())
+            : undefined;
+          if (!definition && siblingMeta) {
+            return {
+              ...baseSummary,
+              ruleSetKey: siblingMeta.ruleSetKey,
+              resourceKey: siblingMeta.resourceKey,
+              ...(siblingMeta.availableRoots.length ? { availableRoots: siblingMeta.availableRoots } : {}),
+              ...(siblingMeta.conceptRoots.length ? { conceptRoots: siblingMeta.conceptRoots } : {})
+            };
+          }
+          return baseSummary;
         }
         const conditionFactPaths = collectFactPaths(definition?.condition);
         if (conditionFactPaths.some(factPath => !decision.factPaths.includes(factPath))) {
@@ -143,6 +214,13 @@ export class ProjectionCatalogService {
           this.parameterCatalog(definition, serverParameterCatalog),
           workspace?.parameters
         );
+        const definitionBody = this.record(definition?.definition);
+        const slotPlanMeta = this.extractSlotPlanMetadata(definitionBody, decision);
+        const executorKind = this.stringValue(definitionBody, 'executorKind');
+        const isForbiddenSlot =
+          slotPlanMeta.slotOverridePolicy === 'FORBIDDEN'
+          || executorKind === 'JAVA'
+          || executorKind === 'JAVA_EXECUTOR';
         return {
           order: decision.order,
           // Projection order is scoped to the governed decision set, not to the
@@ -162,9 +240,9 @@ export class ProjectionCatalogService {
           baselineAuthority: projection.authorityEvidence.baselineAuthority,
           source: decision.semanticSourceRef,
           evidenceCount: projection.sourceArtifacts.length,
-          authoringSupported: decision.editable
+          authoringSupported: !isForbiddenSlot && (decision.editable
             || (parameterCatalog?.parameters.length ?? 0) > 0
-            || this.hasEditableOperationalPolicy(definition),
+            || this.hasEditableOperationalPolicy(definition)),
           availableDefinitionActions,
           reviewStatus: decision.reviewStatus,
           configDefinitionId: candidate.definitionId,
@@ -190,7 +268,8 @@ export class ProjectionCatalogService {
           ruleType: definition?.ruleType ?? candidate.ruleType,
           parameters: definition?.parameters ?? {},
           parameterCatalog,
-          detailHydrated: true
+          detailHydrated: definition !== undefined,
+          ...slotPlanMeta
         };
       });
           if (!projection) return summaries;
@@ -292,18 +371,24 @@ export class ProjectionCatalogService {
       this.parameterCatalog(definition, serverParameterCatalog),
       workspace?.parameters
     );
+    const slotPlanMeta = this.extractSlotPlanMetadata(definitionBody, undefined);
+    const executorKind = this.stringValue(definitionBody, 'executorKind');
+    const isForbiddenSlot =
+      slotPlanMeta.slotOverridePolicy === 'FORBIDDEN'
+      || executorKind === 'JAVA'
+      || executorKind === 'JAVA_EXECUTOR';
     const hasConditionFacts =
       facts.length > 0
       && definition?.condition != null
       && conditionFactPaths.every(factPath => facts.some(fact => fact.path === factPath));
-    const authoringSupported = hasConditionFacts
+    const authoringSupported = !isForbiddenSlot && (hasConditionFacts
       || (parameterCatalog?.parameters.length ?? 0) > 0
-      || this.hasEditableOperationalPolicy(definition);
+      || this.hasEditableOperationalPolicy(definition));
     const code = this.stringValue(definitionBody, 'falseReasonCode')
       ?? this.stringValue(definitionBody, 'reasonCode')
       ?? this.stringValue(parametersBody, 'reasonCode')
       ?? this.operationalPolicyString(parametersBody, 'code')
-      ?? candidate.ruleKey;
+      ?? this.inferReasonCodeFromRuleKey(candidate.ruleKey);
     const name = this.localizedText(definitionBody?.['labels'], locale)
       ?? this.localizedText(definitionBody?.['title'], locale)
       ?? this.stringValue(definitionBody, 'presentationLabel')
@@ -312,6 +397,7 @@ export class ProjectionCatalogService {
     const meaning = this.localizedText(definitionBody?.['descriptions'], locale)
       ?? this.localizedText(definitionBody?.['description'], locale)
       ?? this.stringValue(definitionBody, 'description')
+      ?? this.stringValue(definitionBody, 'messagePtBr')
       ?? this.operationalPolicyString(parametersBody, 'message')
       ?? this.localizedText(definitionBody?.['labels'], locale)
       ?? this.localizedText(definitionBody?.['title'], locale)
@@ -380,8 +466,17 @@ export class ProjectionCatalogService {
       ruleType: definition?.ruleType ?? candidate.ruleType,
       parameters: definition?.parameters ?? {},
       parameterCatalog,
-      detailHydrated: definition !== undefined
+      detailHydrated: definition !== undefined,
+      ...slotPlanMeta
     };
+  }
+
+  private inferReasonCodeFromRuleKey(ruleKey: string): string {
+    const match = /(?:^|[._:-])(c?erg)[-_]?(\d{4,5})$/i.exec(ruleKey.trim());
+    if (match) {
+      return `${match[1].toUpperCase()}-${match[2]}`;
+    }
+    return ruleKey;
   }
 
   private projectionFacts(
@@ -494,8 +589,73 @@ export class ProjectionCatalogService {
       operationKeys: projection.ruleSetRef.operationKeys,
       hostContractVersion: projection.ruleSetRef.hostContractVersion ?? null,
       evidence: projection.sourceArtifacts,
-      draftLifecycle: null
+      draftLifecycle: null,
+      ...this.extractSlotPlanMetadata(null, decision)
     }));
+  }
+
+  private extractSlotPlanMetadata(
+    definitionBody: Record<string, unknown> | null,
+    decisionRef?: DomainProjection['decisionRefs'][number]
+  ): Pick<
+    DecisionSummary,
+    | 'slotKey'
+    | 'decisionStage'
+    | 'slotOverridePolicy'
+    | 'slotCardinality'
+    | 'availableRoots'
+    | 'conceptRoots'
+    | 'legacyOccurrence'
+  > {
+    const slotKey = this.stringValue(definitionBody, 'slotKey') ?? null;
+    const rawStage = this.stringValue(definitionBody, 'decisionStage') ?? decisionRef?.stage ?? null;
+    const validStages: readonly DecisionStageId[] = [
+      'PROTECTED_GUARD',
+      'DOMAIN_DECISION',
+      'POST_DECISION',
+      'TRANSFORMATION_INTENT',
+      'EFFECT_INTENT'
+    ];
+    const decisionStage = rawStage && validStages.includes(rawStage as DecisionStageId)
+      ? (rawStage as DecisionStageId)
+      : null;
+
+    const rawPolicy = this.stringValue(definitionBody, 'overridePolicy') ?? decisionRef?.overridePolicy ?? null;
+    const validPolicies: readonly SlotOverridePolicyId[] = [
+      'FORBIDDEN',
+      'PARAMETERIZABLE',
+      'REPLACEABLE',
+      'RESTRICT_ONLY',
+      'EXTEND_ONLY'
+    ];
+    const slotOverridePolicy = rawPolicy && validPolicies.includes(rawPolicy as SlotOverridePolicyId)
+      ? (rawPolicy as SlotOverridePolicyId)
+      : null;
+
+    const slotCardinality = this.stringValue(definitionBody, 'cardinality') ?? decisionRef?.cardinality ?? null;
+    const availableRoots = this.stringArrayValue(definitionBody, 'availableRoots') ?? [];
+    const conceptRoots = this.stringArrayValue(definitionBody, 'conceptRoots') ?? [];
+
+    const legacyRec = this.record(definitionBody?.['legacyOccurrence']);
+    const legacyCode = this.stringValue(legacyRec, 'code');
+    const legacyOccurrence: DecisionLegacyOccurrence | null = legacyCode
+      ? {
+          code: legacyCode,
+          targetField: this.stringValue(legacyRec, 'targetField'),
+          plsqlOrigin: this.stringValue(legacyRec, 'plsqlOrigin'),
+          plsqlLineage: this.stringValue(legacyRec, 'plsqlLineage')
+        }
+      : null;
+
+    return {
+      ...(slotKey ? { slotKey } : {}),
+      ...(decisionStage ? { decisionStage } : {}),
+      ...(slotOverridePolicy ? { slotOverridePolicy } : {}),
+      ...(slotCardinality ? { slotCardinality } : {}),
+      ...(availableRoots.length ? { availableRoots } : {}),
+      ...(conceptRoots.length ? { conceptRoots } : {}),
+      ...(legacyOccurrence ? { legacyOccurrence } : {})
+    };
   }
 
   createDefinition(
@@ -522,7 +682,7 @@ export class ProjectionCatalogService {
     return this.domainRules.updateChangeWorkspaceDraft(workspace.id, {
       condition: this.record(condition),
       parameters: (parameters ?? workspace.parameters) as Record<string, unknown>,
-      rationale: 'Policy Studio visual authoring round-trip'
+      rationale: 'Rules Studio visual authoring round-trip'
     }, workspace.etag, this.requestOptions(config));
   }
 
@@ -573,7 +733,7 @@ export class ProjectionCatalogService {
     config: PolicyStudioRuntimeConfig
   ): Observable<PolicySandboxRun> {
     const baseUrl = (config.configApiBaseUrl ?? '').replace(/\/$/, '');
-    return this.http.post<PolicySandboxRun>(`${baseUrl}/api/praxis/policy-studio/sandbox/runs`, {
+    return this.http.post<PolicySandboxRun>(`${baseUrl}/api/praxis/rules-studio/sandbox/runs`, {
       workspaceId,
       scenarioIds,
       userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
@@ -589,7 +749,7 @@ export class ProjectionCatalogService {
     return this.discovery.getActionsByResourceKey(resourceKey, this.requestOptions(config)).pipe(
       map(catalog => {
         const candidates = catalog.actions.filter(action =>
-          action.tags.includes('policy-studio') && action.tags.includes('operational-proof'));
+          (action.tags.includes('rules-studio') || action.tags.includes('policy-studio')) && action.tags.includes('operational-proof'));
         if (candidates.length > 1) {
           throw new Error(`OPERATIONAL_ACTION_AMBIGUOUS ${resourceKey}`);
         }
@@ -716,7 +876,7 @@ export class ProjectionCatalogService {
     return this.domainRules.publish({
       ruleDefinitionId: definitionId,
       applyEligibleMaterializations: true,
-      publicationNotes: { source: 'praxis-policy-studio', intent: 'publish-governed-definition' }
+      publicationNotes: { source: 'praxis-rules-studio', intent: 'publish-governed-definition' }
     }, this.requestOptions(config)).pipe(map(publication => ({
       status: publication.publicationStatus ?? null,
       readiness: publication.publicationReadiness ?? null,
@@ -746,7 +906,7 @@ export class ProjectionCatalogService {
   }
 
   snapshotCockpit(
-    ruleSetKey: string,
+    ruleSetKey: string, operationKey: string,
     config: PolicyStudioRuntimeConfig
   ): Observable<{
     readonly head: DomainRuleSnapshotHeadStatus | null;
@@ -754,23 +914,23 @@ export class ProjectionCatalogService {
   }> {
     if (config.mode !== 'remote') return of({ head: null, versions: [] });
     const options = this.requestOptions(config);
-    const head = this.domainRules.getSnapshotHeadStatus(ruleSetKey, options).pipe(
+    const head = this.domainRules.getSnapshotHeadStatus(ruleSetKey, operationKey, options).pipe(
       catchError((error: unknown) => this.isMissingSnapshotHead(error)
         ? of(null)
         : throwError(() => error))
     );
     return forkJoin({
       head,
-      versions: this.domainRules.listSnapshotVersions(ruleSetKey, 50, options)
+      versions: this.domainRules.listSnapshotVersions(ruleSetKey, operationKey, 50, options)
     });
   }
 
   activeSnapshot(
-    ruleSetKey: string,
+    ruleSetKey: string, operationKey: string,
     config: PolicyStudioRuntimeConfig
   ): Observable<DomainRuleSnapshotActivation | null> {
     if (config.mode !== 'remote') return of(null);
-    return this.domainRules.getSnapshotHead(ruleSetKey, this.requestOptions(config)).pipe(
+    return this.domainRules.getSnapshotHead(ruleSetKey, operationKey, this.requestOptions(config)).pipe(
       catchError((error: unknown) => this.isMissingSnapshotHead(error)
         ? of(null)
         : throwError(() => error))
@@ -781,8 +941,8 @@ export class ProjectionCatalogService {
     return this.domainRules.getSnapshotExecutionSummary(snapshotKey, this.requestOptions(config));
   }
 
-  hostStatusSummary(ruleSetKey: string, config: PolicyStudioRuntimeConfig): Observable<DomainRuleHostStatusSummary> {
-    return this.domainRules.getSnapshotHostStatusSummary(ruleSetKey, this.requestOptions(config));
+  hostStatusSummary(ruleSetKey: string, operationKey: string, config: PolicyStudioRuntimeConfig): Observable<DomainRuleHostStatusSummary> {
+    return this.domainRules.getSnapshotHostStatusSummary(ruleSetKey, operationKey, this.requestOptions(config));
   }
 
   rolloutPolicyCatalog(
@@ -821,8 +981,8 @@ export class ProjectionCatalogService {
     return this.domainRules.activateRolloutPolicy(policy.policyId, policyHeadEtag, this.requestOptions(config));
   }
 
-  rolloutCatalog(ruleSetKey: string, config: PolicyStudioRuntimeConfig): Observable<DomainRuleRolloutCatalog> {
-    return this.domainRules.getRolloutCatalog(ruleSetKey, this.requestOptions(config));
+  rolloutCatalog(ruleSetKey: string, operationKey: string, config: PolicyStudioRuntimeConfig): Observable<DomainRuleRolloutCatalog> {
+    return this.domainRules.getRolloutCatalog(ruleSetKey, operationKey, this.requestOptions(config));
   }
 
   createRollout(
@@ -867,26 +1027,34 @@ export class ProjectionCatalogService {
     return throwError(() => new Error(`SNAPSHOT_ACTION_NOT_AVAILABLE ${version.availableAction}`));
   }
 
+  snapshotHeadSet(
+    ruleSetKey: string,
+    operationKeys: readonly string[],
+    config: PolicyStudioRuntimeConfig
+  ): Observable<DomainRuleSnapshotHeadSetResponse | null> {
+    if (config.mode !== 'remote' || !ruleSetKey || operationKeys.length === 0) return of(null);
+    return this.domainRules.getSnapshotHeadSet(ruleSetKey, operationKeys, this.requestOptions(config)).pipe(
+      catchError((error: unknown) => this.isMissingSnapshotHead(error)
+        ? of(null)
+        : throwError(() => error))
+    );
+  }
+
+  withdrawSnapshotHead(
+    request: DomainRuleSnapshotWithdrawalRequest,
+    headEtag: string,
+    config: PolicyStudioRuntimeConfig
+  ): Observable<DomainRuleSnapshotWithdrawalResponse> {
+    this.candidateHeadPrecondition(headEtag);
+    return this.domainRules.withdrawSnapshotHead(request, headEtag, this.requestOptions(config));
+  }
+
   prepareRuleSetCandidate(
     ruleSetKey: string,
     request: RuleSetCompositionCandidateRequest,
     config: PolicyStudioRuntimeConfig
   ): Observable<RuleSetCompositionCandidate> {
-    const core = this.domainRules as unknown as {
-      prepareRuleSetCandidate?: (
-        key: string,
-        body: RuleSetCompositionCandidateRequest,
-        options: unknown
-      ) => Observable<RuleSetCompositionCandidate>;
-    };
-    if (typeof core.prepareRuleSetCandidate === 'function') {
-      return core.prepareRuleSetCandidate(ruleSetKey, request, this.requestOptions(config));
-    }
-    const baseUrl = (config.configApiBaseUrl ?? '').replace(/\/$/, '');
-    return this.http.post<RuleSetCompositionCandidate>(
-      `${baseUrl}/api/praxis/policy-studio/rule-sets/${encodeURIComponent(ruleSetKey)}/candidate`,
-      request
-    );
+    return this.domainRules.prepareRuleSetCandidate(ruleSetKey, request, this.requestOptions(config));
   }
 
   approveRuleSetCandidate(
@@ -894,21 +1062,7 @@ export class ProjectionCatalogService {
     command: RuleSetCompositionCandidateCommand,
     config: PolicyStudioRuntimeConfig
   ): Observable<DomainRuleCompositionApproval> {
-    const core = this.domainRules as unknown as {
-      approveRuleSetCandidate?: (
-        key: string,
-        body: RuleSetCompositionCandidateCommand,
-        options: unknown
-      ) => Observable<DomainRuleCompositionApproval>;
-    };
-    if (typeof core.approveRuleSetCandidate === 'function') {
-      return core.approveRuleSetCandidate(ruleSetKey, command, this.requestOptions(config));
-    }
-    const baseUrl = (config.configApiBaseUrl ?? '').replace(/\/$/, '');
-    return this.http.post<DomainRuleCompositionApproval>(
-      `${baseUrl}/api/praxis/policy-studio/rule-sets/${encodeURIComponent(ruleSetKey)}/candidate/approvals`,
-      command
-    );
+    return this.domainRules.approveRuleSetCandidate(ruleSetKey, command, this.requestOptions(config));
   }
 
   publishRuleSetCandidate(
@@ -917,24 +1071,8 @@ export class ProjectionCatalogService {
     currentHeadEtag: string | null,
     config: PolicyStudioRuntimeConfig
   ): Observable<RuleSetCompositionPublication> {
-    const headers = this.candidateHeadPrecondition(currentHeadEtag);
-    const core = this.domainRules as unknown as {
-      publishRuleSetCandidate?: (
-        key: string,
-        body: RuleSetCompositionCandidateCommand,
-        headEtag: string | null,
-        options: unknown
-      ) => Observable<RuleSetCompositionPublication>;
-    };
-    if (typeof core.publishRuleSetCandidate === 'function') {
-      return core.publishRuleSetCandidate(ruleSetKey, command, currentHeadEtag, this.requestOptions(config));
-    }
-    const baseUrl = (config.configApiBaseUrl ?? '').replace(/\/$/, '');
-    return this.http.post<RuleSetCompositionPublication>(
-      `${baseUrl}/api/praxis/policy-studio/rule-sets/${encodeURIComponent(ruleSetKey)}/candidate/publish`,
-      command,
-      { headers }
-    );
+    this.candidateHeadPrecondition(currentHeadEtag);
+    return this.domainRules.publishRuleSetCandidate(ruleSetKey, command, currentHeadEtag, this.requestOptions(config));
   }
 
   prepareSnapshotComposition(

@@ -6,7 +6,7 @@
     {
       "path": "src/main/java/com/example/praxis/apiquickstart/config/PayrollReactiveDeterminationRuleSet.java",
       "kind": "RULESET_DEFINITION",
-      "sha256": "9C890A51B90A52DE4362249389454C9EACC5FC96D49878B584433B31241DE065"
+      "sha256": "59EE07A0A5889A7A6BA2635BF793895BFB47C5AE74C4C48173D87E3894D600AE"
     },
     {
       "path": "src/main/java/com/example/praxis/apiquickstart/config/ReactiveDeterminationPilotConfiguration.java",

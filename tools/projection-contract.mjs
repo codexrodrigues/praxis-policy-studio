@@ -1,9 +1,15 @@
-export const PROJECTION_KIND = 'ERGONX_POLICY_STUDIO_PROJECTION_V1';
+export const PROJECTION_KIND = 'ERGONX_RULES_STUDIO_PROJECTION_V1';
+const SUPPORTED_PROJECTION_KINDS = new Set([
+  'ERGONX_RULES_STUDIO_PROJECTION_V1',
+  'RULES_STUDIO_PROJECTION_V1',
+  'ERGONX_POLICY_STUDIO_PROJECTION_V1',
+  'POLICY_STUDIO_PROJECTION_V1'
+]);
 
 export function validateProjection(projection) {
   const errors = [];
   if (!projection || typeof projection !== 'object') errors.push('DOCUMENT_REQUIRED');
-  if (projection?.kind !== PROJECTION_KIND && projection?.kind !== 'POLICY_STUDIO_PROJECTION_V1') errors.push('KIND_UNSUPPORTED');
+  if (!SUPPORTED_PROJECTION_KINDS.has(projection?.kind)) errors.push('KIND_UNSUPPORTED');
   if (!projection?.projectionId || !projection?.projectionVersion) errors.push('IDENTITY_REQUIRED');
   if (!projection?.ruleSetRef?.domainKey || !projection?.ruleSetRef?.ruleSetKey) errors.push('RULESET_REQUIRED');
   if (projection?.ruleSetRef?.operationalResourceKey !== undefined &&

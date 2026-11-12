@@ -1,4 +1,4 @@
-# Estado e roadmap do Praxis Policy Studio
+# Estado e roadmap do Praxis Rules Studio
 
 - Baseline de desenvolvimento validada: Studio `main@05903ac` mais o corte local
   de integridade corporativa e adoção direta de `DomainRuleService.getDefinitionParameters`,
@@ -48,7 +48,7 @@ multi-consumidor.
 | cenários, sandbox e Test Run | 90 | `suportado-parcialmente` | cenário e Test Run reais provaram candidate `ALLOW` e active fail-closed sem snapshot; o Studio deriva inputs tipados do catálogo canônico de facts (incluindo `array<number>` / `number-array` alinhados no Config) e usa JSON estruturado apenas para preview ou para famílias de decisão sem `factCatalog` declarado; baseline independente, retry, asserções e action host-owned existem |
 | review/maker-checker | 88 | `suportado-parcialmente` | workspace, ETag, blockers, run submetido (`submittedTestRunId` + elegibilidade de baseline vinculados até publicação), segregação 4-olhos e execução delegada com confirmação governada (`requestDelegatedGateCommand`) comprovados |
 | publicação/materialização | 85 | `suportado-parcialmente` | readiness e action `PUBLISH` são server-owned, com inspeção automática de prontidão no disparo delegado (`PUBLISH_DEFINITION`), recibo de evidência vinculado (`governance-bound-receipt`) e confirmação governada no gate de publicação |
-| snapshot, rollback e staged rollout | 97 | `suportado-parcialmente` | composição assistida host-owned de snapshot candidato (`/api/praxis/policy-studio/rule-sets/{ruleSetKey}/candidate`, `/candidate/approvals`, `/candidate/publish` sem expor o grafo executável ao browser), análise reativa pré-publicação de impacto e `where-used` (superfícies operacionais, operações vinculadas, fatos compartilhados entre regras, composição de slots do RuleSet, diagnóstico de lacunas `MISSING_SLOT_FACTS` e alerta de rascunhos irmãos não promovidos), segregação 4-olhos via `authorizedActions` (`PREPARE`/`APPROVE`/`PUBLISH`), tratamento de `409 STALE_RULESET_CANDIDATE`, blockers tipados server-owned, rollback governado de snapshot com `If-Match` Head ETag e confirmação explícita, create/cancel/activate rollout e lifecycle de rollout-policy são principal-specific |
+| snapshot, rollback e staged rollout | 97 | `suportado-parcialmente` | composição assistida host-owned de snapshot candidato (`/api/praxis/rules-studio/rule-sets/{ruleSetKey}/candidate`, `/candidate/approvals`, `/candidate/publish` sem expor o grafo executável ao browser), análise reativa pré-publicação de impacto e `where-used` (superfícies operacionais, operações vinculadas, fatos compartilhados entre regras, composição de slots do RuleSet, diagnóstico de lacunas `MISSING_SLOT_FACTS` e alerta de rascunhos irmãos não promovidos), segregação 4-olhos via `authorizedActions` (`PREPARE`/`APPROVE`/`PUBLISH`), tratamento de `409 STALE_RULESET_CANDIDATE`, blockers tipados server-owned, rollback governado de snapshot com `If-Match` Head ETag e confirmação explícita, create/cancel/activate rollout e lifecycle de rollout-policy são principal-specific |
 | evidência V58/V60/Ergon | 89 | `suportado-parcialmente` | contrato leve, action dedicada, reserva pré-DML e quatro quadrantes foram provados; a cadeia publicada de folha confirmou snapshots v1/v2 e execução no Neon sem duplicação; faltam adapter Ergon e Oracle/HADES |
 | segurança, multitenancy e capabilities | 85 | `suportado-parcialmente` | publicação e rollout não são mais inferidos no browser; seis sujeitos separados passaram pela cadeia HTTP publicada; author abriu o catálogo no site homologado e auditor permaneceu read-only; faltam Neon cross-tenant e matriz visual multi-persona completa |
 | UX, i18n e acessibilidade | 88 | `suportado-parcialmente` | decomposição completa do workspace em store/facades/componentes dedicados, i18n bilíngue (`pt-BR` e `en-US`) em toda a workstation/authoring/cockpit e validação Playwright desktop/narrow, teclado e Axe cobrindo fluxos corporativos e `en-US` |
@@ -100,7 +100,7 @@ A prova sanitizada confirmou:
   Definition, workspace, publicação, snapshot ou Test Run durante a matriz.
 
 O PR `#29` publicou depois o Studio em
-`https://praxis-policy-studio-homolog.onrender.com`. A origin exata passou por
+`https://praxis-rules-studio-homolog.onrender.com`. A origin exata passou por
 CORS e pelo filtro do Config; uma sessão de author carregou as dez decisões no
 browser e uma sessão de auditor preservou leitura `200` com escrita `403`.
 
@@ -258,7 +258,7 @@ O mesmo corte:
 
 A navegação corrigida revelou dois botões contextuais sem nome acessível no
 `@praxisui/visual-builder`. A correção pertence ao owner da biblioteca e foi
-validada pelo teste focal do editor e pelo Axe do Policy Studio em desktop e
+validada pelo teste focal do editor e pelo Axe do Rules Studio em desktop e
 narrow. O manifesto AI e o registry não mudam: não houve alteração de API,
 configuração, JSON Logic ou operação authorable.
 

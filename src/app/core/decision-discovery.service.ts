@@ -59,8 +59,8 @@ export class DecisionDiscoveryService {
     const turnRequest: AgenticAuthoringTurnStreamRequest = {
       clientTurnId: createClientRequestId(),
       userPrompt: request.prompt.trim(),
-      targetApp: 'praxis-policy-studio',
-      targetComponentId: 'policy-decision-discovery',
+      targetApp: 'praxis-rules-studio',
+      targetComponentId: 'rules-decision-discovery',
       currentRoute: '/catalog',
       contextHints: { responseLocale: request.locale }
     };

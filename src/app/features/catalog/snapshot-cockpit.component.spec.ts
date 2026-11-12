@@ -5,6 +5,10 @@ import { BrowserTestingModule, platformBrowserTesting } from '@angular/platform-
 import type { DomainRuleRolloutPolicy, DomainRuleSnapshotVersion } from '@praxisui/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { RuleSetCompositionCandidate } from './catalog.fixture';
+import {
+  buildDecisionMaturityPosture,
+  buildExecutionCorrelationSummary
+} from './catalog-presentation';
 import { SnapshotCockpitComponent } from './snapshot-cockpit.component';
 import { DecisionParametersEditorComponent } from '../authoring/decision-parameters-editor.component';
 
@@ -16,8 +20,10 @@ describe('SnapshotCockpitComponent', () => {
 
   it('labels only the action already authorized by the snapshot catalog', () => {
     const component = TestBed.runInInjectionContext(() => new SnapshotCockpitComponent());
+    Object.defineProperty(component, 'operationKey', { configurable: true, value: () => 'evaluate' });
+    Object.defineProperty(component, 'operationKeys', { configurable: true, value: () => ['evaluate'] });
     const version: DomainRuleSnapshotVersion = {
-      snapshotKey: 'snapshot-2', ruleSetKey: 'benefit-rules', ruleSetVersion: 2,
+      snapshotKey: 'snapshot-2', ruleSetKey: 'benefit-rules', operationKey: 'evaluate', ruleSetVersion: 2,
       publicationRevision: 2, snapshotContentHash: 'A'.repeat(64), publishedBy: 'publisher',
       publishedAtUtc: '2026-08-13T12:00:00Z', active: false,
       governanceState: 'READY', availableAction: 'ROLLBACK'
@@ -28,6 +34,8 @@ describe('SnapshotCockpitComponent', () => {
 
   it('emits a typed REQUIRED rollout-policy draft only with a valid quorum', () => {
     const component = TestBed.runInInjectionContext(() => new SnapshotCockpitComponent());
+    Object.defineProperty(component, 'operationKey', { configurable: true, value: () => 'evaluate' });
+    Object.defineProperty(component, 'operationKeys', { configurable: true, value: () => ['evaluate'] });
     Object.defineProperty(component, 'ruleSetKey', { value: () => 'frequency-rules' });
     const requests: unknown[] = [];
     component.createRolloutPolicy.subscribe(request => requests.push(request));
@@ -46,6 +54,8 @@ describe('SnapshotCockpitComponent', () => {
 
   it('derives policy commands from lifecycle without inferring user roles', () => {
     const component = TestBed.runInInjectionContext(() => new SnapshotCockpitComponent());
+    Object.defineProperty(component, 'operationKey', { configurable: true, value: () => 'evaluate' });
+    Object.defineProperty(component, 'operationKeys', { configurable: true, value: () => ['evaluate'] });
     const policy: DomainRuleRolloutPolicy = {
       policyId: 'policy-1', ruleSetKey: 'frequency-rules', policyKey: 'strict-host-quorum',
       policyVersion: 1, status: 'DRAFT', enforcementMode: 'REQUIRED', minimumFreshProbes: 2,
@@ -65,8 +75,10 @@ describe('SnapshotCockpitComponent', () => {
 
   it('creates rollout controls only from the rollout catalog action', () => {
     const component = TestBed.runInInjectionContext(() => new SnapshotCockpitComponent());
+    Object.defineProperty(component, 'operationKey', { configurable: true, value: () => 'evaluate' });
+    Object.defineProperty(component, 'operationKeys', { configurable: true, value: () => ['evaluate'] });
     const version: DomainRuleSnapshotVersion = {
-      snapshotKey: 'candidate-2', ruleSetKey: 'benefit-rules', ruleSetVersion: 2,
+      snapshotKey: 'candidate-2', ruleSetKey: 'benefit-rules', operationKey: 'evaluate', ruleSetVersion: 2,
       publicationRevision: 2, snapshotContentHash: 'A'.repeat(64), publishedBy: 'publisher',
       publishedAtUtc: '2026-08-13T12:00:00Z', active: false,
       governanceState: 'READY', availableAction: 'ACTIVATE'
@@ -105,6 +117,8 @@ describe('SnapshotCockpitComponent', () => {
 
   it('explains runtime incompatibility and preserved audit history in both locales', () => {
     const component = TestBed.runInInjectionContext(() => new SnapshotCockpitComponent());
+    Object.defineProperty(component, 'operationKey', { configurable: true, value: () => 'evaluate' });
+    Object.defineProperty(component, 'operationKeys', { configurable: true, value: () => ['evaluate'] });
     expect(component.i18n.text('snapshotRuntimeIncompatible')).toContain('runtime atual');
     expect(component.i18n.text('snapshotRuntimeIncompatibleHint')).toContain('auditoria');
     component.i18n.locale.set('en-US');
@@ -114,6 +128,8 @@ describe('SnapshotCockpitComponent', () => {
 
   it('projects stable snapshot blocker codes through localized product copy', () => {
     const component = TestBed.runInInjectionContext(() => new SnapshotCockpitComponent());
+    Object.defineProperty(component, 'operationKey', { configurable: true, value: () => 'evaluate' });
+    Object.defineProperty(component, 'operationKeys', { configurable: true, value: () => ['evaluate'] });
 
     expect(component.blockerLabel('OPERATION_DECISION_MATRIX_INCOMPLETE'))
       .toContain('CREATE e UPDATE');
@@ -123,6 +139,8 @@ describe('SnapshotCockpitComponent', () => {
 
   it('enforces Segregation of Duties (SoD) via authorizedActions on the host-owned RuleSetCompositionCandidate', () => {
     const component = TestBed.runInInjectionContext(() => new SnapshotCockpitComponent());
+    Object.defineProperty(component, 'operationKey', { configurable: true, value: () => 'evaluate' });
+    Object.defineProperty(component, 'operationKeys', { configurable: true, value: () => ['evaluate'] });
     const candidateSignal = signal<RuleSetCompositionCandidate | null>({
       ruleSetKey: 'benefit-rules',
       ruleSetVersion: 3,
@@ -207,6 +225,8 @@ describe('SnapshotCockpitComponent', () => {
 
   it('resets customPromotedDefinitionId when switching decisions or ruleSetKeys', () => {
     const component = TestBed.runInInjectionContext(() => new SnapshotCockpitComponent());
+    Object.defineProperty(component, 'operationKey', { configurable: true, value: () => 'evaluate' });
+    Object.defineProperty(component, 'operationKeys', { configurable: true, value: () => ['evaluate'] });
     const ruleSetKeySignal = signal('benefit-rules');
     const defaultSourceSignal = signal<string | null>('def-default-1');
     const eligibleSourcesSignal = signal([
@@ -249,6 +269,8 @@ describe('SnapshotCockpitComponent', () => {
 
   it('computes pre-publication RuleSet impact, shared facts (where-used), peer slot roles, and unpromoted draft warnings', () => {
     const component = TestBed.runInInjectionContext(() => new SnapshotCockpitComponent());
+    Object.defineProperty(component, 'operationKey', { configurable: true, value: () => 'evaluate' });
+    Object.defineProperty(component, 'operationKeys', { configurable: true, value: () => ['evaluate'] });
     const ruleSetKeySignal = signal('extraordinary-grant-eligibility');
     const defaultSourceSignal = signal<string | null>('def-amount-promoted');
     const candidateSignal = signal<RuleSetCompositionCandidate | null>(null);
@@ -384,6 +406,175 @@ describe('SnapshotCockpitComponent', () => {
       affectedRuleKeys: ['budget.availability'],
       detail: 'budget.availability'
     });
+  });
+
+  it('supports governed head withdrawal validation and reactivation rollout when head is WITHDRAWN (V73/V74 tombstone)', () => {
+    const component = TestBed.runInInjectionContext(() => new SnapshotCockpitComponent());
+    Object.defineProperty(component, 'operationKey', { configurable: true, value: () => 'funcao-confianca:create' });
+    Object.defineProperty(component, 'operationKeys', {
+      configurable: true,
+      value: () => ['funcao-confianca:create', 'funcao-confianca:update']
+    });
+    const headSignal = signal<{
+      readonly ruleSetKey: string;
+      readonly operationKey: string;
+      readonly activeSnapshotKey: string;
+      readonly ruleSetVersion: number;
+      readonly publicationRevision: number;
+      readonly activationRevision: number;
+      readonly activatedBy: string;
+      readonly activatedAtUtc: string;
+      readonly headEtag: string;
+      readonly executionReady: boolean;
+      readonly governanceState: 'READY' | 'WITHDRAWN';
+    } | null>({
+      ruleSetKey: 'ergon.funcao-confianca',
+      operationKey: 'funcao-confianca:create',
+      activeSnapshotKey: 'fc-snap-v1',
+      ruleSetVersion: 1,
+      publicationRevision: 1,
+      activationRevision: 1,
+      activatedBy: 'publisher',
+      activatedAtUtc: '2026-08-13T12:00:00Z',
+      headEtag: '"head-ready-1"',
+      executionReady: true,
+      governanceState: 'READY'
+    });
+    Object.defineProperty(component, 'head', { configurable: true, value: headSignal });
+    Object.defineProperty(component, 'rolloutCatalog', {
+      configurable: true,
+      value: () => ({
+        ruleSetKey: 'ergon.funcao-confianca',
+        operationKey: 'funcao-confianca:create',
+        rollouts: [],
+        availableActions: ['CREATE_ROLLOUT']
+      })
+    });
+
+    const withdrawnReasons: string[] = [];
+    const selectedOperations: string[] = [];
+    component.withdrawHead.subscribe(reason => withdrawnReasons.push(reason));
+    component.operationSelected.subscribe(op => selectedOperations.push(op));
+
+    component.withdrawAuthoringOpen.set(true);
+    component.submitWithdraw('   ');
+    expect(component.withdrawInputError()).toBe(true);
+    expect(withdrawnReasons).toHaveLength(0);
+
+    // Switching operations resets withdrawAuthoringOpen and withdrawInputError
+    component.selectOperation('funcao-confianca:update');
+    expect(component.withdrawAuthoringOpen()).toBe(false);
+    expect(component.withdrawInputError()).toBe(false);
+    expect(selectedOperations).toEqual(['funcao-confianca:update']);
+
+    component.submitWithdraw('Incidente operacional no lote de funções governadas');
+    expect(component.withdrawInputError()).toBe(false);
+    expect(withdrawnReasons).toEqual(['Incidente operacional no lote de funções governadas']);
+
+    // Even while the currently inspected operation head is READY, if the coupled family cohort (head-set)
+    // is null (404 because another peer operation was withdrawn), posture reports CONFIG_AUTHORITATIVE (no active cohort).
+    const coupledReadyHeadWithIncompleteCohort = buildDecisionMaturityPosture(
+      {
+        order: 1,
+        totalDecisions: 1,
+        key: 'ergon.funcao_confianca.identidade_obrigatoria',
+        code: 'ERG_FC_IDENTIDADE_OBRIGATORIA',
+        name: 'Identidade obrigatória',
+        domain: 'ergon',
+        ruleSet: 'Função de Confiança',
+        ruleSetKey: 'ergon.administracao-pessoal.funcoes.chefia',
+        resourceKey: 'ergon.funcao-confianca',
+        serviceKey: 'praxis-ergon-showcase',
+        state: 'verified' as const,
+        meaning: 'Valida código e nome.',
+        authority: 'GOVERNED_SNAPSHOT',
+        baselineAuthority: 'LEGACY_ORACLE',
+        source: 'FuncaoConfiancaRuleSet',
+        evidenceCount: 1,
+        authoringSupported: true,
+        availableDefinitionActions: [],
+        expression: null,
+        condition: null,
+        factPaths: [],
+        facts: [],
+        nullSemantics: 'FAIL_CLOSED',
+        operationKeys: ['createErgonFuncaoConfianca', 'updateErgonFuncaoConfianca'],
+        hostContractVersion: 'ergon/1.0',
+        evidence: [],
+        draftLifecycle: null
+      },
+      headSignal(),
+      null
+    );
+    expect(coupledReadyHeadWithIncompleteCohort?.activeSnapshotKey).toBeNull();
+    expect(coupledReadyHeadWithIncompleteCohort?.operationalAuthority).toBe('CONFIG_AUTHORITATIVE');
+
+    // Transition to WITHDRAWN tombstone: activeSnapshotKey is preserved for audit, executionReady is false,
+    // and published READY versions expose CREATE_ROLLOUT for reactivation using the rotated headEtag.
+    headSignal.set({
+      ruleSetKey: 'ergon.funcao-confianca',
+      operationKey: 'funcao-confianca:create',
+      activeSnapshotKey: 'fc-snap-v1',
+      ruleSetVersion: 1,
+      publicationRevision: 1,
+      activationRevision: 2,
+      activatedBy: 'publisher',
+      activatedAtUtc: '2026-08-13T12:00:00Z',
+      headEtag: '"head-withdrawn-2"',
+      executionReady: false,
+      governanceState: 'WITHDRAWN'
+    });
+
+    const reactivationCandidate: DomainRuleSnapshotVersion = {
+      snapshotKey: 'fc-snap-v1',
+      ruleSetKey: 'ergon.funcao-confianca',
+      operationKey: 'funcao-confianca:create',
+      ruleSetVersion: 1,
+      publicationRevision: 1,
+      snapshotContentHash: 'B'.repeat(64),
+      publishedBy: 'publisher',
+      publishedAtUtc: '2026-08-13T12:00:00Z',
+      active: false,
+      governanceState: 'READY',
+      availableAction: 'CREATE_ROLLOUT'
+    };
+    expect(component.canCreateRollout(reactivationCandidate)).toBe(true);
+
+    const decision = {
+      order: 1,
+      totalDecisions: 1,
+      key: 'ergon.funcao_confianca.identidade_obrigatoria',
+      code: 'ERG_FC_IDENTIDADE_OBRIGATORIA',
+      name: 'Identidade obrigatória',
+      domain: 'ergon',
+      ruleSet: 'Função de Confiança',
+      ruleSetKey: 'ergon.funcao-confianca',
+      resourceKey: 'ergon.funcao-confianca',
+      serviceKey: 'praxis-ergon-showcase',
+      state: 'verified' as const,
+      meaning: 'Valida código e nome.',
+      authority: 'GOVERNED_SNAPSHOT',
+      baselineAuthority: 'LEGACY_ORACLE',
+      source: 'FuncaoConfiancaRuleSet',
+      evidenceCount: 1,
+      authoringSupported: true,
+      availableDefinitionActions: [],
+      expression: null,
+      condition: null,
+      factPaths: [],
+      facts: [],
+      nullSemantics: 'FAIL_CLOSED',
+      operationKeys: ['funcao-confianca:create', 'funcao-confianca:update'],
+      hostContractVersion: 'ergon/1.0',
+      evidence: [],
+      draftLifecycle: null
+    };
+    const posture = buildDecisionMaturityPosture(decision, headSignal());
+    expect(posture?.activeSnapshotKey).toBeNull();
+    expect(posture?.operationalAuthority).toBe('CONFIG_AUTHORITATIVE');
+
+    const correlation = buildExecutionCorrelationSummary(decision, null, headSignal(), null, null);
+    expect(correlation?.activeSnapshotKey).toBeNull();
   });
 
 });

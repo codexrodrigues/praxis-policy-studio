@@ -6,7 +6,7 @@ export const routes: Routes = [
     path: 'catalog',
     loadComponent: () => import('./features/catalog/catalog-workspace.component')
       .then(module => module.CatalogWorkspaceComponent),
-    title: 'Catálogo — Praxis Policy Studio'
+    title: 'Catálogo — Praxis Rules Studio'
   },
   { path: '**', redirectTo: 'catalog' }
 ];

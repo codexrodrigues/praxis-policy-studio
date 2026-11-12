@@ -1,4 +1,4 @@
-# Handoff Ergon — Policy Studio beta.8 / evidência V58
+# Handoff Ergon — Rules Studio beta.8 / evidência V58
 
 > Este documento preserva o corte publicado beta.8/rc.32. A action host-owned posterior e os
 > limites atuais estão no [complemento V59](ergon-handoff-v59.md).
@@ -39,7 +39,7 @@ Adotar somente a cadeia completa, sem `SNAPSHOT`:
 2. `praxis-config-starter:0.1.0-rc.113` no control plane/host de referência;
 3. `praxis-api-quickstart:2.0.0-rc.32` como laboratório reproduzível;
 4. `@praxisui/core:9.0.5-rc.23` para projetar o run vinculado;
-5. `praxis-policy-studio:0.1.0-beta.8`.
+5. `praxis-rules-studio:0.1.0-beta.8`.
 
 A cadeia acima está publicada. Fixar essas versões exatas ou seus commits de release;
 não reutilizar tags anteriores. Não importar `praxis-config-starter` no Ergon para
@@ -112,7 +112,7 @@ vinculado à submissão é o mesmo receipt homologado.
 - política RN-013 bloqueia promoção quando Oracle não é `ELIGIBLE`, a matriz está incompleta,
   a paridade diverge ou o cleanup não foi comprovado;
 - logs e receipts não contêm dados de negócio sensíveis;
-- autoridade continua legado até homologação explícita fora do Policy Studio.
+- autoridade continua legado até homologação explícita fora do Rules Studio.
 
 ## Limites ainda abertos
 

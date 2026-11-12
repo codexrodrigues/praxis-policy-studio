@@ -2,7 +2,7 @@
 
 ## Escopo comprovado
 
-O Policy Studio executa uma suíte Playwright reproduzível na porta oficial
+O Rules Studio executa uma suíte Playwright reproduzível na porta oficial
 `4302`, nos viewports desktop `1440×1000` e narrow `390×844`. O backend é
 hermético e preserva os contratos públicos observados pelo browser.
 
@@ -50,7 +50,7 @@ POLICY_STUDIO_LIVE_OPERATOR_USERNAME=... \
 POLICY_STUDIO_LIVE_OPERATOR_PASSWORD=... \
 POLICY_STUDIO_LIVE_AUDITOR_USERNAME=... \
 POLICY_STUDIO_LIVE_AUDITOR_PASSWORD=... \
-POLICY_STUDIO_LIVE_STUDIO_URL=https://praxis-policy-studio-homolog.onrender.com \
+POLICY_STUDIO_LIVE_STUDIO_URL=https://praxis-rules-studio-homolog.onrender.com \
 POLICY_STUDIO_LIVE_BACKEND_URL=https://praxis-api-quickstart.onrender.com \
 npm run e2e:live:multipersona
 ```
@@ -78,7 +78,7 @@ positivas, negativas `403`, auditor read-only e Origin/CORS para a porta oficial
 existente.
 
 A homologação estática posterior foi publicada em
-`https://praxis-policy-studio-homolog.onrender.com` pelo PR `#29`. O site abriu a
+`https://praxis-rules-studio-homolog.onrender.com` pelo PR `#29`. O site abriu a
 rota SPA diretamente, criou uma sessão real de author e carregou as dez decisões
 do Quickstart publicado. CORS, filtro de Origin, auditor read-only `200` e recusa
 operacional `403` foram repetidos no container que serve essa origin.

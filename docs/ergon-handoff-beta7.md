@@ -1,4 +1,4 @@
-# Handoff Ergon — Policy Studio 0.1.0-beta.7
+# Handoff Ergon — Rules Studio 0.1.0-beta.7
 
 Este corte complementa a issue executiva
 [`Techne-ErgonX-migracao#300`](https://github.com/codexrodrigues/Techne-ErgonX-migracao/issues/300).
@@ -6,7 +6,7 @@ Ele não substitui o gate Oracle/HADES e não promove autoridade do legado.
 
 ## Artefatos coordenados
 
-- Policy Studio `0.1.0-beta.7`;
+- Rules Studio `0.1.0-beta.7`;
 - Praxis Config `0.1.0-rc.112`;
 - `@praxisui/*` `9.0.5-rc.21`;
 - Quickstart `v2.0.0-rc.31`, que preserva o laboratório V57 e incorpora a

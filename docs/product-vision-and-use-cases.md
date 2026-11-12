@@ -13,7 +13,7 @@ conhecimento de especialistas. Isso torna difícil responder perguntas simples:
 - quem pode propor, revisar, publicar ou reverter a mudança;
 - qual versão foi executada e qual evidência sustenta seu significado.
 
-O Praxis Policy Studio existe para tornar esse ciclo compreensível e operável.
+O Praxis Rules Studio existe para tornar esse ciclo compreensível e operável.
 Ele é a camada de experiência da plataforma de decisões: apresenta contratos
 governados, orienta a criação de novas versões e, por meio das APIs canônicas,
 acompanha o lifecycle sem assumir responsabilidades do control plane ou do
@@ -75,7 +75,7 @@ editores ad hoc e processos manuais para regras. Os principais custos são:
 
 ## 4. Não objetivos e limites
 
-O Policy Studio não deve:
+O Rules Studio não deve:
 
 - executar regras no browser como autoridade operacional;
 - persistir regras em armazenamento próprio;

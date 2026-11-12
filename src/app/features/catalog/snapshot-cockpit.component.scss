@@ -89,3 +89,8 @@ p { margin: 0; }
   .rollout-policy-form { grid-template-columns: 1fr; }
   .rollout-policy-timeline li { grid-template-columns: 1fr; gap: .15rem; }
 }
+
+.snapshot-operation { display: grid; gap: .5rem; width: min(100%, 36rem); min-width: 0; scroll-margin-block: 8rem; }
+.snapshot-operation label { font-size: .85rem; font-weight: 700; }
+.snapshot-operation select { min-height: 2.75rem; width: 100%; min-width: 0; padding: .6rem .75rem; border: 1px solid var(--pax-color-outline, #718087); border-radius: .5rem; background: var(--pax-color-surface, #f8fafc); color: var(--pax-color-on-surface, #172329); font: inherit; }
+.snapshot-operation select:focus-visible { outline: 2px solid var(--pax-color-primary, #076487); outline-offset: 3px; }

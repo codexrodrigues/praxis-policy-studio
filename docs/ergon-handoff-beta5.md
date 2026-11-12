@@ -1,4 +1,4 @@
-# Handoff Ergon — Policy Studio 0.1.0-beta.5
+# Handoff Ergon — Rules Studio 0.1.0-beta.5
 
 Este corte permite ao agente da migração validar a integração do Ergon sem Oracle
 local. O caso neutro do Quickstart reproduz o fluxo de decisões ordenadas,
@@ -7,7 +7,7 @@ pela RN-013, mantendo o núcleo do Studio independente do produto Ergon.
 
 ## Baseline compatível
 
-- Policy Studio `0.1.0-beta.5`, porta oficial `4302`;
+- Rules Studio `0.1.0-beta.5`, porta oficial `4302`;
 - Quickstart com dez slots de catálogo e sete definições governadas no caso Policy,
   porta oficial `8088`;
 - `@praxisui/*` `9.0.5-rc.18`, incluindo o client público de workspaces,

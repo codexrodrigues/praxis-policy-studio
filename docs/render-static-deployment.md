@@ -1,19 +1,19 @@
 # Deployment estático homologado no Render
 
-O Policy Studio pode ser publicado separadamente do Quickstart sem versionar a
+O Rules Studio pode ser publicado separadamente do Quickstart sem versionar a
 URL do ambiente. O build continua produzindo o mesmo app Angular e materializa o
 `configApiBaseUrl` somente no artefato derivado.
 
 ## Configuração do site
 
 - build command: `npm ci && npm run build:static`;
-- publish directory: `dist/praxis-policy-studio/browser`;
-- environment: `POLICY_STUDIO_CONFIG_API_BASE_URL`, contendo somente a origin
+- publish directory: `dist/praxis-rules-studio/browser`;
+- environment: `RULES_STUDIO_CONFIG_API_BASE_URL`, contendo somente a origin
   HTTPS do Quickstart, sem path, query, fragmento ou credenciais;
 - rewrite SPA: `/*` para `/index.html`.
 
 A homologação oficial está publicada em
-`https://praxis-policy-studio-homolog.onrender.com` (serviço Render
+`https://praxis-rules-studio-homolog.onrender.com` (serviço Render
 `srv-da0fbqlbedkc73ald6e0`) e aponta para o Quickstart público canônico
 `https://praxis-api-quickstart.onrender.com`. A URL e o identificador
 do serviço são evidência operacional; não são contrato de produto nem endpoint de
@@ -37,7 +37,7 @@ tenant, environment, capabilities, ETag ou segregação de funções no browser.
 ## Migração para o Quickstart canônico em 2026-08-26
 
 O deploy Render `dep-da7ggr142hec73bo2qr0` materializou
-`POLICY_STUDIO_CONFIG_API_BASE_URL=https://praxis-api-quickstart.onrender.com`.
+`RULES_STUDIO_CONFIG_API_BASE_URL=https://praxis-api-quickstart.onrender.com`.
 O log do build registrou
 `POLICY_STUDIO_STATIC_DEPLOYMENT_OK backend=https://praxis-api-quickstart.onrender.com`
 e o `app-config.json` publicado confirmou `mode=remote` com essa mesma origin.
@@ -46,7 +46,7 @@ Antes da migração, o Quickstart público foi validado com a origin exata do St
 catálogo estrutural `200`, headers CORS `Access-Control-Allow-Origin` e
 `Access-Control-Expose-Headers: ETag, X-Schema-Hash, X-Data-Version`, preflight de
 Config `200` e liveness `UP`. O serviço temporário
-`praxis-enterprise-proof-sandbox-v2` deixa de ser dependência do Policy Studio; sua
+`praxis-enterprise-proof-sandbox-v2` deixa de ser dependência do Rules Studio; sua
 suspensão continua condicionada à auditoria de todos os demais consumidores
 publicados.
 

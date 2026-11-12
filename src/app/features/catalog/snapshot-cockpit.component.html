@@ -6,7 +6,37 @@
     </div>
     <code>{{ ruleSetKey() }}</code>
   </header>
-  @if (loading()) {
+  <div class="snapshot-operation">
+  <label for="snapshot-operation">{{ i18n.text('snapshotOperation') }}</label>
+  <select id="snapshot-operation" [value]="operationKey() ?? ''"
+    (change)="selectOperation($any($event.target).value)">
+    <option value="" disabled>{{ i18n.text('snapshotChooseOperation') }}</option>
+    @for (operation of operationKeys(); track operation) {
+      <option [value]="operation">{{ operation }}</option>
+    }
+  </select>
+  </div>
+  @if (operationKeys().length > 1) {
+    @if (headSet(); as cohort) {
+      <dl class="facts snapshot-head" data-testid="snapshot-head-set-summary">
+        <div>
+          <dt>{{ i18n.text('coupledCohortReadyLabel') }}</dt>
+          <dd><strong>{{ headSetCount() }} / {{ operationKeys().length }}</strong></dd>
+        </div>
+        <div class="snapshot-etag">
+          <dt>{{ i18n.text('coupledCohortFingerprintLabel') }}</dt>
+          <dd><code>{{ cohort.fingerprint }}</code></dd>
+        </div>
+      </dl>
+    } @else if (headSet() === null && !headSetLoading() && !headSetError()) {
+      <p class="state-message" role="alert" data-testid="snapshot-cohort-incomplete-alert">
+        {{ i18n.text('coupledCohortIncompleteAlert') }}
+      </p>
+    }
+  }
+  @if (!operationKey()) {
+    <p class="empty" role="status">{{ i18n.text('snapshotChooseOperation') }}</p>
+  } @else if (loading()) {
     <p class="empty" aria-live="polite">{{ i18n.text('loading') }}</p>
   } @else if (loadError()) {
     <p class="empty state-message" role="alert">{{ i18n.text('snapshotLoadError') }}</p>
@@ -14,16 +44,75 @@
   } @else {
     @if (head(); as currentHead) {
       <dl class="facts snapshot-head">
-        <div><dt>{{ i18n.text('activeSnapshot') }}</dt><dd><code>{{ currentHead.activeSnapshotKey }}</code></dd></div>
+        <div>
+          <dt>{{ i18n.text(currentHead.governanceState === 'WITHDRAWN' ? 'lastSelectedSnapshot' : 'activeSnapshot') }}</dt>
+          <dd><code>{{ currentHead.activeSnapshotKey }}</code></dd>
+        </div>
         <div><dt>{{ i18n.text('executionReadiness') }}</dt><dd>{{ currentHead.executionReady ? i18n.text('ready') : i18n.text('notReady') }}</dd></div>
         <div><dt>{{ i18n.text('ruleSetVersion') }}</dt><dd>{{ currentHead.ruleSetVersion }}</dd></div>
         <div><dt>{{ i18n.text('publicationRevision') }}</dt><dd>{{ currentHead.publicationRevision }}</dd></div>
         <div><dt>{{ i18n.text('activationRevision') }}</dt><dd>{{ currentHead.activationRevision }}</dd></div>
-        <div><dt>{{ i18n.text('governanceState') }}</dt><dd>{{ currentHead.governanceState === 'RUNTIME_INCOMPATIBLE' ? i18n.text('snapshotRuntimeIncompatible') : currentHead.governanceState }}</dd></div>
+        <div>
+          <dt>{{ i18n.text('governanceState') }}</dt>
+          <dd>{{
+            currentHead.governanceState === 'RUNTIME_INCOMPATIBLE'
+              ? i18n.text('snapshotRuntimeIncompatible')
+              : currentHead.governanceState === 'WITHDRAWN'
+                ? i18n.text('snapshotWithdrawnState')
+                : currentHead.governanceState
+          }}</dd>
+        </div>
         <div class="snapshot-etag"><dt>{{ i18n.text('headEtag') }}</dt><dd><code>{{ currentHead.headEtag }}</code></dd></div>
       </dl>
       @if (currentHead.governanceState === 'RUNTIME_INCOMPATIBLE') {
         <p class="state-message" role="status">{{ i18n.text('snapshotRuntimeIncompatibleHint') }}</p>
+      } @else if (currentHead.governanceState === 'WITHDRAWN') {
+        <p class="state-message" role="status" data-testid="snapshot-withdrawn-hint">{{ i18n.text('snapshotWithdrawnHint') }}</p>
+      }
+      @if (currentHead.governanceState === 'READY' && currentHead.headEtag) {
+        <div class="rollout-actions">
+          <button
+            type="button"
+            class="quiet-button"
+            data-testid="toggle-withdraw-snapshot"
+            [disabled]="busy()"
+            [attr.aria-expanded]="withdrawAuthoringOpen()"
+            (click)="withdrawAuthoringOpen.set(!withdrawAuthoringOpen()); withdrawInputError.set(false)"
+          >
+            {{ i18n.text(withdrawAuthoringOpen() ? 'closeWithdrawSnapshotHead' : 'withdrawSnapshotHead') }}
+          </button>
+        </div>
+        @if (withdrawAuthoringOpen()) {
+          @if (operationKeys().length > 1) {
+            <p class="state-message" role="alert" data-testid="coupled-headset-withdrawal-warning">
+              {{ i18n.text('coupledHeadSetWithdrawWarning') }}
+            </p>
+          }
+          <form class="rollout-policy-form" (submit)="$event.preventDefault(); submitWithdraw(withdrawReason.value)">
+            <label>
+              {{ i18n.text('withdrawReasonLabel') }}
+              <input
+                #withdrawReason
+                required
+                maxlength="1000"
+                autocomplete="off"
+                data-testid="withdraw-snapshot-reason"
+                [attr.placeholder]="i18n.text('withdrawReasonPlaceholder')"
+              />
+            </label>
+            <button
+              type="submit"
+              class="quiet-button"
+              data-testid="submit-withdraw-snapshot"
+              [disabled]="busy()"
+            >
+              {{ i18n.text('withdrawSnapshotHead') }}
+            </button>
+          </form>
+          @if (withdrawInputError()) {
+            <p class="state-message" role="alert">{{ i18n.text('invalidWithdrawReason') }}</p>
+          }
+        }
       }
       <small class="authority-note">{{ i18n.text('etagBoundary') }}</small>
 
@@ -177,6 +266,7 @@
         }
       </section>
     @if (head(); as currentHead) {
+      @if (currentHead.governanceState !== 'WITHDRAWN') {
       <section class="execution-observations" aria-labelledby="host-status-title">
         <header>
           <div>
@@ -251,6 +341,7 @@
           <p class="empty">{{ i18n.text('noExecutionObservations') }}</p>
         }
       </section>
+      }
     }
 
     <div class="snapshot-version-list">
@@ -308,12 +399,15 @@
         type="button"
         class="quiet-button"
         data-testid="toggle-snapshot-composition"
-        [disabled]="busy()"
+        [disabled]="busy() || operationKeys().length !== 1"
         (click)="compositionOpen.update(v => !v)">
         {{ compositionOpen() ? i18n.text('closeSnapshotComposition') : i18n.text('composeSnapshotCandidate') }}
       </button>
     </header>
-    @if (compositionOpen()) {
+    @if (operationKeys().length !== 1) {
+      <p class="authority-note" role="status">{{ i18n.text('snapshotCompositionUnavailable') }}</p>
+    }
+    @if (compositionOpen() && operationKeys().length === 1) {
       <div class="rollout-policy-form" data-testid="snapshot-composition-form">
         @if (eligibleSources().length) {
           <fieldset class="eligible-sources-fieldset" data-testid="snapshot-eligible-sources">

@@ -8,6 +8,21 @@
     <a routerLink="/catalog" aria-current="page"><span class="glyph" aria-hidden="true">⌘</span>{{ i18n.text('catalog') }}</a>
   </nav>
   <div class="context">
+    @if (runtime.mode() === 'remote') {
+      <label class="host-selector" data-testid="studio-host-profile-selector">
+        <span class="visually-hidden">{{ i18n.locale() === 'pt-BR' ? 'Host governado' : 'Governed host' }}</span>
+        <span class="glyph" aria-hidden="true">⇄</span>
+        <select
+          [value]="runtime.activeHostProfileId() ?? 'same-origin-proxy'"
+          (change)="runtime.selectHostProfile($any($event.target).value)">
+          @for (profile of runtime.hostProfiles; track profile.id) {
+            <option [value]="profile.id">
+              {{ i18n.locale() === 'pt-BR' ? profile.labelPtBr : profile.labelEnUs }}
+            </option>
+          }
+        </select>
+      </label>
+    }
     <span><span class="glyph" aria-hidden="true">◇</span>{{ i18n.text(runtime.mode() === 'remote' ? 'governedConfig' : 'fixture') }}</span>
     <span><span class="glyph" aria-hidden="true">●</span>{{ i18n.text(runtime.mode() === 'remote' ? 'governedOperations' : 'readonly') }}</span>
   </div>

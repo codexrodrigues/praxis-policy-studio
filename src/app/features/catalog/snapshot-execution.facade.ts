@@ -12,6 +12,7 @@ import {
   type DomainRuleRolloutPolicyCreateRequest,
   type DomainRuleRolloutPolicyEvent,
   type DomainRuleSnapshotBlocker,
+  type DomainRuleSnapshotHeadSetResponse,
   type DomainRuleSnapshotHeadStatus,
   type DomainRuleSnapshotVersion
 } from '@praxisui/core';
@@ -34,7 +35,11 @@ export class SnapshotExecutionFacade {
   private readonly runtime = inject(RuntimeConfigService);
   private readonly i18n = inject(PolicyStudioI18n);
 
+  readonly snapshotOperationKey = signal<string | null>(null);
   readonly snapshotHead = signal<DomainRuleSnapshotHeadStatus | null>(null);
+  readonly snapshotHeadSet = signal<DomainRuleSnapshotHeadSetResponse | null | undefined>(undefined);
+  readonly snapshotHeadSetLoading = signal(false);
+  readonly snapshotHeadSetError = signal(false);
   readonly snapshotVersions = signal<readonly DomainRuleSnapshotVersion[]>([]);
   readonly snapshotsLoading = signal(false);
   readonly snapshotsError = signal(false);
@@ -71,12 +76,20 @@ export class SnapshotExecutionFacade {
   readonly compositionPublication = signal<RuleSetCompositionPublication | null>(null);
 
   private snapshotLoadRevision = 0;
+  private snapshotHeadSetLoadRevision = 0;
   private rolloutPolicyLoadRevision = 0;
   private rolloutLoadRevision = 0;
   private hostStatusLoadRevision = 0;
   private executionSummaryLoadRevision = 0;
 
   resetForSelection(): void {
+    this.snapshotOperationKey.set(null);
+    this.snapshotHeadSet.set(undefined);
+    this.snapshotHeadSetLoading.set(false);
+    this.snapshotHeadSetError.set(false);
+    this.snapshotBusy.set(false);
+    this.rolloutBusy.set(false);
+    this.rolloutPolicyBusy.set(false);
     this.snapshotFeedback.set(null);
     this.snapshotFeedbackError.set(false);
     this.snapshotBlockers.set([]);
@@ -90,12 +103,17 @@ export class SnapshotExecutionFacade {
   }
 
   clearAll(): void {
+    this.snapshotOperationKey.set(null);
     ++this.snapshotLoadRevision;
+    ++this.snapshotHeadSetLoadRevision;
     ++this.rolloutPolicyLoadRevision;
     ++this.rolloutLoadRevision;
     ++this.hostStatusLoadRevision;
     ++this.executionSummaryLoadRevision;
     this.snapshotHead.set(null);
+    this.snapshotHeadSet.set(undefined);
+    this.snapshotHeadSetLoading.set(false);
+    this.snapshotHeadSetError.set(false);
     this.snapshotVersions.set([]);
     this.snapshotsLoading.set(false);
     this.snapshotsError.set(false);
@@ -127,33 +145,103 @@ export class SnapshotExecutionFacade {
     this.compositionPublication.set(null);
   }
 
+  selectSnapshotOperation(operationKey: string): void {
+    if (!this.store.selected()?.operationKeys.includes(operationKey)
+      || operationKey === this.snapshotOperationKey()) return;
+    ++this.store.selectionRevision;
+    this.store.governedConfirmation.set(null);
+    this.clearAll();
+    this.snapshotOperationKey.set(operationKey);
+    this.loadSnapshots();
+  }
+
   loadSnapshots(): void {
     const loadRevision = ++this.snapshotLoadRevision;
     const state = this.runtime.state();
     const ruleSetKey = this.store.selected()?.ruleSetKey;
+    const operations = this.store.selected()?.operationKeys ?? [];
+    const selected = this.snapshotOperationKey();
+    const operationKey = selected && operations.includes(selected)
+      ? selected : operations.length === 1 ? operations[0] : null;
+    this.snapshotOperationKey.set(operationKey);
+    this.executionSummary.set(null);
+    this.hostStatusSummary.set(null);
     this.snapshotHead.set(null);
     this.snapshotVersions.set([]);
     this.snapshotsError.set(false);
+    this.loadSnapshotHeadSet(ruleSetKey ?? null, operations);
     this.loadRolloutPolicies(ruleSetKey ?? null);
     this.loadRollouts(ruleSetKey ?? null);
-    if (state.kind !== 'ready' || !ruleSetKey || state.config.mode !== 'remote') {
+    if (state.kind !== 'ready' || !ruleSetKey || !operationKey || state.config.mode !== 'remote') {
       this.snapshotsLoading.set(false);
       return;
     }
     this.snapshotsLoading.set(true);
-    this.catalog.snapshotCockpit(ruleSetKey, state.config).subscribe({
+    this.catalog.snapshotCockpit(ruleSetKey, operationKey, state.config).subscribe({
       next: cockpit => {
-        if (loadRevision !== this.snapshotLoadRevision || ruleSetKey !== this.store.selected()?.ruleSetKey) return;
+        if (loadRevision !== this.snapshotLoadRevision || ruleSetKey !== this.store.selected()?.ruleSetKey || operationKey !== this.snapshotOperationKey()) return;
+        if ((cockpit.head && cockpit.head.operationKey !== operationKey)
+          || cockpit.versions.some(version => version.operationKey !== operationKey)) {
+          this.snapshotsLoading.set(false);
+          this.snapshotsError.set(true);
+          return;
+        }
         this.snapshotHead.set(cockpit.head);
         this.snapshotVersions.set(cockpit.versions);
         this.snapshotsLoading.set(false);
-        this.loadExecutionSummary(cockpit.head?.activeSnapshotKey ?? null);
-        this.loadHostStatusSummary(ruleSetKey);
+        const activeSnapshotKey =
+          cockpit.head && cockpit.head.governanceState !== 'WITHDRAWN'
+            ? (cockpit.head.activeSnapshotKey ?? null)
+            : null;
+        this.loadExecutionSummary(activeSnapshotKey);
+        if (cockpit.head && cockpit.head.governanceState !== 'WITHDRAWN') {
+          this.loadHostStatusSummary(ruleSetKey);
+        }
       },
       error: () => {
-        if (loadRevision !== this.snapshotLoadRevision || ruleSetKey !== this.store.selected()?.ruleSetKey) return;
+        if (loadRevision !== this.snapshotLoadRevision || ruleSetKey !== this.store.selected()?.ruleSetKey || operationKey !== this.snapshotOperationKey()) return;
         this.snapshotsLoading.set(false);
         this.snapshotsError.set(true);
+      }
+    });
+  }
+
+  loadSnapshotHeadSet(
+    ruleSetKey: string | null = this.store.selected()?.ruleSetKey ?? null,
+    operations: readonly string[] = this.store.selected()?.operationKeys ?? []
+  ): void {
+    const loadRevision = ++this.snapshotHeadSetLoadRevision;
+    const state = this.runtime.state();
+    this.snapshotHeadSet.set(undefined);
+    this.snapshotHeadSetError.set(false);
+    if (state.kind !== 'ready'
+      || state.config.mode !== 'remote'
+      || !ruleSetKey
+      || operations.length <= 1
+      || typeof this.catalog.snapshotHeadSet !== 'function') {
+      this.snapshotHeadSetLoading.set(false);
+      return;
+    }
+    this.snapshotHeadSetLoading.set(true);
+    this.catalog.snapshotHeadSet(ruleSetKey, operations, state.config).subscribe({
+      next: headSet => {
+        if (loadRevision !== this.snapshotHeadSetLoadRevision || ruleSetKey !== this.store.selected()?.ruleSetKey) return;
+        if (headSet !== null && (
+          headSet.ruleSetKey !== ruleSetKey
+          || !headSet.heads
+          || operations.some(op => !Object.prototype.hasOwnProperty.call(headSet.heads, op))
+        )) {
+          this.snapshotHeadSetLoading.set(false);
+          this.snapshotHeadSetError.set(true);
+          return;
+        }
+        this.snapshotHeadSet.set(headSet);
+        this.snapshotHeadSetLoading.set(false);
+      },
+      error: () => {
+        if (loadRevision !== this.snapshotHeadSetLoadRevision || ruleSetKey !== this.store.selected()?.ruleSetKey) return;
+        this.snapshotHeadSetLoading.set(false);
+        this.snapshotHeadSetError.set(true);
       }
     });
   }
@@ -198,21 +286,28 @@ export class SnapshotExecutionFacade {
   ): void {
     const loadRevision = ++this.rolloutLoadRevision;
     const state = this.runtime.state();
+    const operationKey = this.snapshotOperationKey();
     this.rolloutCatalog.set(null);
     this.rolloutError.set(false);
-    if (state.kind !== 'ready' || state.config.mode !== 'remote' || !ruleSetKey) {
+    if (state.kind !== 'ready' || state.config.mode !== 'remote' || !ruleSetKey || !operationKey) {
       this.rolloutLoading.set(false);
       return;
     }
     this.rolloutLoading.set(true);
-    this.catalog.rolloutCatalog(ruleSetKey, state.config).subscribe({
+    this.catalog.rolloutCatalog(ruleSetKey, operationKey, state.config).subscribe({
       next: catalog => {
-        if (loadRevision !== this.rolloutLoadRevision || ruleSetKey !== this.store.selected()?.ruleSetKey) return;
+        if (loadRevision !== this.rolloutLoadRevision || ruleSetKey !== this.store.selected()?.ruleSetKey || operationKey !== this.snapshotOperationKey()) return;
+        if (catalog.operationKey !== operationKey
+          || catalog.rollouts.some(item => item.rollout.operationKey !== operationKey)) {
+          this.rolloutLoading.set(false);
+          this.rolloutError.set(true);
+          return;
+        }
         this.rolloutCatalog.set(catalog);
         this.rolloutLoading.set(false);
       },
       error: () => {
-        if (loadRevision !== this.rolloutLoadRevision || ruleSetKey !== this.store.selected()?.ruleSetKey) return;
+        if (loadRevision !== this.rolloutLoadRevision || ruleSetKey !== this.store.selected()?.ruleSetKey || operationKey !== this.snapshotOperationKey()) return;
         this.rolloutLoading.set(false);
         this.rolloutError.set(true);
       }
@@ -224,21 +319,27 @@ export class SnapshotExecutionFacade {
   ): void {
     const loadRevision = ++this.hostStatusLoadRevision;
     const state = this.runtime.state();
+    const operationKey = this.snapshotOperationKey();
     this.hostStatusSummary.set(null);
     this.hostStatusError.set(null);
-    if (state.kind !== 'ready' || state.config.mode !== 'remote' || !ruleSetKey) {
+    if (state.kind !== 'ready' || state.config.mode !== 'remote' || !ruleSetKey || !operationKey) {
       this.hostStatusLoading.set(false);
       return;
     }
     this.hostStatusLoading.set(true);
-    this.catalog.hostStatusSummary(ruleSetKey, state.config).subscribe({
+    this.catalog.hostStatusSummary(ruleSetKey, operationKey, state.config).subscribe({
       next: summary => {
-        if (loadRevision !== this.hostStatusLoadRevision || ruleSetKey !== this.store.selected()?.ruleSetKey) return;
+        if (loadRevision !== this.hostStatusLoadRevision || ruleSetKey !== this.store.selected()?.ruleSetKey || operationKey !== this.snapshotOperationKey()) return;
+        if (!summary || summary.operationKey !== operationKey) {
+          this.hostStatusLoading.set(false);
+          this.hostStatusError.set('failed');
+          return;
+        }
         this.hostStatusSummary.set(summary);
         this.hostStatusLoading.set(false);
       },
       error: (error: unknown) => {
-        if (loadRevision !== this.hostStatusLoadRevision || ruleSetKey !== this.store.selected()?.ruleSetKey) return;
+        if (loadRevision !== this.hostStatusLoadRevision || ruleSetKey !== this.store.selected()?.ruleSetKey || operationKey !== this.snapshotOperationKey()) return;
         this.hostStatusLoading.set(false);
         this.hostStatusError.set(error instanceof HttpErrorResponse && error.status === 401
           ? 'authentication'
@@ -286,7 +387,6 @@ export class SnapshotExecutionFacade {
     this.catalog.createRolloutPolicy(request, state.config).subscribe({
       next: () => {
         if (commandRevision !== this.store.selectionRevision) {
-          this.rolloutPolicyBusy.set(false);
           return;
         }
         this.rolloutPolicyBusy.set(false);
@@ -295,7 +395,6 @@ export class SnapshotExecutionFacade {
       },
       error: error => {
         if (commandRevision !== this.store.selectionRevision) {
-          this.rolloutPolicyBusy.set(false);
           return;
         }
         this.failRolloutPolicyOperation(error);
@@ -327,7 +426,6 @@ export class SnapshotExecutionFacade {
     this.catalog.approveRolloutPolicy(currentPolicy, state.config).subscribe({
       next: () => {
         if (commandRevision !== this.store.selectionRevision) {
-          this.rolloutPolicyBusy.set(false);
           return;
         }
         this.rolloutPolicyBusy.set(false);
@@ -336,7 +434,6 @@ export class SnapshotExecutionFacade {
       },
       error: error => {
         if (commandRevision !== this.store.selectionRevision) {
-          this.rolloutPolicyBusy.set(false);
           return;
         }
         this.failRolloutPolicyOperation(error);
@@ -370,7 +467,6 @@ export class SnapshotExecutionFacade {
       this.catalog.activateRolloutPolicy(currentPolicy, headEtag, state.config).subscribe({
         next: () => {
           if (commandRevision !== this.store.selectionRevision) {
-            this.rolloutPolicyBusy.set(false);
             return;
           }
           this.rolloutPolicyBusy.set(false);
@@ -379,7 +475,6 @@ export class SnapshotExecutionFacade {
         },
         error: error => {
           if (commandRevision !== this.store.selectionRevision) {
-            this.rolloutPolicyBusy.set(false);
             return;
           }
           this.failRolloutPolicyOperation(error);
@@ -407,10 +502,15 @@ export class SnapshotExecutionFacade {
       || !this.rolloutCatalog()?.availableActions.includes('CREATE_ROLLOUT')) return false;
     const candidate = this.snapshotVersions().find(item => item.snapshotKey === candidateSnapshotKey);
     if (!candidate || candidate.active || candidate.governanceState !== 'READY') return false;
-    return this.snapshotHead() === null
-      ? candidate.availableAction === 'CREATE_ROLLOUT'
-      : !!this.snapshotHead()?.headEtag
-        && (candidate.availableAction === 'ACTIVATE' || candidate.availableAction === 'ROLLBACK');
+    const currentHead = this.snapshotHead();
+    if (currentHead === null) {
+      return candidate.availableAction === 'CREATE_ROLLOUT';
+    }
+    if (currentHead.governanceState === 'WITHDRAWN') {
+      return !!currentHead.headEtag && candidate.availableAction === 'CREATE_ROLLOUT';
+    }
+    return !!currentHead.headEtag
+      && (candidate.availableAction === 'ACTIVATE' || candidate.availableAction === 'ROLLBACK');
   }
 
   private executeCreateRollout(candidateSnapshotKey: string, expectedHeadEtag: string | null): void {
@@ -429,7 +529,6 @@ export class SnapshotExecutionFacade {
       this.catalog.createRollout(candidateSnapshotKey, expectedHeadEtag, state.config).subscribe({
         next: () => {
           if (commandRevision !== this.store.selectionRevision) {
-            this.rolloutBusy.set(false);
             return;
           }
           this.rolloutBusy.set(false);
@@ -438,7 +537,6 @@ export class SnapshotExecutionFacade {
         },
         error: error => {
           if (commandRevision !== this.store.selectionRevision) {
-            this.rolloutBusy.set(false);
             return;
           }
           this.failRolloutOperation(error);
@@ -472,7 +570,6 @@ export class SnapshotExecutionFacade {
     this.catalog.cancelRollout(currentItem, state.config).subscribe({
       next: () => {
         if (commandRevision !== this.store.selectionRevision) {
-          this.rolloutBusy.set(false);
           return;
         }
         this.rolloutBusy.set(false);
@@ -481,7 +578,6 @@ export class SnapshotExecutionFacade {
       },
       error: error => {
         if (commandRevision !== this.store.selectionRevision) {
-          this.rolloutBusy.set(false);
           return;
         }
         this.failRolloutOperation(error);
@@ -523,7 +619,6 @@ export class SnapshotExecutionFacade {
       this.catalog.activateRolloutCandidate(currentItem, state.config).subscribe({
         next: () => {
           if (commandRevision !== this.store.selectionRevision) {
-            this.rolloutBusy.set(false);
             return;
           }
           this.rolloutBusy.set(false);
@@ -533,7 +628,6 @@ export class SnapshotExecutionFacade {
         },
         error: error => {
           if (commandRevision !== this.store.selectionRevision) {
-            this.rolloutBusy.set(false);
             return;
           }
           this.failRolloutOperation(error);
@@ -604,7 +698,6 @@ export class SnapshotExecutionFacade {
       this.catalog.operateSnapshot(currentVersion, headEtag, state.config).subscribe({
         next: () => {
           if (commandRevision !== this.store.selectionRevision) {
-            this.snapshotBusy.set(false);
             return;
           }
           this.snapshotBusy.set(false);
@@ -616,7 +709,75 @@ export class SnapshotExecutionFacade {
         },
         error: error => {
           if (commandRevision !== this.store.selectionRevision) {
-            this.snapshotBusy.set(false);
+            return;
+          }
+          this.failSnapshotOperation(error);
+        }
+      });
+    } catch (error: unknown) {
+      this.failSnapshotOperation(error);
+    }
+  }
+
+  withdrawSnapshotHead(reason: string): void {
+    const trimmedReason = reason.trim();
+    const currentHead = this.snapshotHead();
+    const ruleSetKey = this.store.selected()?.ruleSetKey;
+    const operationKey = this.snapshotOperationKey();
+    if (this.runtime.state().kind !== 'ready'
+      || !ruleSetKey
+      || !operationKey
+      || !currentHead?.headEtag
+      || currentHead.governanceState !== 'READY'
+      || !trimmedReason
+      || trimmedReason.length > 1000
+      || this.snapshotBusy()) return;
+    const expectedHeadEtag = currentHead.headEtag;
+    const isCoupledFamily = (this.store.selected()?.operationKeys.length ?? 0) > 1;
+    this.store.openGovernedConfirmation(
+      this.i18n.text(isCoupledFamily ? 'confirmWithdrawCoupledSnapshotHead' : 'confirmWithdrawSnapshotHead'),
+      `${ruleSetKey} · ${operationKey} (${currentHead.activeSnapshotKey})`,
+      this.i18n.text('withdrawSnapshotHead'),
+      () => this.executeWithdrawSnapshotHead(trimmedReason, expectedHeadEtag)
+    );
+  }
+
+  private executeWithdrawSnapshotHead(reason: string, expectedHeadEtag: string): void {
+    const state = this.runtime.state();
+    const currentHead = this.snapshotHead();
+    const ruleSetKey = this.store.selected()?.ruleSetKey;
+    const operationKey = this.snapshotOperationKey();
+    if (state.kind !== 'ready' || this.snapshotBusy() || !ruleSetKey || !operationKey) return;
+    if (!currentHead?.headEtag
+      || currentHead.headEtag !== expectedHeadEtag
+      || currentHead.governanceState !== 'READY') {
+      this.snapshotFeedbackError.set(true);
+      this.snapshotFeedback.set(this.i18n.text('snapshotStateChanged'));
+      return;
+    }
+    this.snapshotBusy.set(true);
+    this.snapshotFeedback.set(null);
+    this.snapshotFeedbackError.set(false);
+    this.snapshotBlockers.set([]);
+    const commandRevision = this.store.selectionRevision;
+    try {
+      this.catalog.withdrawSnapshotHead(
+        { ruleSetKey, operationKey, reason },
+        expectedHeadEtag,
+        state.config
+      ).subscribe({
+        next: () => {
+          if (commandRevision !== this.store.selectionRevision) {
+            return;
+          }
+          this.snapshotBusy.set(false);
+          this.snapshotFeedbackError.set(false);
+          this.snapshotFeedback.set(this.i18n.text('snapshotWithdrawn'));
+          this.loadSnapshots();
+          this.store.loadLifecycle();
+        },
+        error: error => {
+          if (commandRevision !== this.store.selectionRevision) {
             return;
           }
           this.failSnapshotOperation(error);
@@ -636,7 +797,7 @@ export class SnapshotExecutionFacade {
   prepareSnapshotComposition(request: RuleSetCompositionCandidateRequest): void {
     const state = this.runtime.state();
     const ruleSetKey = this.store.selected()?.ruleSetKey;
-    if (state.kind !== 'ready' || state.config.mode !== 'remote' || !ruleSetKey || this.snapshotBusy()) return;
+    if (state.kind !== 'ready' || state.config.mode !== 'remote' || !ruleSetKey || this.store.selected()?.operationKeys.length !== 1 || !this.snapshotOperationKey() || this.snapshotBusy()) return;
     this.snapshotBusy.set(true);
     this.snapshotFeedback.set(null);
     this.snapshotFeedbackError.set(false);
@@ -645,7 +806,6 @@ export class SnapshotExecutionFacade {
     this.catalog.prepareRuleSetCandidate(ruleSetKey, request, state.config).subscribe({
       next: candidate => {
         if (commandRevision !== this.store.selectionRevision) {
-          this.snapshotBusy.set(false);
           return;
         }
         this.snapshotBusy.set(false);
@@ -656,7 +816,6 @@ export class SnapshotExecutionFacade {
       },
       error: error => {
         if (commandRevision !== this.store.selectionRevision) {
-          this.snapshotBusy.set(false);
           return;
         }
         this.failSnapshotOperation(error);
@@ -667,7 +826,7 @@ export class SnapshotExecutionFacade {
   approveSnapshotComposition(command: RuleSetCompositionCandidateCommand): void {
     const state = this.runtime.state();
     const ruleSetKey = this.store.selected()?.ruleSetKey;
-    if (state.kind !== 'ready' || state.config.mode !== 'remote' || !ruleSetKey || this.snapshotBusy()) return;
+    if (state.kind !== 'ready' || state.config.mode !== 'remote' || !ruleSetKey || this.store.selected()?.operationKeys.length !== 1 || !this.snapshotOperationKey() || this.snapshotBusy()) return;
     this.snapshotBusy.set(true);
     this.snapshotFeedback.set(null);
     this.snapshotFeedbackError.set(false);
@@ -676,7 +835,6 @@ export class SnapshotExecutionFacade {
     this.catalog.approveRuleSetCandidate(ruleSetKey, command, state.config).subscribe({
       next: approval => {
         if (commandRevision !== this.store.selectionRevision) {
-          this.snapshotBusy.set(false);
           return;
         }
         this.snapshotBusy.set(false);
@@ -685,7 +843,6 @@ export class SnapshotExecutionFacade {
       },
       error: error => {
         if (commandRevision !== this.store.selectionRevision) {
-          this.snapshotBusy.set(false);
           return;
         }
         this.failSnapshotOperation(error);
@@ -696,7 +853,7 @@ export class SnapshotExecutionFacade {
   publishSnapshotComposition(command: RuleSetCompositionCandidateCommand): void {
     const state = this.runtime.state();
     const ruleSetKey = this.store.selected()?.ruleSetKey;
-    if (state.kind !== 'ready' || state.config.mode !== 'remote' || !ruleSetKey || this.snapshotBusy()) return;
+    if (state.kind !== 'ready' || state.config.mode !== 'remote' || !ruleSetKey || this.store.selected()?.operationKeys.length !== 1 || !this.snapshotOperationKey() || this.snapshotBusy()) return;
     this.snapshotBusy.set(true);
     this.snapshotFeedback.set(null);
     this.snapshotFeedbackError.set(false);
@@ -707,7 +864,6 @@ export class SnapshotExecutionFacade {
       this.catalog.publishRuleSetCandidate(ruleSetKey, command, currentHeadEtag, state.config).subscribe({
         next: publication => {
           if (commandRevision !== this.store.selectionRevision) {
-            this.snapshotBusy.set(false);
             return;
           }
           this.snapshotBusy.set(false);
@@ -718,7 +874,6 @@ export class SnapshotExecutionFacade {
         },
         error: error => {
           if (commandRevision !== this.store.selectionRevision) {
-            this.snapshotBusy.set(false);
             return;
           }
           this.failSnapshotOperation(error);

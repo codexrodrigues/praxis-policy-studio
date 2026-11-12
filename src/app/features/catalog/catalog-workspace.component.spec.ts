@@ -11,6 +11,7 @@ import { PolicyStudioI18n } from '../../core/i18n';
 import { ProjectionCatalogService } from '../../core/projection-catalog.service';
 import { RuntimeConfigService } from '../../core/runtime-config.service';
 import type { DecisionLifecycleSummary, DecisionSummary } from './catalog.fixture';
+import { buildRuleSetImpactSummary } from './catalog-presentation';
 import { CatalogSelectionStore } from './catalog-selection.store';
 import { ScenarioSandboxFacade } from './scenario-sandbox.facade';
 import { SnapshotExecutionFacade } from './snapshot-execution.facade';
@@ -37,14 +38,14 @@ function decision(key: string): DecisionSummary {
     configDefinitionId: `definition-${key}`, workspaceId: `workspace-${key}`,
     workspaceEtag: `etag-${key}`,
     expression: null, condition: { '===': [1, 1] }, factPaths: [], facts: [],
-    nullSemantics: null, operationKeys: [], hostContractVersion: null, evidence: [],
+    nullSemantics: null, operationKeys: ['evaluate'], hostContractVersion: null, evidence: [],
     draftLifecycle: null
   };
 }
 
 function snapshotVersion(overrides: Partial<DomainRuleSnapshotVersion> = {}): DomainRuleSnapshotVersion {
   return {
-    snapshotKey: 'candidate-1', ruleSetKey: 'test-rules', ruleSetVersion: 1,
+    snapshotKey: 'candidate-1', ruleSetKey: 'test-rules', operationKey: 'evaluate', ruleSetVersion: 1,
     publicationRevision: 1, snapshotContentHash: 'A'.repeat(64), publishedBy: 'publisher',
     publishedAtUtc: '2026-10-21T10:00:00Z', active: false,
     governanceState: 'READY', availableAction: 'ACTIVATE', ...overrides
@@ -179,6 +180,45 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     TestBed.resetTestingModule();
+  });
+
+  it('discards old operation responses and confirmations after selecting another profile', () => {
+    const remoteConfig = { ...config, mode: 'remote' as const, configApiBaseUrl: '' };
+    vi.spyOn(component.runtime, 'state').mockReturnValue({ kind: 'ready', config: remoteConfig });
+    component.selected.set({ ...decision('A'), operationKeys: ['createA', 'updateA'] });
+    const createResponse = new Subject<any>();
+    const updateResponse = new Subject<any>();
+    snapshotCockpit.mockReturnValueOnce(createResponse).mockReturnValueOnce(updateResponse);
+    component.snapshots.selectSnapshotOperation('createA');
+    component.governedConfirmation.set({ execute: vi.fn() } as any);
+    component.snapshots.selectSnapshotOperation('updateA');
+    expect(component.governedConfirmation()).toBeNull();
+    createResponse.next({ head: { operationKey: 'createA' }, versions: [] });
+    expect(component.snapshotHead()).toBeNull();
+    expect(component.snapshotsLoading()).toBe(true);
+    updateResponse.next({ head: null, versions: [snapshotVersion({ operationKey: 'updateA' })] });
+    expect(component.snapshotVersions()[0].operationKey).toBe('updateA');
+    expect(snapshotCockpit).toHaveBeenLastCalledWith('test-rules', 'updateA', remoteConfig);
+  });
+
+  it('rejects a cockpit payload belonging to another operation', () => {
+    vi.spyOn(component.runtime, 'state').mockReturnValue({ kind: 'ready', config: { ...config, mode: 'remote' } });
+    component.selected.set({ ...decision('A'), operationKeys: ['createA', 'updateA'] });
+    snapshotCockpit.mockReturnValue(of({ head: { operationKey: 'updateA' }, versions: [] }));
+    component.snapshots.selectSnapshotOperation('createA');
+    expect(component.snapshotsError()).toBe(true);
+    expect(component.snapshotHead()).toBeNull();
+    expect(component.snapshotVersions()).toEqual([]);
+  });
+
+  it('requires an explicit operation when a family declares more than one profile', () => {
+    const selected = { ...decision('A'), operationKeys: ['createA', 'updateA'] };
+    component.selected.set(selected);
+    snapshotCockpit.mockClear();
+    component.snapshots.loadSnapshots();
+    expect(component.snapshots.snapshotOperationKey()).toBeNull();
+    expect(snapshotCockpit).not.toHaveBeenCalled();
+    expect(component.snapshotHead()).toBeNull();
   });
 
   it('ignores timeline, lifecycle, scenario, review and error responses from a previous selection', () => {
@@ -567,8 +607,8 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
   });
 
   it('does not offer snapshot or rollout operations for non-ready history, even when active', () => {
-    component.snapshotHead.set({ headEtag: 'head-1' } as any);
-    component.rolloutCatalog.set({ availableActions: ['CREATE_ROLLOUT'], rollouts: [] } as any);
+    component.snapshotHead.set({ operationKey: 'evaluate', headEtag: 'head-1' } as any);
+    component.rolloutCatalog.set({ operationKey: 'evaluate', availableActions: ['CREATE_ROLLOUT'], rollouts: [] } as any);
     for (const governanceState of ['RUNTIME_INCOMPATIBLE', 'REPUBLICATION_REQUIRED', 'INVALID'] as const) {
       for (const active of [false, true]) {
         const version = snapshotVersion({
@@ -585,7 +625,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
   });
 
   it('starts a server-authorized bootstrap rollout using the observed absence', () => {
-    component.rolloutCatalog.set({ availableActions: ['CREATE_ROLLOUT'], rollouts: [] } as any);
+    component.rolloutCatalog.set({ operationKey: 'evaluate', availableActions: ['CREATE_ROLLOUT'], rollouts: [] } as any);
     component.snapshotVersions.set([snapshotVersion({ availableAction: 'CREATE_ROLLOUT' })]);
     createRollout.mockReturnValue(of({ rolloutId: 'bootstrap-1' }));
 
@@ -598,7 +638,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
   });
 
   it('does not reinterpret a missing head while its read is loading or failed', () => {
-    component.rolloutCatalog.set({ availableActions: ['CREATE_ROLLOUT'], rollouts: [] } as any);
+    component.rolloutCatalog.set({ operationKey: 'evaluate', availableActions: ['CREATE_ROLLOUT'], rollouts: [] } as any);
     component.snapshotVersions.set([snapshotVersion({ availableAction: 'CREATE_ROLLOUT' })]);
     component.snapshotsLoading.set(true);
     component.createRollout('candidate-1');
@@ -611,11 +651,11 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
   });
 
   it('does not replace confirmed absence with a head that appeared during confirmation', () => {
-    component.rolloutCatalog.set({ availableActions: ['CREATE_ROLLOUT'], rollouts: [] } as any);
+    component.rolloutCatalog.set({ operationKey: 'evaluate', availableActions: ['CREATE_ROLLOUT'], rollouts: [] } as any);
     component.snapshotVersions.set([snapshotVersion({ availableAction: 'CREATE_ROLLOUT' })]);
     component.createRollout('candidate-1');
     expect(component.governedConfirmation()).not.toBeNull();
-    component.snapshotHead.set({ headEtag: 'new-head' } as any);
+    component.snapshotHead.set({ operationKey: 'evaluate', headEtag: 'new-head' } as any);
     component.snapshotVersions.set([snapshotVersion()]);
 
     component.confirmGovernedOperation();
@@ -626,18 +666,18 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
   });
 
   it('does not refresh a confirmed existing head token for rollout or activation', () => {
-    component.snapshotHead.set({ headEtag: 'head-1' } as any);
-    component.rolloutCatalog.set({ availableActions: ['CREATE_ROLLOUT'], rollouts: [] } as any);
+    component.snapshotHead.set({ operationKey: 'evaluate', headEtag: 'head-1' } as any);
+    component.rolloutCatalog.set({ operationKey: 'evaluate', availableActions: ['CREATE_ROLLOUT'], rollouts: [] } as any);
     component.snapshotVersions.set([snapshotVersion()]);
     component.createRollout('candidate-1');
-    component.snapshotHead.set({ headEtag: 'head-2' } as any);
+    component.snapshotHead.set({ operationKey: 'evaluate', headEtag: 'head-2' } as any);
     component.confirmGovernedOperation();
     expect(createRollout).not.toHaveBeenCalled();
     expect(component.rolloutFeedbackError()).toBe(true);
     expect(component.rolloutFeedback()).toContain('O estado mudou.');
 
     component.operateSnapshot(snapshotVersion());
-    component.snapshotHead.set({ headEtag: 'head-3' } as any);
+    component.snapshotHead.set({ operationKey: 'evaluate', headEtag: 'head-3' } as any);
     component.confirmGovernedOperation();
     expect(operateSnapshot).not.toHaveBeenCalled();
     expect(component.snapshotFeedbackError()).toBe(true);
@@ -645,8 +685,8 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
   });
 
   it('revalidates candidate availability after rollout confirmation', () => {
-    component.snapshotHead.set({ headEtag: 'head-1' } as any);
-    component.rolloutCatalog.set({ availableActions: ['CREATE_ROLLOUT'], rollouts: [] } as any);
+    component.snapshotHead.set({ operationKey: 'evaluate', headEtag: 'head-1' } as any);
+    component.rolloutCatalog.set({ operationKey: 'evaluate', availableActions: ['CREATE_ROLLOUT'], rollouts: [] } as any);
     const candidate = snapshotVersion();
     component.snapshotVersions.set([candidate]);
     component.createRollout(candidate.snapshotKey);
@@ -662,7 +702,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
   });
 
   it('revalidates snapshot availability after activation confirmation', () => {
-    component.snapshotHead.set({ headEtag: 'head-1' } as any);
+    component.snapshotHead.set({ operationKey: 'evaluate', headEtag: 'head-1' } as any);
     const candidate = snapshotVersion();
     component.snapshotVersions.set([candidate]);
     component.operateSnapshot(candidate);
@@ -680,6 +720,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
   function readyBootstrapRollout(): DomainRuleRolloutCatalogItem {
     return {
       rollout: {
+        operationKey: 'evaluate',
         rolloutId: 'bootstrap-1', ruleSetKey: 'test-rules', candidateSnapshotKey: 'candidate-1',
         candidateContentHash: 'A'.repeat(64), expectedActiveSnapshotKey: null, expectedHeadEtag: null,
         policyKey: 'host-quorum', policyVersion: 1, enforcementMode: 'REQUIRED', status: 'READY',
@@ -699,11 +740,11 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     'expectedActiveSnapshotKey', 'expectedHeadEtag'] as const)(
     'rejects rollout activation when the confirmed %s changes and explains the conflict', field => {
       const item = readyBootstrapRollout();
-      component.rolloutCatalog.set({ ruleSetKey: 'test-rules', availableActions: [], rollouts: [item] });
+      component.rolloutCatalog.set({ operationKey: 'evaluate', ruleSetKey: 'test-rules', availableActions: [], rollouts: [item] });
       component.activateRollout(item);
       expect(component.governedConfirmation()?.target).toBe('candidate-1');
       if (field === 'action') item.availableActions = [];
-      else if (field === 'missing') component.rolloutCatalog.set({ ruleSetKey: 'test-rules', availableActions: [], rollouts: [] });
+      else if (field === 'missing') component.rolloutCatalog.set({ operationKey: 'evaluate', ruleSetKey: 'test-rules', availableActions: [], rollouts: [] });
       else item.rollout[field] = 'changed-after-confirmation';
 
       component.confirmGovernedOperation();
@@ -717,7 +758,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
 
   it('activates only the unchanged confirmed bootstrap rollout identity', () => {
     const item = readyBootstrapRollout();
-    component.rolloutCatalog.set({ ruleSetKey: 'test-rules', availableActions: [], rollouts: [item] });
+    component.rolloutCatalog.set({ operationKey: 'evaluate', ruleSetKey: 'test-rules', availableActions: [], rollouts: [item] });
     activateRolloutCandidate.mockReturnValue(new Subject().asObservable());
     component.activateRollout(item);
     component.confirmGovernedOperation();
@@ -730,7 +771,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
       rollout: { candidateSnapshotKey: 'snapshot-candidate', rolloutId: 'rollout-A' },
       availableActions: ['CANCEL']
     } as any;
-    component.rolloutCatalog.set({ availableActions: [], rollouts: [item] } as any);
+    component.rolloutCatalog.set({ operationKey: 'evaluate', availableActions: [], rollouts: [item] } as any);
 
     component.cancelRollout(item);
 
@@ -749,9 +790,9 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
       rollout: { candidateSnapshotKey: 'snapshot-candidate', rolloutId: 'rollout-A' },
       availableActions: ['CANCEL']
     } as any;
-    component.rolloutCatalog.set({ availableActions: [], rollouts: [item] } as any);
+    component.rolloutCatalog.set({ operationKey: 'evaluate', availableActions: [], rollouts: [item] } as any);
     component.cancelRollout(item);
-    component.rolloutCatalog.set({
+    component.rolloutCatalog.set({ operationKey: 'evaluate',
       availableActions: [], rollouts: [{ ...item, availableActions: [] }]
     } as any);
 
@@ -1242,11 +1283,38 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
       configStatus: 'draft',
       promotedDefinitionId: 'def-promoted-ready'
     };
-    component.allDecisions.set([draftDecision, promotedDecision]);
+    const forbiddenGuardPeer: DecisionSummary = {
+      ...decision('procurement.po_approval.guard_only'),
+      configStatus: 'draft',
+      authoringSupported: false,
+      reviewStatus: 'CATALOG_IDENTITY_ONLY',
+      slotOverridePolicy: 'FORBIDDEN',
+      decisionStage: 'PROTECTED_GUARD',
+      factPaths: ['request.requestedAmount'],
+      facts: [{
+        path: 'request.requestedAmount',
+        valueType: 'number',
+        nullable: false,
+        label: 'Amount',
+        description: 'Requested amount.',
+        providerRef: 'request.amount',
+        evidenceRefs: [],
+        sensitivity: 'NON_SENSITIVE',
+        redaction: 'NONE'
+      }]
+    };
+    component.allDecisions.set([draftDecision, promotedDecision, forbiddenGuardPeer]);
     component.selected.set(draftDecision);
     expect(component.eligibleSnapshotSources().map(item => item.definitionId)).toEqual(['def-promoted-ready']);
     expect(component.eligibleSnapshotSources()[0]?.status).toBe('approved');
     expect(component.defaultSnapshotSourceDefinitionId()).toBe('def-promoted-ready');
+    const impact = buildRuleSetImpactSummary(
+      'test-rules',
+      component.allDecisions(),
+      'def-promoted-ready',
+      null
+    );
+    expect(impact?.diagnostics.some(diag => diag.code === 'MISSING_SLOT_FACTS')).toBe(false);
 
     // Verify 428 Precondition Required reloads snapshots and surfaces conflict message
     const preconditionStream = new Subject<any>();
@@ -1316,6 +1384,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     loadCatalog.mockReturnValueOnce(of([refreshedDecision]));
     snapshotCockpit.mockReturnValueOnce(of({
       head: {
+        operationKey: 'evaluate',
         ruleSetKey: 'test-rules',
         activeSnapshotKey: 'snap-1',
         headEtag: '"head-etag-2"'
@@ -1462,7 +1531,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
         results: []
       } as unknown as import('@praxisui/core').DomainRuleTestRun
     });
-    component.snapshotHead.set({
+    component.snapshotHead.set({ operationKey: 'evaluate',
       ruleSetKey: 'benefit-rules',
       activeSnapshotKey: 'snap-1',
       ruleSetVersion: 2,
@@ -1489,7 +1558,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
       firstObservedAtUtc: '2026-08-18T10:00:00Z',
       lastObservedAtUtc: '2026-08-18T11:00:00Z'
     });
-    component.hostStatusSummary.set({
+    component.hostStatusSummary.set({ operationKey: 'evaluate',
       ruleSetKey: 'benefit-rules',
       expectedSnapshotKey: 'snap-1',
       expectedSnapshotContentHash: 'A'.repeat(64),
@@ -1541,25 +1610,54 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     };
     const hydratedDecision: DecisionSummary = {
       ...deferredDecision,
+      workspaceId: 'ws-deferred-5',
+      workspaceEtag: '"5"',
       detailHydrated: true,
       authoringSupported: true,
       condition: { '<=': [{ var: 'benefit.value' }, 10] },
       expression: 'benefit.value <= 10'
     };
-    const loadDiscoveredCandidate = vi.fn(() => of(hydratedDecision));
+    const deferredSibling: DecisionSummary = {
+      ...decision('deferred.sibling'),
+      order: 6,
+      ruleSetKey: deferredDecision.ruleSetKey,
+      configDefinitionId: 'def-deferred-6',
+      configVersion: 1,
+      configStatus: 'draft',
+      detailHydrated: false,
+      authoringSupported: false,
+      condition: null,
+      facts: []
+    };
+    const hydratedSibling: DecisionSummary = {
+      ...deferredSibling,
+      detailHydrated: true,
+      authoringSupported: true,
+      decisionStage: 'POST_DECISION',
+      slotOverridePolicy: 'RESTRICT_ONLY',
+      condition: { '==': [1, 1] },
+      expression: '1 == 1'
+    };
+    const loadDiscoveredCandidate = vi.fn((cand: { definitionId: string }) =>
+      of(cand.definitionId === 'def-deferred-6' ? hydratedSibling : hydratedDecision)
+    );
+    const loadScenariosSpy = vi.spyOn(component, 'loadScenarios');
     (component as any).catalog.loadDiscoveredCandidate = loadDiscoveredCandidate;
     vi.spyOn(component.runtime, 'state').mockReturnValue({
       kind: 'ready',
       config: { ...config, mode: 'remote', configApiBaseUrl: 'http://localhost:8088' }
     });
-    component.allDecisions.set([decision('A'), deferredDecision]);
+    component.allDecisions.set([decision('A'), deferredDecision, deferredSibling]);
 
     component.select(deferredDecision);
 
-    expect(loadDiscoveredCandidate).toHaveBeenCalledTimes(1);
+    expect(loadDiscoveredCandidate).toHaveBeenCalledTimes(2);
     expect(component.selected()?.detailHydrated).toBe(true);
     expect(component.selected()?.authoringSupported).toBe(true);
     expect(component.selected()?.expression).toBe('benefit.value <= 10');
+    expect(loadScenariosSpy).toHaveBeenCalled();
+    expect(component.allDecisions().find(d => d.key === 'deferred.sibling')?.detailHydrated).toBe(true);
+    expect(component.allDecisions().find(d => d.key === 'deferred.sibling')?.slotOverridePolicy).toBe('RESTRICT_ONLY');
   });
 
   it('automatically inspects publication readiness before publishing when readiness is null', () => {
@@ -1638,5 +1736,212 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     // For '>=' (eligible when request.amount >= 100), relaxing the minimum lowers the threshold to 90; tightening raises to 110
     expect(lowerProposals.find(p => p.id === 'RELAX_THRESHOLD_10')?.condition).toEqual({ '>=': [{ var: 'request.amount' }, 90] });
     expect(lowerProposals.find(p => p.id === 'TIGHTEN_THRESHOLD_10')?.condition).toEqual({ '>=': [{ var: 'request.amount' }, 110] });
+  });
+
+  it('resolves initial decision from deep-link URL query parameters (?ruleSetKey=...&slotKey=...&decisionKey=...)', () => {
+    const originalUrl = window.location.href;
+    const decisionsList: DecisionSummary[] = [
+      { ...decision('request.authorization-integrity'), ruleSetKey: 'quickstart.benefit.v1' },
+      { ...decision('funcao.vigencia-retroativa'), ruleSetKey: 'urn:praxis:ergon:ruleset:funcao-confianca' },
+      {
+        ...decision('rn013.sale-days.limit.product'),
+        slotKey: 'rn013.sale-days.limit',
+        ruleSetKey: 'urn:praxis:ergon:ruleset:funcao-confianca'
+      },
+      {
+        ...decision('ERG-03185'),
+        slotKey: 'slot.erg-03185',
+        ruleSetKey: 'urn:praxis:ergon:ruleset:funcao-confianca'
+      }
+    ];
+
+    try {
+      window.history.replaceState(
+        {},
+        '',
+        '/?ruleSetKey=urn:praxis:ergon:ruleset:funcao-confianca&slotKey=rn013.sale-days.limit'
+      );
+      const matched = component.resolveInitialDecision(decisionsList, 'request.authorization-integrity');
+      expect(matched?.key).toBe('rn013.sale-days.limit.product');
+
+      window.history.replaceState(
+        {},
+        '',
+        '/?ruleSetKey=urn:praxis:ergon:ruleset:funcao-confianca&slotKey=slot.erg-03185&decisionKey=ERG-03185'
+      );
+      const matchedByDecisionKey = component.resolveInitialDecision(decisionsList, 'request.authorization-integrity');
+      expect(matchedByDecisionKey?.key).toBe('ERG-03185');
+
+      window.history.replaceState({}, '', '/?ruleSetKey=urn:praxis:ergon:ruleset:funcao-confianca');
+      const matchedByRuleSet = component.resolveInitialDecision(decisionsList, 'request.authorization-integrity');
+      expect(matchedByRuleSet?.key).toBe('funcao.vigencia-retroativa');
+
+      const withResource: DecisionSummary[] = [
+        ...decisionsList,
+        {
+          ...decision('ferias.limite-dias'),
+          slotKey: 'ferias.limite-dias',
+          ruleSetKey: 'urn:praxis:ergon:ruleset:ferias-gozo.create',
+          resourceKey: 'administracao-pessoal.ferias-gozo'
+        }
+      ];
+      window.history.replaceState({}, '', '/?resourceKey=administracao-pessoal.ferias-gozo&bindingKey=ferias.limite-dias');
+      const matchedByResourceAndBinding = component.resolveInitialDecision(withResource, 'request.authorization-integrity');
+      expect(matchedByResourceAndBinding?.key).toBe('ferias.limite-dias');
+
+      window.history.replaceState({}, '', '/?resourceKey=administracao-pessoal.ferias-gozo');
+      const matchedByResourceOnly = component.resolveInitialDecision(withResource, 'request.authorization-integrity');
+      expect(matchedByResourceOnly?.key).toBe('ferias.limite-dias');
+
+      loadCatalog.mockReturnValue(of(decisionsList));
+      component.narrowDetailOpen.set(false);
+      component.loadCatalog();
+      expect(component.narrowDetailOpen()).toBe(true);
+
+      window.history.replaceState({}, '', '/');
+      component.narrowDetailOpen.set(false);
+      component.loadCatalog();
+      expect(component.narrowDetailOpen()).toBe(false);
+    } finally {
+      window.history.replaceState({}, '', originalUrl);
+    }
+  });
+
+  it('validates and auto-fixes ontological roots in authoring, scaffolds scenario ontology skeletons, and filters catalog by 1-hop root', () => {
+    const ergonDecision: DecisionSummary = {
+      ...decision('A'),
+      availableRoots: ['draft', 'vinculo'],
+      conceptRoots: ['vinculo'],
+      factPaths: ['draft.quantidade', 'vinculo.situacao'],
+      facts: [
+        {
+          path: 'draft.quantidade',
+          valueType: 'number',
+          nullable: false,
+          label: 'Quantidade',
+          description: 'Quantidade lançada.',
+          providerRef: 'freq.qtd',
+          evidenceRefs: [],
+          sensitivity: 'NON_SENSITIVE',
+          redaction: 'NONE'
+        },
+        {
+          path: 'vinculo.situacao',
+          valueType: 'string',
+          nullable: false,
+          label: 'Situação do vínculo',
+          description: 'Situação funcional.',
+          providerRef: 'vinculo.sit',
+          evidenceRefs: [],
+          sensitivity: 'NON_SENSITIVE',
+          redaction: 'NONE'
+        }
+      ],
+      condition: { '<=': [{ var: 'draft.quantidade' }, 180] },
+      workspaceCondition: { '<=': [{ var: 'draft.quantidade' }, 180] }
+    };
+    const otherDecision: DecisionSummary = {
+      ...decision('B'),
+      availableRoots: ['draft', 'cargo'],
+      conceptRoots: ['cargo'],
+      factPaths: ['cargo.codigo']
+    };
+
+    component.allDecisions.set([ergonDecision, otherDecision]);
+    component.select(ergonDecision);
+    capabilities.A[0].next({
+      workspaceId: 'workspace-A',
+      availableActions: ['VIEW', 'UPDATE_DRAFT', 'MANAGE_SCENARIOS'],
+      blockers: []
+    });
+
+    // 1. Catalog 1-hop root filter
+    component.filterByOntologyRoot('vinculo');
+    expect(component.decisions().map(d => d.key)).toEqual(['A']);
+    component.clearQuery();
+    expect(component.decisions()).toHaveLength(2);
+
+    // 2. Authoring ontological validation + auto-fix (including editorState reset)
+    component.openAuthoring();
+    expect(component.ontologicalWarning()).toBeNull();
+
+    component.draftCondition.set({ '<=': [{ var: 'facts.quantidade' }, 120] });
+    component.updateEditorState({
+      mode: 'visual',
+      rootIds: [],
+      nodes: {},
+      selectedNodeIds: [],
+      validationErrors: [{ nodeId: 'n1', message: 'Invalid field', severity: 'error' }],
+      isDirty: true
+    } as any);
+    expect(component.ontologicalWarning()).toContain('facts.quantidade');
+    expect(component.totalAuthoringValidationErrors()).toBe(2);
+
+    component.autoFixDraftOntology();
+    expect(component.draftCondition()).toEqual({ '<=': [{ var: 'draft.quantidade' }, 120] });
+    expect(component.ontologicalWarning()).toBeNull();
+    expect(component.totalAuthoringValidationErrors()).toBe(0);
+
+    // 3. Scenario ontological skeleton scaffolding & validation
+    component.scenarioFactDraft.set({});
+    component.scaffoldScenarioOntology();
+    expect(component.scenarioFactDraft()).toEqual({
+      'draft.quantidade': 0,
+      'vinculo.situacao': ''
+    });
+    expect(JSON.parse(component.scenarioFactsJson())).toEqual({
+      draft: { quantidade: 0 },
+      vinculo: { situacao: '' }
+    });
+    expect(component.scenarioOntologyWarning()).toBeNull();
+
+    // 4. Finding A5: flat factPath ('retroactiveDays') declared alongside dotted availableRoots is honored as valid
+    const hybridDecision: DecisionSummary = {
+      ...decision('B'),
+      availableRoots: ['draft', 'cargo'],
+      conceptRoots: ['cargo'],
+      factPaths: ['cargo.codigo', 'retroactiveDays'],
+      facts: [],
+      condition: {
+        and: [
+          { '===': [{ var: 'cargo.codigo' }, 'C01'] },
+          { '<=': [{ var: 'retroactiveDays' }, 30] }
+        ]
+      },
+      workspaceCondition: {
+        and: [
+          { '===': [{ var: 'cargo.codigo' }, 'C01'] },
+          { '<=': [{ var: 'retroactiveDays' }, 30] }
+        ]
+      }
+    };
+    // Close authoring clean before switching to hybridDecision
+    component.authoring.completeCloseAuthoring();
+    component.select(hybridDecision);
+    capabilities.B[0].next({
+      workspaceId: 'workspace-B',
+      availableActions: ['VIEW', 'UPDATE_DRAFT', 'MANAGE_SCENARIOS'],
+      blockers: []
+    });
+
+    // Verify Finding A6: selecting another decision cleared scenarioFactDraft from decision A
+    expect(component.scenarioFactDraft()).toEqual({});
+    expect(component.scenarioFactsFallback()).toBe('{}');
+
+    component.openAuthoring();
+    expect(component.ontologicalWarning()).toBeNull();
+
+    // 5. Finding A6: fallback JSON mode (decision.facts is empty) normalizes misplaced top-level keys into primary root
+    component.scenarioFactsFallback.set('{"facts":{"dias":15},"observacao":"urgente","retroactiveDays":20}');
+    expect(component.scenarioOntologyWarning()).toContain('facts');
+    expect(component.scenarioOntologyWarning()).toContain('observacao');
+
+    component.scaffoldScenarioOntology();
+    expect(component.scenarioOntologyWarning()).toBeNull();
+    expect(JSON.parse(component.scenarioFactsFallback())).toEqual({
+      draft: { dias: 15, observacao: 'urgente' },
+      cargo: { codigo: null },
+      retroactiveDays: 20
+    });
   });
 });

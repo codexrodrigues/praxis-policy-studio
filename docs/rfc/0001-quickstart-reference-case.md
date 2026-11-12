@@ -7,7 +7,7 @@
 ## Problema
 
 O ErgonX RN-013 é o primeiro consumidor real, mas não pode ser o único ambiente
-de evolução do Policy Studio. O checkout local não possui o Oracle nem toda a
+de evolução do Rules Studio. O checkout local não possui o Oracle nem toda a
 infraestrutura do cliente. Uma fixture simplificada também não prova composição,
 precedência, `null`, outcomes, shadow, ativação atômica ou efeitos.
 
@@ -52,7 +52,7 @@ ela não se torna fonte semântica, endpoint ou contrato público.
 A projeção derivada e o script de sincronização devem ser removidos quando o
 Config e o Metadata oferecerem discovery autenticado equivalente para
 identidade, composição, schemas de facts, evidências e capabilities. Não haverá
-uma API paralela de projeções do Policy Studio.
+uma API paralela de projeções do Rules Studio.
 
 ## Estado dos gates
 

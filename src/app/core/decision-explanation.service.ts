@@ -64,8 +64,8 @@ export class DecisionExplanationService {
     const turnRequest: AgenticAuthoringTurnStreamRequest = {
       clientTurnId: createClientRequestId(),
       userPrompt: this.prompt(request.locale),
-      targetApp: 'praxis-policy-studio',
-      targetComponentId: 'policy-decision-explanation',
+      targetApp: 'praxis-rules-studio',
+      targetComponentId: 'rules-decision-explanation',
       currentRoute: '/catalog',
       contextHints: {
         selectedDomainDecisionRef: {
@@ -73,7 +73,7 @@ export class DecisionExplanationService {
           definitionId: request.definitionId,
           ruleKey: request.ruleKey,
           version: request.version,
-          source: 'policy-studio-selection'
+          source: 'rules-studio-selection' as unknown as 'policy-studio-selection'
         }
       }
     };

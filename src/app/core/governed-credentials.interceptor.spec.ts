@@ -1,10 +1,11 @@
 import '@angular/compiler';
-import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
+import { HttpClient, HttpHeaders, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { BrowserTestingModule, platformBrowserTesting } from '@angular/platform-browser/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { governedCredentialsInterceptor } from './governed-credentials.interceptor';
+import { GovernedHostScopeService } from './governed-host-scope.service';
 
 TestBed.initTestEnvironment(BrowserTestingModule, platformBrowserTesting());
 
@@ -53,4 +54,27 @@ describe('governedCredentialsInterceptor', () => {
       request.flush({});
     });
   }
+
+  it('propagates realm/organization scope headers and captures in-memory X-XSRF-TOKEN for mutations', () => {
+    const scopeService = TestBed.inject(GovernedHostScopeService);
+    scopeService.syncFromQueryString('?tenantId=df&organizationId=GROUP%3AGDF_CONSOLIDADO&environment=local');
+
+    http.get('http://localhost:8089/auth/session').subscribe();
+    const sessionReq = controller.expectOne('http://localhost:8089/auth/session');
+    expect(sessionReq.request.withCredentials).toBe(true);
+    expect(sessionReq.request.headers.get('X-Tenant-Realm')).toBe('df');
+    expect(sessionReq.request.headers.get('X-Tenant-ID')).toBe('df');
+    expect(sessionReq.request.headers.get('X-Organization-ID')).toBe('GROUP:GDF_CONSOLIDADO');
+    expect(sessionReq.request.headers.get('X-Env')).toBe('local');
+    sessionReq.flush(null, { headers: new HttpHeaders({ 'X-XSRF-TOKEN': 'csrf-df-123' }) });
+
+    http.post('http://localhost:8089/api/praxis/config/domain-rules/definitions', { ok: true }).subscribe();
+    const mutationReq = controller.expectOne('http://localhost:8089/api/praxis/config/domain-rules/definitions');
+    expect(mutationReq.request.withCredentials).toBe(true);
+    expect(mutationReq.request.headers.get('X-Tenant-Realm')).toBe('df');
+    expect(mutationReq.request.headers.get('X-Tenant-ID')).toBe('df');
+    expect(mutationReq.request.headers.get('X-Organization-ID')).toBe('GROUP:GDF_CONSOLIDADO');
+    expect(mutationReq.request.headers.get('X-XSRF-TOKEN')).toBe('csrf-df-123');
+    mutationReq.flush({});
+  });
 });

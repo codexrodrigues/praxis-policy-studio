@@ -4,6 +4,6 @@ import { AppComponent } from './app/app.component';
 
 bootstrapApplication(AppComponent, appConfig).catch((error: unknown) => {
   document.body.dataset['bootstrapError'] = 'true';
-  console.error('Policy Studio bootstrap failed', error);
+  console.error('Rules Studio bootstrap failed', error);
 });
 

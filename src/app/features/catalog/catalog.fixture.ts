@@ -2,6 +2,27 @@ import type { DomainRuleDefinitionAction, DomainRuleTestRun } from '@praxisui/co
 
 export type DecisionState = 'technical-draft' | 'verified';
 
+export type DecisionStageId =
+  | 'PROTECTED_GUARD'
+  | 'DOMAIN_DECISION'
+  | 'POST_DECISION'
+  | 'TRANSFORMATION_INTENT'
+  | 'EFFECT_INTENT';
+
+export type SlotOverridePolicyId =
+  | 'FORBIDDEN'
+  | 'PARAMETERIZABLE'
+  | 'REPLACEABLE'
+  | 'RESTRICT_ONLY'
+  | 'EXTEND_ONLY';
+
+export interface DecisionLegacyOccurrence {
+  readonly code: string;
+  readonly targetField?: string | null;
+  readonly plsqlOrigin?: string | null;
+  readonly plsqlLineage?: string | null;
+}
+
 export interface DecisionSummary {
   readonly order: number;
   readonly totalDecisions: number;
@@ -45,6 +66,13 @@ export interface DecisionSummary {
   readonly parameters?: Readonly<Record<string, unknown>>;
   readonly parameterCatalog?: DecisionParameterCatalog | null;
   readonly detailHydrated?: boolean;
+  readonly slotKey?: string | null;
+  readonly decisionStage?: DecisionStageId | null;
+  readonly slotOverridePolicy?: SlotOverridePolicyId | null;
+  readonly slotCardinality?: string | null;
+  readonly availableRoots?: readonly string[];
+  readonly conceptRoots?: readonly string[];
+  readonly legacyOccurrence?: DecisionLegacyOccurrence | null;
 }
 
 export type DecisionParameterValueType = 'STRING' | 'NUMBER' | 'INTEGER' | 'BOOLEAN';

@@ -11,6 +11,7 @@ import type {
   DomainRuleRolloutPolicyEvent,
   DomainRuleRolloutCatalog,
   DomainRuleRolloutCatalogItem,
+  DomainRuleSnapshotHeadSetResponse,
   DomainRuleSnapshotHeadStatus,
   DomainRuleSnapshotBlocker,
   DomainRuleSnapshotVersion
@@ -49,7 +50,17 @@ export interface SnapshotSourceCandidate {
 })
 export class SnapshotCockpitComponent {
   readonly ruleSetKey = input.required<string>();
+  readonly operationKeys = input<readonly string[]>([]);
+  readonly operationKey = input<string | null>(null);
+  readonly operationSelected = output<string>();
   readonly head = input<DomainRuleSnapshotHeadStatus | null>(null);
+  readonly headSet = input<DomainRuleSnapshotHeadSetResponse | null | undefined>(undefined);
+  readonly headSetLoading = input(false);
+  readonly headSetError = input(false);
+  readonly headSetCount = computed(() => {
+    const heads = this.headSet()?.heads;
+    return heads ? Object.keys(heads).length : 0;
+  });
   readonly versions = input<readonly DomainRuleSnapshotVersion[]>([]);
   readonly loading = input(false);
   readonly loadError = input(false);
@@ -98,11 +109,14 @@ export class SnapshotCockpitComponent {
   readonly approveComposition = output<RuleSetCompositionCandidateCommand>();
   readonly publishComposition = output<RuleSetCompositionCandidateCommand>();
   readonly compositionDraftChanged = output<void>();
+  readonly withdrawHead = output<string>();
   readonly i18n = inject(PolicyStudioI18n);
   readonly policyAuthoringOpen = signal(false);
   readonly policyInputError = signal(false);
   readonly compositionOpen = signal(false);
   readonly compositionInputError = signal(false);
+  readonly withdrawAuthoringOpen = signal(false);
+  readonly withdrawInputError = signal(false);
   private readonly customPromotedSelection = signal<{
     readonly ruleSetKey: string;
     readonly defaultSourceId: string | null;
@@ -175,12 +189,38 @@ export class SnapshotCockpitComponent {
   }
 
   canCreateRollout(version: DomainRuleSnapshotVersion): boolean {
-    return !version.active
-      && version.governanceState === 'READY'
-      && (this.head() === null
-        ? version.availableAction === 'CREATE_ROLLOUT'
-        : version.availableAction === 'ACTIVATE' || version.availableAction === 'ROLLBACK')
-      && (this.rolloutCatalog()?.availableActions.includes('CREATE_ROLLOUT') ?? false);
+    if (version.active
+      || version.governanceState !== 'READY'
+      || !(this.rolloutCatalog()?.availableActions.includes('CREATE_ROLLOUT') ?? false)) {
+      return false;
+    }
+    const currentHead = this.head();
+    if (currentHead === null) {
+      return version.availableAction === 'CREATE_ROLLOUT';
+    }
+    if (currentHead.governanceState === 'WITHDRAWN') {
+      return !!currentHead.headEtag && version.availableAction === 'CREATE_ROLLOUT';
+    }
+    return !!currentHead.headEtag
+      && (version.availableAction === 'ACTIVATE' || version.availableAction === 'ROLLBACK');
+  }
+
+  selectOperation(operationKey: string): void {
+    this.withdrawAuthoringOpen.set(false);
+    this.withdrawInputError.set(false);
+    this.operationSelected.emit(operationKey);
+  }
+
+  submitWithdraw(reasonRaw: string): void {
+    const trimmed = reasonRaw.trim();
+    const invalid = !trimmed
+      || trimmed.length > 1000
+      || this.head()?.governanceState !== 'READY'
+      || !this.head()?.headEtag;
+    this.withdrawInputError.set(invalid);
+    if (invalid) return;
+    this.withdrawAuthoringOpen.set(false);
+    this.withdrawHead.emit(trimmed);
   }
 
   submitPolicy(
@@ -248,7 +288,8 @@ export class SnapshotCockpitComponent {
     const promotedDefinitionId = promotedDefinitionIdRaw.trim();
     const validFromUtc = validFromUtcRaw.trim();
     const validUntilUtc = validUntilUtcRaw.trim() || null;
-    const invalid = !promotedDefinitionId || !validFromUtc;
+    const operationKey = this.operationKey();
+    const invalid = !promotedDefinitionId || !validFromUtc || !operationKey || this.operationKeys().length !== 1;
     this.compositionInputError.set(invalid);
     if (invalid) return;
 

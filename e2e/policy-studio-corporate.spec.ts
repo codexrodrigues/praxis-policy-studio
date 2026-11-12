@@ -444,7 +444,7 @@ async function governedResponse(
     return json({ ...workspace, revision: 5, etag: 'workspace-etag-5', condition: body.condition });
   }
   if (path.endsWith('/workspaces/workspace-1')) return json(currentWorkspace);
-  if (path.endsWith('/policy-studio/sandbox/runs') && request.method() === 'POST') {
+  if ((path.endsWith('/rules-studio/sandbox/runs') || path.endsWith('/policy-studio/sandbox/runs')) && request.method() === 'POST') {
     const body = request.postDataJSON() as { workspaceId: string; scenarioIds: string[]; evaluatedAtUtc: string };
     return json({
       runId: 'sandbox-run-1', workspaceId: body.workspaceId, workspaceRevision: 4,
@@ -1197,4 +1197,44 @@ test('renders full en-US corporate workstation, authoring chrome, and snapshot i
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   const violations = await new AxeBuilder({ page }).analyze();
   expect(violations.violations).toEqual([]);
+});
+
+
+test('selects snapshot operation explicitly without inheriting a family head', async ({ page }, testInfo) => {
+  const reads: string[] = [];
+  await mockGovernedBackend(page, false);
+  await page.route('**/api/**/snapshots**', route => {
+    const url = new URL(route.request().url());
+    if (url.pathname.endsWith('/head/status') || url.pathname.endsWith('/snapshots')) {
+      reads.push(url.searchParams.get('operationKey') ?? 'MISSING');
+    }
+    if (url.pathname.endsWith('/rollouts')) return route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ ruleSetKey: url.searchParams.get('ruleSetKey'), operationKey: url.searchParams.get('operationKey'), rollouts: [], availableActions: [] }) });
+    return route.fallback();
+  });
+  await page.goto('/catalog');
+  if (testInfo.project.name === 'narrow') {
+    await page.getByRole('button', { name: /O valor solicitado deve respeitar o limite do programa/ }).click();
+  }
+  await page.getByRole('button', { name: /^Operar/ }).click();
+  const cockpit = page.locator('pax-snapshot-cockpit');
+  const selector = cockpit.getByLabel('Operação governada', { exact: true });
+  await expect(selector).toHaveValue('');
+  await expect(cockpit.getByText('Selecione a operação para consultar seus heads e versões', { exact: true }).last()).toBeVisible();
+  expect(reads).toEqual([]);
+  expect((await selector.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await selector.click();
+  await page.keyboard.press('Escape');
+  await selector.selectOption('CREATE');
+  await expect.poll(() => reads.filter(operation => operation === 'CREATE').length).toBe(2);
+  await selector.selectOption('UPDATE');
+  await expect.poll(() => reads.filter(operation => operation === 'UPDATE').length).toBe(2);
+  expect(reads).not.toContain('MISSING');
+  await expect(cockpit.getByTestId('toggle-snapshot-composition')).toBeDisabled();
+  await expect(page.getByTestId('correlation-host-alignment')).toContainText('Evidência de alinhamento indisponível');
+  await selector.scrollIntoViewIfNeeded();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await selector.evaluate(el => el.scrollIntoView({ block: 'center' }));
+  await page.screenshot({ path: testInfo.outputPath('operation-scope.png'), fullPage: false });
 });

@@ -5,7 +5,7 @@ const port = new URL(baseURL).port || '4302';
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: /policy-studio-multipersona\.live\.spec\.ts/,
+  testMatch: /\.live\.spec\.ts/,
   outputDir: 'test-results-live',
   fullyParallel: false,
   retries: 0,

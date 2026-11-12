@@ -14,9 +14,12 @@ import {
   type SuggestedScenarioTemplate,
   assertionListFromText,
   buildSuggestedScenarioTemplates,
+  inspectScenarioFactsOntology,
   nestedFactPayload,
   optionalJsonValue,
   parseScenarioFactValue,
+  resolveAllowedOntologyRoots,
+  scaffoldDecisionOntologyFacts,
   valueAtFactPath
 } from './catalog-presentation';
 import { CatalogSelectionStore } from './catalog-selection.store';
@@ -48,6 +51,22 @@ export class ScenarioSandboxFacade {
   readonly scenarioFactsJson = computed(() => JSON.stringify(nestedFactPayload(this.scenarioFactDraft()), null, 2));
   readonly activeScenarios = computed(() => this.scenarios().filter(item => item.status === 'ACTIVE'));
   readonly suggestedScenarios = computed(() => buildSuggestedScenarioTemplates(this.store.selected()));
+  readonly canScaffoldScenarioOntology = computed(() => {
+    const decision = this.store.selected();
+    if (!decision) return false;
+    return decision.facts.length > 0 || decision.factPaths.length > 0 || resolveAllowedOntologyRoots(decision).length > 0;
+  });
+  readonly scenarioOntologyWarning = computed<string | null>(() => {
+    const decision = this.store.selected();
+    if (!decision) return null;
+    const jsonToInspect = decision.facts.length > 0 ? this.scenarioFactsJson() : this.scenarioFactsFallback();
+    const inspection = inspectScenarioFactsOntology(decision, jsonToInspect);
+    if (inspection.valid) return null;
+    const isPtBr = this.i18n.locale() === 'pt-BR';
+    return isPtBr
+      ? `Chaves de topo fora do contrato ontológico (${inspection.invalidTopKeys.join(', ')}). Utilize apenas as raízes permitidas: ${inspection.allowedRoots.join(', ')}.`
+      : `Top-level keys outside ontological contract (${inspection.invalidTopKeys.join(', ')}). Use only allowed roots: ${inspection.allowedRoots.join(', ')}.`;
+  });
 
   readonly editingScenarioId = signal<string | null>(null);
   readonly editingScenarioDirty = signal(false);
@@ -84,6 +103,8 @@ export class ScenarioSandboxFacade {
     this.pendingOperationalCommand = null;
     this.store.clearTaskMessage(this.scenarioFeedback, this.scenarioError);
     this.store.clearTaskMessage(this.sandboxFeedback, this.sandboxError);
+    this.scenarioFactDraft.set({});
+    this.scenarioFactsFallback.set('{}');
     this.operationalAction.set(null);
     this.operationalActionError.set(false);
     this.operationalScenarioModes.set({});
@@ -96,6 +117,8 @@ export class ScenarioSandboxFacade {
     ++this.scenariosLoadRevision;
     ++this.operationalActionLoadRevision;
     this.scenarios.set([]);
+    this.scenarioFactDraft.set({});
+    this.scenarioFactsFallback.set('{}');
     this.operationalAction.set(null);
     this.operationalActionLoading.set(false);
     this.operationalActionError.set(false);
@@ -117,6 +140,18 @@ export class ScenarioSandboxFacade {
   applyScenarioSuggestion(template: SuggestedScenarioTemplate): void {
     this.scenarioFactDraft.set({ ...template.factValues });
     this.scenarioFactsFallback.set(JSON.stringify(nestedFactPayload(template.factValues), null, 2));
+  }
+
+  scaffoldScenarioOntology(): void {
+    const decision = this.store.selected();
+    if (!decision) return;
+    const scaffolded = scaffoldDecisionOntologyFacts(
+      decision,
+      this.scenarioFactDraft(),
+      this.scenarioFactsFallback()
+    );
+    this.scenarioFactDraft.set(scaffolded.flatValues);
+    this.scenarioFactsFallback.set(JSON.stringify(scaffolded.nestedPayload, null, 2));
   }
 
   loadScenarios(selectionRevision = this.store.selectionRevision): void {

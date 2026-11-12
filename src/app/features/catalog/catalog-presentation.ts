@@ -1,6 +1,7 @@
 import type {
   DomainRuleExecutionSummary,
   DomainRuleHostStatusSummary,
+  DomainRuleSnapshotHeadSetResponse,
   DomainRuleSnapshotHeadStatus,
   DomainRuleWorkspaceCapabilities,
   DomainRuleWorkspaceReview
@@ -375,7 +376,7 @@ export function buildRuleSetImpactSummary(
     });
   }
   const missingFactMembers = ruleSetMembers.filter(member =>
-    (member.reviewStatus === 'CATALOG_IDENTITY_ONLY' && member.factPaths.length > 0)
+    (member.reviewStatus === 'CATALOG_IDENTITY_ONLY' && member.factPaths.length > 0 && member.facts.length === 0)
     || (member.facts.length > 0 && member.factPaths.some(path => !member.facts.some(fact => fact.path === path)))
   );
   if (missingFactMembers.length > 0) {
@@ -648,10 +649,17 @@ export function buildExecutionCorrelationSummary(
   lifecycle: DecisionLifecycleSummary | null | undefined = null,
   snapshotHead: DomainRuleSnapshotHeadStatus | null | undefined = null,
   executionSummary: DomainRuleExecutionSummary | null | undefined = null,
-  hostStatusSummary: DomainRuleHostStatusSummary | null | undefined = null
+  hostStatusSummary: DomainRuleHostStatusSummary | null | undefined = null,
+  snapshotHeadSet: DomainRuleSnapshotHeadSetResponse | null | undefined = undefined
 ): ExecutionCorrelationSummary | null {
   if (!decision) return null;
-  const activeSnapshotKey = snapshotHead?.activeSnapshotKey?.trim() || null;
+  const coupledCohortIncomplete = decision.operationKeys.length > 1 && snapshotHeadSet === null;
+  const activeSnapshotKey =
+    !coupledCohortIncomplete
+    && snapshotHead?.executionReady !== false
+    && (!snapshotHead?.governanceState || snapshotHead.governanceState === 'READY')
+      ? (snapshotHead?.activeSnapshotKey?.trim() || null)
+      : null;
   const totalObservations = executionSummary?.totalObservations ?? 0;
   const counts = executionSummary?.outcomeCounts;
   const technicalErrorCount = counts?.TECHNICAL_ERROR ?? 0;
@@ -701,7 +709,8 @@ export function buildExecutionCorrelationSummary(
 
 export function buildDecisionMaturityPosture(
   decision: DecisionSummary | null | undefined,
-  snapshotHead: DomainRuleSnapshotHeadStatus | null | undefined = null
+  snapshotHead: DomainRuleSnapshotHeadStatus | null | undefined = null,
+  snapshotHeadSet: DomainRuleSnapshotHeadSetResponse | null | undefined = undefined
 ): DecisionMaturityPosture | null {
   if (!decision) return null;
   const technicalMaturity: DecisionMaturityPosture['technicalMaturity'] =
@@ -724,7 +733,13 @@ export function buildDecisionMaturityPosture(
             ? 'REJECTED'
             : 'DRAFT_OPEN';
 
-  const activeSnapshotKey = snapshotHead?.activeSnapshotKey?.trim() || null;
+  const coupledCohortIncomplete = decision.operationKeys.length > 1 && snapshotHeadSet === null;
+  const activeSnapshotKey =
+    !coupledCohortIncomplete
+    && snapshotHead?.executionReady !== false
+    && (!snapshotHead?.governanceState || snapshotHead.governanceState === 'READY')
+      ? (snapshotHead?.activeSnapshotKey?.trim() || null)
+      : null;
   const normalizedAuthority = decision.authority.toUpperCase();
   const operationalAuthority: DecisionMaturityPosture['operationalAuthority'] =
     normalizedAuthority.includes('LEGACY_AUTHORITATIVE')
@@ -900,4 +915,347 @@ export function buildSuggestedDraftDiffProposals(
   }
 
   return proposals;
+}
+
+export interface DecisionOntologyInspection {
+  readonly allowedRoots: readonly string[];
+  readonly referencedVars: readonly string[];
+  readonly invalidVars: readonly string[];
+  readonly valid: boolean;
+}
+
+export interface ConceptRootNeighborGroup {
+  readonly root: string;
+  readonly isConceptRoot: boolean;
+  readonly neighborDecisions: readonly DecisionSummary[];
+  readonly distinctRuleSetKeys: readonly string[];
+}
+
+const GENERIC_ONTOLOGY_ROOTS = new Set(['draft', 'current', 'context', 'neighborhood']);
+
+export function resolveAllowedOntologyRoots(
+  decision: DecisionSummary | null | undefined
+): readonly string[] {
+  if (!decision) return [];
+  const explicit = (decision.availableRoots ?? [])
+    .map(root => root.trim())
+    .filter(Boolean);
+  if (explicit.length > 0) {
+    return [...new Set(explicit)];
+  }
+  const derived = [
+    ...decision.factPaths,
+    ...decision.facts.map(fact => fact.path)
+  ]
+    .map(path => {
+      const trimmed = path.trim();
+      const dotIndex = trimmed.indexOf('.');
+      return dotIndex > 0 ? trimmed.slice(0, dotIndex).trim() : '';
+    })
+    .filter(Boolean);
+  return [...new Set(derived)];
+}
+
+export function inspectDecisionExpressionOntology(
+  decision: DecisionSummary | null | undefined,
+  condition: unknown
+): DecisionOntologyInspection {
+  const allowedRoots = resolveAllowedOntologyRoots(decision);
+  if (!condition || typeof condition !== 'object') {
+    return { allowedRoots, referencedVars: [], invalidVars: [], valid: true };
+  }
+  const knownFactPaths = new Set(
+    [
+      ...(decision?.factPaths ?? []),
+      ...(decision?.facts.map(fact => fact.path) ?? [])
+    ]
+      .map(path => path.trim())
+      .filter(Boolean)
+  );
+  const referenced: string[] = [];
+  const invalid: string[] = [];
+
+  const visit = (node: unknown): void => {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) {
+      node.forEach(visit);
+      return;
+    }
+    const record = node as Record<string, unknown>;
+    if ('var' in record) {
+      const rawVar = record['var'];
+      const varPath = Array.isArray(rawVar) ? rawVar[0] : rawVar;
+      if (typeof varPath === 'string' && varPath.trim()) {
+        const trimmed = varPath.trim();
+        if (/^(?:parameters|params)\./.test(trimmed)) return;
+        referenced.push(trimmed);
+        if (allowedRoots.length > 0) {
+          if (trimmed === 'facts' || trimmed.startsWith('facts.')) {
+            invalid.push(trimmed);
+          } else if (!knownFactPaths.has(trimmed)) {
+            const dotIndex = trimmed.indexOf('.');
+            const root = dotIndex > 0 ? trimmed.slice(0, dotIndex) : '';
+            if (!root || !allowedRoots.includes(root)) {
+              invalid.push(trimmed);
+            }
+          }
+        }
+      }
+      return;
+    }
+    Object.values(record).forEach(visit);
+  };
+
+  visit(condition);
+  const referencedVars = [...new Set(referenced)];
+  const invalidVars = [...new Set(invalid)];
+  return {
+    allowedRoots,
+    referencedVars,
+    invalidVars,
+    valid: invalidVars.length === 0
+  };
+}
+
+export function rewriteDecisionExpressionOntology(
+  decision: DecisionSummary | null | undefined,
+  condition: unknown
+): unknown {
+  const allowedRoots = resolveAllowedOntologyRoots(decision);
+  if (!condition || typeof condition !== 'object' || allowedRoots.length === 0) {
+    return condition;
+  }
+  const primaryRoot = allowedRoots.includes('draft') ? 'draft' : allowedRoots[0];
+  const knownPaths = [
+    ...new Set(
+      [
+        ...(decision?.factPaths ?? []),
+        ...(decision?.facts.map(fact => fact.path) ?? [])
+      ]
+        .map(path => path.trim())
+        .filter(Boolean)
+    )
+  ];
+
+  const normalizeVarPath = (rawPath: string): string => {
+    const trimmed = rawPath.trim();
+    if (!trimmed || /^(?:parameters|params)\./.test(trimmed)) return trimmed;
+    if (trimmed === 'facts') return primaryRoot;
+    if (!trimmed.startsWith('facts.') && knownPaths.includes(trimmed)) {
+      return trimmed;
+    }
+    const stripped = trimmed.startsWith('facts.') ? trimmed.slice('facts.'.length) : trimmed;
+    const dotIndex = stripped.indexOf('.');
+    if (dotIndex > 0) {
+      const root = stripped.slice(0, dotIndex);
+      if (allowedRoots.includes(root)) return stripped;
+      const leaf = stripped.slice(dotIndex + 1);
+      const exactKnown = knownPaths.find(path => path.endsWith(`.${leaf}`));
+      return exactKnown ?? `${primaryRoot}.${leaf}`;
+    }
+    const exactKnown = knownPaths.find(path => path.endsWith(`.${stripped}`));
+    return exactKnown ?? `${primaryRoot}.${stripped}`;
+  };
+
+  const rewriteNode = (node: unknown): unknown => {
+    if (!node || typeof node !== 'object') return node;
+    if (Array.isArray(node)) return node.map(rewriteNode);
+    const record = node as Record<string, unknown>;
+    if ('var' in record) {
+      const rawVar = record['var'];
+      if (typeof rawVar === 'string') {
+        return { ...record, var: normalizeVarPath(rawVar) };
+      }
+      if (Array.isArray(rawVar) && typeof rawVar[0] === 'string') {
+        return { ...record, var: [normalizeVarPath(rawVar[0]), ...rawVar.slice(1)] };
+      }
+      return record;
+    }
+    return Object.fromEntries(
+      Object.entries(record).map(([key, val]) => [key, rewriteNode(val)])
+    );
+  };
+
+  return rewriteNode(condition);
+}
+
+export function scaffoldDecisionOntologyFacts(
+  decision: DecisionSummary | null | undefined,
+  currentValues?: Readonly<Record<string, unknown>>,
+  fallbackJson?: string
+): {
+  readonly flatValues: Readonly<Record<string, unknown>>;
+  readonly nestedPayload: Readonly<Record<string, unknown>>;
+} {
+  if (!decision) {
+    return { flatValues: {}, nestedPayload: {} };
+  }
+  const allowedRoots = resolveAllowedOntologyRoots(decision);
+  const primaryRoot = allowedRoots.includes('draft') ? 'draft' : (allowedRoots[0] ?? null);
+  const flatValues: Record<string, unknown> = { ...(currentValues ?? {}) };
+  const factByPath = new Map(decision.facts.map(fact => [fact.path, fact]));
+  const allFactPaths = [
+    ...new Set([
+      ...decision.facts.map(fact => fact.path),
+      ...decision.factPaths
+    ])
+  ];
+  const knownFactPaths = new Set(allFactPaths.map(path => path.trim()).filter(Boolean));
+
+  const defaultForFact = (fact: DecisionFact | undefined): unknown => {
+    if (!fact) return null;
+    if (fact.valueType === 'boolean') return false;
+    if (fact.valueType === 'number') return 0;
+    if (fact.valueType === 'date') return '2026-01-15';
+    if (
+      fact.valueType === 'number-array'
+      || fact.valueType === 'array<number>'
+      || fact.valueType === 'string-array'
+      || fact.valueType === 'date-array'
+    ) {
+      return [];
+    }
+    return '';
+  };
+
+  for (const path of allFactPaths) {
+    if (!(path in flatValues) || flatValues[path] === undefined) {
+      flatValues[path] = defaultForFact(factByPath.get(path));
+    }
+  }
+
+  const nestedPayload = nestedFactPayload(flatValues);
+  if (fallbackJson && fallbackJson.trim()) {
+    try {
+      const parsed = JSON.parse(fallbackJson);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const ensureRootBucket = (root: string): Record<string, unknown> => {
+          const existing = nestedPayload[root];
+          if (!existing || typeof existing !== 'object' || Array.isArray(existing)) {
+            const created: Record<string, unknown> = {};
+            nestedPayload[root] = created;
+            return created;
+          }
+          return existing as Record<string, unknown>;
+        };
+        for (const [key, val] of Object.entries(parsed as Record<string, unknown>)) {
+          if (key === 'facts' && val && typeof val === 'object' && !Array.isArray(val) && primaryRoot) {
+            const targetBucket = ensureRootBucket(primaryRoot);
+            for (const [innerKey, innerVal] of Object.entries(val as Record<string, unknown>)) {
+              if (!(innerKey in targetBucket) || targetBucket[innerKey] === null) {
+                targetBucket[innerKey] = innerVal;
+              }
+            }
+          } else if (allowedRoots.includes(key) && val && typeof val === 'object' && !Array.isArray(val)) {
+            const targetBucket = ensureRootBucket(key);
+            for (const [innerKey, innerVal] of Object.entries(val as Record<string, unknown>)) {
+              if (!(innerKey in targetBucket) || targetBucket[innerKey] === null) {
+                targetBucket[innerKey] = innerVal;
+              }
+            }
+          } else if (knownFactPaths.has(key) && key !== 'facts') {
+            if (!(key in nestedPayload) || nestedPayload[key] === null) {
+              nestedPayload[key] = val;
+            }
+          } else if (primaryRoot) {
+            const targetBucket = ensureRootBucket(primaryRoot);
+            if (!(key in targetBucket) || targetBucket[key] === null) {
+              targetBucket[key] = val;
+            }
+          }
+        }
+      }
+    } catch {
+      // Ignore malformed fallback JSON during scaffolding
+    }
+  }
+
+  for (const root of allowedRoots) {
+    if (!(root in nestedPayload) || typeof nestedPayload[root] !== 'object' || nestedPayload[root] === null) {
+      nestedPayload[root] = {};
+    }
+  }
+
+  return { flatValues, nestedPayload };
+}
+
+export function inspectScenarioFactsOntology(
+  decision: DecisionSummary | null | undefined,
+  factsJson: string
+): {
+  readonly allowedRoots: readonly string[];
+  readonly invalidTopKeys: readonly string[];
+  readonly valid: boolean;
+} {
+  const allowedRoots = resolveAllowedOntologyRoots(decision);
+  if (allowedRoots.length === 0 || !factsJson.trim()) {
+    return { allowedRoots, invalidTopKeys: [], valid: true };
+  }
+  const knownFactPaths = new Set(
+    [
+      ...(decision?.factPaths ?? []),
+      ...(decision?.facts.map(fact => fact.path) ?? [])
+    ]
+      .map(path => path.trim())
+      .filter(Boolean)
+  );
+  try {
+    const parsed = JSON.parse(factsJson);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { allowedRoots, invalidTopKeys: [], valid: true };
+    }
+    const invalidTopKeys = Object.keys(parsed as Record<string, unknown>).filter(
+      key => key === 'facts' || (!allowedRoots.includes(key) && !knownFactPaths.has(key))
+    );
+    return {
+      allowedRoots,
+      invalidTopKeys,
+      valid: invalidTopKeys.length === 0
+    };
+  } catch {
+    return { allowedRoots, invalidTopKeys: [], valid: true };
+  }
+}
+
+export function buildConceptRootNeighborhood(
+  decision: DecisionSummary | null | undefined,
+  allDecisions: readonly DecisionSummary[]
+): readonly ConceptRootNeighborGroup[] {
+  if (!decision) return [];
+  const conceptSet = new Set((decision.conceptRoots ?? []).map(r => r.trim()).filter(Boolean));
+  const domainAvailable = resolveAllowedOntologyRoots(decision).filter(
+    root => !GENERIC_ONTOLOGY_ROOTS.has(root)
+  );
+  const candidateRoots = [...new Set([...conceptSet, ...domainAvailable])];
+  if (candidateRoots.length === 0) return [];
+
+  return candidateRoots.map(root => {
+    const matchesRoot = (item: DecisionSummary): boolean => {
+      if (item.key === decision.key) return false;
+      const itemConcepts = item.conceptRoots ?? [];
+      const itemAvailable = resolveAllowedOntologyRoots(item);
+      return (
+        itemConcepts.includes(root)
+        || itemAvailable.includes(root)
+        || item.factPaths.some(path => path.startsWith(`${root}.`))
+        || (item.resourceKey?.endsWith(`.${root}`) ?? false)
+        || item.ruleSetKey.includes(root)
+      );
+    };
+    const neighborDecisions = allDecisions
+      .filter(matchesRoot)
+      .sort((left, right) => {
+        const leftExternal = left.ruleSetKey !== decision.ruleSetKey ? 0 : 1;
+        const rightExternal = right.ruleSetKey !== decision.ruleSetKey ? 0 : 1;
+        if (leftExternal !== rightExternal) return leftExternal - rightExternal;
+        return left.order - right.order;
+      });
+    const distinctRuleSetKeys = [...new Set(neighborDecisions.map(item => item.ruleSetKey))];
+    return {
+      root,
+      isConceptRoot: conceptSet.has(root),
+      neighborDecisions,
+      distinctRuleSetKeys
+    };
+  });
 }

@@ -6,7 +6,7 @@
 
 ## Contexto
 
-O Policy Studio precisa permitir que pessoas e agentes encontrem, expliquem,
+O Rules Studio precisa permitir que pessoas e agentes encontrem, expliquem,
 criem, editem, testem e operem decisões. A plataforma já possui no Praxis Config
 e no `@praxisui/ai` infraestrutura horizontal para providers, resolução semântica
 de intenção, conversas, SSE com replay/cancelamento, clarificação, registry de
@@ -15,13 +15,13 @@ tools, identidade e evidência sanitizada.
 Esse runtime hoje reconhece intenções de shared rules principalmente para impedir
 que o Page Builder trate uma decisão de domínio como patch de página. O handoff
 consultivo não executa a jornada de decisão e não existe projeção de evidência
-específica para explicar uma regra. Criar um segundo motor LLM no Policy Studio
+específica para explicar uma regra. Criar um segundo motor LLM no Rules Studio
 duplicaria sessão, segurança, tools, observabilidade e roteamento.
 
 ## Decisão
 
 O Policy Assistant reutilizará o runtime canônico de IA do Config e o transporte
-público de `@praxisui/ai`. O Policy Studio materializará a experiência, mas não
+público de `@praxisui/ai`. O Rules Studio materializará a experiência, mas não
 possuirá provider, API key, roteador de intenção, persistência de conversa ou
 executor paralelo.
 
@@ -35,7 +35,7 @@ segregação de funções das pessoas. Não haverá uma API privilegiada de IA.
 
 ```mermaid
 flowchart LR
-    User["Pessoa ou agente delegado"] --> Shell["Policy Studio / @praxisui/ai"]
+    User["Pessoa ou agente delegado"] --> Shell["Rules Studio / @praxisui/ai"]
     Shell --> AI["Praxis Config AI runtime"]
     AI --> Evidence["Tools read-only de decisão"]
     AI --> Commands["Comandos canônicos de decisão"]

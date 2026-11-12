@@ -3,7 +3,7 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "praxis-policy-studio": {
+    "praxis-rules-studio": {
       "projectType": "application",
       "root": "",
       "sourceRoot": "src",
@@ -40,8 +40,8 @@
         "serve": {
           "builder": "@angular/build:dev-server",
           "configurations": {
-            "production": { "buildTarget": "praxis-policy-studio:build:production" },
-            "development": { "buildTarget": "praxis-policy-studio:build:development" }
+            "production": { "buildTarget": "praxis-rules-studio:build:production" },
+            "development": { "buildTarget": "praxis-rules-studio:build:development" }
           },
           "defaultConfiguration": "development"
         },

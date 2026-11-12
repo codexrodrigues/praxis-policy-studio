@@ -23,6 +23,7 @@ import type { PolicyStudioRuntimeConfig } from '../../core/runtime-config';
 import { RuntimeConfigService } from '../../core/runtime-config.service';
 import { DecisionParametersEditorComponent } from '../authoring/decision-parameters-editor.component';
 import { LocalDraftWorkspaceComponent } from '../authoring/local-draft-workspace.component';
+import { RuleDecisionPlanDagComponent } from './rule-decision-plan-dag.component';
 import {
   buildDecisionMaturityPosture,
   buildExecutionCorrelationSummary,
@@ -66,7 +67,8 @@ import { WorkspaceBlockersComponent } from './workspace-blockers.component';
     ScenarioCatalogComponent,
     ScenarioCreateFormComponent,
     DecisionParametersEditorComponent,
-    DecisionCreateFormComponent
+    DecisionCreateFormComponent,
+    RuleDecisionPlanDagComponent
   ],
   providers: [
     ProjectionCatalogService,
@@ -136,6 +138,8 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly draftParameters = this.authoring.draftParameters;
   readonly parameterValidationErrors = this.authoring.parameterValidationErrors;
   readonly editorState = this.authoring.editorState;
+  readonly ontologyInspection = this.authoring.ontologyInspection;
+  readonly ontologicalWarning = this.authoring.ontologicalWarning;
   readonly totalAuthoringValidationErrors = this.authoring.totalAuthoringValidationErrors;
   readonly originalExpression = this.authoring.originalExpression;
   readonly draftExpression = this.authoring.draftExpression;
@@ -156,6 +160,8 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly scenarioFactsJson = this.testing.scenarioFactsJson;
   readonly activeScenarios = this.testing.activeScenarios;
   readonly suggestedScenarios = this.testing.suggestedScenarios;
+  readonly canScaffoldScenarioOntology = this.testing.canScaffoldScenarioOntology;
+  readonly scenarioOntologyWarning = this.testing.scenarioOntologyWarning;
   readonly editingScenarioId = this.testing.editingScenarioId;
   readonly editingScenarioDirty = this.testing.editingScenarioDirty;
   readonly editingScenarioFactDraft = this.testing.editingScenarioFactDraft;
@@ -168,6 +174,9 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly sandboxRun = this.testing.sandboxRun;
 
   readonly snapshotHead = this.snapshots.snapshotHead;
+  readonly snapshotHeadSet = this.snapshots.snapshotHeadSet;
+  readonly snapshotHeadSetLoading = this.snapshots.snapshotHeadSetLoading;
+  readonly snapshotHeadSetError = this.snapshots.snapshotHeadSetError;
   readonly snapshotVersions = this.snapshots.snapshotVersions;
   readonly snapshotsLoading = this.snapshots.snapshotsLoading;
   readonly snapshotsError = this.snapshots.snapshotsError;
@@ -206,14 +215,16 @@ export class CatalogWorkspaceComponent implements OnInit {
   ));
   readonly maturityPosture = computed(() => buildDecisionMaturityPosture(
     this.selected(),
-    this.snapshotHead()
+    this.snapshotHead(),
+    this.snapshotHeadSet()
   ));
   readonly executionCorrelation = computed(() => buildExecutionCorrelationSummary(
     this.selected(),
     this.lifecycle(),
     this.snapshotHead(),
     this.executionSummary(),
-    this.hostStatusSummary()
+    this.hostStatusSummary(),
+    this.snapshotHeadSet()
   ));
 
   constructor(readonly i18n: PolicyStudioI18n) {}
@@ -368,8 +379,8 @@ export class CatalogWorkspaceComponent implements OnInit {
         this.sessionActive.set(state.config.mode === 'remote');
         this.logoutFailed.set(false);
         this.allDecisions.set(decisions);
-        const initial = decisions.find(item => item.key === state.config.initialDecisionKey) ?? decisions[0] ?? null;
-        if (initial) this.select(initial, true, false);
+        const initial = this.resolveInitialDecision(decisions, state.config.initialDecisionKey);
+        if (initial) this.select(initial, true, this.hasExplicitDeepLink());
         else this.clearSelection();
         this.loading.set(false);
       },
@@ -387,6 +398,80 @@ export class CatalogWorkspaceComponent implements OnInit {
         }
       }
     });
+  }
+
+  resolveInitialDecision(
+    decisions: readonly DecisionSummary[],
+    configuredInitialKey: string | null
+  ): DecisionSummary | null {
+    if (!decisions.length) return null;
+    if (typeof window !== 'undefined' && window.location?.search) {
+      const params = new URLSearchParams(window.location.search);
+      const requestedDecisionKey = params.get('decisionKey')?.trim() || null;
+      const requestedBindingKey = params.get('bindingKey')?.trim() || null;
+      const requestedSlotKey = params.get('slotKey')?.trim() || null;
+      const requestedRuleSetKey = params.get('ruleSetKey')?.trim() || null;
+      const requestedResourceKey = params.get('resourceKey')?.trim() || null;
+
+      const matchesSlot = (item: DecisionSummary, slotKey: string): boolean =>
+        item.slotKey === slotKey || item.key === slotKey || item.key.startsWith(`${slotKey}.`);
+
+      if (requestedDecisionKey) {
+        const matchByDecisionKey = decisions.find(
+          item => item.key === requestedDecisionKey || item.code === requestedDecisionKey
+        );
+        if (matchByDecisionKey) return matchByDecisionKey;
+      }
+      if (requestedBindingKey) {
+        const matchByBindingKey = decisions.find(
+          item => item.key === requestedBindingKey || item.code === requestedBindingKey
+        );
+        if (matchByBindingKey) return matchByBindingKey;
+      }
+      if (requestedRuleSetKey && requestedSlotKey) {
+        const matchByRuleSetAndSlot = decisions.find(
+          item => item.ruleSetKey === requestedRuleSetKey && matchesSlot(item, requestedSlotKey)
+        );
+        if (matchByRuleSetAndSlot) return matchByRuleSetAndSlot;
+      }
+      if (requestedResourceKey && requestedSlotKey) {
+        const matchByResourceAndSlot = decisions.find(
+          item =>
+            (item.resourceKey === requestedResourceKey || item.ruleSetKey === requestedResourceKey)
+            && matchesSlot(item, requestedSlotKey)
+        );
+        if (matchByResourceAndSlot) return matchByResourceAndSlot;
+      }
+      if (requestedSlotKey) {
+        const matchBySlot = decisions.find(item => matchesSlot(item, requestedSlotKey));
+        if (matchBySlot) return matchBySlot;
+      }
+      if (requestedRuleSetKey) {
+        const matchByRuleSet = decisions.find(
+          item => item.ruleSetKey === requestedRuleSetKey || item.resourceKey === requestedRuleSetKey
+        );
+        if (matchByRuleSet) return matchByRuleSet;
+      }
+      if (requestedResourceKey) {
+        const matchByResource = decisions.find(
+          item => item.resourceKey === requestedResourceKey || item.ruleSetKey === requestedResourceKey
+        );
+        if (matchByResource) return matchByResource;
+      }
+    }
+    return decisions.find(item => item.key === configuredInitialKey) ?? decisions[0] ?? null;
+  }
+
+  private hasExplicitDeepLink(): boolean {
+    if (typeof window === 'undefined' || !window.location?.search) return false;
+    const params = new URLSearchParams(window.location.search);
+    return Boolean(
+      params.get('decisionKey')?.trim() ||
+        params.get('bindingKey')?.trim() ||
+        params.get('slotKey')?.trim() ||
+        params.get('ruleSetKey')?.trim() ||
+        params.get('resourceKey')?.trim()
+    );
   }
 
   private resolveForbiddenResponse(config: PolicyStudioRuntimeConfig, catalogRevision: number): void {
@@ -458,6 +543,10 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   updateQuery(value: string): void { this.query.set(value); }
+
+  filterByOntologyRoot(root: string): void {
+    this.query.set(root.trim());
+  }
 
   clearQuery(): void {
     this.query.set('');
@@ -539,48 +628,97 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   private hydrateSelectedDecision(decision: DecisionSummary, selectionRevision: number): void {
     const state = this.runtime.state();
-    if (decision.detailHydrated !== false
-      || !decision.configDefinitionId
-      || !decision.configVersion
-      || state.kind !== 'ready'
+    if (state.kind !== 'ready'
       || state.config.mode !== 'remote'
       || typeof this.catalog.loadDiscoveredCandidate !== 'function') {
       return;
     }
-    const index = Math.max(0, this.allDecisions().findIndex(item => item.key === decision.key));
-    const total = Math.max(this.allDecisions().length, decision.totalDecisions);
-    this.catalog.loadDiscoveredCandidate(
-      {
-        definitionId: decision.configDefinitionId,
-        ruleKey: decision.key,
-        version: decision.configVersion,
-        status: decision.configStatus ?? 'draft',
-        ruleType: decision.ruleType ?? 'validation',
-        contextKey: decision.domain,
-        resourceKey: decision.resourceKey,
-        serviceKey: decision.serviceKey,
-        semanticOwner: null,
-        updatedAt: ''
-      },
-      index,
-      total,
-      this.i18n.locale(),
-      state.config
-    ).subscribe({
-      next: hydrated => {
-        if (selectionRevision !== this.store.selectionRevision || this.hasUnsavedWork()) return;
-        this.allDecisions.update(items => items.map(item => item.key === hydrated.key ? hydrated : item));
-        this.selected.set(hydrated);
-        this.authoring.resetForSelection(hydrated);
-        if (hydrated.resourceKey !== decision.resourceKey) {
-          this.loadOperationalTestAction(selectionRevision);
+    const all = this.allDecisions();
+    const total = Math.max(all.length, decision.totalDecisions);
+
+    if (decision.detailHydrated === false && decision.configDefinitionId && decision.configVersion) {
+      const index = Math.max(0, all.findIndex(item => item.key === decision.key));
+      this.catalog.loadDiscoveredCandidate(
+        {
+          definitionId: decision.configDefinitionId,
+          ruleKey: decision.key,
+          version: decision.configVersion,
+          status: decision.configStatus ?? 'draft',
+          ruleType: decision.ruleType ?? 'validation',
+          contextKey: decision.domain,
+          resourceKey: decision.ruleSetKey || decision.resourceKey,
+          serviceKey: decision.serviceKey,
+          semanticOwner: null,
+          updatedAt: ''
+        },
+        index,
+        total,
+        this.i18n.locale(),
+        state.config
+      ).subscribe({
+        next: hydrated => {
+          if (selectionRevision !== this.store.selectionRevision || this.hasUnsavedWork()) return;
+          this.allDecisions.update(items => items.map(item => item.key === hydrated.key ? hydrated : item));
+          this.selected.set(hydrated);
+          this.authoring.resetForSelection(hydrated);
+          if (hydrated.workspaceId !== decision.workspaceId) {
+            this.loadTimeline(selectionRevision);
+            this.loadLifecycle(selectionRevision);
+            this.loadScenarios(selectionRevision);
+            this.loadReviews(selectionRevision);
+            this.loadWorkspaceCapabilities(selectionRevision);
+          }
+          if (hydrated.resourceKey !== decision.resourceKey) {
+            this.loadOperationalTestAction(selectionRevision);
+          }
+          if (hydrated.ruleSetKey !== decision.ruleSetKey) {
+            this.loadSnapshots();
+          }
+        },
+        error: error => this.store.failAuthoringCommand(error, selectionRevision, decision.key)
+      });
+    }
+
+    const unhydratedSiblings = all.filter(
+      item =>
+        item.key !== decision.key
+        && Boolean(decision.ruleSetKey)
+        && item.ruleSetKey === decision.ruleSetKey
+        && item.detailHydrated === false
+        && Boolean(item.configDefinitionId)
+        && Boolean(item.configVersion)
+    );
+    for (const sibling of unhydratedSiblings) {
+      const siblingIndex = Math.max(0, all.findIndex(item => item.key === sibling.key));
+      this.catalog.loadDiscoveredCandidate(
+        {
+          definitionId: sibling.configDefinitionId!,
+          ruleKey: sibling.key,
+          version: sibling.configVersion!,
+          status: sibling.configStatus ?? 'draft',
+          ruleType: sibling.ruleType ?? 'validation',
+          contextKey: sibling.domain,
+          resourceKey: sibling.ruleSetKey || sibling.resourceKey,
+          serviceKey: sibling.serviceKey,
+          semanticOwner: null,
+          updatedAt: ''
+        },
+        siblingIndex,
+        total,
+        this.i18n.locale(),
+        state.config
+      ).subscribe({
+        next: hydratedSibling => {
+          if (selectionRevision !== this.store.selectionRevision) return;
+          this.allDecisions.update(items =>
+            items.map(item => item.key === hydratedSibling.key ? hydratedSibling : item)
+          );
+        },
+        error: () => {
+          // Sibling background hydration for DAG completeness is non-blocking
         }
-        if (hydrated.ruleSetKey !== decision.ruleSetKey) {
-          this.loadSnapshots();
-        }
-      },
-      error: error => this.store.failAuthoringCommand(error, selectionRevision, decision.key)
-    });
+      });
+    }
   }
 
   selectDiscoveredCandidate(candidate: DecisionDiscoveryCandidate): void {
@@ -737,6 +875,10 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.authoring.applyDiffProposal(proposal);
   }
 
+  autoFixDraftOntology(): void {
+    this.authoring.autoFixDraftOntology();
+  }
+
   updateEditorState(state: RuleBuilderState): void {
     this.authoring.updateEditorState(state);
   }
@@ -824,6 +966,10 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   applyScenarioSuggestion(template: SuggestedScenarioTemplate): void {
     this.testing.applyScenarioSuggestion(template);
+  }
+
+  scaffoldScenarioOntology(): void {
+    this.testing.scaffoldScenarioOntology();
   }
 
   setScenarioFactValue(fact: DecisionFact, rawValue: string | boolean): void {

@@ -1,6 +1,6 @@
-# Praxis Policy Studio
+# Praxis Rules Studio
 
-Workstation independente da **Praxis Platform** — uma plataforma semanticamente orientada para aplicações corporativas AI-native — para compreender, criar, simular, testar e aprovar decisões governadas e políticas de negócio descritas uma vez e operadas de forma idêntica por interfaces tradicionais, interfaces generativas, agentes de IA e integrações. O ErgonX é o primeiro consumidor; contratos e semântica do produto permanecem neutros em relação ao domínio.
+Workstation independente da **Praxis Platform** (plano de experiência do **Praxis Decision Studio** sobre o Control Plane `praxis-config-starter`) para compreender, criar, simular, testar e aprovar decisões governadas descritas uma vez e operadas de forma idêntica por interfaces tradicionais, interfaces generativas, agentes de IA e integrações. Na arquitetura da **Praxis Decision Platform**, o Studio distingue explicitamente as duas trilhas de decisão governadas pelo mesmo PAP: (1) **Regras e Políticas Operacionais de Negócio (`decisionKind = BUSINESS`)**, compiladas em `PublishedRuleSnapshot` e executadas pelo `praxis-rules-engine` (`DecisionBinding`); e (2) **Políticas de Autorização, Escopo de Dados e Mascaramento (`decisionKind = AUTHORIZATION`, `ruleType = "authorization_policy"`)**, compiladas em `OpaPolicyUnitManifest` / `OpaRuntimeRelease` e executadas por `praxis-authz-*` (`RuntimeEnforcementBinding`). O ErgonX é o primeiro consumidor; contratos e semântica do produto permanecem neutros em relação ao domínio.
 
 ## Estado atual
 
@@ -16,7 +16,7 @@ chamadas ao baseline sem expor facts, payloads ou linhas de banco.
 Não há síntese local de `RuleSet` no browser: o Studio cria definições governadas,
 edita condições, parâmetros tipados (`/definitions/{id}/parameters`) e efeito operacional
 explícito (`BLOCK`/`ALLOW`), publica definições/materializações e opera o fluxo
-assistido de candidato de composição (`/api/praxis/policy-studio/rule-sets/{ruleSetKey}/candidate`,
+assistido de candidato de composição (`/api/praxis/rules-studio/rule-sets/{ruleSetKey}/candidate`,
 `/candidate/approvals`, `/candidate/publish`) e versões de snapshot somente pelas
 ações (`authorizedActions`), segregação de funções (4-olhos) e ETag forte fornecidos
 pelo host e pelo Config.
@@ -37,12 +37,13 @@ condição e lifecycle continuam vindo do Config autenticado.
 
 ```powershell
 npm ci
-npm start
+npm start        # Proxy para praxis-api-quickstart (http://127.0.0.1:8088)
+npm run start:ergon # Proxy para praxis-ergon-showcase (http://127.0.0.1:8086)
 ```
 
-No modo remoto, uma sessão ausente exibe o login explícito do ambiente de desenvolvimento. O formulário chama o endpoint canônico `/auth/login`, recebe apenas o cookie `HttpOnly` do host e descarta os campos após a tentativa; o Policy Studio não persiste senha ou token. Uma sessão reconhecida pode ser encerrada por `/auth/logout`; após a resposta do host, o Studio invalida catálogo, seleção e evidências governadas mantidas em memória antes de voltar ao login.
+No modo remoto, uma sessão ausente exibe o login explícito do ambiente de desenvolvimento. O formulário chama o endpoint canônico `/auth/login`, recebe apenas o cookie `HttpOnly` do host e descarta os campos após a tentativa; o Rules Studio não persiste senha ou token. Uma sessão reconhecida pode ser encerrada por `/auth/logout`; após a resposta do host, o Studio invalida catálogo, seleção e evidências governadas mantidas em memória antes de voltar ao login.
 
-Abra `http://localhost:4302/catalog`.
+Abra `http://localhost:4302/catalog` (ou navegue por deep-link contextual a partir do Catálogo e Simulador em `praxis-ergon-showcase-ui`: `/catalog?ruleSetKey=...&slotKey=...&decisionKey=...`, que resolve diretamente o slot solicitado e abre o detalhe automaticamente mesmo em viewports estreitos).
 
 ### Jornada da interface
 
@@ -221,14 +222,24 @@ ou ambíguo.
 
 ```powershell
 npm run e2e
+npm run e2e:ergon
+npm run e2e:live:ergon
 ```
 
 A suíte Playwright inicia o Studio na porta oficial `4302`, usa Chromium e valida
 desktop `1440×1000` e narrow `390×844`. Ela cobre sessão ausente, capability
 negada, confirmação de ação de alto risco, conflito `412`, teclado, ausência de
-overflow horizontal e axe. As respostas HTTP são herméticas para tornar o gate
-reprodutível no CI; a evidência integrada `4302 ↔ 8088` continua sendo um gate
-separado, dependente de Quickstart e Neon configurados.
+overflow horizontal e axe. A suíte `npm run e2e:ergon` (`e2e/ergon-rules-studio-convergence.spec.ts`)
+valida especificamente a convergência com o Ergon Showcase em desktop e narrow:
+resolução de deep-link (`?ruleSetKey=...&slotKey=...&decisionKey=...`), renderização
+do DAG de 6 estágios (`<pax-rule-decision-plan-dag>`) com guards `FORBIDDEN` (`ERG-00019`,
+`ERG-08382`, `ERG-08393`) em postura somente-leitura, linhagem PL/SQL, navegação
+ontológica 1-hop entre `RuleSet`s (`RN-013 ↔ RN-017`), simulação no sandbox com
+trace visual de divergência, prova operacional host-driven (`run-rules-studio-operational-test`)
+e composição/publicação de snapshot candidato. As respostas HTTP são herméticas
+para tornar o gate reprodutível no CI; a evidência integrada `4302 ↔ 8088`
+(`e2e:live:multipersona`) e `4302 ↔ 8086` (`e2e:live:ergon`) continua sendo um gate
+separado com os hosts ativos.
 
 Workspaces expõem save, scenarios, Test Run, submit, review e promoção somente
 quando `GET /workspaces/{id}/capabilities` publica a ação correspondente. Os
@@ -273,7 +284,7 @@ O Studio deliberadamente não monta o grafo executável do `RuleSet` no navegado
 Essa operação exige o RuleSet completo, os IDs de origem, contrato do host e duas
 aprovações distintas (`RULE_COMPOSITION_APPROVER`) segregadas do publicador
 (`RULE_SNAPSHOT_PUBLISHER`). O Quickstart materializa esse candidato no compositor
-Java do host (`/api/praxis/policy-studio/rule-sets/{ruleSetKey}/candidate`) usando
+Java do host (`/api/praxis/rules-studio/rule-sets/{ruleSetKey}/candidate`) usando
 as definições governadas elegíveis e a definição promovida opcional; o browser
 consome apenas o resumo sanitizado do candidato (`compositionDigest`,
 `implementationCatalogDigest`, `currentHeadEtag`, `sources` e `authorizedActions`),
@@ -379,3 +390,9 @@ repete DML quando a resposta se perde depois do commit.
 ## Política de CI e publicação
 
 Validação local durante desenvolvimento; Actions apenas no fechamento necessário de versões. Consulte [ACTIONS-RELEASE-POLICY.md](ACTIONS-RELEASE-POLICY.md) para gatilhos, gates e recuperação.
+
+### Seleção de operação de snapshots (candidato G3)
+
+O cockpit seleciona a operação declarada na projeção. Uma única operação pode ser determinada sem ambiguidade; múltiplos perfis exigem escolha explícita antes das leituras. Trocar a operação limpa heads, versões, status, rollouts, composição e confirmação pendente e invalida respostas antigas. A ausência de escolha não aparece como ausência comprovada de head.
+
+A preparação pelo endpoint neutro continua indisponível para famílias com mais de uma operação até o gate canônico de publisher por operação. Consultas e operações de versões existentes continuam separadas dessa capacidade; o browser não fabrica autoridade. O corte requer o novo Core e sua coorte de pacotes; a prova isolada usa tarball identificado, sem substituir o aceite de release público nem G4 visual/operacional.

@@ -69,9 +69,19 @@ export interface ProjectionFactSchema {
   readonly evidenceRefs: readonly string[];
 }
 
+export const SUPPORTED_DOMAIN_PROJECTION_KINDS = [
+  'RULES_STUDIO_PROJECTION_V1',
+  'ERGONX_RULES_STUDIO_PROJECTION_V1',
+  'POLICY_STUDIO_PROJECTION_V1',
+  'ERGONX_POLICY_STUDIO_PROJECTION_V1'
+] as const;
+
 export function validateDomainProjection(value: unknown): DomainProjection {
   if (!value || typeof value !== 'object') throw new Error('PROJECTION_DOCUMENT_REQUIRED');
   const projection = value as Partial<DomainProjection>;
+  if (projection.kind && !SUPPORTED_DOMAIN_PROJECTION_KINDS.includes(projection.kind as any)) {
+    throw new Error('PROJECTION_KIND_UNSUPPORTED');
+  }
   if (!projection.projectionId || !projection.ruleSetRef?.domainKey || !projection.ruleSetRef.ruleSetKey) {
     throw new Error('PROJECTION_IDENTITY_REQUIRED');
   }

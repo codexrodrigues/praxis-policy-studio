@@ -6,7 +6,7 @@
     {
       "path": "src/main/java/com/example/praxis/apiquickstart/rulelab/ExtraordinaryGrantRuleSetFactory.java",
       "kind": "RULESET_DEFINITION",
-      "sha256": "5EB0A86B32E86E4471EA770BE9FD1C620C8BAA3A2B31287058FE68520E049964"
+      "sha256": "E64E3B265766AACD90E4C91728500F6181825C11B993C6FC3001DB7D5EB08612"
     },
     {
       "path": "src/test/resources/rule-lab/rule-lab-golden-suite.json",

@@ -20,7 +20,7 @@ export default defineConfig({
     { name: 'narrow', use: { ...devices['Desktop Chrome'], viewport: { width: 390, height: 844 } } }
   ],
   webServer: {
-    command: `npx ng serve --host 127.0.0.1 --port ${port}`,
+    command: `node ./node_modules/@angular/cli/bin/ng.js serve --host 127.0.0.1 --port ${port}`,
     url: `${baseURL}/projections/quickstart-benefit-eligibility.v1.json`,
     reuseExistingServer: !process.env['CI'],
     timeout: 120_000

@@ -1,9 +1,10 @@
 {
-  "name": "praxis-policy-studio",
+  "name": "praxis-rules-studio",
   "version": "0.1.0-beta.15",
   "private": true,
   "scripts": {
     "start": "ng serve --host 0.0.0.0 --port 4302 --proxy-config proxy.conf.json",
+    "start:ergon": "ng serve --host 0.0.0.0 --port 4302 --proxy-config proxy.ergon.conf.json",
     "build": "ng build",
     "build:static": "ng build && node tools/prepare-static-deployment.mjs",
     "check:projections": "node tools/check-projections.mjs",
@@ -11,9 +12,11 @@
     "generate:ergonx-projection": "node tools/generate-ergonx-projection.mjs",
     "sync:quickstart-projection": "node tools/sync-quickstart-projection.mjs",
     "lint": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.spec.json --noEmit",
-    "test": "vitest run --environment jsdom --exclude \"e2e/**\" --exclude \"**/.worktrees/**\"",
+    "test": "vitest run --environment jsdom --maxWorkers=4 --exclude \"e2e/**\" --exclude \"**/.worktrees/**\"",
     "e2e": "playwright test",
-    "e2e:live:multipersona": "playwright test --config playwright.live.config.ts"
+    "e2e:ergon": "playwright test e2e/ergon-rules-studio-convergence.spec.ts",
+    "e2e:live:multipersona": "playwright test e2e/policy-studio-multipersona.live.spec.ts --config playwright.live.config.ts",
+    "e2e:live:ergon": "playwright test e2e/ergon-rules-studio-convergence.live.spec.ts --config playwright.live.config.ts"
   },
   "dependencies": {
     "@angular/animations": "21.2.20",

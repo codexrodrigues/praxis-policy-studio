@@ -74,7 +74,21 @@ export class CatalogSelectionStore {
   readonly decisions = computed(() => {
     const query = this.query().trim().toLocaleLowerCase();
     return query
-      ? this.allDecisions().filter(item => `${item.code} ${item.name} ${item.domain}`.toLocaleLowerCase().includes(query))
+      ? this.allDecisions().filter(item =>
+          [
+            item.code,
+            item.name,
+            item.domain,
+            item.ruleSetKey,
+            item.slotKey ?? '',
+            ...(item.availableRoots ?? []),
+            ...(item.conceptRoots ?? []),
+            ...item.factPaths
+          ]
+            .join(' ')
+            .toLocaleLowerCase()
+            .includes(query)
+        )
       : this.allDecisions();
   });
 

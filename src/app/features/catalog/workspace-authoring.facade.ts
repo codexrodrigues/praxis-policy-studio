@@ -26,6 +26,9 @@ import {
   effectiveWorkspaceCondition,
   hasAllowOperationalEffect,
   hasEditableDecisionParameters,
+  inspectDecisionExpressionOntology,
+  rewriteDecisionExpressionOntology,
+  type DecisionOntologyInspection,
   type SuggestedDraftDiffProposal
 } from './catalog-presentation';
 import { CatalogSelectionStore } from './catalog-selection.store';
@@ -52,8 +55,21 @@ export class WorkspaceAuthoringFacade {
   readonly parameterValidationErrors = signal<readonly string[]>([]);
   readonly editorState = signal<RuleBuilderState | null>(null);
 
+  readonly ontologyInspection = computed<DecisionOntologyInspection>(() =>
+    inspectDecisionExpressionOntology(this.store.selected(), this.draftCondition())
+  );
+  readonly ontologicalWarning = computed<string | null>(() => {
+    const inspection = this.ontologyInspection();
+    if (inspection.valid) return null;
+    const isPtBr = this.i18n.locale() === 'pt-BR';
+    return isPtBr
+      ? `Referência fora do contrato ontológico (${inspection.invalidVars.join(', ')}). Raízes permitidas: ${inspection.allowedRoots.join(', ')}.`
+      : `Reference outside ontological contract (${inspection.invalidVars.join(', ')}). Allowed roots: ${inspection.allowedRoots.join(', ')}.`;
+  });
   readonly totalAuthoringValidationErrors = computed(() =>
-    (this.editorState()?.validationErrors?.length ?? 0) + this.parameterValidationErrors().length
+    (this.editorState()?.validationErrors?.length ?? 0)
+    + this.parameterValidationErrors().length
+    + this.ontologyInspection().invalidVars.length
   );
   readonly originalExpression = computed(() => formatDecisionExpression(this.store.selected()?.condition));
   readonly draftExpression = computed(() => formatDecisionExpression(this.draftCondition()));
@@ -175,6 +191,14 @@ export class WorkspaceAuthoringFacade {
     if (proposal.parameters !== null && proposal.parameters !== undefined) {
       this.updateDraftParameters(proposal.parameters);
     }
+  }
+
+  autoFixDraftOntology(): void {
+    const current = this.draftCondition();
+    if (!current) return;
+    const rewritten = rewriteDecisionExpressionOntology(this.store.selected(), current);
+    this.draftCondition.set(rewritten);
+    this.editorState.set(null);
   }
 
   updateEditorState(state: RuleBuilderState): void {

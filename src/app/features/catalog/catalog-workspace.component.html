@@ -242,6 +242,13 @@
     </div>
 
     <div class="work-mode-panel" [hidden]="activeMode() !== 'understand'">
+      <pax-rule-decision-plan-dag
+        [selected]="current"
+        [decisions]="allDecisions()"
+        [sandboxRun]="sandboxRun()"
+        [latestTestRun]="lifecycle()?.latestTestRun ?? null"
+        (decisionSelected)="select($event)"
+        (conceptRootSelected)="filterByOntologyRoot($event)" />
       @if (policyConfig(); as studioConfig) {
         <pax-decision-explanation [decision]="current" [config]="studioConfig" />
       }
@@ -394,6 +401,19 @@
             <code>{{ draftExpression() ?? '—' }}</code>
           </section>
         </div>
+        @if (ontologicalWarning(); as ontologyAlert) {
+          <div class="ontology-warning-banner" role="alert" data-testid="authoring-ontology-warning">
+            <p class="state-message">{{ ontologyAlert }}</p>
+            <button
+              type="button"
+              class="quiet-button"
+              data-testid="authoring-ontology-autofix"
+              [disabled]="authoringBusy()"
+              (click)="autoFixDraftOntology()">
+              {{ i18n.locale() === 'pt-BR' ? 'Normalizar raízes ontológicas' : 'Normalize ontological roots' }}
+            </button>
+          </div>
+        }
         <footer>
           <div>
             <strong>{{ totalAuthoringValidationErrors() }} {{ i18n.text('validationIssues') }}</strong>
@@ -422,10 +442,13 @@
           [factsJson]="scenarioFactsJson()" [fallbackJson]="scenarioFactsFallback()"
           [busy]="authoringBusy()" [canManage]="hasWorkspaceAction('MANAGE_SCENARIOS')"
           [suggestions]="suggestedScenarios()"
+          [canScaffoldOntology]="canScaffoldScenarioOntology()"
+          [ontologyWarning]="scenarioOntologyWarning()"
           (factValueChanged)="setScenarioFactValue($event.fact, $event.value)"
           (factNullChanged)="setScenarioFactNull($event.fact, $event.useNull)"
           (fallbackJsonChanged)="scenarioFactsFallback.set($event)"
           (suggestionApplied)="applyScenarioSuggestion($event)"
+          (scaffoldOntologyRequested)="scaffoldScenarioOntology()"
           (createRequested)="createScenarioFromView($event)" />
         @if (scenarioFeedback()) {
           <p class="task-feedback" [class.state-message]="scenarioError()"
@@ -641,7 +664,7 @@
             </div>
             <div data-testid="correlation-host-alignment">
               <dt>{{ i18n.text('hostAlignmentRatio') }}</dt>
-              <dd>{{ correlation.alignedHosts }}/{{ correlation.totalHosts }}</dd>
+              <dd>{{ hostStatusSummary() ? (correlation.alignedHosts + '/' + correlation.totalHosts) : i18n.text('hostAlignmentUnavailable') }}</dd>
             </div>
             <div data-testid="correlation-bound-receipt">
               <dt>{{ i18n.text('boundEvidenceReceipt') }}</dt>
@@ -666,7 +689,13 @@
     @if (runtime.mode() === 'remote') {
       <pax-snapshot-cockpit
         [ruleSetKey]="current.ruleSetKey"
+          [operationKeys]="current.operationKeys"
+          [operationKey]="snapshots.snapshotOperationKey()"
+          (operationSelected)="snapshots.selectSnapshotOperation($event)"
         [head]="snapshotHead()"
+        [headSet]="snapshotHeadSet()"
+        [headSetLoading]="snapshotHeadSetLoading()"
+        [headSetError]="snapshotHeadSetError()"
         [versions]="snapshotVersions()"
         [loading]="snapshotsLoading()"
         [loadError]="snapshotsError()"
@@ -711,6 +740,7 @@
         (cancelRollout)="cancelRollout($event)"
         (activateRollout)="activateRollout($event)"
         (operate)="operateSnapshot($event)"
+        (withdrawHead)="snapshots.withdrawSnapshotHead($event)"
         (prepareComposition)="prepareSnapshotComposition($event)"
         (approveComposition)="approveSnapshotComposition($event)"
         (publishComposition)="publishSnapshotComposition($event)"

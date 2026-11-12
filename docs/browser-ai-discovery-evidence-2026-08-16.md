@@ -1,7 +1,7 @@
 # Evidência de navegador — discovery e explicação por IA
 
 Data: 2026-08-16  
-Escopo: Policy Studio `feat/assistant-domain-rule-discovery`  
+Escopo: Rules Studio `feat/assistant-domain-rule-discovery`  
 Origem oficial: `http://127.0.0.1:4302/catalog`
 
 ## O que a prova cobre

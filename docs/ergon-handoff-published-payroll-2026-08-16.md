@@ -25,7 +25,7 @@ confirmou:
 Essa prova cobre Quickstart, Config, Render e Neon. Ela não usa Oracle, não executa
 HADES e não é paridade RN-013/RN-017.
 
-## O que o Policy Studio passa a materializar
+## O que o Rules Studio passa a materializar
 
 O caso padrão deixa de ser apenas o corpus sintético de auxílio extraordinário e
 passa a abrir a cadeia publicada de folha. A projeção é derivada no Quickstart e
@@ -71,5 +71,5 @@ evidência do cliente. O Ergon só pode declarar uma regra compatível quando:
 - o Test Run possui receipt idempotente e provenance `LEGACY_ORACLE`;
 - maker-checker, isolamento e autoridade legada permanecem preservados.
 
-Até esses gates, o Policy Studio pode explicar, editar, testar e governar candidatos,
+Até esses gates, o Rules Studio pode explicar, editar, testar e governar candidatos,
 mas não autoriza promoção de autoridade no Ergon.

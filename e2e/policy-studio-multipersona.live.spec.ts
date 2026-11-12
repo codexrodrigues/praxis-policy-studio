@@ -88,7 +88,7 @@ const personas: readonly Persona[] = [
 
 const missingCredentials = personas.some(persona => !persona.username || !persona.password);
 
-test.describe('Policy Studio live multi-persona governance', () => {
+test.describe('Rules Studio live multi-persona governance', () => {
   test.skip(missingCredentials,
     'Set all POLICY_STUDIO_LIVE_* persona credentials and start the Quickstart on the official 8088 origin.');
 

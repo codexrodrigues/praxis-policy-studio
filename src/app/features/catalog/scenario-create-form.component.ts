@@ -31,12 +31,15 @@ export class ScenarioCreateFormComponent {
   readonly busy = input(false);
   readonly canManage = input(false);
   readonly suggestions = input<readonly SuggestedScenarioTemplate[]>([]);
+  readonly canScaffoldOntology = input(false);
+  readonly ontologyWarning = input<string | null>(null);
 
   readonly factValueChanged = output<ScenarioFactValueChange>();
   readonly factNullChanged = output<ScenarioFactNullChange>();
   readonly fallbackJsonChanged = output<string>();
   readonly createRequested = output<ScenarioCreateView>();
   readonly suggestionApplied = output<SuggestedScenarioTemplate>();
+  readonly scaffoldOntologyRequested = output<void>();
   readonly i18n = inject(PolicyStudioI18n);
 
   applySuggestion(

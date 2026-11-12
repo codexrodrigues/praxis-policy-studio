@@ -2,7 +2,7 @@
 
 ## Escopo
 
-Prova local e somente leitura do `praxis-policy-studio` contra o
+Prova local e somente leitura do `praxis-rules-studio` contra o
 `praxis-api-quickstart` no commit `96e85f789b7cf585841f1f4f1355640b991307b3`,
 consumindo `praxis-config-starter:0.1.0-rc.103` da coordenada pública.
 
@@ -30,7 +30,7 @@ degradar silenciosamente para a fixture.
 
 O transporte protegido e o tratamento de acesso negado estão funcionais. O
 bloqueio atual é de conteúdo: o Config de desenvolvimento ainda não contém as
-14 definições RN-013 com suas identidades canônicas. Por isso, o Policy Studio
+14 definições RN-013 com suas identidades canônicas. Por isso, o Rules Studio
 não pode apresentar status nem timeline dessas decisões sem criar uma fonte
 paralela ou inventar correspondências.
 

@@ -1,4 +1,4 @@
-# Handoff operacional V61 — discovery governado no Policy Studio
+# Handoff operacional V61 — discovery governado no Rules Studio
 
 - Data: 2026-08-15
 - Autoridade Ergon: `LEGACY_AUTHORITATIVE`
@@ -15,7 +15,7 @@
    do change workspace identificado por `workspaceId`;
 4. `@praxisui/core` `9.0.5-rc.25` expõe os campos e discovery filtrado por
    `resourceKey`;
-5. Policy Studio correlaciona o `operationalResourceKey` publicado pelo host na
+5. Rules Studio correlaciona o `operationalResourceKey` publicado pelo host na
    projeção (sem reinterpretar o `resourceKey` do RuleSet na Definition), exige
    exatamente uma action com tags `policy-studio` e `operational-proof`, apresenta
    CREATE/UPDATE por cenário, confirma o risco e executa o protocolo publicado.

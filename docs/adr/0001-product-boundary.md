@@ -1,13 +1,11 @@
-# ADR 0001 — fronteira do Praxis Policy Studio
+# ADR 0001 — fronteira do Praxis Rules Studio
 
 - Estado: aceito para o incremento de fundação
 - Data: 2026-08-12
 
 ## Decisão
 
-O Praxis Policy Studio nasce como deployable Angular independente. Ele consome
-pacotes públicos `@praxisui/*`, o control plane do Praxis Config e contratos do
-Praxis Rules Engine, mas não redefine nenhum desses owners.
+O Praxis Rules Studio nasce como deployable Angular independente (plano de experiência do **Praxis Decision Studio**). Ele consome pacotes públicos `@praxisui/*`, o control plane do Praxis Config (`praxis-config-starter`) e contratos de decisão da plataforma (`praxis-rules-engine` para `decisionKind = BUSINESS` e `praxis-authz-contracts` para `decisionKind = AUTHORIZATION`), mas não redefine nenhum desses owners nem mistura `DecisionBinding` (regras de negócio em JSON Logic) com `RuntimeEnforcementBinding` (políticas de acesso, escopo de dados e mascaramento em OPA/Rego).
 
 O core do produto permanece neutro em relação ao ErgonX. Conteúdo de domínio é
 recebido por projeções read-only baseadas em referências e digests. O ErgonX é

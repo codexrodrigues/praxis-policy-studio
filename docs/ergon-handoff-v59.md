@@ -1,4 +1,4 @@
-# Handoff operacional V59 — complemento ao Policy Studio beta.8
+# Handoff operacional V59 — complemento ao Rules Studio beta.8
 
 - Estado: publicado no Quickstart `v2.0.0-rc.33` (PR #189, merge `52616aac`, release `9e027e83`);
   não altera a versão da UI beta.8

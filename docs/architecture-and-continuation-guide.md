@@ -1,6 +1,6 @@
 # Arquitetura e guia de continuidade
 
-Este documento permite que uma pessoa ou agente continue o Praxis Policy Studio
+Este documento permite que uma pessoa ou agente continue o Praxis Rules Studio
 em outra máquina, mesmo sem acesso ao Ergon, Oracle, VPN ou repositórios privados.
 Ele separa fatos verificáveis do estado atual, arquitetura pretendida e trabalho
 futuro.
@@ -12,7 +12,7 @@ uma experiência sobre quatro owners independentes:
 
 ```mermaid
 flowchart LR
-    User["Pessoa usuária"] --> Studio["Praxis Policy Studio\nexperience plane"]
+    User["Pessoa usuária"] --> Studio["Praxis Rules Studio\nexperience plane"]
     Studio --> Config["Praxis Config\nversões, capabilities e lifecycle"]
     Studio -. "contratos e simulação futura" .-> Engine["Praxis Rules Engine\ncompilação e avaliação"]
     Config --> Host["Host consumidor\nfacts, autorização, transação e efeitos"]
@@ -32,13 +32,13 @@ flowchart LR
 | autorização e escopo | servidor/host | consumir capabilities; nunca inferir |
 | transação e efeitos | host consumidor | explicar limites; nunca executar por conta própria |
 | identidade e evidência do domínio | artefatos governados do domínio | consumir projeção por refs/digests |
-| experiência de catálogo e authoring | Policy Studio | organizar, comparar, orientar e diagnosticar |
+| experiência de catálogo e authoring | Rules Studio | organizar, comparar, orientar e diagnosticar |
 
 ## 2. Repositórios e dependências
 
 ### Necessários para evoluir o core
 
-- `praxis-policy-studio`: aplicação, testes, projeções e documentação;
+- `praxis-rules-studio`: aplicação, testes, projeções e documentação;
 - registry npm: pacotes públicos `@praxisui/*` usados pela UI.
 
 ### Necessários para integração remota
