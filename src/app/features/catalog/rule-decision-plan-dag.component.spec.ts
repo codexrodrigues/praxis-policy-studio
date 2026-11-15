@@ -45,7 +45,7 @@ function createDecision(overrides: Partial<DecisionSummary> = {}): DecisionSumma
       code: 'ERG-08390',
       targetField: 'qtdMax',
       plsqlOrigin: 'PCK_REGRAS_FREQ.MAIN_PRE',
-      plsqlLineage: 'IF v_regras_freq.qtd_max > 180 THEN pack_hades.trata_erro(8390); END IF;'
+      plsqlLineage: 'IF v_regras_freq.qtd_max > 180 THEN pkg_legacy_rules.raise_error(8390); END IF;'
     },
     ...overrides
   };

@@ -217,7 +217,7 @@
       "status": "HISTORICAL_PROOF_DOES_NOT_CERTIFY_G4"
     },
     {
-      "boundary": "ERGON_ORACLE_PARITY",
+      "boundary": "LEGACY_BASELINE_PARITY",
       "operations": [
         "CREATE",
         "UPDATE"

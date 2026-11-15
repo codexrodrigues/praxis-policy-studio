@@ -30,15 +30,15 @@ export const DEFAULT_RULES_STUDIO_HOST_PROFILES: readonly RulesStudioHostProfile
     apiBaseUrl: 'http://127.0.0.1:8088'
   },
   {
-    id: 'ergon-local',
-    labelPtBr: 'Ergon RH (:8080)',
-    labelEnUs: 'Ergon HR (:8080)',
+    id: 'enterprise-rh-local',
+    labelPtBr: 'Host Corporativo RH (:8080)',
+    labelEnUs: 'Enterprise HR Host (:8080)',
     apiBaseUrl: 'http://127.0.0.1:8080'
   },
   {
-    id: 'ergon-showcase-local',
-    labelPtBr: 'Ergon Showcase (:8089)',
-    labelEnUs: 'Ergon Showcase (:8089)',
+    id: 'enterprise-showcase-local',
+    labelPtBr: 'Enterprise Showcase (:8089)',
+    labelEnUs: 'Enterprise Showcase (:8089)',
     apiBaseUrl: 'http://127.0.0.1:8089'
   }
 ];
