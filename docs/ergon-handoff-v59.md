@@ -3,7 +3,7 @@
 - Estado: publicado no Quickstart `v2.0.0-rc.33` (PR #189, merge `52616aac`, release `9e027e83`);
   não altera a versão da UI beta.8
 - Data: 2026-08-15
-- Autoridade Ergon: `LEGACY_AUTHORITATIVE`
+- Autoridade corporativa: `LEGACY_AUTHORITATIVE`
 
 ## O que mudou
 
@@ -33,23 +33,23 @@ qualquer mutação.
 - `403`, `412`, `422` e `428` separados;
 - nenhum payload de negócio sensível atravessa a fronteira do Test Run.
 
-Isso prova compatibilidade operacional do laboratório Quickstart. Não prova Neon, Oracle/HADES ou
-paridade RN-013.
+Isso prova compatibilidade operacional do laboratório Quickstart. Não prova banco remoto homologado, ambiente legado autorizado ou
+paridade de pacote corporativo.
 
-## Cadeia para o agente Ergon
+## Cadeia para o agente de integração
 
-O trabalho repository-only da issue #300 continua válido. O adapter Ergon deve adotar a mesma
+O trabalho repository-only da frente de migração continua válido. O adapter corporativo deve adotar a mesma
 fronteira:
 
 1. resolver tenant/environment/ator no servidor;
-2. reservar o comando completo antes de Oracle ou DML;
+2. reservar o comando completo antes do baseline legado ou DML;
 3. selecionar cenários governados e mapear explicitamente CREATE/UPDATE;
-4. medir chamadas ao Oracle por observer, sem aceitar contador do caller;
+4. medir chamadas ao baseline legado por observer, sem aceitar contador do caller;
 5. capturar before/after/effects/readback e limpar somente fixtures possuídas;
-6. registrar um único receipt V58 com baseline `LEGACY_ORACLE` independente de active;
+6. registrar um único receipt V58 com baseline legado independente de active;
 7. manter autoridade legada até homologação explícita.
 
-O Ergon não deve copiar o endpoint de benefício extraordinário nem seus DTOs de domínio. Ele deve
+O host corporativo não deve copiar o endpoint de benefício extraordinário nem seus DTOs de domínio. Ele deve
 reutilizar `praxis-config-contracts:0.1.0-beta.4` e implementar sua própria action host-owned com o
 mesmo protocolo de segurança, idempotência e evidência.
 
@@ -66,5 +66,5 @@ Também permanecem pendentes:
 - smoke da action contra o Neon já configurado;
 - browser com operator e unauthorized;
 - isolamento cross-tenant/environment;
-- quatro canários Oracle/HADES e expansão para a matriz RN-013;
+- quatro canários em ambiente legado autorizado e expansão para a matriz de referência;
 - extensão do gate V58 para publication/snapshot/activation.

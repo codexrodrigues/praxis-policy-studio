@@ -1,6 +1,21 @@
-# Praxis Rules Studio
+# Praxis Policy Studio
 
-Workstation independente da **Praxis Platform** (plano de experiência do **Praxis Decision Studio** sobre o Control Plane `praxis-config-starter`) para compreender, criar, simular, testar e aprovar decisões governadas descritas uma vez e operadas de forma idêntica por interfaces tradicionais, interfaces generativas, agentes de IA e integrações. Na arquitetura da **Praxis Decision Platform**, o Studio distingue explicitamente as duas trilhas de decisão governadas pelo mesmo PAP: (1) **Regras e Políticas Operacionais de Negócio (`decisionKind = BUSINESS`)**, compiladas em `PublishedRuleSnapshot` e executadas pelo `praxis-rules-engine` (`DecisionBinding`); e (2) **Políticas de Autorização, Escopo de Dados e Mascaramento (`decisionKind = AUTHORIZATION`, `ruleType = "authorization_policy"`)**, compiladas em `OpaPolicyUnitManifest` / `OpaRuntimeRelease` e executadas por `praxis-authz-*` (`RuntimeEnforcementBinding`). O ErgonX é o primeiro consumidor; contratos e semântica do produto permanecem neutros em relação ao domínio.
+Workstation independente da [**Praxis Platform**](https://praxisui.dev/) (plano de experiência do **Praxis Decision Studio** sobre o Control Plane [`praxis-config-starter`](https://github.com/codexrodrigues/praxis-config-starter)) para compreender, criar, simular, testar e aprovar decisões governadas descritas uma vez e operadas de forma idêntica por interfaces tradicionais, interfaces generativas, agentes de IA e integrações.
+
+## Arquitetura Dual-Lens e Ecossistema Integrado
+
+Na **Praxis Decision Platform**, uma aplicação corporativa não mistura lógica funcional com controle de acesso. O Studio expõe exatamente duas lentes sobre o mesmo PAP governado (simulação, corpus positivo/negativo e aprovação 4-olhos *maker-checker*):
+
+1. **Lente de Regras de Negócio (`decisionKind = BUSINESS`):** Cria e simula invariantes funcionais, cálculos e elegibilidade compiladas em `PublishedRuleSnapshot` e executadas pelo [`praxis-rules-engine`](https://github.com/codexrodrigues/praxis-rules-engine) (`DecisionBinding`) no Passo 12 de mutações sobre estado real sem mascaramento.
+2. **Lente de Acesso e Proteção de Dados (`decisionKind = AUTHORIZATION`):** Cria e valida políticas `praxis.authorization-policy/v1` (acesso `ACCESS`, filtro relacional Kleene 3VL `DATA_SCOPE`, `FIELD_USE`, `FIELD_WRITE`, mascaramento em 7 níveis `MASK` e obrigações auditáveis `OBLIGATIONS`), compiladas para OPA `import rego.v1` pelo [`praxis-authz-opa`](https://github.com/codexrodrigues/praxis-authz-opa) e executadas no runtime pelo pipeline PEP de 15 etapas em [`praxis-authz-contracts`](https://github.com/codexrodrigues/praxis-authz-contracts), [`praxis-authz-enforcement-core`](https://github.com/codexrodrigues/praxis-authz-enforcement-core) e [`praxis-authz-starter`](https://github.com/codexrodrigues/praxis-authz-starter) (`0.1.0-beta.1` no Maven Central), alimentados pelos metadados de [`praxis-metadata-starter`](https://github.com/codexrodrigues/praxis-metadata-starter).
+
+### Por que Supera Ferramentas de Mercado e Multiplica a Produtividade com IA?
+
+- **Problema Resolvido:** Acaba com o abismo entre analistas de negócio/segurança e desenvolvedores — em vez de regras ficarem enterradas em código Java, SQL ou arquivos `.rego` manuais sem feedback visual nem testes de regressão integrados, toda alteração passa por simulação com impacto real em DTOs e superfícies descobertas.
+- **À Frente do Mercado:** Diferente de BRMS pesados ou editores low-code desconectados de segurança, o Studio governa tanto negócio quanto autorização/mascaramento sobre a mesma base semântica (`ai_registry`, `/schemas/domain` e catálogo PAP) já validada antes da ativação (gate anti-`denyAll`).
+- **Ganho em Tokens e Velocidade em Grandes Sistemas:** Como regras e políticas já nascem como artefatos estruturados (`RuleSet` e `AuthorizationPolicyDefinition`) vinculados a `DecisionPointDescriptor` e `QueryableResourceProjection`, times e agentes de IA não precisam reler bases inteiras de código para evoluir normas corporativas — entregando mudanças auditadas com contexto enxuto e zero retrabalho entre UI, backend e agentes.
+
+Os contratos e a semântica do produto permanecem neutros em relação ao domínio e ao host consumidor.
 
 ## Estado atual
 
@@ -21,7 +36,7 @@ assistido de candidato de composição (`/api/praxis/rules-studio/rule-sets/{rul
 ações (`authorizedActions`), segregação de funções (4-olhos) e ETag forte fornecidos
 pelo host e pelo Config.
 
-O catálogo versiona 14 referências RN-013 e um caso neutro real do Quickstart.
+O catálogo versiona projeções corporativas de referência e o caso neutro real do Quickstart.
 Por padrão, o desenvolvimento local abre o Rule Lab de auxílio extraordinário:
 10 slots, 11 bindings e evidências ligadas à suíte golden de 15 casos.
 Os manifestos não contêm expressões executáveis nem credenciais. Eles projetam
@@ -38,12 +53,11 @@ condição e lifecycle continuam vindo do Config autenticado.
 ```powershell
 npm ci
 npm start        # Proxy para praxis-api-quickstart (http://127.0.0.1:8088)
-npm run start:ergon # Proxy para praxis-ergon-showcase (http://127.0.0.1:8086)
 ```
 
 No modo remoto, uma sessão ausente exibe o login explícito do ambiente de desenvolvimento. O formulário chama o endpoint canônico `/auth/login`, recebe apenas o cookie `HttpOnly` do host e descarta os campos após a tentativa; o Rules Studio não persiste senha ou token. Uma sessão reconhecida pode ser encerrada por `/auth/logout`; após a resposta do host, o Studio invalida catálogo, seleção e evidências governadas mantidas em memória antes de voltar ao login.
 
-Abra `http://localhost:4302/catalog` (ou navegue por deep-link contextual a partir do Catálogo e Simulador em `praxis-ergon-showcase-ui`: `/catalog?ruleSetKey=...&slotKey=...&decisionKey=...`, que resolve diretamente o slot solicitado e abre o detalhe automaticamente mesmo em viewports estreitos).
+Abra `http://localhost:4302/catalog` (ou navegue por deep-link contextual a partir da UI do host consumidor: `/catalog?ruleSetKey=...&slotKey=...&decisionKey=...`, que resolve diretamente o slot solicitado e abre o detalhe automaticamente mesmo em viewports estreitos).
 
 ### Jornada da interface
 
@@ -73,15 +87,9 @@ nunca ao tamanho do catálogo filtrado ou paginado. Por isso, precedência não 
 apresentada como indicador solto na visão geral. Quando voltar a ser materializada,
 deve informar o conjunto, o efeito de curto-circuito e o denominador canônico.
 
-Para integrar o primeiro consumidor, consulte o histórico no
-[handoff do Ergon beta.7](docs/ergon-handoff-beta7.md) e o corte V58 no
-[handoff Ergon beta.8](docs/ergon-handoff-beta8.md).
-O caso neutro publicado mais recente e a cadeia atual para a issue #300 estão no
-[handoff de folha de 2026-08-16](docs/ergon-handoff-published-payroll-2026-08-16.md).
-O complemento operacional corrente está no
-[handoff V61](docs/ergon-handoff-v61.md): ele registra a cadeia de discovery
-cross-resource consumida pelo Studio e preserva a prova Neon do V60 sem a
-confundir com evidência Oracle.
+Para integrar hosts corporativos consumidores, utilize a cadeia canônica V58/V61
+de discovery cross-resource via Metadata e Config, preservando as provas de
+runtime em banco remoto sem as confundir com evidência de paridade em sistema legado.
 A baseline auditada em 19/08/2026 usava Contracts beta.4, Config rc.128,
 Metadata rc.127, Quickstart rc.43 e `@praxisui/*` rc.38. Essas coordenadas são
 históricas e não descrevem as dependências atuais da UI. O código posterior à
@@ -108,7 +116,7 @@ Na composição de snapshot, o Config devolve blockers governados tipados e o
 Studio os apresenta por códigos estáveis em pt-BR/en-US. A UI não interpreta nem
 expõe a mensagem técnica do backend como contrato de produto.
 O handoff referencia o corpus portátil executável mantido pelo Quickstart, que
-exercita riscos de migração sem transformar evidência sintética em prova Oracle.
+exercita riscos de migração sem transformar evidência sintética em prova de sistema legado.
 O percentual auditado, os bloqueadores e a sequência de cortes estão em
 [Estado e roadmap](docs/current-status-and-roadmap.md). A fronteira para busca,
 explicação e authoring por agente está em
@@ -116,7 +124,7 @@ explicação e authoring por agente está em
 A prova controlada desktop/narrow da jornada discovery → seleção → explicação está
 em [Evidência de navegador do Policy Assistant](docs/browser-ai-discovery-evidence-2026-08-16.md).
 O [Estado e roadmap](docs/current-status-and-roadmap.md) separa o que já foi provado
-do que ainda depende de Neon, Oracle/HADES, UX corporativa ou releases coordenados.
+do que ainda depende de banco remoto homologado, ambiente legado autorizado, UX corporativa ou releases coordenados.
 
 ## Configuração
 
@@ -187,7 +195,7 @@ simbólica, os dados referenciados, a semântica de `null`, as operações cober
 as evidências de origem. A comparação entre baseline
 e draft é deliberadamente assimétrica: a autoridade de referência declarada
 pela projeção permanece explícita, enquanto o Config aparece como draft técnico.
-No RN-013 essa referência é o Oracle legado; no Quickstart é o baseline sintético.
+Em fluxos corporativos com legado essa referência é o baseline autorizado do host; no Quickstart é o baseline sintético.
 Esta superfície não altera autoridade sem um comando governado explícito.
 
 A decisão focal editável abre o Visual Builder oficial em um chunk lazy quando
@@ -222,24 +230,19 @@ ou ambíguo.
 
 ```powershell
 npm run e2e
-npm run e2e:ergon
-npm run e2e:live:ergon
 ```
 
 A suíte Playwright inicia o Studio na porta oficial `4302`, usa Chromium e valida
 desktop `1440×1000` e narrow `390×844`. Ela cobre sessão ausente, capability
 negada, confirmação de ação de alto risco, conflito `412`, teclado, ausência de
-overflow horizontal e axe. A suíte `npm run e2e:ergon` (`e2e/ergon-rules-studio-convergence.spec.ts`)
-valida especificamente a convergência com o Ergon Showcase em desktop e narrow:
-resolução de deep-link (`?ruleSetKey=...&slotKey=...&decisionKey=...`), renderização
-do DAG de 6 estágios (`<pax-rule-decision-plan-dag>`) com guards `FORBIDDEN` (`ERG-00019`,
-`ERG-08382`, `ERG-08393`) em postura somente-leitura, linhagem PL/SQL, navegação
-ontológica 1-hop entre `RuleSet`s (`RN-013 ↔ RN-017`), simulação no sandbox com
+overflow horizontal e axe. A suíte de convergência multi-host valida
+em desktop e narrow a resolução de deep-link (`?ruleSetKey=...&slotKey=...&decisionKey=...`), renderização
+do DAG (`<pax-rule-decision-plan-dag>`) com guards `FORBIDDEN` em postura somente-leitura, linhagem de origem, navegação
+ontológica 1-hop entre `RuleSet`s, simulação no sandbox com
 trace visual de divergência, prova operacional host-driven (`run-rules-studio-operational-test`)
 e composição/publicação de snapshot candidato. As respostas HTTP são herméticas
 para tornar o gate reprodutível no CI; a evidência integrada `4302 ↔ 8088`
-(`e2e:live:multipersona`) e `4302 ↔ 8086` (`e2e:live:ergon`) continua sendo um gate
-separado com os hosts ativos.
+(`e2e:live:multipersona`) continua sendo um gate separado com os hosts ativos.
 
 Workspaces expõem save, scenarios, Test Run, submit, review e promoção somente
 quando `GET /workspaces/{id}/capabilities` publica a ação correspondente. Os
@@ -302,17 +305,6 @@ npm run check:projections
 npm run build
 ```
 
-Para atualizar a projeção RN-013 a partir de um checkout governado da migração:
-
-```powershell
-npm run generate:ergonx-projection -- D:\caminho\para\Techne-ErgonX-migracao
-npm run check:projections
-```
-
-O gerador falha se materializador e host não tiverem exatamente as mesmas 14
-identidades na mesma ordem. IDs das definições Config permanecem explicitamente
-`NOT_RESOLVED_IN_VERSIONED_EVIDENCE`; o Studio não os infere.
-
 Para sincronizar o caso neutro a partir do Quickstart irmão:
 
 ```powershell
@@ -326,9 +318,9 @@ Consulte `docs/rfc/0001-quickstart-reference-case.md`.
 
 O shell inicia pela cadeia publicada de folha
 `human-resources.payroll.reactive-determinations`. Esse caso prova integração
-Config/host/Neon, snapshots v1/v2 e execução create/update. O corpus de auxílio
+Config/host/PostgreSQL, snapshots v1/v2 e execução create/update. O corpus de auxílio
 extraordinário permanece disponível como caso de amplitude de regras, mas não é
-tratado como evidência de publicação nem como paridade Oracle do Ergon.
+tratado como evidência de publicação nem como paridade com sistema legado corporativo.
 
 ## Policy Assistant
 

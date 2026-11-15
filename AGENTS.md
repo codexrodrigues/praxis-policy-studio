@@ -1,4 +1,4 @@
-# AGENTS.md — Praxis Rules Studio
+# AGENTS.md — Praxis Policy Studio
 
 ## Escopo
 
@@ -9,14 +9,14 @@ Aplica-se a todo o repositório.
 - O Studio é experience plane; não possui lifecycle, snapshot, ETag ou autoridade.
 - `praxis-config-starter` é o control plane.
 - **Separação Ortogonal na Praxis Decision Platform (`BUSINESS` vs. `AUTHORIZATION`):**
-  - O `praxis-rules-studio` atua como o **Praxis Decision Studio** unificado sobre o control plane `/api/praxis/config/domain-rules/**`, separando claramente duas experiências distintas:
+  - O `praxis-policy-studio` atua como o **Praxis Decision Studio** unificado sobre o control plane `/api/praxis/config/domain-rules/**`, separando claramente duas experiências distintas:
     - **Regras de Negócio (`decisionKind = BUSINESS`):** invariantes transacionais, elegibilidade e validações em JSON Logic executadas pelo `praxis-rules-engine`.
     - **Políticas de Acesso, Mascaramento e Privacidade (`decisionKind = AUTHORIZATION`, `ruleType = "authorization_policy"`):** políticas RBAC/ABAC/LGPD compiladas em unidades Rego (`targetLayer = "policy_engine"`, `targetArtifactType = "opa-policy"`) e executadas por `praxis-authz-starter` / `praxis-authz-enforcement-core` / `praxis-authz-opa`.
 - `praxis-rules-engine` possui compilação e avaliação determinística de regras de negócio (`decisionKind = BUSINESS`).
 - O host consumidor possui facts, autorização, transação e efeitos.
 - Projeções de domínio são read-only, baseadas em refs/digests e não copiam semântica.
-- **Convergência Multi-Host (`praxis-api-quickstart` `:8088` e `praxis-ergon-showcase` `:8080`) e DAG de 5 Estágios (`DecisionStage`):**
-  - `npm start` encaminha para o Quickstart (`proxy.conf.json` $\rightarrow$ `http://127.0.0.1:8088`), enquanto `npm run start:ergon` encaminha para o Ergon Showcase (`proxy.ergon.conf.json` $\rightarrow$ `http://127.0.0.1:8080`), além do seletor de perfil de host na barra superior e suporte fail-closed a `?apiBaseUrl=...`;
+- **Convergência Multi-Host (`praxis-api-quickstart` `:8088` e hosts corporativos) e DAG de 5 Estágios (`DecisionStage`):**
+  - `npm start` encaminha para o Quickstart (`proxy.conf.json` $\rightarrow$ `http://127.0.0.1:8088`), além de suportar perfis de proxy dedicados para hosts corporativos na barra superior e resolução fail-closed de `?apiBaseUrl=...`;
   - O componente `<pax-rule-decision-plan-dag>` materializa os 5 estágios canônicos de `DecisionStage` (`PROTECTED_GUARD`, `DOMAIN_DECISION`, `POST_DECISION`, `TRANSFORMATION_INTENT`, `EFFECT_INTENT`), políticas de slot (`FORBIDDEN`, `PARAMETERIZABLE`, `RESTRICT_ONLY`, `EXTEND_ONLY`, `REPLACEABLE`), linhagem PL/SQL (`legacyOccurrence`), navegação ontológica 1-hop (`availableRoots` / `conceptRoots`) e trace visual de divergência (`sandboxRun` / `latestTestRun`);
   - Slots `OverridePolicy.FORBIDDEN` ou `executorKind = JAVA` são projetados no DAG em modo somente-leitura (`authoringSupported = false` / `CATALOG_IDENTITY_ONLY`) para garantir visibilidade completa de guards estruturais sem expor edição indevida;
   - Deep-links `/catalog?resourceKey=...&ruleSetKey=...&slotKey=...&bindingKey=...&decisionKey=...` resolvem diretamente o slot solicitado e abrem automaticamente o painel de detalhe em viewports estreitas (`hasExplicitDeepLink()`).
@@ -24,7 +24,7 @@ Aplica-se a todo o repositório.
 ## Regras
 
 - consumir somente pacotes públicos `@praxisui/*`;
-- não introduzir hardcodes Ergon no core;
+- não introduzir hardcodes de clientes ou hosts específicos no core;
 - não inferir capability, ator, versão, ETag ou escopo no browser;
 - toda copy de chrome deve existir em `pt-BR` e `en-US`;
 - nenhum segredo, tenant ou credencial pode ser versionado;
@@ -36,7 +36,7 @@ Aplica-se a todo o repositório.
 npm run lint
 npm test
 npm run build
-npm run e2e:ergon
+npm run e2e
 ```
 
 Mudança visual relevante também exige inspeção desktop e narrow na porta oficial

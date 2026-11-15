@@ -1,7 +1,7 @@
 # Contribuindo com o Praxis Policy Studio
 
 Este guia é destinado a pessoas e agentes que precisam analisar, corrigir ou
-ampliar o projeto sem depender de conhecimento prévio do ErgonX.
+ampliar o projeto sem depender de conhecimento prévio de sistemas legados internos.
 
 ## 1. Leitura obrigatória
 
@@ -22,7 +22,7 @@ npm run check:projections
 npm run build
 ```
 
-Esses comandos não exigem Ergon, Oracle ou VPN. O build não deve depender de
+Esses comandos não exigem infraestrutura corporativa privada, banco legado ou VPN. O build não deve depender de
 pacotes npm locais, symlinks ou arquivos fora do repositório.
 
 ## 3. Escolha do modo
@@ -117,7 +117,7 @@ persistido, sem expor dados sensíveis.
 - o teste falha antes e passa depois da correção, quando aplicável;
 - execução hermética continua disponível;
 - documentação e código descrevem a mesma capacidade;
-- qualquer afirmação sobre Ergon está apoiada pela projeção/evidência versionada
+- qualquer afirmação sobre um host consumidor está apoiada pela projeção/evidência versionada
   ou marcada como não verificada;
 - nenhum commit contém segredo ou arquivo local de ambiente.
 
@@ -135,4 +135,4 @@ Limites: não publicar, não ativar, não alterar autoridade, quando aplicável.
 ```
 
 O agente deve conseguir iniciar em `fixture` e separar claramente o que depende
-de integração remota. Nunca presuma que ele tenha acesso ao Ergon.
+de integração remota. Nunca presuma que ele tenha acesso ao ambiente privado de um cliente.

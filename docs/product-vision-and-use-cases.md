@@ -54,7 +54,7 @@ editores ad hoc e processos manuais para regras. Os principais custos são:
 
 ### 3.2 Objetivos de plataforma
 
-- funcionar para múltiplos produtos sem hardcodes de ErgonX;
+- funcionar para múltiplos produtos sem hardcodes específicos de cliente ou host;
 - reutilizar `@praxisui/*` e contratos públicos Praxis;
 - manter uma única fonte canônica para cada responsabilidade;
 - permitir que pacotes de domínio sejam adicionados por projeções verificáveis;
@@ -101,7 +101,7 @@ O Rules Studio não deve:
 | Operador | publicar, ativar, observar e reverter | ações server-owned, estado ativo e timeline |
 | Auditor | reconstruir o que ocorreu | versões imutáveis, eventos, digests e correlação |
 | Agente delegado | explicar, propor e executar ações autorizadas | as mesmas tools, capabilities, ETag, blockers e auditoria da pessoa |
-| Desenvolvedor da plataforma | ampliar capacidades reutilizáveis | core neutro, fixtures e contratos independentes do ErgonX |
+| Desenvolvedor da plataforma | ampliar capacidades reutilizáveis | core neutro, fixtures e contratos independentes de domínio ou cliente específico |
 
 ## 6. Casos de uso prioritários
 

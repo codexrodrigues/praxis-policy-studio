@@ -6,8 +6,8 @@
 
 ## Problema
 
-O ErgonX RN-013 é o primeiro consumidor real, mas não pode ser o único ambiente
-de evolução do Rules Studio. O checkout local não possui o Oracle nem toda a
+Um primeiro consumidor corporativo real não pode ser o único ambiente
+de evolução do Studio. O checkout local não possui banco legado nem toda a
 infraestrutura do cliente. Uma fixture simplificada também não prova composição,
 precedência, `null`, outcomes, shadow, ativação atômica ou efeitos.
 
@@ -43,8 +43,8 @@ ela não se torna fonte semântica, endpoint ou contrato público.
 | Vocabulário e proveniência de facts | `suportado-parcialmente` | Metadata/host; a projeção é uma ponte de evidência |
 | Draft persistido e concorrente | `ja-suportado-so-ux` | Config mantém change workspace, base hash/ETag e ações server-owned |
 | Scenario e Test Run governados | `ja-suportado-so-ux` | Config persiste; sandbox host-owned avalia sem efeitos |
-| Sandbox candidate versus active | `ja-suportado-mal-nomeado-ou-mal-materializado` | já executa as duas lanes; não deve ser confundido com readiness estrutural nem oracle legado |
-| Proveniência de baseline e prova CREATE/UPDATE | `suportado-parcialmente` | Config V58 persiste lane independente, receipt idempotente e gates opt-in; Quickstart prova os quatro quadrantes localmente, mas adapter Ergon/Neon/Oracle ainda são externos |
+| Sandbox candidate versus active | `ja-suportado-mal-nomeado-ou-mal-materializado` | já executa as duas lanes; não deve ser confundido com readiness estrutural nem baseline legado |
+| Proveniência de baseline e prova CREATE/UPDATE | `suportado-parcialmente` | Config V58 persiste lane independente, receipt idempotente e gates opt-in; Quickstart prova os quatro quadrantes localmente, mas adapters corporativos e paridade em ambiente autorizado ainda são externos |
 | Decision execution log redigido | `suportado-parcialmente` | observações e resumos existem; faltam completar prova corporativa, retenção, redaction e isolamento sob carga |
 
 ## Remoção da ponte
@@ -56,7 +56,7 @@ uma API paralela de projeções do Rules Studio.
 
 ## Estado dos gates
 
-1. O caso Quickstart carrega sem identidade Ergon no shell.
+1. O caso Quickstart carrega sem identidade específica de cliente no shell.
 2. Versão e condição detalhada são resolvidas pelo control plane.
 3. Candidate é persistido em change workspace com ETag.
 4. Cenários tipados executam candidate versus active no sandbox do host e geram Test Run imutável.
@@ -85,14 +85,14 @@ O caso padrão do Studio passa a ser a cadeia neutra de folha do Quickstart:
   `human-resources.payroll.payment-date`;
 - snapshots imutáveis v1/v2, head, ETag e rollback governados pelo Config;
 - execução host-owned em create/update, com rejeição de derivados adulterados;
-- prova publicada no Render usando o banco Neon `enterprise-proof-homolog`.
+- prova publicada no Render usando banco PostgreSQL remoto homologado.
 
 Em 16 de agosto de 2026, a matriz publicada confirmou uma única cadeia coerente
 por requisição, três casos positivos e dois casos negativos governados, com duas
 decisões Config aplicadas. O provisionamento idempotente encontrou as versões 1 e
 2 já existentes e não criou snapshot duplicado no retry. Essa evidência prova o
-contrato Quickstart/Config/Neon; não prova paridade com Oracle, HADES ou regras
-específicas do Ergon.
+contrato Quickstart/Config/PostgreSQL; não prova paridade com sistemas legados ou regras
+específicas de um host corporativo.
 
 A projeção `quickstart-payroll-reactive-determinations.v1.json` é derivada do
 RuleSet e dos bindings host-owned. O teste no Quickstart confere identidade,

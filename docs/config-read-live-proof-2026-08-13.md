@@ -2,7 +2,7 @@
 
 ## Escopo
 
-Prova local e somente leitura do `praxis-rules-studio` contra o
+Prova local e somente leitura do `praxis-policy-studio` contra o
 `praxis-api-quickstart` no commit `96e85f789b7cf585841f1f4f1355640b991307b3`,
 consumindo `praxis-config-starter:0.1.0-rc.103` da coordenada pública.
 
@@ -19,7 +19,7 @@ autoridade de execução foi promovida.
 | Leitura autenticada de definições | `200 OK` |
 | Definições remotas existentes | `11` |
 | Leitura autenticada de timeline | `200 OK`, `1` evento para a definição amostrada |
-| Decisões na projeção RN-013 | `14` |
+| Decisões na projeção de domínio | `14` |
 | Correspondências exatas por `decisionKey`/`ruleKey` | `0` |
 
 O estado visual anônimo também foi verificado no navegador: a aplicação exibiu
@@ -30,7 +30,7 @@ degradar silenciosamente para a fixture.
 
 O transporte protegido e o tratamento de acesso negado estão funcionais. O
 bloqueio atual é de conteúdo: o Config de desenvolvimento ainda não contém as
-14 definições RN-013 com suas identidades canônicas. Por isso, o Rules Studio
+14 definições de domínio com suas identidades canônicas. Por isso, o Policy Studio
 não pode apresentar status nem timeline dessas decisões sem criar uma fonte
 paralela ou inventar correspondências.
 
@@ -38,7 +38,7 @@ paralela ou inventar correspondências.
 
 O gate seguinte foi concluído pela fábrica e revalidado de forma idempotente:
 `created=0`, `reused=14`, `matched=14` e timelines `14/14`. Permanecem
-`publications=0`, `materializations=0`, `snapshots=0` e `oracleTouched=false`.
+`publications=0`, `materializations=0`, `snapshots=0` e `legacyBaselineTouched=false`.
 
 O Studio agora usa o modo remoto como configuração padrão da POC e oferece para
 a decisão focal um workspace lazy de edição exclusivamente local, com schemas

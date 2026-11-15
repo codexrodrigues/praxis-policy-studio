@@ -27,8 +27,8 @@ abaixo fecha autenticação e segregação de responsabilidades no browser publi
 persistência, idempotência e execução host-owned continuam pertencendo às suites
 e provas HTTP/PostgreSQL do Quickstart.
 
-Oracle/HADES permanece responsabilidade do adapter Ergon em ambiente autorizado.
-Nenhuma evidência sintética ou Neon deve ser apresentada como paridade Oracle.
+A paridade com sistemas legados corporativos permanece responsabilidade do adapter do host em ambiente autorizado.
+Nenhuma evidência sintética ou de homologação deve ser apresentada como paridade de legado.
 
 ## Suíte live multi-persona comprovada
 
@@ -50,7 +50,7 @@ POLICY_STUDIO_LIVE_OPERATOR_USERNAME=... \
 POLICY_STUDIO_LIVE_OPERATOR_PASSWORD=... \
 POLICY_STUDIO_LIVE_AUDITOR_USERNAME=... \
 POLICY_STUDIO_LIVE_AUDITOR_PASSWORD=... \
-POLICY_STUDIO_LIVE_STUDIO_URL=https://praxis-rules-studio-homolog.onrender.com \
+POLICY_STUDIO_LIVE_STUDIO_URL=https://<studio-homolog-host>.onrender.com \
 POLICY_STUDIO_LIVE_BACKEND_URL=https://praxis-api-quickstart.onrender.com \
 npm run e2e:live:multipersona
 ```
@@ -78,7 +78,7 @@ positivas, negativas `403`, auditor read-only e Origin/CORS para a porta oficial
 existente.
 
 A homologação estática posterior foi publicada em
-`https://praxis-rules-studio-homolog.onrender.com` pelo PR `#29`. O site abriu a
+`https://<studio-homolog-host>.onrender.com` pelo PR `#29`. O site abriu a
 rota SPA diretamente, criou uma sessão real de author e carregou as dez decisões
 do Quickstart publicado. CORS, filtro de Origin, auditor read-only `200` e recusa
 operacional `403` foram repetidos no container que serve essa origin.

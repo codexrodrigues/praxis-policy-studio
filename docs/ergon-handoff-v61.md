@@ -1,9 +1,9 @@
 # Handoff operacional V61 — discovery governado no Rules Studio
 
 - Data: 2026-08-15
-- Autoridade Ergon: `LEGACY_AUTHORITATIVE`
-- Coordenação: `Techne-ErgonX-migracao#300`
-- Complementa o [V60](ergon-handoff-v60.md); não substitui sua evidência Neon
+- Autoridade corporativa: `LEGACY_AUTHORITATIVE`
+- Coordenação: frente de integração corporativa
+- Complementa o handoff V60 anterior; não substitui sua evidência em PostgreSQL remoto
 
 ## Cadeia publicada
 
@@ -24,29 +24,29 @@ O Studio não conhece a URL do Quickstart, não reutiliza uma capability de outr
 operação e não inventa tenant, environment ou autorização. Ausência, ambiguidade,
 protocolo incompleto ou ETag ausente bloqueiam o comando.
 
-## Cadeia indicada ao agente Ergon
+## Cadeia indicada ao agente de integração
 
-O agente da issue #300 pode usar o mesmo modelo:
+O agente da frente corporativa pode usar o mesmo modelo:
 
 1. reconciliar portfólio, intake, inventário e matriz antes dos canários;
-2. publicar uma action host-owned no recurso Ergon correto com as mesmas tags
+2. publicar uma action host-owned no recurso corporativo correto com as mesmas tags
    semânticas, mas com DTO e workflow próprios do host;
 3. apontar a precondition ao change workspace canônico e transportar `workspaceId`;
-4. resolver facts, target Oracle/HADES, tenant/environment e efeitos somente no host;
-5. medir o baseline Oracle por observer e mantê-lo independente de `active`;
+4. resolver facts, target legado, tenant/environment e efeitos somente no host;
+5. medir o baseline legado por observer e mantê-lo independente de `active`;
 6. executar um Test Run com quatro resultados CREATE/UPDATE × ALLOW/DENY,
    idempotência, before/after, no-mutation, effects, readback e cleanup;
 7. manter `LEGACY_AUTHORITATIVE` até homologação explícita.
 
 O agente não deve copiar a URL, os DTOs de benefício extraordinário nem o banco
 operacional do Quickstart. O contrato reutilizável é o catálogo de action e o
-receipt Config; comandos e transações pertencem ao host Ergon.
+receipt Config; comandos e transações pertencem ao host consumidor.
 
 ## O que este corte prova — e o que não prova
 
 Prova: discovery semântico, capability principal-specific, confirmação explícita,
 ETag cross-resource, idempotency key, receipt e atualização da revisão do workspace.
 
-Não prova: paridade Oracle, semântica integral das 14 decisões RN-013, HADES,
-efeitos reais do Ergon, isolamento cross-tenant em browser ou homologação produtiva.
-Esses gates continuam na máquina autorizada do Ergon.
+Não prova: paridade com sistema legado, semântica integral de pacotes corporativos,
+efeitos reais do host consumidor, isolamento cross-tenant em browser ou homologação produtiva.
+Esses gates continuam no ambiente autorizado do host consumidor.

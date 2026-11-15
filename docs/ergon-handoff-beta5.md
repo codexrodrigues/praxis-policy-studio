@@ -1,9 +1,9 @@
-# Handoff Ergon — Rules Studio 0.1.0-beta.5
+# Handoff Corporativo — Policy Studio 0.1.0-beta.5
 
-Este corte permite ao agente da migração validar a integração do Ergon sem Oracle
+Este corte permite ao agente da migração validar a integração de um host corporativo sem acesso a banco legado
 local. O caso neutro do Quickstart reproduz o fluxo de decisões ordenadas,
 condições JSON Logic, facts opcionais, cenários, revisão e promoção que será usado
-pela RN-013, mantendo o núcleo do Studio independente do produto Ergon.
+pelos pacotes corporativos, mantendo o núcleo do Studio independente de qualquer produto consumidor.
 
 ## Baseline compatível
 
@@ -21,9 +21,9 @@ Não crie schema ou banco próprio do Studio. Definitions, drafts, scenarios, Te
 Runs, reviews, snapshots, rollout e observações pertencem aos contratos canônicos
 do Config. O browser só projeta essas entidades.
 
-## Prova local sem Ergon
+## Prova local sem host corporativo
 
-1. Inicie o Quickstart com os dois datasources Neon e os segredos locais exigidos.
+1. Inicie o Quickstart com os dois datasources PostgreSQL remotos e os segredos locais exigidos.
 2. Garanta que as origins permitidas incluam `http://localhost:4302` e
    `http://127.0.0.1:4302`.
 3. No Studio, execute `npm ci`, `npm run check:local-runtime` e `npm start`.
@@ -36,50 +36,44 @@ do Config. O browser só projeta essas entidades.
 O proxy de desenvolvimento é parte do contrato deste corte: `/auth` e `/api`
 são encaminhados para `127.0.0.1:8088`, preservando cookie same-origin.
 
-## Encaixe do Ergon
+## Encaixe do host consumidor
 
-O adaptador Ergon deve publicar identidades, facts, precedência e evidências como
+O adaptador corporativo deve publicar identidades, facts, precedência e evidências como
 projeção derivada. Ele não deve persistir uma segunda definição executável nem
-transformar PL/SQL, Java ou telas legadas em fonte canônica do Studio. Condição,
+transformar código legado, Java ou telas antigas em fonte canônica do Studio. Condição,
 versão e lifecycle vêm do Config; avaliação vem do Rules Engine/host; facts,
-efeitos e autoridade transacional permanecem no host Ergon.
+efeitos e autoridade transacional permanecem no host consumidor.
 
-O Quickstart mantém o primeiro corpus neutro de hazards executável em
-`src/test/resources/policy-studio/ergon-portable-parity-corpus.v1.json`, com a
-especificação em `docs/POLICY-STUDIO-ERGON-PORTABLE-PARITY-CORPUS.md`. A
+O Quickstart mantém um primeiro corpus neutro executável de hazards em artefato portátil próprio. A
 autoridade desse corpus é explicitamente `SYNTHETIC_BASELINE`: ele permite
 desenvolvimento local, mas não constitui corpus de paridade nem compara candidato
-com baseline legado. No Ergon, cada caso
+com baseline legado. No host consumidor, cada caso
 deve ser ligado ao handoff aprovado da Parte 1 e comparado com a rota legada.
 
-O primeiro baseline Ergon suficientemente fechado é a RN-013 Parte 1 da tela
-`ERGadm00036 — Regras de frequência`, nas operações CREATE e UPDATE da rota
-`/api/administracao-pessoal/regras-frequencia`. O gate da fábrica está
+O primeiro baseline corporativo suficientemente fechado é o pacote inicial de regras funcionais de referência, nas operações CREATE e UPDATE da rota canônica do recurso. O gate da fábrica está
 `Ready with adjustments`, mantém o legado como autoridade e exige persistência
-real. DELETE não pertence à RN-013; a ERG-08393 e o gap de intervalo da RN-017
-também não devem ser misturados neste primeiro corte.
+real. DELETE e decisões de pacotes temporais fora de escopo também não devem ser misturados neste primeiro corte.
 
-A fábrica já possui uma matriz DB-backed de 38 casos para essa RN: 14 negativas
+A fábrica já possui uma matriz DB-backed de 38 casos para esse pacote: 14 negativas
 em CREATE e UPDATE, limites inclusivos de data, semântica de `null` e colisões de
 precedência. A profundidade da evidência varia por caso; nem todos registram a
 mesma contagem de chamadas, readback e cleanup. Os artefatos continuam sob a
 Parte 1 no repositório da fábrica;
 copiá-las como identidade de produto para o Quickstart tornaria o caso neutro
-dependente do Ergon. O adaptador deve importá-las futuramente como evidência
+dependente do host corporativo. O adaptador deve importá-las futuramente como evidência
 legada governada e preservar a proveniência da observação.
 
-O primeiro trabalho do agente Ergon é reconciliar portfolio, intake, inventário,
-traceability matrix e phase gates. A ERG-08382 já possui evidência Java de
-desenvolvimento em CREATE e UPDATE, mas o portfolio ainda a descreve como
-`NOT_INTAKEN/NOT_STARTED`. Ela não deve ser anexada automaticamente ao gate Phase
-15 da RN-013a, que possui escopo histórico distinto. Decisões RN-017 ainda
-`NOT_INTAKEN` ou `BLOCKED`, especialmente agregação/concurrency, permanecem
+O primeiro trabalho do agente de integração é reconciliar portfolio, intake, inventário,
+traceability matrix e phase gates. A decisão corporativa já validada em Java de
+desenvolvimento em CREATE e UPDATE ainda precisa manter separação histórica quando
+descrita no portfolio como `NOT_INTAKEN/NOT_STARTED`, sem mistura com decisões
+ainda `NOT_INTAKEN` ou `BLOCKED` (especialmente agregação/concurrency), que permanecem
 deferred e não podem ser apresentadas como cobertas pelo laboratório neutro.
 
 A ativação só pode ocorrer depois de paridade registrada, gates de revisão e
-snapshot governado. A restrição “UPDATE baseline-only” vale para a RN-013a no
-período descrito pelo gate correspondente; a decisão 8382 da RN-013 já possui
-autoridade Java de desenvolvimento em CREATE e UPDATE, sem promoção produtiva.
+snapshot governado. A restrição “UPDATE baseline-only” vale para o escopo histórico
+do gate correspondente; a decisão já validada em CREATE e UPDATE permanece
+em desenvolvimento sem promoção produtiva.
 
 O corte inicial já executa 14 casos neutros com create/update como rótulos de
 contexto,
@@ -87,7 +81,7 @@ limites inclusivos, imediatamente acima/abaixo, `null` explícito, fact ausente,
 `NOT_APPLICABLE` e sobreposição de falhas com precedência determinística. O
 modo de operação ainda não é enviado ao engine/host e, portanto, não prova
 diferença de persistência, readback, DML, ETag ou cleanup entre CREATE e UPDATE. O
-agente Ergon deve adaptar a evidência específica de trigger/package/HADES, erro
+agente do host deve adaptar a evidência específica de trigger/rotina/engine legada, erro
 legado, side effects e ausência de mutação em shadow para o Test Run V57. O Config
 aceita referência/digest sanitizados, before/after, mutação ou não mutação,
 cleanup, ledger de efeito e contagem de chamadas ao baseline. A V57 atual valida
@@ -106,9 +100,9 @@ outra:
 O sandbox do Studio materializa a primeira e a terceira. O Config V57 é o owner
 canônico da proveniência sanitizada, mas o baseline está no nível do run e cada
 result expõe candidate × active; ainda não há lane legada independente por
-cenário. O adapter host-owned do Ergon precisa produzir essa prova depois que o
+cenário. O adapter host-owned corporativo precisa produzir essa prova depois que o
 Config publicar o transport V57, idempotência e baseline por result. O Studio não
-deve fabricar uma segunda API nem chamar o snapshot ativo de “Oracle legado”.
+deve fabricar uma segunda API nem chamar o snapshot ativo de “baseline legado”.
 
 ## Limite conhecido deste corte
 
@@ -118,7 +112,7 @@ commit indicado no handoff operacional ou aguardar um novo release; o tag rc.27
 sozinho não disponibiliza o laboratório descrito.
 
 Não existe ainda endpoint/action/capability para invocar remotamente o executor
-operacional do Quickstart. O agente Ergon pode implementar interfaces, observers,
+operacional do Quickstart. O agente de integração pode implementar interfaces, observers,
 sanitização e testes fake em modo repository-only, mas deve aguardar o contrato
 público antes de implementar o recorder HTTP final. A matriz canônica é um Test
 Run idempotente com quatro results: CREATE/UPDATE × ALLOW/DENY.

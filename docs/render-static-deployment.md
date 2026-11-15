@@ -7,13 +7,13 @@ URL do ambiente. O build continua produzindo o mesmo app Angular e materializa o
 ## Configuração do site
 
 - build command: `npm ci && npm run build:static`;
-- publish directory: `dist/praxis-rules-studio/browser`;
+- publish directory: diretório de saída Angular configurado no build estático (`dist/<app-name>/browser`);
 - environment: `RULES_STUDIO_CONFIG_API_BASE_URL`, contendo somente a origin
   HTTPS do Quickstart, sem path, query, fragmento ou credenciais;
 - rewrite SPA: `/*` para `/index.html`.
 
 A homologação oficial está publicada em
-`https://praxis-rules-studio-homolog.onrender.com` (serviço Render
+`https://<studio-homolog-host>.onrender.com` (serviço Render
 `srv-da0fbqlbedkc73ald6e0`) e aponta para o Quickstart público canônico
 `https://praxis-api-quickstart.onrender.com`. A URL e o identificador
 do serviço são evidência operacional; não são contrato de produto nem endpoint de
@@ -77,7 +77,7 @@ um cenário `amount-within-limit`, e executou o sandbox. O receipt persistido
 registrou `candidate=ALLOW`, `active=TECHNICAL_ERROR` e
 `ACTIVE_SNAPSHOT_UNAVAILABLE`. Isso prova o candidate authorado e o fail-closed
 da lane ativa sem snapshot; não prova publicação, ativação nem paridade com
-Oracle/HADES.
+sistemas legados corporativos.
 
 Em 2026-08-17, a matriz Playwright live passou no ambiente publicado com anonymous
 e seis personas. Em 2026-08-18, o deploy `dep-da1t7bnqj5pc73d4csf0` publicou o

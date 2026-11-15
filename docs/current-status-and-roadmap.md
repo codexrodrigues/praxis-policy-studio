@@ -1,12 +1,12 @@
-# Estado e roadmap do Praxis Rules Studio
+# Estado e roadmap do Praxis Policy Studio
 
 - Baseline de desenvolvimento validada: Studio `main@05903ac` mais o corte local
   de integridade corporativa e adoção direta de `DomainRuleService.getDefinitionParameters`,
   Config `0.1.0-rc.128` e Quickstart `main@5448625`, com transporte, governance V58,
-  snapshot v1/v2, bootstrap rollout / guarda `RUNTIME_INCOMPATIBLE` e cadeia de folha host-owned no Neon homologado
+  snapshot v1/v2, bootstrap rollout / guarda `RUNTIME_INCOMPATIBLE` e cadeia de folha host-owned homologada
 - Data da auditoria: 2026-10-27
 - Escopo: Studio pós-beta.15, Metadata rc.127, Config rc.128, Quickstart rc.43,
-  Contracts beta.4, `@praxisui/*` `10.0.0-rc.36` e handoff Ergon #300
+  Contracts beta.4 e `@praxisui/*` `10.0.0-rc.36`
 
 ## Leitura executiva
 
@@ -22,7 +22,7 @@ também separa seis identidades de laboratório e prova a matriz positiva/negati
 login, JWT, cookie, troca de sessão e matchers HTTP reais. O Studio agora também
 materializa o logout canônico e invalida o estado governado local ao encerrar a
 sessão; não transforma o laboratório em seletor de personas. Ainda não é uma beta corporativa segura para uso autônomo
-pelo Ergon.
+em produção corporativa.
 
 Marcos diferentes têm distâncias diferentes:
 
@@ -40,7 +40,7 @@ multi-consumidor.
 
 | Capability | % | Aderência | Diagnóstico |
 | --- | ---: | --- | --- |
-| fronteiras canônicas e neutralidade | 96 | `suportado` | owners corretos; normalização legada de prefixo Ergon removida de `decision-inspection.ts` e expressões JSON Logic formatadas de forma 100% agnóstica a domínio |
+| fronteiras canônicas e neutralidade | 96 | `suportado` | owners corretos; normalização legada de prefixo de cliente removida de `decision-inspection.ts` e expressões JSON Logic formatadas de forma 100% agnóstica a domínio |
 | catálogo/discovery multi-domínio | 92 | `suportado-parcialmente` | o catálogo canônico paginado materializou sete decisões neutras persistidas no Neon, o assistente descobre identidades governadas no escopo server-owned e `catalogSummary()` consome canonicamente `/definitions/{id}/facts` e `/definitions/{id}/parameters`, materializando condição, workspace, `parameterCatalog`, `factCatalog`, `reasonCode`, rótulos/descrições localizadas, evidências (`evidenceRefs`/`sourceArtifacts`) e convivendo de forma governada com famílias de regras sem `factCatalog` (`visual_guidance`, `form_rule`, `color_palette`) |
 | inspeção e explicação humana/IA | 88 | `suportado-parcialmente` | facts, precedência, expressão, fases observáveis de progresso da IA (`connecting` / `inspecting_evidence` / `synthesizing`), explicação grounded da definição e correlação causal com execução e SLO operacional (`buildExecutionCorrelationSummary`) |
 | editar regra existente | 88 | `suportado-parcialmente` | condição focal carregada, representações por intenção (`tree`, `table` com proteção `lossless: false` contra achatamento destrutivo, e `expression`), parâmetros do template governado resolvidos via `/definitions/{id}/parameters` com overlay reativo de workspace (`parameterValues`), validação estrita contra limpeza de campos numéricos obrigatórios e `effect` operacional explícito (`BLOCK`/`ALLOW`) authorados e comparados no `semanticDiff` |
@@ -49,7 +49,7 @@ multi-consumidor.
 | review/maker-checker | 88 | `suportado-parcialmente` | workspace, ETag, blockers, run submetido (`submittedTestRunId` + elegibilidade de baseline vinculados até publicação), segregação 4-olhos e execução delegada com confirmação governada (`requestDelegatedGateCommand`) comprovados |
 | publicação/materialização | 85 | `suportado-parcialmente` | readiness e action `PUBLISH` são server-owned, com inspeção automática de prontidão no disparo delegado (`PUBLISH_DEFINITION`), recibo de evidência vinculado (`governance-bound-receipt`) e confirmação governada no gate de publicação |
 | snapshot, rollback e staged rollout | 97 | `suportado-parcialmente` | composição assistida host-owned de snapshot candidato (`/api/praxis/rules-studio/rule-sets/{ruleSetKey}/candidate`, `/candidate/approvals`, `/candidate/publish` sem expor o grafo executável ao browser), análise reativa pré-publicação de impacto e `where-used` (superfícies operacionais, operações vinculadas, fatos compartilhados entre regras, composição de slots do RuleSet, diagnóstico de lacunas `MISSING_SLOT_FACTS` e alerta de rascunhos irmãos não promovidos), segregação 4-olhos via `authorizedActions` (`PREPARE`/`APPROVE`/`PUBLISH`), tratamento de `409 STALE_RULESET_CANDIDATE`, blockers tipados server-owned, rollback governado de snapshot com `If-Match` Head ETag e confirmação explícita, create/cancel/activate rollout e lifecycle de rollout-policy são principal-specific |
-| evidência V58/V60/Ergon | 89 | `suportado-parcialmente` | contrato leve, action dedicada, reserva pré-DML e quatro quadrantes foram provados; a cadeia publicada de folha confirmou snapshots v1/v2 e execução no Neon sem duplicação; faltam adapter Ergon e Oracle/HADES |
+| evidência V58/V60 corporativa | 89 | `suportado-parcialmente` | contrato leve, action dedicada, reserva pré-DML e quatro quadrantes foram provados; a cadeia publicada de folha confirmou snapshots v1/v2 e execução persistida sem duplicação; faltam adapter corporativo e paridade legada autorizada |
 | segurança, multitenancy e capabilities | 85 | `suportado-parcialmente` | publicação e rollout não são mais inferidos no browser; seis sujeitos separados passaram pela cadeia HTTP publicada; author abriu o catálogo no site homologado e auditor permaneceu read-only; faltam Neon cross-tenant e matriz visual multi-persona completa |
 | UX, i18n e acessibilidade | 88 | `suportado-parcialmente` | decomposição completa do workspace em store/facades/componentes dedicados, i18n bilíngue (`pt-BR` e `en-US`) em toda a workstation/authoring/cockpit e validação Playwright desktop/narrow, teclado e Axe cobrindo fluxos corporativos e `en-US` |
 | testes, release e documentação | 97 | `suportado-parcialmente` | cadeia V61, prova HTTP/PostgreSQL/Neon V60, E2E hermético V62, discovery/explanation desktop+narrow e matriz de segurança multi-persona publicados; o teste agora recusa catálogo vazio, mas essa asserção nova ainda precisa ser repetida no site publicado |
@@ -77,7 +77,7 @@ multi-consumidor.
    cadeia HTTP publicada. A prova local no mesmo PostgreSQL também confirma escopo server-owned, replay
    idempotente no escopo do principal e `404` para workspace estrangeiro. A suíte browser integrada
    passou depois com anonymous e as seis personas contra os dois serviços publicados; ainda faltam
-   repetição cross-tenant no Neon e Oracle/HADES autorizado.
+   repetição cross-tenant e paridade em ambiente legado autorizado.
 
 ## Prova publicada multi-persona de 2026-08-15
 
@@ -100,7 +100,7 @@ A prova sanitizada confirmou:
   Definition, workspace, publicação, snapshot ou Test Run durante a matriz.
 
 O PR `#29` publicou depois o Studio em
-`https://praxis-rules-studio-homolog.onrender.com`. A origin exata passou por
+`https://<studio-homolog-host>.onrender.com`. A origin exata passou por
 CORS e pelo filtro do Config; uma sessão de author carregou as dez decisões no
 browser e uma sessão de auditor preservou leitura `200` com escrita `403`.
 
@@ -114,8 +114,8 @@ Em 2026-08-17, a suíte Playwright live completa passou com sete testes contra o
 Studio homologado e o Quickstart no commit `375e6c0`: anonymous mais as seis
 personas. Cada persona leu o mesmo catálogo com e sem headers adversariais de
 tenant/environment, e os resultados permaneceram idênticos porque o escopo é
-resolvido no servidor. O corte ainda não repete workspace estrangeiro no Neon e
-não constitui paridade Oracle/HADES.
+resolvido no servidor. O corte ainda não repete workspace estrangeiro e
+não constitui paridade com sistemas legados corporativos.
 
 Em 2026-08-18, o Config `rc.127` corrigiu a busca do catálogo em PostgreSQL e o
 Quickstart `482cdf9` passou a materializar, depois da auto-configuração do Config,
@@ -160,7 +160,7 @@ Não existe uma segunda entidade de requirements apenas para o Studio.
 - tags anteriores permaneceram imutáveis.
 
 Continuam fora desse gate a jornada visual multi-persona `4302 ↔ 8088`, axe e uma
-prova Oracle/HADES. Elas pertencem aos próximos marcos,
+prova de paridade em sistema legado autorizado. Elas pertencem aos próximos marcos,
 não devem ser inferidas da migração de banco.
 
 ### P1 — capabilities e evidência
@@ -176,7 +176,7 @@ não devem ser inferidas da migração de banco.
 - endpoint/action host-owned, bindings explícitos, capability dedicada, verificação integral
   `candidate × active` e reserva idempotente pré-DML — validados no Quickstart rc.34/V60;
 - `If-Match` cross-resource no contrato canônico e consumo por discovery no Studio — concluídos no V61;
-- integrar o observer do baseline ao adapter Ergon real;
+- integrar o observer do baseline ao adapter corporativo real;
 - `403`, `409`, `412`, `422`, `428`, retry, no-mutation e cleanup estão cobertos localmente;
   o isolamento de workspace entre dois tenants no mesmo PostgreSQL/schema também está coberto,
   sem confiar em `X-Tenant-ID`/`X-Env`; faltam repetição no Neon e browser multi-persona;
@@ -220,10 +220,10 @@ não devem ser inferidas da migração de banco.
 
 ## Gatilhos de release
 
-O agente Ergon pode iniciar a fase repository-only usando a cadeia V58 publicada e
-o contrato da action V60 como referência de host, junto do client leve beta.4,
-do exemplo de um Test Run/quatro results e deste handoff.
-Canários Oracle/HADES continuam condicionados ao ambiente autorizado e à lane
+Agentes de integração podem iniciar a fase repository-only usando a cadeia V58 publicada e
+o contrato da action V60 como referência de host, junto do client leve beta.4 e
+do exemplo de um Test Run/quatro results.
+Canários de legado continuam condicionados ao ambiente autorizado e à lane
 operacional remota ou a um adapter host-owned equivalente.
 Uma versão estável exige também P2/P3, repetição do isolamento entre
 tenant/environment no Neon, recuperação de conflito, auditoria/redaction, SLO e rollback

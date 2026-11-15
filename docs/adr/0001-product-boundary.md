@@ -7,9 +7,8 @@
 
 O Praxis Rules Studio nasce como deployable Angular independente (plano de experiência do **Praxis Decision Studio**). Ele consome pacotes públicos `@praxisui/*`, o control plane do Praxis Config (`praxis-config-starter`) e contratos de decisão da plataforma (`praxis-rules-engine` para `decisionKind = BUSINESS` e `praxis-authz-contracts` para `decisionKind = AUTHORIZATION`), mas não redefine nenhum desses owners nem mistura `DecisionBinding` (regras de negócio em JSON Logic) com `RuntimeEnforcementBinding` (políticas de acesso, escopo de dados e mascaramento em OPA/Rego).
 
-O core do produto permanece neutro em relação ao ErgonX. Conteúdo de domínio é
-recebido por projeções read-only baseadas em referências e digests. O ErgonX é
-o primeiro consumidor e o Rule Lab do Quickstart é o caso neutro de prova local.
+O core do produto permanece neutro em relação a domínios específicos de clientes. Conteúdo de domínio é
+recebido por projeções read-only baseadas em referências e digests. O Rule Lab do Quickstart é o caso neutro de prova local para onboarding de hosts corporativos.
 
 ## Limites do incremento atual
 
@@ -31,7 +30,7 @@ fechado em cardinalidade, ordem ou autoridade divergentes.
 - `PS-003`: projeção interna mínima, sem nova fonte semântica — concluída;
 - `CFG-READ-001`: read plane autenticado e escopo server-owned — concluído para
   a superfície consumida pelo catálogo;
-- adapter e catálogo reais — concluídos para o primeiro slice RN-013.
+- adapter e catálogo reais — concluídos para a primeira fatia corporativa de referência.
 
 O estado corrente, as limitações e o roadmap não são mantidos neste ADR
 histórico. Consulte a [arquitetura e o guia de continuidade](../architecture-and-continuation-guide.md).

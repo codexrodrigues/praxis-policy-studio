@@ -1,7 +1,7 @@
 # Arquitetura e guia de continuidade
 
-Este documento permite que uma pessoa ou agente continue o Praxis Rules Studio
-em outra máquina, mesmo sem acesso ao Ergon, Oracle, VPN ou repositórios privados.
+Este documento permite que uma pessoa ou agente continue o Praxis Policy Studio
+em outra máquina, mesmo sem acesso a sistemas legados corporativos, VPN ou repositórios privados.
 Ele separa fatos verificáveis do estado atual, arquitetura pretendida e trabalho
 futuro.
 
@@ -38,7 +38,7 @@ flowchart LR
 
 ### Necessários para evoluir o core
 
-- `praxis-rules-studio`: aplicação, testes, projeções e documentação;
+- `praxis-policy-studio`: aplicação, testes, projeções e documentação;
 - registry npm: pacotes públicos `@praxisui/*` usados pela UI.
 
 ### Necessários para integração remota
@@ -46,11 +46,11 @@ flowchart LR
 - `praxis-api-quickstart`: host de referência e autenticação de desenvolvimento;
 - `praxis-config-starter`: owner dos endpoints e lifecycle do Config.
 
-### Opcionais e específicos do primeiro consumidor
+### Opcionais e específicos de um host consumidor
 
-- `Techne-ErgonX-migracao`: fontes governadas para regenerar a projeção RN-013;
-- host Java do ErgonX: integração de runtime;
-- Oracle legado: somente para provas de paridade/autoridade do produto consumidor.
+- fábrica de origem: fontes governadas para regenerar projeções específicas de domínio;
+- host Java corporativo: integração de runtime;
+- baseline legado: somente para provas de paridade/autoridade do produto consumidor.
 
 Não ter acesso aos itens opcionais **não bloqueia** correções no shell, catálogo,
 UX, i18n, contratos internos, checker, fixtures ou authoring genérico.
@@ -173,9 +173,9 @@ Config publicar a capability correta.
 | shell e rota | implementados | `src/app`, testes e build |
 | i18n | implementado (`pt-BR` e `en-US`) | `src/app/core/i18n.ts`, `app.component.html` e todos os templates de catálogo/authoring |
 | contrato de projeção | implementado | `domain-projection.ts` (`TECHNICAL_DRAFT_READY`, `REFERENCE_IMPLEMENTED`, `G4_SOURCE_CANDIDATE`) e checker Node |
-| pacote RN-013 | 14 decisões versionadas | `public/projections/ergonx-rn013.v1.json` |
+| pacote corporativo de referência | 14 decisões versionadas | projeção de domínio isolada |
 | corpus neutro amplo | valida composição e variedade semântica | `quickstart-benefit-eligibility.v1.json` |
-| caso neutro publicado | valida snapshot, Neon e cadeia operacional | `quickstart-payroll-reactive-determinations.v1.json` (sincronizado com Quickstart G4 `quickstart/2.0`) |
+| caso neutro publicado | valida snapshot, PostgreSQL remoto e cadeia operacional | `quickstart-payroll-reactive-determinations.v1.json` (sincronizado com Quickstart G4 `quickstart/2.0`) |
 | leitura Config | implementada no slice | service, detalhe, testes e prova live documentada |
 | sessão de desenvolvimento | implementada | `auth-session.service.ts` e limpeza completa em `401` / logout |
 | capabilities | implementadas nas operações correntes | workspace, definitions, snapshots, publicação, criação de rollout e rollout-policy consomem ações principal-specific server-owned; novos comandos devem manter a mesma regra |
@@ -183,7 +183,7 @@ Config publicar a capability correta.
 | editor | implementado para condição, parâmetros, políticas operacionais e composição de RuleSet | Visual Builder, representações por intenção (`tree`, `table`, `expression`), `DecisionParametersEditorComponent`, `DecisionCreateFormComponent`, `buildSuggestedDraftDiffProposals` e composição de `RuleSet` no `SnapshotCockpitComponent` |
 | catálogo de facts | implementado no `main` pós-beta.15 sobre Core rc.38 | Config valida e projeta tipos (incluindo `array<number>`), nulabilidade, i18n, sensibilidade e redaction; `@praxisui/core` é o cliente público e o Studio deriva criação e edição tipadas sem duplicar o contrato |
 | persistência | workspace concorrente com ETag e recuperação assistida | `ProjectionCatalogService`, `reloadGovernedEvidence` (`409`/`412`/`428`) e testes de integração |
-| simulação | candidate × active, transporte V58, action host V60 e sugestões tipadas implementados | cenários/Test Runs do Config, sugestões assistidas (`ALLOW`/`DENY` em `buildSuggestedScenarioTemplates`), sandbox host-owned, baseline independente, reserva idempotente e quatro resultados comprovados no Neon; permanecem externos o adapter Ergon real e a prova Oracle |
+| simulação | candidate × active, transporte V58, action host V60 e sugestões tipadas implementados | cenários/Test Runs do Config, sugestões assistidas (`ALLOW`/`DENY` em `buildSuggestedScenarioTemplates`), sandbox host-owned, baseline independente, reserva idempotente e quatro resultados comprovados em banco remoto; permanecem externos o adapter corporativo real e a prova em baseline legado |
 | publicação/ativação/rollback | implementados com confirmação governada e recibo vinculado | readiness/materializações, matriz de gates SoD/ETag (`buildGovernanceGateSummary`), recibo vinculado (`governance-bound-receipt`), comandos delegados (`requestDelegatedGateCommand`), snapshot, rollback governado e staged rollout |
 | assistente de decisões | discovery on-demand, fases observáveis de explicação e propostas consultivas implementados | Config/`@praxisui/ai` resolvem intenção, `loadDiscoveredCandidate` carrega decisões multi-domínio sob demanda, `DecisionExplanationProgressPhase` expõe fases intermediárias e propostas de cenários/diffs passam pelo mesmo fluxo humano |
 | autoridade Java/produção | não alterada pelo Studio | projeção e docs de evidência |
@@ -196,7 +196,7 @@ significa homologação de negócio nem readiness produtivo.
 ### Caminho A — desenvolvimento hermético
 
 Use este caminho para UI, acessibilidade, i18n, projeções, checkers, contratos e
-testes. Não requer backend, Ergon ou Oracle.
+testes. Não requer backend nem infraestrutura legada privada.
 
 1. clone o repositório;
 2. execute `npm ci`;
@@ -220,16 +220,16 @@ readiness, publicação e cockpit operacional dentro das ações disponíveis.
 4. autentique com uma conta de desenvolvimento fornecida fora do repositório;
 5. confirme que leitura anônima é negada e leitura autorizada funciona;
 6. prove ETag, capability negativa e as transições que a persona realmente possui;
-7. não trate o Test Run V58/V60 como paridade Oracle: o contrato, a action do host e a prova Neon
-   existem, mas o adapter Ergon, os quatro canários reais e a prova Oracle permanecem externos.
+7. não trate o Test Run V58/V60 como paridade de sistema legado: o contrato, a action do host e a prova persistida
+   existem, mas o adapter corporativo real, os quatro canários reais e a prova em baseline legado permanecem externos.
 
-### Caminho C — atualizar o pacote ErgonX
+### Caminho C — atualizar projeção de pacote de domínio
 
-Este caminho exige um checkout governado da migração, mas não exige conexão ao
-Oracle para a regeneração estática.
+Este caminho exige os artefatos governados na origem, sem exigir conexão ao
+ambiente legado para a regeneração estática.
 
 1. atualize os artefatos canônicos na fábrica;
-2. execute `npm run generate:ergonx-projection -- <checkout>`;
+2. execute o script correspondente de regeneração da projeção sobre `<checkout>`;
 3. revise mudanças de identidade, ordem, facts, evidências e authority;
 4. execute `npm run check:projections`;
 5. não aceite um diff apenas porque o JSON é válido: confira a origem governada.
@@ -285,7 +285,7 @@ fronteira da IA está em [ADR 0002 — Policy Assistant](adr/0002-policy-assista
 - o catálogo remoto navega o catálogo paginado do Config e resolve candidatos externos sob demanda (`loadDiscoveredCandidate`), usando `projectionPath` apenas como enriquecimento opcional;
 - o authoring suporta condições (`tree`, `table`, `expression`), parâmetros e políticas operacionais (`ALLOW`/`BLOCK`), além da composição de `RuleSet` no `SnapshotCockpitComponent`;
 - comparison candidate × active, baseline independente por resultado, idempotência
-  do Test Run e action remota host-owned consumida por discovery existem; a prova Oracle/HADES no ambiente corporativo ainda é lacuna externa;
+  do Test Run e action remota host-owned consumida por discovery existem; a prova de paridade legada no ambiente corporativo ainda é lacuna externa;
 - workspace, definitions, publicação, create rollout e rollout-policy consomem capabilities principal-specific server-owned e matriz de gates SoD/ETag (`buildGovernanceGateSummary`);
 - a suíte E2E hermética cobre a jornada 4-olhos (`author` → `reviewer` → `publisher`/`operator`), recuperação de conflito (`409`/`412`/`428`) e rollback governado; a repetição integrada contra o Quickstart/Neon live depende da janela operacional;
 - a V58 governa `SUBMIT`/`PROMOTE` por política opt-in e o Studio exibe o recibo vinculado (`governance-bound-receipt`) na matriz de gates e no diagnóstico causal; o enforcement server-side do receipt até a ativação final pertence ao Config;

@@ -2,8 +2,8 @@
 
 - Estado: Quickstart `v2.0.0-rc.34`, correção do PR #191 para o defeito #190
 - Data: 2026-08-15
-- Autoridade Ergon: `LEGACY_AUTHORITATIVE`
-- Complementa, sem reescrever, o [handoff V59](ergon-handoff-v59.md)
+- Autoridade corporativa: `LEGACY_AUTHORITATIVE`
+- Complementa, sem reescrever, o handoff V59 anterior
 
 ## Correção de integridade
 
@@ -30,22 +30,22 @@ banco ou schema paralelo foi criado.
   cenário incompatível e `403` persona sem autoridade.
 
 A evidência comprova o laboratório Quickstart e sua integração com o Config. Ela não é evidência
-Oracle, não homologa a semântica RN-013 e não promove autoridade Java no Ergon.
+de banco legado, não homologa semântica de pacotes corporativos e não promove autoridade Java no host consumidor.
 
-## Cadeia indicada ao agente Ergon
+## Cadeia indicada ao agente de integração
 
-O agente da issue #300 pode avançar com o trabalho repository-only:
+O agente da frente corporativa pode avançar com o trabalho repository-only:
 
-1. reconciliar portfólio, intake, inventário e matriz de rastreabilidade antes de anexar a ERG-08382
-   a qualquer gate RN-013a;
-2. reutilizar Contracts beta.4 e o protocolo V60, criando uma action host-owned do Ergon — não
+1. reconciliar portfólio, intake, inventário e matriz de rastreabilidade antes de anexar a regra piloto
+   aos gates de entrega;
+2. reutilizar Contracts beta.4 e o protocolo V60, criando uma action host-owned própria — não
    copiando DTOs de benefício extraordinário;
 3. resolver facts, comandos, target, tenant/environment e referências no host;
-4. medir chamadas Oracle por observer e manter baseline `LEGACY_ORACLE` separado de active;
+4. medir chamadas ao baseline legado por observer e manter essa lane separada de active;
 5. executar cada fixture em uma transação descartável compatível com a política do host; nunca
    apagar ledger imutável para simular cleanup;
 6. registrar um Test Run com quatro results CREATE/UPDATE × ALLOW/DENY e preservar idempotência;
-7. executar Oracle/HADES apenas na máquina autorizada, com before/after, DML, effects, readback e
+7. executar paridade legada apenas no ambiente autorizado, com before/after, DML, effects, readback e
    cleanup comprovados; manter `LEGACY_AUTHORITATIVE` até homologação explícita.
 
 ## Próxima fronteira do Studio
