@@ -45,7 +45,9 @@ e reversão dependem dos papéis e dos gates de aprovação e verificação do h
 
 O Angular limita as requisições governadas ao host ativo. O navegador mantém
 o cookie HttpOnly do respectivo host. O Studio recebe `X-XSRF-TOKEN` em
-`GET /auth/session` e o vincula à origin e ao tenant em memória. O login consulta a sessão antes de enviar as credenciais e confirma
+`GET /auth/session` e o vincula à origin e ao tenant em memória. Nas rotas de sessão, um slug de realm segue em `X-Tenant-Realm`.
+Os hints `X-Tenant-ID`, `X-Organization-ID` e `X-Env` seguem nas consultas
+e mutações das superfícies governadas do Config e dos schemas. O login consulta a sessão antes de enviar as credenciais e confirma
 a nova sessão após a autenticação. O logout descarta o token anterior. Uma
 sondagem anônima usa o novo desafio CSRF quando o host o fornece. Cada host
 deve admitir a origin exata do Studio no CORS com credenciais e no filtro
