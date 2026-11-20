@@ -1,0 +1,49 @@
+<details class="review">
+  <summary>{{ i18n.text('accessReview') }}</summary>
+  <p>{{ i18n.text('accessHint') }}</p>
+  <pax-pap-catalog [config]="config()" />
+  <label for="access-source">{{ i18n.text('accessSource') }}</label>
+  <textarea id="access-source" rows="5" spellcheck="false" [disabled]="busy()" [value]="source()"
+    (input)="editSource($any($event.target).value)"></textarea>
+  <button type="button" [disabled]="busy() || !source().trim() || attempted()" (click)="review()">{{ i18n.text('accessInspect') }}</button>
+  @if (candidate(); as draft) {
+    <section [attr.aria-label]="i18n.text('accessInspect')">
+      <h3>{{ draft.preview.title }}</h3>
+      <p>{{ draft.request.ruleKey }} · v{{ draft.request.version }}<br>{{ draft.request.serviceKey }} · {{ draft.request.resourceKey }}</p>
+      <p>{{ draft.preview.policyId }} · {{ draft.preview.version }}</p>
+      <h4>{{ i18n.text('accessTargets') }}</h4>
+      <ul>
+        @for (target of draft.preview.targets; track $index) {
+          <li><code>{{ target.point }}</code> · {{ target.modes.join(', ') }}<br><code>{{ target.digest }}</code></li>
+        }
+      </ul>
+      <h4>{{ i18n.text('accessEffects') }}</h4>
+      <ul>
+        @for (rule of draft.preview.rules; track $index) {
+          <li>{{ rule.id }} · {{ rule.modes.join(', ') }}<br><strong>{{ rule.authority }} / {{ rule.effect }}</strong> · {{ rule.reason }}</li>
+        }
+      </ul>
+      <p>policy_engine / opa-policy · {{ draft.preview.artifacts.join(', ') }}</p>
+      <details><summary>{{ i18n.text('accessOriginal') }}</summary><pre>{{ draft.request | json }}</pre></details>
+      @if (!attempted()) {
+        <button type="button" [disabled]="busy()" (click)="save()">{{ i18n.text('accessSave') }}</button>
+      }
+    </section>
+  }
+  <label for="access-id">{{ i18n.text('accessId') }}</label>
+  <input id="access-id" [value]="definitionId()" [disabled]="busy()" (input)="definitionId.set($any($event.target).value); stored.set(null)">
+  <button type="button" [disabled]="busy() || !definitionId().trim()" (click)="read()">{{ i18n.text('accessRead') }}</button>
+  @if (busy()) { <p role="status">{{ i18n.text('loading') }}</p> }
+  @if (error(); as message) { <p role="alert">{{ i18n.text(message) }}</p> }
+  @if (stored(); as result) {
+    <section>
+      <p role="status"><strong>{{ i18n.text('accessReadConfirmed') }}</strong></p>
+      <p>{{ result.ruleKey }} · v{{ result.version }} · {{ result.status }}<br>{{ result.id }}</p>
+      @if (result.tenantId || result.environment || result.createdBy) {
+        <p>{{ [result.tenantId, result.environment, result.createdBy].filter(present).join(' · ') }}</p>
+      }
+      <details><summary>{{ i18n.text('accessStored') }}</summary><pre>{{ result | json }}</pre></details>
+    </section>
+  }
+</details>
+<pax-access-release [config]="config()" />

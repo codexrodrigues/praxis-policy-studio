@@ -32,6 +32,11 @@
         [busy]="authoringBusy()"
         (createRequested)="createGovernedDecision($event)"
         (validationFailed)="reportDecisionCreateValidation($event)" />
+      @if (policyConfig(); as config) {
+        @if (!loading() && (!loadError() || permissionLimited()) && !signingOut()) {
+          <pax-access-draft-review [config]="config" />
+        }
+      }
     }
 
     <label class="search">

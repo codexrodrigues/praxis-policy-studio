@@ -13,10 +13,9 @@
         <span class="visually-hidden">{{ i18n.locale() === 'pt-BR' ? 'Host governado' : 'Governed host' }}</span>
         <span class="glyph" aria-hidden="true">⇄</span>
         <select
-          [value]="runtime.activeHostProfileId() ?? 'same-origin-proxy'"
           (change)="runtime.selectHostProfile($any($event.target).value)">
-          @for (profile of runtime.hostProfiles; track profile.id) {
-            <option [value]="profile.id">
+          @for (profile of runtime.hostProfiles(); track profile.id) {
+            <option [value]="profile.id" [selected]="profile.id === runtime.activeHostProfileId()">
               {{ i18n.locale() === 'pt-BR' ? profile.labelPtBr : profile.labelEnUs }}
             </option>
           }

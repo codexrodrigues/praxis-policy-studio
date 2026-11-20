@@ -2,6 +2,7 @@ import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http
 import { Injectable, inject } from '@angular/core';
 import { catchError, EMPTY, expand, forkJoin, map, Observable, of, reduce, switchMap, throwError } from 'rxjs';
 import { PolicyStudioRuntimeConfig, SupportedLocale } from './runtime-config';
+import { AUTHORIZATION_RULE_TYPE } from './prepared-access-draft';
 import { createClientRequestId } from './client-request-id';
 import { DomainProjection, validateDomainProjection } from './domain-projection';
 import {
@@ -305,6 +306,7 @@ export class ProjectionCatalogService {
     }).pipe(
       map(({ definitionWithParameters, factCatalog, workspaces, definitionCapabilities }) => {
         const { definition, serverParameterCatalog } = definitionWithParameters;
+        if (definition.ruleType === AUTHORIZATION_RULE_TYPE) throw new Error('BUSINESS_DEFINITION_REQUIRED');
         const workspace = this.latestWorkspace(workspaces, candidate.ruleKey);
         const availableDefinitionActions = this.mergeDefinitionActions(
           definitionCapabilities,
@@ -335,7 +337,7 @@ export class ProjectionCatalogService {
         ? this.domainRules.browseDefinitionCatalog({ page: page.page + 1, limit: page.limit }, options)
         : EMPTY),
       reduce((candidates, page) => [...candidates, ...page.candidates], [] as DomainRuleCatalogCandidate[]),
-      map(candidates => this.latestCatalogCandidates(candidates))
+      map(candidates => this.latestCatalogCandidates(candidates.filter(candidate => candidate.ruleType !== AUTHORIZATION_RULE_TYPE)))
     );
   }
 
@@ -663,6 +665,10 @@ export class ProjectionCatalogService {
     config: PolicyStudioRuntimeConfig
   ): Observable<DomainRuleDefinition> {
     return this.domainRules.createDefinition(request, this.requestOptions(config));
+  }
+
+  readDefinition(id: string, config: PolicyStudioRuntimeConfig): Observable<DomainRuleDefinition> {
+    return this.domainRules.getDefinition(id, this.requestOptions(config));
   }
 
   createWorkspace(

@@ -21,8 +21,9 @@ nav a { width: fit-content; min-height: 2.5rem; padding: 0 .75rem; border-radius
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .loader { animation: none; border-top-color: var(--pax-color-outline-variant, #c5d0d5); border-inline-start-color: var(--pax-color-primary, #076487); } }
 @media (max-width: 760px) {
-  .product-bar { grid-template-columns: 1fr auto; min-height: 4rem; gap: .5rem; }
+  .product-bar { grid-template-columns: minmax(0, 1fr); gap: .5rem; padding-block: .625rem; }
   nav { display: none; }
-  .context span:first-child { display: none; }
+  .context { flex-wrap: wrap; }
+  .context > span > .glyph { display: none; }
   .brand strong { font-size: .9rem; }
 }

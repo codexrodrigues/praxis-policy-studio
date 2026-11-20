@@ -5,19 +5,23 @@ import { TestBed } from '@angular/core/testing';
 import { BrowserTestingModule, platformBrowserTesting } from '@angular/platform-browser/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { governedCredentialsInterceptor } from './governed-credentials.interceptor';
+import { RuntimeConfigService } from './runtime-config.service';
 import { GovernedHostScopeService } from './governed-host-scope.service';
 
 TestBed.initTestEnvironment(BrowserTestingModule, platformBrowserTesting());
 
 describe('governedCredentialsInterceptor', () => {
+  let baseUrl: string;
   let http: HttpClient;
   let controller: HttpTestingController;
 
   beforeEach(() => {
+    baseUrl = document.location.origin;
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(withInterceptors([governedCredentialsInterceptor])),
-        provideHttpClientTesting()
+        provideHttpClientTesting(),
+        { provide: RuntimeConfigService, useValue: { state: () => ({ kind: 'ready', config: { mode: 'remote', configApiBaseUrl: baseUrl } }) } }
       ]
     });
     http = TestBed.inject(HttpClient);
@@ -35,6 +39,7 @@ describe('governedCredentialsInterceptor', () => {
     'https://quickstart.example/schemas/actions'
   ]) {
     it(`sends the HttpOnly session to governed URL ${url}`, () => {
+      baseUrl = new URL(url, document.baseURI).origin;
       http.get(url).subscribe();
       const request = controller.expectOne(url);
       expect(request.request.withCredentials).toBe(true);
@@ -56,6 +61,7 @@ describe('governedCredentialsInterceptor', () => {
   }
 
   it('propagates realm/organization scope headers and captures in-memory X-XSRF-TOKEN for mutations', () => {
+    baseUrl = 'http://localhost:8089';
     const scopeService = TestBed.inject(GovernedHostScopeService);
     scopeService.syncFromQueryString('?tenantId=df&organizationId=GROUP%3AGDF_CONSOLIDADO&environment=local');
 
@@ -76,5 +82,24 @@ describe('governedCredentialsInterceptor', () => {
     expect(mutationReq.request.headers.get('X-Organization-ID')).toBe('GROUP:GDF_CONSOLIDADO');
     expect(mutationReq.request.headers.get('X-XSRF-TOKEN')).toBe('csrf-df-123');
     mutationReq.flush({});
+  });
+
+  it('blocks governed requests to another origin and isolates tokens by host and tenant', () => {
+    const scope = TestBed.inject(GovernedHostScopeService);
+    scope.recordCsrfToken('qa-secret', 'https://quickstart.example', 'rio');
+    scope.recordCsrfToken('other-tenant-secret', 'https://enterprise.example', 'other');
+    scope.syncFromQueryString('?tenantId=rio');
+    baseUrl = 'https://enterprise.example';
+    const alien = 'https://quickstart.example/auth/login';
+    let failure: unknown;
+    http.post(alien, {}, { withCredentials: true }).subscribe({ error: err => { failure = err; } });
+    expect(failure).toMatchObject({ message: 'GOVERNED_HOST_MISMATCH' });
+    controller.expectNone(alien);
+    const target = baseUrl + '/api/praxis/config/domain-rules/definitions';
+    http.post(target, {}).subscribe();
+    const mutation = controller.expectOne(target);
+    expect(mutation.request.withCredentials).toBe(true);
+    expect(mutation.request.headers.has('X-XSRF-TOKEN')).toBe(false);
+    mutation.flush({});
   });
 });

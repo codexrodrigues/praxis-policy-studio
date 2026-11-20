@@ -1,0 +1,13 @@
+:host { display: block; min-width: 0; }
+.review { margin-bottom: .75rem; padding: .75rem; border: 1px solid var(--line, #c5d0d5); border-radius: .45rem; overflow-wrap: anywhere; }
+summary, button { cursor: pointer; font: inherit; font-weight: 600; }
+.review > summary { color: var(--pax-color-primary, #076487); }
+.review[open] > * + *, section > * + * { margin-block: .65rem 0; }
+h3, h4, p { margin: 0; }
+label { display: block; font-weight: 600; }
+textarea, input { display: block; box-sizing: border-box; width: 100%; padding: .5rem; font: inherit; }
+textarea { resize: vertical; }
+button { border: 1px solid var(--pax-color-outline, #718087); border-radius: .35rem; padding: .45rem .65rem; background: var(--pax-color-surface, #fff); color: inherit; }
+button:disabled { cursor: default; }
+ul { padding-inline-start: 1.2rem; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-height: 20rem; overflow-y: auto; }

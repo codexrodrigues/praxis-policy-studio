@@ -112,6 +112,7 @@ describe('ProjectionCatalogService', () => {
     });
     definitions.flush({ schemaVersion: 'praxis-domain-rule-catalog.v1', page: 0, limit: 12, hasMore: false,
       candidates: [
+        { definitionId: 'access-draft', ruleKey: 'access.review', version: 1, ruleType: 'authorization_policy', status: 'draft' },
         { definitionId: 'v1', ruleKey: 'grant.amount-parameters', version: 1, ruleType: 'eligibility', status: 'draft' },
         { definitionId: 'v2', ruleKey: 'grant.amount-parameters', version: 2, ruleType: 'eligibility', status: 'approved',
           resourceKey: 'extraordinary-grant-eligibility', serviceKey: 'extraordinary-benefit-request-service' }
@@ -945,7 +946,7 @@ describe('ProjectionCatalogService', () => {
       validFromUtc: '2026-08-14T00:00:00Z',
       validUntilUtc: '2026-12-31T23:59:59Z'
     }, config).subscribe();
-    const prepareCandidate = http.expectOne('/api/praxis/policy-studio/rule-sets/procurement.po_approval/candidate');
+    const prepareCandidate = http.expectOne('/api/praxis/rules-studio/rule-sets/procurement.po_approval/candidate');
     expect(prepareCandidate.request.method).toBe('POST');
     expect(prepareCandidate.request.body).toEqual({
       promotedDefinitionId: 'def-1',
@@ -969,7 +970,7 @@ describe('ProjectionCatalogService', () => {
       expectedCompositionDigest: 'sha256:comp-1'
     };
     service.approveRuleSetCandidate('procurement.po_approval', candidateCommand, config).subscribe();
-    const approveCandidate = http.expectOne('/api/praxis/policy-studio/rule-sets/procurement.po_approval/candidate/approvals');
+    const approveCandidate = http.expectOne('/api/praxis/rules-studio/rule-sets/procurement.po_approval/candidate/approvals');
     expect(approveCandidate.request.method).toBe('POST');
     approveCandidate.flush({
       approvalKey: 'app-1',
@@ -980,7 +981,7 @@ describe('ProjectionCatalogService', () => {
     });
 
     service.publishRuleSetCandidate('procurement.po_approval', candidateCommand, '"head-1"', config).subscribe();
-    const publishCandidate = http.expectOne('/api/praxis/policy-studio/rule-sets/procurement.po_approval/candidate/publish');
+    const publishCandidate = http.expectOne('/api/praxis/rules-studio/rule-sets/procurement.po_approval/candidate/publish');
     expect(publishCandidate.request.method).toBe('POST');
     expect(publishCandidate.request.headers.get('If-Match')).toBe('"head-1"');
     publishCandidate.flush({
@@ -991,7 +992,7 @@ describe('ProjectionCatalogService', () => {
     });
 
     service.publishRuleSetCandidate('procurement.po_approval', candidateCommand, null, config).subscribe();
-    const publishFirstCandidate = http.expectOne('/api/praxis/policy-studio/rule-sets/procurement.po_approval/candidate/publish');
+    const publishFirstCandidate = http.expectOne('/api/praxis/rules-studio/rule-sets/procurement.po_approval/candidate/publish');
     expect(publishFirstCandidate.request.headers.get('If-None-Match')).toBe('*');
     publishFirstCandidate.flush({
       snapshotKey: 'snap-1',

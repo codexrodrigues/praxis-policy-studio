@@ -1,21 +1,42 @@
 # Praxis Policy Studio
 
-Workstation independente da [**Praxis Platform**](https://praxisui.dev/) (plano de experiência do **Praxis Decision Studio** sobre o Control Plane [`praxis-config-starter`](https://github.com/codexrodrigues/praxis-config-starter)) para compreender, criar, simular, testar e aprovar decisões governadas descritas uma vez e operadas de forma idêntica por interfaces tradicionais, interfaces generativas, agentes de IA e integrações.
+Workstation da Praxis Platform para compreender, criar, simular, testar e aprovar decisões governadas sobre o control plane Praxis Config. [Praxis Platform](https://praxisui.dev/) · [Praxis Config](https://github.com/codexrodrigues/praxis-config-starter)
 
-## Arquitetura Dual-Lens e Ecossistema Integrado
+## Regras de negócio e políticas de autorização
 
-Na **Praxis Decision Platform**, uma aplicação corporativa não mistura lógica funcional com controle de acesso. O Studio expõe exatamente duas lentes sobre o mesmo PAP governado (simulação, corpus positivo/negativo e aprovação 4-olhos *maker-checker*):
+**Regras de negócio (`decisionKind = BUSINESS`).** A experiência disponível no
+Studio usa `/catalog` para trabalhar com validações, cálculos e elegibilidade.
+As regras de um `RuleSet` são compostas em `PublishedRuleSnapshot` e executadas
+pelo Rules Engine. [Praxis Rules Engine](https://github.com/codexrodrigues/praxis-rules-engine)
 
-1. **Lente de Regras de Negócio (`decisionKind = BUSINESS`):** Cria e simula invariantes funcionais, cálculos e elegibilidade compiladas em `PublishedRuleSnapshot` e executadas pelo [`praxis-rules-engine`](https://github.com/codexrodrigues/praxis-rules-engine) (`DecisionBinding`) no Passo 12 de mutações sobre estado real sem mascaramento.
-2. **Lente de Acesso e Proteção de Dados (`decisionKind = AUTHORIZATION`):** Cria e valida políticas `praxis.authorization-policy/v1` (acesso `ACCESS`, filtro relacional Kleene 3VL `DATA_SCOPE`, `FIELD_USE`, `FIELD_WRITE`, mascaramento em 7 níveis `MASK` e obrigações auditáveis `OBLIGATIONS`), compiladas para OPA `import rego.v1` pelo [`praxis-authz-opa`](https://github.com/codexrodrigues/praxis-authz-opa) e executadas no runtime pelo pipeline PEP de 15 etapas em [`praxis-authz-contracts`](https://github.com/codexrodrigues/praxis-authz-contracts), [`praxis-authz-enforcement-core`](https://github.com/codexrodrigues/praxis-authz-enforcement-core) e [`praxis-authz-starter`](https://github.com/codexrodrigues/praxis-authz-starter) (`0.1.0-beta.1` no Maven Central), alimentados pelos metadados de [`praxis-metadata-starter`](https://github.com/codexrodrigues/praxis-metadata-starter).
+**Acesso e proteção de dados (`decisionKind = AUTHORIZATION`).** O contrato da
+plataforma usa `ruleType = "authorization_policy"` e
+`definition.schemaVersion = "praxis.authorization-policy/v1"` para acesso,
+escopo de dados, uso e escrita de campos, mascaramento e obrigações. A
+materialização `policy_engine` / `opa-policy` é consumida pelo Praxis Authz e
+pelo OPA. No catálogo remoto autenticado, **Revisar rascunho de acesso (ACCESS)**
+recebe uma requisição de criação preparada para o host. O revisor confere pontos
+`EXACT`, digests declarados, modos, contribuições ACCESS, códigos de razão,
+condições e governança antes de salvar como `draft`. O Studio envia o documento
+ao Config e compara a releitura por ID com a candidata enviada. O mesmo ID
+permite reabrir a definição. **Consultar pontos de decisão do host** consulta o
+PAP da sessão atual. Selecione o serviço, o ponto e o modo para consultar os
+caminhos, tipos, cardinalidade e presença dos fatos. A referência EXACT inclui
+o digest do descritor fornecido pelo host. O texto da candidata é preservado
+durante a consulta. A admissão do runtime ocorre na publicação.
+[Praxis Authz Starter](https://github.com/codexrodrigues/praxis-authz-starter) · [Praxis Authz OPA](https://github.com/codexrodrigues/praxis-authz-opa)
 
-### Por que Supera Ferramentas de Mercado e Multiplica a Produtividade com IA?
-
-- **Problema Resolvido:** Acaba com o abismo entre analistas de negócio/segurança e desenvolvedores — em vez de regras ficarem enterradas em código Java, SQL ou arquivos `.rego` manuais sem feedback visual nem testes de regressão integrados, toda alteração passa por simulação com impacto real em DTOs e superfícies descobertas.
-- **À Frente do Mercado:** Diferente de BRMS pesados ou editores low-code desconectados de segurança, o Studio governa tanto negócio quanto autorização/mascaramento sobre a mesma base semântica (`ai_registry`, `/schemas/domain` e catálogo PAP) já validada antes da ativação (gate anti-`denyAll`).
-- **Ganho em Tokens e Velocidade em Grandes Sistemas:** Como regras e políticas já nascem como artefatos estruturados (`RuleSet` e `AuthorizationPolicyDefinition`) vinculados a `DecisionPointDescriptor` e `QueryableResourceProjection`, times e agentes de IA não precisam reler bases inteiras de código para evoluir normas corporativas — entregando mudanças auditadas com contexto enxuto e zero retrabalho entre UI, backend e agentes.
+No mesmo catálogo, **Operar release de acesso (OPA)** lista as definições ACCESS
+aprovadas com alvo exato em modo TARGET. Selecione a versão pelo ID e publique
+o release. O host verifica a aprovação independente, o vínculo ao serviço e a
+política de tenant. Para ativar ou reverter, confirme o ID do release. Outra
+sessão autorizada pode consultar esse ID e retomar uma operação pendente. A
+revisão esperada vem do pacote publicado. A revisão observada, a instância OPA
+e os digests vêm da última confirmação persistida pelo servidor.
 
 Os contratos e a semântica do produto permanecem neutros em relação ao domínio e ao host consumidor.
+
+Para disponibilizar o Ergon no seletor do mesmo Studio que serve o Quickstart, configure a origem HTTPS do host no build estático. [Configuração e validação do site](docs/render-static-deployment.md)
 
 ## Estado atual
 
@@ -96,18 +117,17 @@ históricas e não descrevem as dependências atuais da UI. O código posterior 
 tag beta.15 continua sem uma nova tag do Studio; beta.15 não deve ser usado
 como nome do corte corrente.
 
-A adoção G2 fixa os sete pacotes diretos `@praxisui/*` em `10.0.0-rc.36`, com
-`dialog` na mesma versão pelo grafo normal de peers e lockfile. A instalação
-pelo npm público, `npm ci`, lint, testes unitários, checks de projeções e runtime
-local, build e suíte E2E desktop/narrow passaram com esses pacotes publicados.
-As oito integridades do lock e os arquivos instalados correspondem ao manifesto
-selado da [publicação rc.36](https://github.com/codexrodrigues/praxis-ui-angular/actions/runs/39609796030/attempts/2).
-A prova de adoção usa a UI integrada em `f427d705`, com instalação limpa do registry.
-O cockpit apresenta histórico incompatível, publicação sem seleção de head e
-bootstrap governado por rollout, preservando as ações e precondições do Config.
-A prova de navegador cobre transporte e UX com backend hermético, teclado e axe;
-a prova dos novos contratos por HTTP real com Config/host continua como gate
-separado. Essa validação local não substitui Quickstart/Neon ou personas reais.
+O lockfile fixa os sete pacotes diretos `@praxisui/*` em `10.0.0-rc.58` e
+resolve `@praxisui/dialog` na mesma versão. Esse conjunto publicado fornece o
+contrato que o Studio usa para consultar snapshots por operação, retirar heads
+e preparar, aprovar e publicar candidatos a snapshots. Execute `npm ci` para
+reproduzir a árvore do Studio.
+
+A adoção G2 foi validada em `f427d705` com a
+[publicação rc.36](https://github.com/codexrodrigues/praxis-ui-angular/actions/runs/39609796030/attempts/2).
+Essa evidência histórica cobre o cockpit com histórico incompatível, publicação
+sem seleção de head e bootstrap por rollout. A prova integrada dos contratos
+com Config e host é um gate separado.
 
 O Studio consome o catálogo canônico de facts por definição (`/definitions/{id}/facts`) e deriva
 inputs tipados de cenário, mantendo o editor JSON estruturado apenas para

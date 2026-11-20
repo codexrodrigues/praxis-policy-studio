@@ -1,8 +1,8 @@
 # Deployment estático homologado no Render
 
 O Rules Studio pode ser publicado separadamente do Quickstart sem versionar a
-URL do ambiente. O build continua produzindo o mesmo app Angular e materializa o
-`configApiBaseUrl` somente no artefato derivado.
+URL do ambiente. O build materializa o endpoint padrão e os perfis selecionáveis
+em `app-config.json` no diretório de saída Angular.
 
 ## Configuração do site
 
@@ -10,6 +10,7 @@ URL do ambiente. O build continua produzindo o mesmo app Angular e materializa o
 - publish directory: diretório de saída Angular configurado no build estático (`dist/<app-name>/browser`);
 - environment: `RULES_STUDIO_CONFIG_API_BASE_URL`, contendo somente a origin
   HTTPS do Quickstart, sem path, query, fragmento ou credenciais;
+- environment opcional: `RULES_STUDIO_ERGON_API_BASE_URL`, contendo somente a origin HTTPS do Ergon, distinta do Quickstart;
 - rewrite SPA: `/*` para `/index.html`.
 
 A homologação oficial está publicada em
@@ -25,10 +26,29 @@ URL que não seja uma origin HTTPS. Ele altera apenas o `app-config.json` dentro
 
 ## Sessão e segurança
 
-O host Angular envia `withCredentials` apenas para as famílias governadas
-`/auth`, `/api` e `/schemas`, inclusive quando a URL é absoluta. Assets,
-projeções e destinos externos não recebem o cookie ambiente. O Quickstart deve
-publicar a origin exata do site em CORS e no filtro de Origin do Config.
+O seletor **Host governado** inicia no Quickstart. Com as duas variáveis
+configuradas, o build lista Quickstart e Ergon. A seleção de outro host reabre
+o catálogo e descarta a seleção, o escopo recebido por deep-link e o token em
+memória da sessão anterior. Um link do host pode fornecer `apiBaseUrl` com sua
+origin exata e suas coordenadas governadas. O Studio aceita como override
+somente as origens implantadas em `hostProfiles`. Um endereço desconhecido
+interrompe a abertura do catálogo com `SETUP_UNTRUSTED_HOST`. A abertura sem
+`apiBaseUrl` carrega o backend padrão. A projeção estática do Quickstart é restaurada ao
+voltar ao perfil padrão.
+
+Para validar o artefato, confira que `configApiBaseUrl` é a origin do
+Quickstart e que os itens de `hostProfiles` têm as origens HTTPS configuradas.
+Verifique com uma sessão do Ergon que o catálogo PAP, a releitura de um draft
+e a consulta de releases chegam ao host selecionado. A publicação, ativação
+e reversão dependem dos papéis e dos gates de aprovação e verificação do host.
+
+O Angular limita as requisições governadas ao host ativo. O navegador mantém
+o cookie HttpOnly do respectivo host. O Studio recebe `X-XSRF-TOKEN` em
+`GET /auth/session` e o vincula à origin e ao tenant em memória. Cada host
+deve admitir a origin exata do Studio no CORS com credenciais e no filtro
+de Origin do Config, aceitar os cabeçalhos de escopo e CSRF e expor
+`X-XSRF-TOKEN` na resposta. Sessões entre sites exigem que a política de
+cookies do host e do navegador permita enviar a sessão nesse contexto.
 
 Este deployment é uma superfície de homologação. Ele não substitui IdP/BFF
 corporativo, não transforma o login do Quickstart em IAM de produção e não muda

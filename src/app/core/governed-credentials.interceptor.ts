@@ -1,6 +1,7 @@
 import { HttpInterceptorFn, HttpResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { tap } from 'rxjs';
+import { tap, throwError } from 'rxjs';
+import { RuntimeConfigService } from './runtime-config.service';
 import { GovernedHostScopeService } from './governed-host-scope.service';
 
 const GOVERNED_ROOTS = ['/api', '/auth', '/schemas'] as const;
@@ -16,7 +17,13 @@ const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
  * not receive ambient credentials or contextual headers.
  */
 export const governedCredentialsInterceptor: HttpInterceptorFn = (request, next) => {
-  if (!isGovernedUrl(request.url)) return next(request);
+  const url = new URL(request.url, document.baseURI);
+  if (!GOVERNED_ROOTS.some(root => url.pathname === root || url.pathname.startsWith(root + '/'))) return next(request);
+  const state = inject(RuntimeConfigService).state();
+  if (state.kind !== 'ready' || state.config.mode !== 'remote'
+    || url.origin !== new URL(state.config.configApiBaseUrl || document.baseURI, document.baseURI).origin) {
+    return throwError(() => new Error('GOVERNED_HOST_MISMATCH'));
+  }
 
   const hostScope = inject(GovernedHostScopeService);
   const scope = hostScope.syncFromQueryString();
@@ -37,7 +44,7 @@ export const governedCredentialsInterceptor: HttpInterceptorFn = (request, next)
     setHeaders['X-Env'] = scope.environment;
   }
   if (MUTATING_METHODS.has(request.method.toUpperCase()) && !request.headers.has('X-XSRF-TOKEN')) {
-    const csrf = hostScope.csrfToken(scope.tenantId);
+    const csrf = hostScope.csrfToken(url.origin, scope.tenantId);
     if (csrf) {
       setHeaders['X-XSRF-TOKEN'] = csrf;
     }
@@ -56,19 +63,9 @@ export const governedCredentialsInterceptor: HttpInterceptorFn = (request, next)
       if (event instanceof HttpResponse) {
         const nextCsrf = event.headers.get('X-XSRF-TOKEN');
         if (nextCsrf) {
-          hostScope.recordCsrfToken(nextCsrf, scope.tenantId);
+          hostScope.recordCsrfToken(nextCsrf, url.origin, scope.tenantId);
         }
       }
     })
   );
 };
-
-function isGovernedUrl(value: string): boolean {
-  let pathname: string;
-  try {
-    pathname = new URL(value, 'https://rules-studio.invalid').pathname;
-  } catch {
-    return false;
-  }
-  return GOVERNED_ROOTS.some(root => pathname === root || pathname.startsWith(`${root}/`));
-}

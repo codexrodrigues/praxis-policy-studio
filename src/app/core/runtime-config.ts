@@ -3,6 +3,7 @@ export type SupportedLocale = 'pt-BR' | 'en-US';
 
 export interface PolicyStudioRuntimeConfig {
   readonly mode: PolicyStudioMode;
+  readonly hostProfiles?: readonly RulesStudioHostProfile[];
   readonly configApiBaseUrl: string | null;
   readonly locale: SupportedLocale;
   readonly projectionPath: string | null;
@@ -76,6 +77,28 @@ export function normalizeTrustedConfigApiBaseUrl(
   return `${parsed.origin}${cleanPath}`;
 }
 
+function validateDeploymentProfiles(value: unknown, defaultOrigin: string | null | undefined): readonly RulesStudioHostProfile[] {
+  if (!Array.isArray(value) || !value.length) throw new Error('SETUP_INVALID_HOST_PROFILES');
+  const ids = new Set<string>();
+  const origins = new Set<string>();
+  const profiles = value.map((entry: unknown) => {
+    if (!entry || typeof entry !== 'object') throw new Error('SETUP_INVALID_HOST_PROFILES');
+    const { id, labelPtBr, labelEnUs, apiBaseUrl } = entry as Partial<RulesStudioHostProfile>;
+    if (typeof id !== 'string' || !/^[a-z][a-z0-9-]*$/.test(id) || ids.has(id)
+      || typeof labelPtBr !== 'string' || !labelPtBr.trim() || typeof labelEnUs !== 'string' || !labelEnUs.trim()
+      || typeof apiBaseUrl !== 'string' || !URL.canParse(apiBaseUrl)) throw new Error('SETUP_INVALID_HOST_PROFILES');
+    const url = new URL(apiBaseUrl);
+    if (url.protocol !== 'https:' || url.hostname.includes('*') || url.origin !== apiBaseUrl || origins.has(apiBaseUrl)) {
+      throw new Error('SETUP_INVALID_HOST_PROFILES');
+    }
+    ids.add(id);
+    origins.add(apiBaseUrl);
+    return { id, labelPtBr, labelEnUs, apiBaseUrl };
+  });
+  if (!defaultOrigin || !origins.has(defaultOrigin)) throw new Error('SETUP_INVALID_HOST_PROFILES');
+  return profiles;
+}
+
 export function validateRuntimeConfig(value: unknown): PolicyStudioRuntimeConfig {
   if (!value || typeof value !== 'object') {
     throw new Error('SETUP_INVALID_DOCUMENT');
@@ -97,7 +120,10 @@ export function validateRuntimeConfig(value: unknown): PolicyStudioRuntimeConfig
   if (candidate.mode === 'fixture' && candidate.projectionPath == null) {
     throw new Error('SETUP_PROJECTION_PATH_REQUIRED');
   }
+  const hostProfiles = candidate.hostProfiles === undefined ? undefined
+    : validateDeploymentProfiles(candidate.hostProfiles, candidate.configApiBaseUrl);
   return {
+    ...(hostProfiles ? { hostProfiles } : {}),
     mode: candidate.mode,
     configApiBaseUrl: candidate.configApiBaseUrl ?? null,
     locale: candidate.locale,

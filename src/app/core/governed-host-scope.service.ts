@@ -76,20 +76,12 @@ export class GovernedHostScopeService {
     return !!tenantId && REALM_SLUG_PATTERN.test(tenantId);
   }
 
-  recordCsrfToken(token: string | null | undefined, tenantId?: string | null): void {
+  recordCsrfToken(token: string, origin: string, tenantId: string | null): void {
     const clean = cleanParam(token);
-    if (!clean) return;
-    const key = cleanParam(tenantId) ?? this.scopeSignal().tenantId ?? '__default__';
-    this.csrfTokensByScope.set(key, clean);
+    if (clean) this.csrfTokensByScope.set(JSON.stringify([origin, tenantId]), clean);
   }
 
-  csrfToken(tenantId?: string | null): string | null {
-    const key = cleanParam(tenantId) ?? this.scopeSignal().tenantId ?? '__default__';
-    return this.csrfTokensByScope.get(key) ?? this.csrfTokensByScope.get('__default__') ?? null;
-  }
-
-  clearCsrfToken(tenantId?: string | null): void {
-    const key = cleanParam(tenantId) ?? this.scopeSignal().tenantId ?? '__default__';
-    this.csrfTokensByScope.delete(key);
+  csrfToken(origin: string, tenantId: string | null): string | null {
+    return this.csrfTokensByScope.get(JSON.stringify([origin, tenantId])) ?? null;
   }
 }
