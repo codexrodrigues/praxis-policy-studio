@@ -41,6 +41,7 @@ import type {
   RuleSetCompositionCandidateCommand,
   RuleSetCompositionCandidateRequest
 } from './catalog.fixture';
+import { AccessDraftReviewComponent } from '../authoring/access-draft-review.component';
 import { DecisionCreateFormComponent } from './decision-create-form.component';
 import { DecisionDiscoveryComponent } from './decision-discovery.component';
 import { DecisionExplanationComponent } from './decision-explanation.component';
@@ -68,6 +69,7 @@ import { WorkspaceBlockersComponent } from './workspace-blockers.component';
     ScenarioCreateFormComponent,
     DecisionParametersEditorComponent,
     DecisionCreateFormComponent,
+    AccessDraftReviewComponent,
     RuleDecisionPlanDagComponent
   ],
   providers: [

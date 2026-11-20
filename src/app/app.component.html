@@ -1,11 +1,11 @@
 <a class="skip-link" href="#main-content">{{ i18n.text('skip') }}</a>
 <header class="product-bar">
-  <a class="brand" routerLink="/catalog" [attr.aria-label]="i18n.text('productCatalogLink')">
+  <a class="brand" routerLink="/catalog" queryParamsHandling="preserve" [attr.aria-label]="i18n.text('productCatalogLink')">
     <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
     <strong>{{ i18n.text('product') }}</strong>
   </a>
   <nav [attr.aria-label]="i18n.text('primaryNavigation')">
-    <a routerLink="/catalog" aria-current="page"><span class="glyph" aria-hidden="true">⌘</span>{{ i18n.text('catalog') }}</a>
+    <a routerLink="/catalog" queryParamsHandling="preserve" aria-current="page"><span class="glyph" aria-hidden="true">⌘</span>{{ i18n.text('catalog') }}</a>
   </nav>
   <div class="context">
     @if (runtime.mode() === 'remote') {
@@ -13,10 +13,9 @@
         <span class="visually-hidden">{{ i18n.locale() === 'pt-BR' ? 'Host governado' : 'Governed host' }}</span>
         <span class="glyph" aria-hidden="true">⇄</span>
         <select
-          [value]="runtime.activeHostProfileId() ?? 'same-origin-proxy'"
           (change)="runtime.selectHostProfile($any($event.target).value)">
-          @for (profile of runtime.hostProfiles; track profile.id) {
-            <option [value]="profile.id">
+          @for (profile of runtime.hostProfiles(); track profile.id) {
+            <option [value]="profile.id" [selected]="profile.id === runtime.activeHostProfileId()">
               {{ i18n.locale() === 'pt-BR' ? profile.labelPtBr : profile.labelEnUs }}
             </option>
           }

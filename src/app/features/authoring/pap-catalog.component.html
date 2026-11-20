@@ -1,0 +1,41 @@
+<section>
+  <button type="button" (click)="load()" [disabled]="busy()">{{ i18n.text(services() ? 'papRefresh' : 'papBrowse') }}</button>
+  @if (busy()) { <p role="status">{{ i18n.text('loading') }}</p> }
+  @if (error(); as message) { <p role="alert">{{ i18n.text(message) }}</p> }
+  @if (services(); as catalogs) {
+    @if (catalogs.length) {
+      <label>{{ i18n.text('papService') }}
+        <select [value]="serviceKey()" (change)="serviceKey.set($any($event.target).value)">
+          @for (entry of catalogs; track entry.serviceKey) { <option [value]="entry.serviceKey">{{ entry.serviceKey }}</option> }
+        </select>
+      </label>
+    }
+    @if (service(); as current) {
+      @if (current.decisionPoints.length) {
+        <label>{{ i18n.text('papPoint') }}
+          <select [value]="pointKey()" (change)="pointKey.set($any($event.target).value)">
+            @for (p of current.decisionPoints; track p.pointKey) { <option [value]="p.pointKey">{{ p.pointKey }}</option> }
+          </select>
+        </label>
+      }
+    }
+    @if (point(); as selected) {
+      <label>{{ i18n.text('papMode') }}
+        <select [value]="mode()" (change)="mode.set($any($event.target).value)">
+          @for (m of modes(); track m) { <option [value]="m">{{ m }}</option> }
+        </select>
+      </label>
+      <h4>{{ i18n.text('papFacts') }}</h4>
+      <ul>
+        @for (fact of selected.factsByMode[mode()]; track fact.factPath) {
+          <li><code>{{ fact.factPath }}</code><br>{{ fact.valueType }} · {{ fact.cardinality }} · {{ fact.presenceModel }}</li>
+        } @empty { <li>{{ i18n.text('papNoFacts') }}</li> }
+      </ul>
+      <details>
+        <summary>{{ i18n.text('papReference') }}</summary>
+        <p>{{ selected.resourceKey }} · {{ selected.factContractId }}<br><code>{{ selected.factContractDigest }}</code></p>
+        <pre>{{ reference() | json }}</pre>
+      </details>
+    } @else { <p role="status">{{ i18n.text('papEmpty') }}</p> }
+  }
+</section>

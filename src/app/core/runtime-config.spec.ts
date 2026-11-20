@@ -39,4 +39,18 @@ describe('validateRuntimeConfig', () => {
     expect(normalizeTrustedConfigApiBaseUrl('https://evil.example.invalid/api')).toBeNull();
     expect(normalizeTrustedConfigApiBaseUrl('javascript:alert(1)')).toBeNull();
   });
+
+  it('accepts distinct HTTPS deployment profiles with an explicit matching default', () => {
+    const main = { id: 'primary', labelPtBr: 'Padrão', labelEnUs: 'Default', apiBaseUrl: 'https://primary.example' };
+    const other = { ...main, id: 'other', apiBaseUrl: 'https://other.example' };
+    const config = { mode: 'remote', configApiBaseUrl: main.apiBaseUrl, locale: 'pt-BR', hostProfiles: [main, other] };
+    expect(validateRuntimeConfig(config).hostProfiles).toEqual([main, other]);
+    for (const hostProfiles of [[], [other], [main, main], [main, { ...other, apiBaseUrl: main.apiBaseUrl }],
+      [main, { ...other, labelEnUs: '' }], ...[
+        'http://other.example', 'https://u:p@other.example', 'https://other.example/path', 'https://other.example?site=1',
+        'https://other.example#fragment', 'https://*.example', 'https://other.example/'
+      ].map(apiBaseUrl => [main, { ...other, apiBaseUrl }])]) {
+      expect(() => validateRuntimeConfig({ ...config, hostProfiles })).toThrow('SETUP_INVALID_HOST_PROFILES');
+    }
+  });
 });

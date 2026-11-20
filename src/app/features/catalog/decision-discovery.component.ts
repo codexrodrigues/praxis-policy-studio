@@ -9,6 +9,7 @@ import { PolicyStudioI18n } from '../../core/i18n';
 import type { PolicyStudioRuntimeConfig } from '../../core/runtime-config';
 import type { DecisionSummary } from './catalog.fixture';
 import { createClientRequestId } from '../../core/client-request-id';
+import { AUTHORIZATION_RULE_TYPE } from '../../core/prepared-access-draft';
 
 @Component({
   selector: 'pax-decision-discovery',
@@ -91,7 +92,7 @@ export class DecisionDiscoveryComponent implements OnDestroy {
   }
 
   canResolveExternalCandidate(candidate: DecisionDiscoveryCandidate): boolean {
-    return !this.matchingDecision(candidate) && !this.isStaleCandidate(candidate);
+    return candidate.ruleType !== AUTHORIZATION_RULE_TYPE && !this.matchingDecision(candidate) && !this.isStaleCandidate(candidate);
   }
 
   failureMessage(reason: Extract<DecisionDiscoveryEvent, { kind: 'failed' }>['reason']): string {

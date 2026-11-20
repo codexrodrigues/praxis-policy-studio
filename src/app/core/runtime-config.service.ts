@@ -18,7 +18,10 @@ export type SetupState =
 export class RuntimeConfigService {
   private readonly http = inject(HttpClient);
   private readonly stateSignal = signal<SetupState>({ kind: 'loading' });
-  readonly hostProfiles: readonly RulesStudioHostProfile[] = DEFAULT_RULES_STUDIO_HOST_PROFILES;
+  readonly hostProfiles = computed<readonly RulesStudioHostProfile[]>(() => {
+    const state = this.stateSignal();
+    return state.kind === 'ready' && state.config.hostProfiles ? state.config.hostProfiles : DEFAULT_RULES_STUDIO_HOST_PROFILES;
+  });
   readonly state = this.stateSignal.asReadonly();
   readonly ready = computed(() => this.stateSignal().kind === 'ready');
   readonly mode = computed(() => {
@@ -29,7 +32,7 @@ export class RuntimeConfigService {
     const state = this.stateSignal();
     if (state.kind !== 'ready' || state.config.mode !== 'remote') return null;
     const baseUrl = state.config.configApiBaseUrl ?? '';
-    return this.hostProfiles.find(profile => profile.apiBaseUrl === baseUrl)?.id ?? 'custom';
+    return this.hostProfiles().find(profile => profile.apiBaseUrl === baseUrl)?.id ?? 'custom';
   });
 
   async load(): Promise<void> {
@@ -37,12 +40,13 @@ export class RuntimeConfigService {
     try {
       const raw = await firstValueFrom(this.http.get<unknown>('/app-config.json'));
       const validated = validateRuntimeConfig(raw);
-      const queryOverride = this.resolveQueryApiBaseUrlOverride();
+      const queryOverride = this.resolveQueryApiBaseUrlOverride(validated);
       const nextConfig: PolicyStudioRuntimeConfig =
-        validated.mode === 'remote' && queryOverride !== null
+        validated.mode === 'remote' && queryOverride !== null && queryOverride !== validated.configApiBaseUrl
           ? {
               ...validated,
               configApiBaseUrl: queryOverride,
+              initialDecisionKey: null,
               projectionPath: queryOverride ? null : validated.projectionPath
             }
           : validated;
@@ -58,24 +62,24 @@ export class RuntimeConfigService {
   selectHostProfile(profileId: string): void {
     const current = this.stateSignal();
     if (current.kind !== 'ready' || current.config.mode !== 'remote') return;
-    const target = this.hostProfiles.find(profile => profile.id === profileId);
+    const target = this.hostProfiles().find(profile => profile.id === profileId);
     if (!target || target.apiBaseUrl === (current.config.configApiBaseUrl ?? '')) return;
-    const updatedConfig: PolicyStudioRuntimeConfig = {
-      ...current.config,
-      configApiBaseUrl: target.apiBaseUrl,
-      projectionPath: target.apiBaseUrl ? null : '/projections/quickstart-benefit-eligibility.v1.json'
-    };
-    this.stateSignal.set({ kind: 'loading' });
-    queueMicrotask(() => {
-      this.stateSignal.set({ kind: 'ready', config: updatedConfig });
-    });
+    // A new document clears the previous host's session token, scope, draft and pending callbacks.
+    const url = new URL(window.location.pathname, window.location.origin);
+    url.searchParams.set('apiBaseUrl', target.apiBaseUrl);
+    window.location.assign(url.href);
   }
 
-  private resolveQueryApiBaseUrlOverride(): string | null {
+  private resolveQueryApiBaseUrlOverride(config: PolicyStudioRuntimeConfig): string | null {
     if (typeof window === 'undefined' || !window.location?.search) return null;
     const params = new URLSearchParams(window.location.search);
     const rawApiBaseUrl = params.get('apiBaseUrl');
     if (rawApiBaseUrl === null) return null;
+    if (config.hostProfiles) {
+      const selected = config.hostProfiles.find(profile => profile.apiBaseUrl === rawApiBaseUrl);
+      if (!selected) throw new Error('SETUP_UNTRUSTED_HOST');
+      return selected.apiBaseUrl;
+    }
     return normalizeTrustedConfigApiBaseUrl(rawApiBaseUrl);
   }
 }

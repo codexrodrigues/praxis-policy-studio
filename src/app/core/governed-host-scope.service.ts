@@ -37,7 +37,7 @@ function readWindowQueryScope(): GovernedHostScopeSnapshot {
 @Injectable({ providedIn: 'root' })
 export class GovernedHostScopeService {
   private readonly scopeSignal = signal<GovernedHostScopeSnapshot>(readWindowQueryScope());
-  private readonly csrfTokensByScope = new Map<string, string>();
+  private readonly csrfTokensByScope = new Map<string, { token: string | null }>();
 
   readonly scope = this.scopeSignal.asReadonly();
 
@@ -76,20 +76,18 @@ export class GovernedHostScopeService {
     return !!tenantId && REALM_SLUG_PATTERN.test(tenantId);
   }
 
-  recordCsrfToken(token: string | null | undefined, tenantId?: string | null): void {
-    const clean = cleanParam(token);
-    if (!clean) return;
-    const key = cleanParam(tenantId) ?? this.scopeSignal().tenantId ?? '__default__';
-    this.csrfTokensByScope.set(key, clean);
+  csrfSession(origin: string, tenantId: string | null): { token: string | null } {
+    const key = JSON.stringify([origin, tenantId]);
+    let session = this.csrfTokensByScope.get(key);
+    if (!session) {
+      session = { token: null };
+      this.csrfTokensByScope.set(key, session);
+    }
+    return session;
   }
 
-  csrfToken(tenantId?: string | null): string | null {
-    const key = cleanParam(tenantId) ?? this.scopeSignal().tenantId ?? '__default__';
-    return this.csrfTokensByScope.get(key) ?? this.csrfTokensByScope.get('__default__') ?? null;
-  }
-
-  clearCsrfToken(tenantId?: string | null): void {
-    const key = cleanParam(tenantId) ?? this.scopeSignal().tenantId ?? '__default__';
-    this.csrfTokensByScope.delete(key);
+  rotateCsrfSession(origin: string, tenantId: string | null, token: string | null): void {
+    // Responses still in flight hold the previous session object.
+    this.csrfTokensByScope.set(JSON.stringify([origin, tenantId]), { token });
   }
 }

@@ -672,8 +672,9 @@ test('preserves the governed workspace while editing, adding a typed scenario, a
 
 test('keeps incompatible snapshot history visible without offering runtime operations', async ({ page }, testInfo) => {
   await mockGovernedBackend(page, false);
+  const operationKey = 'CREATE';
   const historical = {
-    snapshotKey: 'historical-contract-1.4', ruleSetKey: 'extraordinary-grant-eligibility', ruleSetVersion: 1,
+    snapshotKey: 'historical-contract-1.4', ruleSetKey: 'extraordinary-grant-eligibility', operationKey, ruleSetVersion: 1,
     publicationRevision: 1, snapshotContentHash: 'A'.repeat(64), publishedBy: 'publisher',
     publishedAtUtc: '2026-10-20T12:00:00Z', active: true,
     governanceState: 'RUNTIME_INCOMPATIBLE', availableAction: 'UNAVAILABLE'
@@ -688,7 +689,7 @@ test('keeps incompatible snapshot history visible without offering runtime opera
     const path = new URL(route.request().url()).pathname;
     const json = (body: unknown) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
     if (path.endsWith('/snapshots/head/status')) return json({
-      ruleSetKey: historical.ruleSetKey, activeSnapshotKey: historical.snapshotKey,
+      ruleSetKey: historical.ruleSetKey, operationKey, activeSnapshotKey: historical.snapshotKey,
       ruleSetVersion: 1, publicationRevision: 1, activationRevision: 2,
       headEtag: '"historical-head"', executionReady: false, governanceState: 'RUNTIME_INCOMPATIBLE'
     });
@@ -696,7 +697,7 @@ test('keeps incompatible snapshot history visible without offering runtime opera
       historical, { ...historical, snapshotKey: 'historical-candidate', active: false, publicationRevision: 2 }
     ]);
     if (path.endsWith('/rollouts')) return json({
-      ruleSetKey: historical.ruleSetKey, rollouts: [], availableActions: ['CREATE_ROLLOUT']
+      ruleSetKey: historical.ruleSetKey, operationKey, rollouts: [], availableActions: ['CREATE_ROLLOUT']
     });
     if (path.endsWith('/rollout-policies')) return json({
       ruleSetKey: historical.ruleSetKey, activePolicy: null, versions: [], availableActions: []
@@ -712,6 +713,7 @@ test('keeps incompatible snapshot history visible without offering runtime opera
   }
   await page.getByRole('button', { name: /^Operar/ }).click();
   const cockpit = page.locator('pax-snapshot-cockpit');
+  await cockpit.getByLabel('Operação governada', { exact: true }).selectOption(operationKey);
   await expect(cockpit.getByText('Incompatível com o runtime atual', { exact: true }).first()).toBeVisible();
   await expect(cockpit.getByText('Não pronto', { exact: true })).toBeVisible();
   await expect(cockpit.getByText('historical-contract-1.4', { exact: true }).first()).toBeVisible();
@@ -734,6 +736,7 @@ for (const hasExistingHead of [false, true]) {
     const oldHeadKey = 'previous-active-snapshot';
     let oldHeadEtag = '"previous-head-7"';
     const ruleSetKey = 'extraordinary-grant-eligibility';
+    const operationKey = 'CREATE';
     let created = false;
     let activated = false;
     const commands: string[] = [];
@@ -746,7 +749,7 @@ for (const hasExistingHead of [false, true]) {
       availableActions: []
     };
     const rollout = {
-      rolloutId: 'governed-rollout-1', ruleSetKey, candidateSnapshotKey: candidateKey,
+      rolloutId: 'governed-rollout-1', ruleSetKey, operationKey, candidateSnapshotKey: candidateKey,
       candidateContentHash: 'B'.repeat(64), expectedActiveSnapshotKey: hasExistingHead ? oldHeadKey : null,
       expectedHeadEtag: hasExistingHead ? oldHeadEtag : null,
       policyKey: policy.policyKey, policyVersion: 1, enforcementMode: 'REQUIRED', status: 'READY',
@@ -754,7 +757,8 @@ for (const hasExistingHead of [false, true]) {
     };
     await page.route('**/api/**/snapshots**', route => {
       const request = route.request();
-      const path = new URL(request.url()).pathname;
+      const url = new URL(request.url());
+      const path = url.pathname;
       const json = (body: unknown, status = 200, headers?: Record<string, string>) => route.fulfill({
         status, contentType: 'application/json', body: JSON.stringify(body), headers
       });
@@ -780,26 +784,33 @@ for (const hasExistingHead of [false, true]) {
           headEtag: '"selected-head-8"', activationRevision: 8, activationType: 'ACTIVATED' });
       }
       if (path.endsWith('/snapshots/head/status')) {
+        expect(url.searchParams.get('operationKey')).toBe(operationKey);
         if (!hasExistingHead && !activated) return json({}, 404, { 'Cache-Control': 'no-store' });
-        return json({ ruleSetKey, activeSnapshotKey: activated ? candidateKey : oldHeadKey,
+        return json({ ruleSetKey, operationKey, activeSnapshotKey: activated ? candidateKey : oldHeadKey,
           ruleSetVersion: activated ? 2 : 1, publicationRevision: activated ? 2 : 1,
           activationRevision: activated ? 8 : 7, headEtag: activated ? '"selected-head-8"' : oldHeadEtag,
           executionReady: true, governanceState: 'READY' });
       }
-      if (path.endsWith('/snapshots')) return json([{
-        snapshotKey: candidateKey, ruleSetKey, ruleSetVersion: 2, publicationRevision: 2,
-        snapshotContentHash: 'B'.repeat(64), publishedBy: 'publisher', publishedAtUtc: '2026-10-21T12:02:30Z',
-        active: activated, governanceState: 'READY',
-        availableAction: activated ? 'ACTIVE' : hasExistingHead ? 'ACTIVATE' : 'CREATE_ROLLOUT'
-      }]);
-      if (path.endsWith('/rollouts')) return json({ ruleSetKey,
-        rollouts: created && !activated ? [{ rollout, expectedHeadCurrent: true, expired: false,
-          readiness: { rolloutId: rollout.rolloutId, ruleSetKey, candidateSnapshotKey: candidateKey,
-            status: 'READY', enforcementMode: 'REQUIRED', minimumFreshProbes: 1, minimumReadyRatio: 1,
-            totalProbes: 1, readyProbes: 1, incompatibleProbes: 0, unavailableProbes: 0, staleProbes: 0,
-            activationReady: true, staleBeforeUtc: '2026-10-21T12:01:00Z' },
-          availableActions: ['ACTIVATE_CANDIDATE'] }] : [],
-        availableActions: created ? [] : ['CREATE_ROLLOUT'] });
+      if (path.endsWith('/snapshots')) {
+        expect(url.searchParams.get('operationKey')).toBe(operationKey);
+        return json([{
+          snapshotKey: candidateKey, ruleSetKey, operationKey, ruleSetVersion: 2, publicationRevision: 2,
+          snapshotContentHash: 'B'.repeat(64), publishedBy: 'publisher', publishedAtUtc: '2026-10-21T12:02:30Z',
+          active: activated, governanceState: 'READY',
+          availableAction: activated ? 'ACTIVE' : hasExistingHead ? 'ACTIVATE' : 'CREATE_ROLLOUT'
+        }]);
+      }
+      if (path.endsWith('/rollouts')) {
+        expect(url.searchParams.get('operationKey')).toBe(operationKey);
+        return json({ ruleSetKey, operationKey,
+          rollouts: created && !activated ? [{ rollout, expectedHeadCurrent: true, expired: false,
+            readiness: { rolloutId: rollout.rolloutId, ruleSetKey, candidateSnapshotKey: candidateKey,
+              status: 'READY', enforcementMode: 'REQUIRED', minimumFreshProbes: 1, minimumReadyRatio: 1,
+              totalProbes: 1, readyProbes: 1, incompatibleProbes: 0, unavailableProbes: 0, staleProbes: 0,
+              activationReady: true, staleBeforeUtc: '2026-10-21T12:01:00Z' },
+            availableActions: ['ACTIVATE_CANDIDATE'] }] : [],
+          availableActions: created ? [] : ['CREATE_ROLLOUT'] });
+      }
       if (path.endsWith('/rollout-policies')) return json({ ruleSetKey, activationRevision: 1,
         headEtag: '"policy-head-1"', activePolicy: policy, versions: [policy], availableActions: [] });
       if (path.endsWith('/timeline')) return json([]);
@@ -812,9 +823,10 @@ for (const hasExistingHead of [false, true]) {
     }
     await page.getByRole('button', { name: /^Operar/ }).click();
     const cockpit = page.locator('pax-snapshot-cockpit');
+    await cockpit.getByLabel('Operação governada', { exact: true }).selectOption(operationKey);
     const head = cockpit.locator('.snapshot-head');
     if (hasExistingHead) await expect(head.getByText(oldHeadKey, { exact: true })).toBeVisible();
-    else await expect(cockpit.getByText('Nenhum snapshot está ativo para este RuleSet.', { exact: true })).toBeVisible();
+    else await expect(cockpit.getByText('Nenhum snapshot está ativo para esta operação.', { exact: true })).toBeVisible();
     await expect(cockpit.getByText('host-quorum', { exact: true })).toBeVisible();
     expect(commands).toEqual([]);
     await cockpit.getByRole('button', { name: `Iniciar rollout · ${candidateKey}`, exact: true }).click();
@@ -1237,4 +1249,346 @@ test('selects snapshot operation explicitly without inheriting a family head', a
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await selector.evaluate(el => el.scrollIntoView({ block: 'center' }));
   await page.screenshot({ path: testInfo.outputPath('operation-scope.png'), fullPage: false });
+});
+
+function preparedAccessRequest() {
+  return {
+    ruleKey: ' access-document-read ', version: 1, ruleType: 'authorization_policy', status: 'draft',
+    resourceKey: ' documents ', serviceKey: ' documents-service ', contextKey: ' ',
+    definition: {
+      schemaVersion: 'praxis.authorization-policy/v1', policyId: 'access-document-read', version: '1.0.0',
+      title: 'Document read', description: 'Review document access', policyPurposes: ['RESOURCE_ACCESS'],
+      legalPurpose: 'STATUTORY_LEGAL_OBLIGATION', legalBasisRef: 'test-basis', combiningProfileRef: 'praxis.authorization-combining/v1',
+      targets: [{ targetId: 'document', kind: 'EXACT', pointKey: 'resource/documents/read',
+        expectedDescriptorDigest: 'sha256:' + 'a'.repeat(64), evaluationModes: ['TARGET'] }],
+      factRequirements: [{ factPath: 'subject.principalId', requiredInModes: ['TARGET'] }],
+      rules: [{ ruleId: 'read-document', description: 'Restrict document read', evaluationModes: ['TARGET'],
+        when: { language: 'praxis-json-logic', profile: 'AUTHORIZATION_TARGET_V1', expression: { '==': [{ var: 'subject.principalId' }, 'review-persona'] } },
+        contributions: { access: { authority: 'RESTRICT', effect: 'DENY' }, reasonCode: 'DOCUMENT_RESTRICTED' }, obligations: [] }],
+      materializationTargets: [{ targetLayer: 'policy_engine', targetArtifactType: 'opa-policy',
+        targetArtifactKey: 'unit:access-document-read:v1', compilerProfileRef: 'praxis.rego-compiler-profile/v1' }]
+    },
+    parameters: null, governance: { ruleAuthoring: 'review_required', requiredApprovals: ['reviewer'] }
+  };
+}
+
+test('reviews a prepared ACCESS draft and retries readback without repeating the write', async ({ page }, testInfo) => {
+  // Hermetic wire fixture. Its declared digest and effects are never admitted or executed.
+  const request = preparedAccessRequest();
+  const result = { ...request, ruleKey: 'access-document-read', resourceKey: 'documents', serviceKey: 'documents-service',
+    contextKey: null, parameters: {}, id: '66b473f5-9721-45ab-8e3a-0b57503b03e1', createdBy: 'server-principal',
+    tenantId: 'test-scope', environment: 'test' };
+  await mockGovernedBackend(page, false);
+  let writes = 0;
+  let reads = 0;
+  let probes = 0;
+  const token = crypto.randomUUID();
+  await page.route('**/auth/session', async route => {
+    expect(route.request().method()).toBe('GET');
+    probes++;
+    if (probes === 1) return route.fulfill({ status: 503 });
+    if (probes === 2) return route.fulfill({ status: 401 });
+    return route.fulfill({ status: 204, headers: { 'X-XSRF-TOKEN': token } });
+  });
+  await page.route('**/api/praxis/config/domain-rules/definitions', async route => {
+    expect(route.request().method()).toBe('POST');
+    expect(await route.request().headerValue('x-xsrf-token')).toBe(token);
+    expect(route.request().postDataJSON()).toEqual(request);
+    writes++;
+    await route.fulfill({ status: 202, json: result });
+  });
+  await page.route('**/api/praxis/config/domain-rules/definitions/' + result.id, async route => {
+    expect(route.request().method()).toBe('GET');
+    reads++;
+    await route.fulfill(reads === 1 ? { status: 503, json: {} } : { json: reads === 2 ? { ...result, serviceKey: 'unexpected-service' } : result });
+  });
+  await page.goto('/catalog');
+  await page.getByText('Revisar rascunho de acesso (ACCESS)', { exact: true }).click();
+  const source = page.getByLabel('Requisição JSON de criação da definição');
+  const inspect = page.getByRole('button', { name: 'Revisar candidata', exact: true });
+  const save = page.getByRole('button', { name: 'Salvar rascunho no Config' });
+  for (const invalid of [{ ...request, status: 'active' }, { ...request, tenantId: 'other' },
+    { ...request, createdBy: 'asserted-author' }, { ...request, ruleType: 'validation' }]) {
+    await source.fill(JSON.stringify(invalid));
+    await inspect.click();
+    await expect(page.getByText(/Use uma requisição de criação em draft/)).toBeVisible();
+    await expect(save).toHaveCount(0);
+  }
+  await source.fill(JSON.stringify(request));
+  await inspect.click();
+  await expect(page.getByText('RESTRICT / DENY')).toBeVisible();
+  await expect(page.getByText(/DOCUMENT_RESTRICTED/).first()).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('access-draft-review.png') });
+  await save.click();
+  await expect(page.getByText('Falha ao consultar a sessão do host. Tente salvar novamente.')).toBeVisible();
+  expect(writes).toBe(0);
+  await save.click();
+  await expect(page.getByText('Inicie uma sessão para consultar o catálogo governado.')).toBeVisible();
+  expect(writes).toBe(0);
+  await save.click();
+  await expect(page.getByText('A leitura falhou. Confira o ID e tente ler novamente.')).toBeVisible();
+  await expect(save).toHaveCount(0);
+  await expect(page.getByLabel('ID da definição no Config')).toHaveValue(result.id);
+  await page.getByRole('button', { name: 'Ler rascunho pelo ID' }).click();
+  await expect(page.getByText('A definição lida difere da candidata enviada. Confira o registro pelo ID.')).toBeVisible();
+  await page.getByRole('button', { name: 'Ler rascunho pelo ID' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Rascunho lido do Config' })).toBeVisible();
+  expect({ probes, writes, reads }).toEqual({ probes: 3, writes: 1, reads: 3 });
+});
+
+test('browses the scoped PAP catalog and uses the selected mode without changing the ACCESS input', async ({ page }, testInfo) => {
+  await mockGovernedBackend(page, false);
+  const subject = { factPath: 'subject.principalId', valueType: 'STRING', cardinality: 'SCALAR', presenceModel: 'ALWAYS_PRESENT' };
+  const target = { ...subject, factPath: 'resource.sensitivity', presenceModel: 'MAY_BE_ABSENT' };
+  const point = {
+    pointKey: 'resource/documents/read', resourceKey: 'documents', descriptorDigest: 'sha256:' + 'a'.repeat(64),
+    factContractId: 'fc-documents', factContractDigest: 'sha256:' + 'b'.repeat(64),
+    factsByMode: { SEARCH: [subject], TARGET: [subject, target] }
+  };
+  let reads = 0;
+  await page.route('**/api/praxis/config/domain-rules/authorization/catalog', async route => {
+    expect(route.request().method()).toBe('GET');
+    reads++;
+    return reads === 1 ? route.fulfill({ status: 403 }) : route.fulfill({
+      json: { services: [{ serviceKey: 'documents-service', catalogDigest: 'catalog', decisionPoints: [point] }] }
+    });
+  });
+  await page.goto('/catalog');
+  await page.getByText('Revisar rascunho de acesso (ACCESS)', { exact: true }).click();
+  const source = page.getByLabel('Requisição JSON de criação da definição');
+  await source.fill('draft in progress');
+  const panel = page.locator('pax-pap-catalog');
+  const browse = panel.getByRole('button', { name: 'Consultar pontos de decisão do host' });
+  await browse.click();
+  await expect(panel.getByRole('alert')).toBeVisible();
+  await expect(panel.getByRole('combobox')).toHaveCount(0);
+  await browse.click();
+  await expect(panel.getByLabel('Ponto de decisão admitido')).toHaveValue(point.pointKey);
+  await expect(panel.getByText(subject.factPath)).toBeVisible();
+  await expect(panel.getByText(target.factPath)).toHaveCount(0);
+  await panel.getByLabel('Modo de avaliação').selectOption('TARGET');
+  await expect(panel.getByText(target.factPath)).toBeVisible();
+  await panel.getByText('Referências do contrato e campos do alvo EXACT').click();
+  await expect(panel.locator('pre')).toContainText(point.descriptorDigest);
+  await expect(panel.locator('pre')).toContainText('TARGET');
+  await expect(source).toHaveValue('draft in progress');
+  await expect(panel.getByText(point.factContractDigest)).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await panel.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('pap-catalog.png') });
+});
+
+test('publishes approved ACCESS and resumes activation and rollback against the observed OPA head', async ({ page }, testInfo) => {
+  const definitionId = 'ec2a1f3e-29bb-45b1-baf9-6dd65c56c06c';
+  const releaseId = '1484e04f-229e-49ea-93d2-e8af3cb71f9a';
+  const releasePath = '/api/praxis/config/domain-rules/authorization/releases';
+  const approved = { ...preparedAccessRequest(), ruleKey: 'review-document', id: definitionId, status: 'approved' };
+  const initial = { releaseId, definitionId, approvalId: '3e010bd1-e64d-42ad-b80c-48cc38e1e495',
+    definitionHash: 'definition-test-hash' };
+  const head = { headEtag: 'head-2', compilerProfileVersion: 'v1', opaCapabilitiesDigest: 'capability-digest', runtimeRevision: 'forward-test', instanceId: 'test-opa', activationRevision: 2,
+    policySetDigest: 'forward-policy', bundleArtifactDigest: 'forward-bundle' };
+  const previous = { ...head, runtimeRevision: 'restore-test', activationRevision: 3,
+    policySetDigest: 'previous-policy', bundleArtifactDigest: 'restored-bundle' };
+  await mockGovernedBackend(page, false);
+  await page.route('**/api/praxis/config/domain-rules/definitions?**', route => {
+    const params = new URL(route.request().url()).searchParams;
+    expect(params.get('status')).toBe('approved');
+    expect(params.get('ruleType')).toBe('authorization_policy');
+    return route.fulfill({ json: [approved, { ...approved, ruleType: 'validation', id: definition.id },
+      { ...approved, status: 'draft', id: definition.id }] });
+  });
+  const csrf = crypto.randomUUID();
+  await page.route('**/auth/session', route => route.fulfill({ status: 204, headers: { 'X-XSRF-TOKEN': csrf } }));
+  const operations: string[] = [];
+  let activated = false;
+  let reverting = false;
+  await page.route('**' + releasePath + '**', async route => {
+    const req = route.request();
+    const suffix = new URL(req.url()).pathname.slice(releasePath.length);
+    operations.push(req.method() + ' ' + suffix);
+    if (req.method() === 'POST') expect(await req.headerValue('x-xsrf-token')).toBe(csrf);
+    if (suffix === '') {
+      expect(req.postDataJSON()).toEqual({ definitionId });
+      return route.fulfill({ json: { ...initial, state: 'published', current: false, expectedHead: head, observedHead: null } });
+    }
+    if (suffix === '/' + releaseId + '/activate') {
+      const state = activated ? 'active' : 'activating';
+      activated = true;
+      return route.fulfill({ status: state === 'active' ? 200 : 202,
+        json: { ...initial, state, current: true, expectedHead: head, observedHead: state === 'active' ? head : null } });
+    }
+    if (suffix === '/' + releaseId + '/rollback') {
+      if (reverting) return route.fulfill({ json: { ...initial, state: 'reverted', current: true, expectedHead: previous, observedHead: previous } });
+      reverting = true;
+      return route.fulfill({ status: 503, json: {} });
+    }
+    expect(req.method()).toBe('GET');
+    expect(suffix).toBe('/' + releaseId);
+    return route.fulfill({ json: { ...initial, state: 'reverting', current: true, expectedHead: previous, observedHead: null } });
+  });
+  await page.goto('/catalog');
+  const panel = page.locator('pax-access-release');
+  await panel.locator('summary').click();
+  await panel.getByRole('button', { name: 'Carregar definições aprovadas' }).click();
+  const options = panel.getByLabel('Definição ACCESS aprovada');
+  await expect(options.locator('option')).toHaveCount(2);
+  await options.selectOption(definitionId);
+  await panel.getByRole('button', { name: 'Publicar release no Config' }).click();
+  await expect(panel.getByLabel('ID do release OPA')).toHaveValue(releaseId);
+  await expect(panel.getByText('Aguardando observação do runtime.')).toBeVisible();
+  const confirm = async (button: string, dialogButton: string) => {
+    await panel.getByRole('button', { name: button, exact: true }).click();
+    const dialog = panel.getByRole('dialog');
+    await expect(dialog.getByText(releaseId)).toBeVisible();
+    await dialog.getByRole('button', { name: dialogButton, exact: true }).click();
+  };
+  await confirm('Ativar release no runtime', 'Ativar release no runtime');
+  await expect(panel.getByText(/Confirmação do runtime pendente/)).toBeVisible();
+  await confirm('Retomar ativação pendente', 'Ativar release no runtime');
+  await expect(panel.getByText('forward-test · test-opa · #2')).toBeVisible();
+  await confirm('Reverter release no runtime', 'Reverter release no runtime');
+  await expect(panel.getByRole('alert')).toContainText('Consulte o estado pelo ID');
+  await panel.getByRole('button', { name: 'Consultar estado no Config' }).click();
+  await confirm('Retomar reversão pendente', 'Reverter release no runtime');
+  await expect(panel.getByText('restore-test · test-opa · #3')).toBeVisible();
+  await expect(panel.getByText('reverted', { exact: true })).toBeVisible();
+  expect(operations).toEqual(['POST ', 'POST /' + releaseId + '/activate', 'POST /' + releaseId + '/activate',
+    'POST /' + releaseId + '/rollback', 'GET /' + releaseId, 'POST /' + releaseId + '/rollback']);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await panel.screenshot({ path: testInfo.outputPath('access-release-observed.png') });
+});
+
+test('recovers a currently selected pending ACCESS activation by confirming rollback', async ({ page }) => {
+  const releaseId = 'bc4ebbe1-31fb-477d-933a-699a09b7048f';
+  const uri = '**/api/praxis/config/domain-rules/authorization/releases/' + releaseId;
+  const head = { headEtag: 'base-etag', compilerProfileVersion: 'v1', opaCapabilitiesDigest: 'cap-digest',
+    runtimeRevision: 'forward-r2', instanceId: 'opa-test', activationRevision: 2, policySetDigest: 'forward', bundleArtifactDigest: 'bundle' };
+  const response = { releaseId, definitionId: '0cba575c-b69c-4b8b-80ab-2e2090fda4e3', definitionHash: 'definition-hash',
+    state: 'activating', current: false, expectedHead: head, observedHead: null };
+  let reads = 0;
+  let rollbacks = 0;
+  await mockGovernedBackend(page, false);
+  await page.route(uri, route => route.fulfill({ json: { ...response, current: ++reads > 1 } }));
+  await page.route(uri + '/rollback', route => {
+    expect(route.request().method()).toBe('POST');
+    rollbacks++;
+    return route.fulfill({ status: 202, json: { ...response, current: true, state: 'reverting',
+      expectedHead: { ...head, activationRevision: 3, runtimeRevision: 'restoring-r3' } } });
+  });
+  await page.goto('/catalog');
+  const panel = page.locator('pax-access-release');
+  await panel.locator('summary').click();
+  await panel.getByLabel('ID do release OPA').fill(releaseId);
+  const refresh = panel.getByRole('button', { name: 'Consultar estado no Config' });
+  const rollbackPending = panel.getByRole('button', { name: 'Reverter ativação pendente' });
+  await refresh.click();
+  await expect(panel.getByText('activating', { exact: true })).toBeVisible();
+  await expect(rollbackPending).toHaveCount(0);
+  await refresh.click();
+  await rollbackPending.click();
+  await panel.getByRole('dialog').getByRole('button', { name: 'Cancelar' }).click();
+  expect(rollbacks).toBe(0);
+  await rollbackPending.click();
+  await panel.getByRole('dialog').getByRole('button', { name: 'Reverter release no runtime' }).click();
+  await expect(panel.getByText('reverting', { exact: true })).toBeVisible();
+  await expect(panel.getByText('Aguardando observação do runtime.')).toBeVisible();
+  expect(rollbacks).toBe(1);
+});
+
+test('selects a trusted deployment host, clears previous host scope and restores the default projection', async ({ page }, testInfo) => {
+  const primary = 'https://primary.example';
+  const secondary = 'https://enterprise.example';
+  const forbidden = 'https://untrusted.example';
+  const projection = '/projections/quickstart-benefit-eligibility.v1.json';
+  await mockGovernedBackend(page, false);
+  await page.route('**/app-config.json', route => route.fulfill({ json: {
+    mode: 'remote', locale: 'pt-BR', configApiBaseUrl: primary, projectionPath: projection,
+    hostProfiles: [
+      { id: 'primary', labelPtBr: 'Padrão', labelEnUs: 'Default', apiBaseUrl: primary },
+      { id: 'enterprise', labelPtBr: 'Corporativo', labelEnUs: 'Enterprise', apiBaseUrl: secondary }
+    ]
+  } }));
+  let projectionReads = 0;
+  let catalogCalls = 0;
+  let foreignCalls = 0;
+  page.on('request', req => {
+    if (new URL(req.url()).pathname === projection) projectionReads++;
+    if (new URL(req.url()).pathname.endsWith('/definitions/catalog')) catalogCalls++;
+    if (req.url().startsWith(forbidden)) foreignCalls++;
+  });
+  const catalogRequest = (origin: string) => page.waitForRequest(req =>
+    req.url().startsWith(origin + '/api/') && new URL(req.url()).pathname.endsWith('/definitions/catalog'));
+  await page.goto('/catalog?tenantId=old&apiBaseUrl=' + encodeURIComponent(forbidden));
+  await expect(page.getByRole('alert')).toContainText('SETUP_UNTRUSTED_HOST');
+  expect(catalogCalls).toBe(0);
+  const [first] = await Promise.all([catalogRequest(primary), page.goto('/catalog?tenantId=old')]);
+  expect(await first.headerValue('x-tenant-id')).toBe('old');
+  const select = page.getByRole('combobox', { name: 'Host governado' });
+  await expect(select).toHaveValue('primary');
+  await expect(select.locator('option')).toHaveCount(2);
+  await expect.poll(() => projectionReads).toBe(1);
+  const [next] = await Promise.all([catalogRequest(secondary), select.selectOption('enterprise')]);
+  await expect(select).toHaveValue('enterprise');
+  expect(await next.headerValue('x-tenant-id')).toBeNull();
+  expect(new URL(page.url()).searchParams.has('tenantId')).toBe(false);
+  expect(projectionReads).toBe(1);
+  await expect(page.getByText('Revisar rascunho de acesso (ACCESS)', { exact: true })).toBeVisible();
+  const link = new URL(page.url());
+  link.searchParams.set('tenantId', 'enterprise-realm');
+  link.searchParams.set('organizationId', '123');
+  link.searchParams.set('environment', 'stage');
+  await Promise.all([catalogRequest(secondary), page.goto(link.href)]);
+  for (const anchor of await page.locator('header a').all()) {
+    const href = await anchor.getAttribute('href');
+    expect(new URL(href!, page.url()).searchParams.toString()).toBe(link.searchParams.toString());
+    if (await anchor.isVisible()) await anchor.click();
+  }
+  const [reloaded] = await Promise.all([catalogRequest(secondary), page.reload()]);
+  expect(await reloaded.headerValue('x-tenant-realm')).toBe('enterprise-realm');
+  expect(await reloaded.headerValue('x-organization-id')).toBe('123');
+  expect(await reloaded.headerValue('x-env')).toBe('stage');
+  await expect(select).toHaveValue('enterprise');
+  await select.scrollIntoViewIfNeeded();
+  await expect(select).toBeInViewport();
+  await page.screenshot({ path: testInfo.outputPath('deployment-host-selection.png') });
+  await Promise.all([catalogRequest(primary), select.selectOption('primary')]);
+  await expect(select).toHaveValue('primary');
+  await expect.poll(() => projectionReads).toBe(2);
+  expect(foreignCalls).toBe(0);
+});
+
+test('switches operators through logout and login in the same host and realm with renewed CSRF', async ({ page }) => {
+  await mockGovernedBackend(page, false);
+  let user: 'maker' | 'operator' | null = 'maker';
+  const tokens = { maker: 'maker-session-fixture', operator: 'operator-session-fixture' };
+  const loggedOut: string[] = [];
+  await page.route('**/auth/session', route => route.fulfill(user
+    ? { status: 204, headers: { 'X-XSRF-TOKEN': tokens[user] } }
+    : { status: 401 })); // An anonymous Config principal login may receive no new token.
+  await page.route('**/auth/logout', async route => {
+    expect(user).not.toBeNull();
+    expect(await route.request().headerValue('x-tenant-realm')).toBe('test-realm');
+    expect(await route.request().headerValue('x-xsrf-token')).toBe(tokens[user!]);
+    loggedOut.push(user!);
+    user = null;
+    return route.fulfill({ status: 204 });
+  });
+  await page.route('**/auth/login', async route => {
+    expect(user).toBeNull();
+    expect(await route.request().headerValue('x-tenant-realm')).toBe('test-realm');
+    expect(await route.request().headerValue('x-xsrf-token')).toBeNull();
+    expect(route.request().postDataJSON().username).toBe('operator');
+    user = 'operator';
+    return route.fulfill({ status: 204 });
+  });
+  await page.goto('/catalog?tenantId=test-realm');
+  const logout = page.getByRole('button', { name: 'Encerrar sessão', exact: true });
+  await logout.click();
+  await page.locator('input[name="username"]').fill('operator');
+  await page.locator('input[name="password"]').fill('fixture-only');
+  await page.locator('form.development-login button[type="submit"]').click();
+  await logout.click();
+  await expect(page.locator('form.development-login')).toBeVisible();
+  expect(loggedOut).toEqual(['maker', 'operator']);
 });

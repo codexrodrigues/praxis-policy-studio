@@ -1,6 +1,7 @@
-import { HttpInterceptorFn, HttpResponse } from '@angular/common/http';
+import { HttpErrorResponse, HttpInterceptorFn, HttpResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { tap } from 'rxjs';
+import { tap, throwError } from 'rxjs';
+import { RuntimeConfigService } from './runtime-config.service';
 import { GovernedHostScopeService } from './governed-host-scope.service';
 
 const GOVERNED_ROOTS = ['/api', '/auth', '/schemas'] as const;
@@ -16,10 +17,20 @@ const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
  * not receive ambient credentials or contextual headers.
  */
 export const governedCredentialsInterceptor: HttpInterceptorFn = (request, next) => {
-  if (!isGovernedUrl(request.url)) return next(request);
+  const url = new URL(request.url, document.baseURI);
+  if (!GOVERNED_ROOTS.some(root => url.pathname === root || url.pathname.startsWith(root + '/'))) return next(request);
+  const state = inject(RuntimeConfigService).state();
+  if (state.kind !== 'ready' || state.config.mode !== 'remote'
+    || url.origin !== new URL(state.config.configApiBaseUrl || document.baseURI, document.baseURI).origin) {
+    return throwError(() => new Error('GOVERNED_HOST_MISMATCH'));
+  }
 
   const hostScope = inject(GovernedHostScopeService);
   const scope = hostScope.syncFromQueryString();
+  const session = hostScope.csrfSession(url.origin, scope.tenantId);
+  const sessionProbe = request.method === 'GET' && url.pathname === '/auth/session';
+  const login = request.method === 'POST' && url.pathname === '/auth/login';
+  const logout = request.method === 'POST' && url.pathname === '/auth/logout';
   const setHeaders: Record<string, string> = {};
 
   if (scope.tenantId) {
@@ -37,7 +48,7 @@ export const governedCredentialsInterceptor: HttpInterceptorFn = (request, next)
     setHeaders['X-Env'] = scope.environment;
   }
   if (MUTATING_METHODS.has(request.method.toUpperCase()) && !request.headers.has('X-XSRF-TOKEN')) {
-    const csrf = hostScope.csrfToken(scope.tenantId);
+    const csrf = session.token;
     if (csrf) {
       setHeaders['X-XSRF-TOKEN'] = csrf;
     }
@@ -52,23 +63,21 @@ export const governedCredentialsInterceptor: HttpInterceptorFn = (request, next)
         });
 
   return next(cloned).pipe(
-    tap(event => {
-      if (event instanceof HttpResponse) {
-        const nextCsrf = event.headers.get('X-XSRF-TOKEN');
-        if (nextCsrf) {
-          hostScope.recordCsrfToken(nextCsrf, scope.tenantId);
+    tap({
+      next: event => {
+        if (!(event instanceof HttpResponse)) return;
+        const emitted = event.headers.get('X-XSRF-TOKEN');
+        if (login || logout) {
+          hostScope.rotateCsrfSession(url.origin, scope.tenantId, logout ? null : emitted);
+        } else if (sessionProbe || emitted) {
+          session.token = emitted;
+        }
+      },
+      error: failure => {
+        if (sessionProbe && failure instanceof HttpErrorResponse && failure.status === 401) {
+          session.token = failure.headers.get('X-XSRF-TOKEN');
         }
       }
     })
   );
 };
-
-function isGovernedUrl(value: string): boolean {
-  let pathname: string;
-  try {
-    pathname = new URL(value, 'https://rules-studio.invalid').pathname;
-  } catch {
-    return false;
-  }
-  return GOVERNED_ROOTS.some(root => pathname === root || pathname.startsWith(`${root}/`));
-}

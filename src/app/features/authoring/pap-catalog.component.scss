@@ -1,0 +1,11 @@
+:host, label, select { display: block; min-width: 0; }
+section { padding-block: .25rem; overflow-wrap: anywhere; }
+section > * + *, details > * + * { margin-block: .65rem 0; }
+h4, p, pre { margin: 0; }
+label, summary { font-weight: 600; }
+button, select { box-sizing: border-box; min-height: 44px; max-width: 100%; border: 1px solid var(--pax-color-outline, #718087); border-radius: .35rem; background: var(--pax-color-surface, #fff); color: inherit; font: inherit; padding: .4rem .55rem; }
+button, summary { cursor: pointer; }
+select { width: 100%; margin-top: .2rem; }
+ul { padding-inline-start: 1.1rem; max-height: 16rem; overflow-y: auto; }
+li + li { margin-block-start: .4rem; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; }
