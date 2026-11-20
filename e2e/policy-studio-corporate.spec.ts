@@ -1563,12 +1563,23 @@ test('switches operators through logout and login in the same host and realm wit
   let user: 'maker' | 'operator' | null = 'maker';
   const tokens = { maker: 'maker-session-fixture', operator: 'operator-session-fixture' };
   const loggedOut: string[] = [];
-  await page.route('**/auth/session', route => route.fulfill(user
-    ? { status: 204, headers: { 'X-XSRF-TOKEN': tokens[user] } }
-    : { status: 401 })); // An anonymous Config principal login may receive no new token.
+  const scopeHints = ['x-tenant-id', 'x-organization-id', 'x-env'];
+  let anonymousProbes = 0;
+  await page.route('**/auth/session', async route => {
+    const sent = await route.request().allHeaders();
+    expect(sent['x-tenant-realm']).toBe('test-realm');
+    if (!user) {
+      anonymousProbes++;
+      // The host rejects Config scope hints before session establishment.
+      return route.fulfill({ status: scopeHints.some(key => key in sent) ? 403 : 401 });
+    }
+    for (const key of scopeHints) expect(sent[key]).toBeUndefined();
+    return route.fulfill({ status: 204, headers: { 'X-XSRF-TOKEN': tokens[user] } });
+  });
   await page.route('**/auth/logout', async route => {
     expect(user).not.toBeNull();
     expect(await route.request().headerValue('x-tenant-realm')).toBe('test-realm');
+    for (const key of scopeHints) expect(await route.request().headerValue(key)).toBeNull();
     expect(await route.request().headerValue('x-xsrf-token')).toBe(tokens[user!]);
     loggedOut.push(user!);
     user = null;
@@ -1577,18 +1588,27 @@ test('switches operators through logout and login in the same host and realm wit
   await page.route('**/auth/login', async route => {
     expect(user).toBeNull();
     expect(await route.request().headerValue('x-tenant-realm')).toBe('test-realm');
+    for (const key of scopeHints) expect(await route.request().headerValue(key)).toBeNull();
     expect(await route.request().headerValue('x-xsrf-token')).toBeNull();
     expect(route.request().postDataJSON().username).toBe('operator');
     user = 'operator';
     return route.fulfill({ status: 204 });
   });
-  await page.goto('/catalog?tenantId=test-realm');
+  await page.goto('/catalog?tenantId=test-realm&organizationId=7&environment=stage');
   const logout = page.getByRole('button', { name: 'Encerrar sessão', exact: true });
   await logout.click();
   await page.locator('input[name="username"]').fill('operator');
   await page.locator('input[name="password"]').fill('fixture-only');
-  await page.locator('form.development-login button[type="submit"]').click();
+  const [catalog] = await Promise.all([
+    page.waitForRequest(req => new URL(req.url()).pathname.endsWith('/definitions/catalog')),
+    page.locator('form.development-login button[type="submit"]').click()
+  ]);
+  const sent = await catalog.allHeaders();
+  expect(sent['x-tenant-id']).toBe('test-realm');
+  expect(sent['x-organization-id']).toBe('7');
+  expect(sent['x-env']).toBe('stage');
   await logout.click();
   await expect(page.locator('form.development-login')).toBeVisible();
+  expect(anonymousProbes).toBe(1);
   expect(loggedOut).toEqual(['maker', 'operator']);
 });

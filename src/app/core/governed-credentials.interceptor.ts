@@ -5,6 +5,7 @@ import { RuntimeConfigService } from './runtime-config.service';
 import { GovernedHostScopeService } from './governed-host-scope.service';
 
 const GOVERNED_ROOTS = ['/api', '/auth', '/schemas'] as const;
+const SESSION_PATHS = new Set(['/auth/session', '/auth/login', '/auth/logout']);
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 /**
@@ -33,19 +34,17 @@ export const governedCredentialsInterceptor: HttpInterceptorFn = (request, next)
   const logout = request.method === 'POST' && url.pathname === '/auth/logout';
   const setHeaders: Record<string, string> = {};
 
-  if (scope.tenantId) {
-    if (!request.headers.has('X-Tenant-ID')) {
-      setHeaders['X-Tenant-ID'] = scope.tenantId;
-    }
-    if (hostScope.isRealmSlug(scope.tenantId) && !request.headers.has('X-Tenant-Realm')) {
-      setHeaders['X-Tenant-Realm'] = scope.tenantId;
-    }
+  const sessionPath = SESSION_PATHS.has(url.pathname);
+  const headers = sessionPath
+    ? request.headers.delete('X-Tenant-ID').delete('X-Organization-ID').delete('X-Env')
+    : request.headers;
+  if (scope.tenantId && hostScope.isRealmSlug(scope.tenantId) && !headers.has('X-Tenant-Realm')) {
+    setHeaders['X-Tenant-Realm'] = scope.tenantId;
   }
-  if (scope.organizationId && !request.headers.has('X-Organization-ID')) {
-    setHeaders['X-Organization-ID'] = scope.organizationId;
-  }
-  if (scope.environment && !request.headers.has('X-Env')) {
-    setHeaders['X-Env'] = scope.environment;
+  if (!sessionPath) {
+    if (scope.tenantId && !headers.has('X-Tenant-ID')) setHeaders['X-Tenant-ID'] = scope.tenantId;
+    if (scope.organizationId && !headers.has('X-Organization-ID')) setHeaders['X-Organization-ID'] = scope.organizationId;
+    if (scope.environment && !headers.has('X-Env')) setHeaders['X-Env'] = scope.environment;
   }
   if (MUTATING_METHODS.has(request.method.toUpperCase()) && !request.headers.has('X-XSRF-TOKEN')) {
     const csrf = session.token;
@@ -54,15 +53,7 @@ export const governedCredentialsInterceptor: HttpInterceptorFn = (request, next)
     }
   }
 
-  const cloned =
-    request.withCredentials && Object.keys(setHeaders).length === 0
-      ? request
-      : request.clone({
-          withCredentials: true,
-          ...(Object.keys(setHeaders).length > 0 ? { setHeaders } : {})
-        });
-
-  return next(cloned).pipe(
+  return next(request.clone({ withCredentials: true, headers, setHeaders })).pipe(
     tap({
       next: event => {
         if (!(event instanceof HttpResponse)) return;

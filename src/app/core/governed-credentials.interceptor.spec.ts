@@ -69,9 +69,9 @@ describe('governedCredentialsInterceptor', () => {
     const sessionReq = controller.expectOne('http://localhost:8089/auth/session');
     expect(sessionReq.request.withCredentials).toBe(true);
     expect(sessionReq.request.headers.get('X-Tenant-Realm')).toBe('df');
-    expect(sessionReq.request.headers.get('X-Tenant-ID')).toBe('df');
-    expect(sessionReq.request.headers.get('X-Organization-ID')).toBe('GROUP:GDF_CONSOLIDADO');
-    expect(sessionReq.request.headers.get('X-Env')).toBe('local');
+    expect(sessionReq.request.headers.get('X-Tenant-ID')).toBeNull();
+    expect(sessionReq.request.headers.get('X-Organization-ID')).toBeNull();
+    expect(sessionReq.request.headers.get('X-Env')).toBeNull();
     sessionReq.flush(null, { headers: new HttpHeaders({ 'X-XSRF-TOKEN': 'csrf-df-123' }) });
 
     http.post('http://localhost:8089/api/praxis/config/domain-rules/definitions', { ok: true }).subscribe();
@@ -82,6 +82,25 @@ describe('governedCredentialsInterceptor', () => {
     expect(mutationReq.request.headers.get('X-Organization-ID')).toBe('GROUP:GDF_CONSOLIDADO');
     expect(mutationReq.request.headers.get('X-XSRF-TOKEN')).toBe('csrf-df-123');
     mutationReq.flush({});
+  });
+
+  it('keeps legacy numeric scope on Config requests and removes caller-provided hints on session paths', () => {
+    TestBed.inject(GovernedHostScopeService).syncFromQueryString('?tenantId=42&organizationId=7&environment=stage');
+    const hints = { 'X-Tenant-ID': '42', 'X-Organization-ID': '7', 'X-Env': 'stage' };
+    for (const [method, url] of [['GET', '/auth/session'], ['POST', '/auth/login'], ['POST', '/auth/logout']]) {
+      http.request(method, url, { headers: hints }).subscribe();
+      const pending = controller.expectOne(url);
+      const { request } = pending;
+      expect(request.withCredentials).toBe(true);
+      expect(request.headers.has('X-Tenant-Realm')).toBe(false);
+      for (const key of Object.keys(hints)) expect(request.headers.has(key)).toBe(false);
+      pending.flush(null);
+    }
+    http.get('/api/praxis/config/domain-rules/authorization/catalog').subscribe();
+    const catalog = controller.expectOne('/api/praxis/config/domain-rules/authorization/catalog');
+    for (const [key, value] of Object.entries(hints)) expect(catalog.request.headers.get(key)).toBe(value);
+    expect(catalog.request.headers.has('X-Tenant-Realm')).toBe(false);
+    catalog.flush({});
   });
 
   it('blocks governed requests to another origin and isolates tokens by host and tenant', () => {
