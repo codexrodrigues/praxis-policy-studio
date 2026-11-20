@@ -86,8 +86,8 @@ describe('governedCredentialsInterceptor', () => {
 
   it('blocks governed requests to another origin and isolates tokens by host and tenant', () => {
     const scope = TestBed.inject(GovernedHostScopeService);
-    scope.recordCsrfToken('qa-secret', 'https://quickstart.example', 'rio');
-    scope.recordCsrfToken('other-tenant-secret', 'https://enterprise.example', 'other');
+    scope.rotateCsrfSession('https://quickstart.example', 'rio', 'qa-secret');
+    scope.rotateCsrfSession('https://enterprise.example', 'other', 'other-tenant-secret');
     scope.syncFromQueryString('?tenantId=rio');
     baseUrl = 'https://enterprise.example';
     const alien = 'https://quickstart.example/auth/login';
@@ -100,6 +100,34 @@ describe('governedCredentialsInterceptor', () => {
     const mutation = controller.expectOne(target);
     expect(mutation.request.withCredentials).toBe(true);
     expect(mutation.request.headers.has('X-XSRF-TOKEN')).toBe(false);
+    mutation.flush({});
+  });
+
+  it.each([null, 'anonymous-token'])('rotates CSRF across logout, anonymous challenge and login in one realm (%s)', challenge => {
+    const scope = TestBed.inject(GovernedHostScopeService);
+    scope.syncFromQueryString('?tenantId=rio');
+    scope.rotateCsrfSession(baseUrl, 'rio', 'first-user-token');
+    http.get('/api/older-request').subscribe();
+    const delayed = controller.expectOne('/api/older-request');
+    http.post('/auth/logout', {}).subscribe();
+    const logout = controller.expectOne('/auth/logout');
+    expect(logout.request.headers.get('X-XSRF-TOKEN')).toBe('first-user-token');
+    logout.flush(null, { status: 204, statusText: 'No Content' });
+    delayed.flush({}, { headers: { 'X-XSRF-TOKEN': 'first-user-token' } });
+    expect(scope.csrfSession(baseUrl, 'rio').token).toBeNull();
+    http.get('/auth/session').subscribe({ error: () => undefined });
+    controller.expectOne('/auth/session').flush(null, {
+      status: 401, statusText: 'Unauthorized', headers: challenge ? { 'X-XSRF-TOKEN': challenge } : {}
+    });
+    http.post('/auth/login', {}).subscribe();
+    const login = controller.expectOne('/auth/login');
+    expect(login.request.headers.get('X-XSRF-TOKEN')).toBe(challenge);
+    login.flush(null);
+    http.get('/auth/session').subscribe();
+    controller.expectOne('/auth/session').flush(null, { headers: { 'X-XSRF-TOKEN': 'second-user-token' } });
+    http.post('/api/mutation', {}).subscribe();
+    const mutation = controller.expectOne('/api/mutation');
+    expect(mutation.request.headers.get('X-XSRF-TOKEN')).toBe('second-user-token');
     mutation.flush({});
   });
 });

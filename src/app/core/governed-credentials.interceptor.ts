@@ -1,4 +1,4 @@
-import { HttpInterceptorFn, HttpResponse } from '@angular/common/http';
+import { HttpErrorResponse, HttpInterceptorFn, HttpResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { tap, throwError } from 'rxjs';
 import { RuntimeConfigService } from './runtime-config.service';
@@ -27,6 +27,10 @@ export const governedCredentialsInterceptor: HttpInterceptorFn = (request, next)
 
   const hostScope = inject(GovernedHostScopeService);
   const scope = hostScope.syncFromQueryString();
+  const session = hostScope.csrfSession(url.origin, scope.tenantId);
+  const sessionProbe = request.method === 'GET' && url.pathname === '/auth/session';
+  const login = request.method === 'POST' && url.pathname === '/auth/login';
+  const logout = request.method === 'POST' && url.pathname === '/auth/logout';
   const setHeaders: Record<string, string> = {};
 
   if (scope.tenantId) {
@@ -44,7 +48,7 @@ export const governedCredentialsInterceptor: HttpInterceptorFn = (request, next)
     setHeaders['X-Env'] = scope.environment;
   }
   if (MUTATING_METHODS.has(request.method.toUpperCase()) && !request.headers.has('X-XSRF-TOKEN')) {
-    const csrf = hostScope.csrfToken(url.origin, scope.tenantId);
+    const csrf = session.token;
     if (csrf) {
       setHeaders['X-XSRF-TOKEN'] = csrf;
     }
@@ -59,11 +63,19 @@ export const governedCredentialsInterceptor: HttpInterceptorFn = (request, next)
         });
 
   return next(cloned).pipe(
-    tap(event => {
-      if (event instanceof HttpResponse) {
-        const nextCsrf = event.headers.get('X-XSRF-TOKEN');
-        if (nextCsrf) {
-          hostScope.recordCsrfToken(nextCsrf, url.origin, scope.tenantId);
+    tap({
+      next: event => {
+        if (!(event instanceof HttpResponse)) return;
+        const emitted = event.headers.get('X-XSRF-TOKEN');
+        if (login || logout) {
+          hostScope.rotateCsrfSession(url.origin, scope.tenantId, logout ? null : emitted);
+        } else if (sessionProbe || emitted) {
+          session.token = emitted;
+        }
+      },
+      error: failure => {
+        if (sessionProbe && failure instanceof HttpErrorResponse && failure.status === 401) {
+          session.token = failure.headers.get('X-XSRF-TOKEN');
         }
       }
     })

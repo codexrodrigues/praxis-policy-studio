@@ -34,7 +34,8 @@ origin exata e suas coordenadas governadas. O Studio aceita como override
 somente as origens implantadas em `hostProfiles`. Um endereço desconhecido
 interrompe a abertura do catálogo com `SETUP_UNTRUSTED_HOST`. A abertura sem
 `apiBaseUrl` carrega o backend padrão. A projeção estática do Quickstart é restaurada ao
-voltar ao perfil padrão.
+voltar ao perfil padrão. Os links internos do cabeçalho preservam o host e as
+coordenadas do deep-link ao retornar ao catálogo ou recarregar a página.
 
 Para validar o artefato, confira que `configApiBaseUrl` é a origin do
 Quickstart e que os itens de `hostProfiles` têm as origens HTTPS configuradas.
@@ -44,7 +45,9 @@ e reversão dependem dos papéis e dos gates de aprovação e verificação do h
 
 O Angular limita as requisições governadas ao host ativo. O navegador mantém
 o cookie HttpOnly do respectivo host. O Studio recebe `X-XSRF-TOKEN` em
-`GET /auth/session` e o vincula à origin e ao tenant em memória. Cada host
+`GET /auth/session` e o vincula à origin e ao tenant em memória. O login consulta a sessão antes de enviar as credenciais e confirma
+a nova sessão após a autenticação. O logout descarta o token anterior. Uma
+sondagem anônima usa o novo desafio CSRF quando o host o fornece. Cada host
 deve admitir a origin exata do Studio no CORS com credenciais e no filtro
 de Origin do Config, aceitar os cabeçalhos de escopo e CSRF e expor
 `X-XSRF-TOKEN` na resposta. Sessões entre sites exigem que a política de

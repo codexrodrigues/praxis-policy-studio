@@ -28,11 +28,13 @@ describe('AuthSessionService', () => {
       mode: 'remote', configApiBaseUrl: 'http://127.0.0.1:8088', locale: 'pt-BR',
       projectionPath: '/projections/quickstart-benefit-eligibility.v1.json', initialDecisionKey: null
     }).subscribe();
+    http.expectOne('http://127.0.0.1:8088/auth/session').flush(null, { status: 401, statusText: 'Anonymous' });
     const request = http.expectOne('http://127.0.0.1:8088/auth/login');
     expect(request.request.method).toBe('POST');
     expect(request.request.withCredentials).toBe(true);
     expect(request.request.body).toEqual({ username: 'admin', password: 'temporary-secret' });
     request.flush(null);
+    http.expectOne('http://127.0.0.1:8088/auth/session').flush(null);
   });
 
   it('rejects login from the hermetic fixture', () => {
@@ -47,6 +49,7 @@ describe('AuthSessionService', () => {
       mode: 'remote', configApiBaseUrl: 'http://127.0.0.1:8088', locale: 'pt-BR',
       projectionPath: '/projections/quickstart-benefit-eligibility.v1.json', initialDecisionKey: null
     }).subscribe();
+    http.expectOne('http://127.0.0.1:8088/auth/session').flush(null);
     const request = http.expectOne('http://127.0.0.1:8088/auth/logout');
     expect(request.request.method).toBe('POST');
     expect(request.request.withCredentials).toBe(true);

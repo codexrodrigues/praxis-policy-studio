@@ -1534,9 +1534,61 @@ test('selects a trusted deployment host, clears previous host scope and restores
   expect(new URL(page.url()).searchParams.has('tenantId')).toBe(false);
   expect(projectionReads).toBe(1);
   await expect(page.getByText('Revisar rascunho de acesso (ACCESS)', { exact: true })).toBeVisible();
+  const link = new URL(page.url());
+  link.searchParams.set('tenantId', 'enterprise-realm');
+  link.searchParams.set('organizationId', '123');
+  link.searchParams.set('environment', 'stage');
+  await Promise.all([catalogRequest(secondary), page.goto(link.href)]);
+  for (const anchor of await page.locator('header a').all()) {
+    const href = await anchor.getAttribute('href');
+    expect(new URL(href!, page.url()).searchParams.toString()).toBe(link.searchParams.toString());
+    if (await anchor.isVisible()) await anchor.click();
+  }
+  const [reloaded] = await Promise.all([catalogRequest(secondary), page.reload()]);
+  expect(await reloaded.headerValue('x-tenant-realm')).toBe('enterprise-realm');
+  expect(await reloaded.headerValue('x-organization-id')).toBe('123');
+  expect(await reloaded.headerValue('x-env')).toBe('stage');
+  await expect(select).toHaveValue('enterprise');
+  await select.scrollIntoViewIfNeeded();
+  await expect(select).toBeInViewport();
   await page.screenshot({ path: testInfo.outputPath('deployment-host-selection.png') });
   await Promise.all([catalogRequest(primary), select.selectOption('primary')]);
   await expect(select).toHaveValue('primary');
   await expect.poll(() => projectionReads).toBe(2);
   expect(foreignCalls).toBe(0);
+});
+
+test('switches operators through logout and login in the same host and realm with renewed CSRF', async ({ page }) => {
+  await mockGovernedBackend(page, false);
+  let user: 'maker' | 'operator' | null = 'maker';
+  const tokens = { maker: 'maker-session-fixture', operator: 'operator-session-fixture' };
+  const loggedOut: string[] = [];
+  await page.route('**/auth/session', route => route.fulfill(user
+    ? { status: 204, headers: { 'X-XSRF-TOKEN': tokens[user] } }
+    : { status: 401 })); // An anonymous Config principal login may receive no new token.
+  await page.route('**/auth/logout', async route => {
+    expect(user).not.toBeNull();
+    expect(await route.request().headerValue('x-tenant-realm')).toBe('test-realm');
+    expect(await route.request().headerValue('x-xsrf-token')).toBe(tokens[user!]);
+    loggedOut.push(user!);
+    user = null;
+    return route.fulfill({ status: 204 });
+  });
+  await page.route('**/auth/login', async route => {
+    expect(user).toBeNull();
+    expect(await route.request().headerValue('x-tenant-realm')).toBe('test-realm');
+    expect(await route.request().headerValue('x-xsrf-token')).toBeNull();
+    expect(route.request().postDataJSON().username).toBe('operator');
+    user = 'operator';
+    return route.fulfill({ status: 204 });
+  });
+  await page.goto('/catalog?tenantId=test-realm');
+  const logout = page.getByRole('button', { name: 'Encerrar sessão', exact: true });
+  await logout.click();
+  await page.locator('input[name="username"]').fill('operator');
+  await page.locator('input[name="password"]').fill('fixture-only');
+  await page.locator('form.development-login button[type="submit"]').click();
+  await logout.click();
+  await expect(page.locator('form.development-login')).toBeVisible();
+  expect(loggedOut).toEqual(['maker', 'operator']);
 });
