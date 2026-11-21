@@ -366,6 +366,7 @@
             [config]="authoringConfig"
             [condition]="editorCondition()"
             [source]="source"
+            [treeInvalid]="authoring.treeValidationErrors() > 0"
             (conditionChanged)="updateDraft($event)"
             (stateChanged)="updateEditorState($event)" />
           } @placeholder {

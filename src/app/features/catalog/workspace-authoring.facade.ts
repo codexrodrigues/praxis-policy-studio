@@ -9,7 +9,8 @@ import {
   canonicalDecisionExpression,
   composeDecisionCondition,
   editableDecisionCondition,
-  formatDecisionExpression
+  formatDecisionExpression,
+  isNeutralDecisionCondition
 } from '../../core/decision-inspection';
 import { PolicyStudioI18n } from '../../core/i18n';
 import { ProjectionCatalogService } from '../../core/projection-catalog.service';
@@ -67,8 +68,13 @@ export class WorkspaceAuthoringFacade {
       ? `Referência fora do contrato ontológico (${inspection.invalidVars.join(', ')}). Raízes permitidas: ${inspection.allowedRoots.join(', ')}.`
       : `Reference outside ontological contract (${inspection.invalidVars.join(', ')}). Allowed roots: ${inspection.allowedRoots.join(', ')}.`;
   });
+  readonly treeValidationErrors = computed(() => {
+    const state = this.editorState();
+    const missingExpression = state?.isDirty && state.rootNodes.length > 0 && state.currentJSON == null;
+    return state?.validationErrors?.length || (missingExpression ? 1 : 0);
+  });
   readonly totalAuthoringValidationErrors = computed(() =>
-    (this.editorState()?.validationErrors?.length ?? 0)
+    this.treeValidationErrors()
     + this.parameterValidationErrors().length
     + this.ontologyInspection().invalidVars.length
   );
@@ -175,12 +181,16 @@ export class WorkspaceAuthoringFacade {
   private replaceDraftCondition(condition: unknown): void {
     this.draftCondition.set(condition);
     this.editorState.set(null);
-    this.conditionEditorSource.set(condition == null ? null : { condition: editableDecisionCondition(condition) });
+    this.conditionEditorSource.set(condition == null ? null : { condition });
   }
 
   updateDraft(condition: unknown): void {
-    const source = effectiveWorkspaceCondition(this.store.selected());
-    this.draftCondition.set(composeDecisionCondition(source, condition));
+    const source = this.conditionEditorSource()?.condition;
+    const originalBranch = editableDecisionCondition(source);
+    const emptyGraph = !this.editorState()?.rootNodes.length;
+    const edited = condition === null && emptyGraph && isNeutralDecisionCondition(originalBranch)
+      ? originalBranch : condition;
+    this.draftCondition.set(composeDecisionCondition(source, edited));
   }
 
   updateDraftParameters(parameters: Readonly<Record<string, unknown>>): void {
@@ -463,7 +473,8 @@ export class WorkspaceAuthoringFacade {
       state.config
     ).subscribe({
       next: actions => {
-        if (!this.store.isCurrentCommand(commandRevision, ruleKey)) return;
+        if (!this.store.isCurrentCommand(commandRevision, ruleKey, current.workspaceId)
+          || this.store.selected()?.promotedDefinitionId !== current.promotedDefinitionId) return;
         const patch = (decision: DecisionSummary): DecisionSummary => ({
           ...decision,
           availableDefinitionActions: actions
@@ -558,8 +569,9 @@ export class WorkspaceAuthoringFacade {
       workspaceStatus: workspace.status,
       workspaceEtag: workspace.etag,
       workspaceRevision: workspace.revision,
-      promotedDefinitionId: workspace.promotedDefinitionId ?? decision.promotedDefinitionId ?? null,
-      configStatus: workspace.promotedDefinitionId ? 'approved' : decision.configStatus,
+      promotedDefinitionId: workspace.promotedDefinitionId ?? null,
+      availableDefinitionActions: (workspace.promotedDefinitionId ?? null) === (decision.promotedDefinitionId ?? null)
+        ? decision.availableDefinitionActions : decision.availableDefinitionActions.filter(action => action !== 'PUBLISH'),
       workspaceCondition: workspace.condition ?? null,
       workspaceParameters: workspace.parameters,
       parameterCatalog: this.catalog.overlayParameterCatalog(decision.parameterCatalog, workspace.parameters)

@@ -75,6 +75,11 @@ describe('governed decision editing envelope', () => {
     ] });
   });
 
+  it('keeps a second, nested guard read-only inside the configurable branch', () => {
+    const outer = { or: [original.or[0], original] };
+    expect(extractDecisionTableProjection(editableDecisionCondition(outer)).lossless).toBe(false);
+  });
+
   it('does not infer an envelope when the preceding branches are business conditions', () => {
     const businessOr = { or: [{ '>': [maximum, 10] }, { '>=': [maximum, minimum] }] };
     expect(editableDecisionCondition(businessOr)).toEqual(businessOr);

@@ -65,13 +65,24 @@ import {
   type DomainRuleWorkspaceCapabilities
 } from '@praxisui/core';
 
+interface CatalogEntry {
+  candidate: DomainRuleCatalogCandidate;
+  workspace?: DomainRuleChangeWorkspace;
+}
+
+type CatalogSelection = Pick<DecisionSummary, 'key' | 'configDefinitionId' | 'workspaceId'>;
+
 @Injectable({ providedIn: 'root' })
 export class ProjectionCatalogService {
   private readonly http = inject(HttpClient);
   private readonly domainRules = inject(DomainRuleService);
   private readonly discovery = inject(ResourceDiscoveryService);
 
-  load(locale: SupportedLocale, config: PolicyStudioRuntimeConfig): Observable<readonly DecisionSummary[]> {
+  load(
+    locale: SupportedLocale,
+    config: PolicyStudioRuntimeConfig,
+    selection?: CatalogSelection
+  ): Observable<readonly DecisionSummary[]> {
     const catalog = config.mode === 'remote'
       ? this.loadCatalogPages(config)
       : of([] as readonly DomainRuleCatalogCandidate[]);
@@ -91,10 +102,12 @@ export class ProjectionCatalogService {
       definitionCapabilities,
       workspaces
     }).pipe(
-      switchMap(({ projection, catalog, definitionCapabilities, workspaces }) => {
+      switchMap(({ projection, catalog: versions, definitionCapabilities, workspaces }) => {
         if (config.mode === 'fixture') {
           return of(this.fixtureSummaries(projection!, locale));
         }
+        const entries = this.catalogEntries(versions, workspaces, selection);
+        const catalog = entries.map(entry => entry.candidate);
         const searchParams = typeof window !== 'undefined' && window.location?.search
           ? new URLSearchParams(window.location.search)
           : null;
@@ -109,7 +122,7 @@ export class ProjectionCatalogService {
           ...(requestedDecisionKey ? [requestedDecisionKey] : []),
           ...(requestedBindingKey ? [requestedBindingKey] : []),
           ...(requestedSlotKey ? [requestedSlotKey] : []),
-          ...workspaces.map(item => item.ruleKey)
+          ...entries.filter(entry => entry.workspace).map(entry => entry.candidate.ruleKey)
         ]);
         const matchesRequestedDeepLink = (candidate: DomainRuleCatalogCandidate): boolean =>
           eagerRuleKeys.has(candidate.ruleKey)
@@ -134,17 +147,9 @@ export class ProjectionCatalogService {
                 matchesRequestedDeepLink(candidate)
                 || isFirstRepresentativeOfResourceKey(candidate)
                 || (candidate.status !== 'retired' && idx < 36));
-        const detailReads = eagerCandidates.map(candidate => forkJoin({
-          definitionWithParameters: this.domainRules.getDefinition(candidate.definitionId, this.requestOptions(config)).pipe(
-            switchMap(definition => (this.hasParameterTemplate(definition)
-              ? this.fetchDefinitionParameters(candidate.definitionId, config)
-              : of<DomainRuleParameterCatalog | null>(null)
-            ).pipe(map(serverParameterCatalog => ({ definition, serverParameterCatalog }))))
-          ),
-          factCatalog: this.domainRules.getDefinitionFacts(candidate.definitionId, this.requestOptions(config))
-        }));
+        const detailReads = eagerCandidates.map(candidate => this.readCandidateDetail(candidate, config));
         return (detailReads.length ? forkJoin(detailReads) : of([])).pipe(map(definitionDetails => {
-          const details = new Map(definitionDetails.map(detail => [detail.definitionWithParameters.definition.id, detail]));
+          const details = new Map(definitionDetails.map(detail => [detail.definition.id, detail]));
           const ruleSetMetaByResourceKey = new Map<string, {
             ruleSetKey: string;
             resourceKey: string | null;
@@ -152,7 +157,7 @@ export class ProjectionCatalogService {
             conceptRoots: readonly string[];
           }>();
           for (const detail of definitionDetails) {
-            const def = detail.definitionWithParameters.definition;
+            const def = detail.definition;
             const rk = def.resourceKey?.trim();
             if (!rk || ruleSetMetaByResourceKey.has(rk)) continue;
             const defBody = this.record(def.definition);
@@ -169,13 +174,12 @@ export class ProjectionCatalogService {
               conceptRoots: slotMeta.conceptRoots ?? []
             });
           }
-          const summaries = catalog.map((candidate, index) => {
+          const summaries = entries.map(({ candidate, workspace }, index) => {
         const detail = details.get(candidate.definitionId);
-        const definition = detail?.definitionWithParameters.definition;
-        const serverParameterCatalog = detail?.definitionWithParameters.serverParameterCatalog ?? null;
+        const definition = detail?.definition;
+        const serverParameterCatalog = detail?.serverParameterCatalog ?? null;
         const factCatalog = detail?.factCatalog ?? undefined;
         const decision = projection?.decisionRefs.find(item => item.decisionKey === candidate.ruleKey);
-        const workspace = this.latestWorkspace(workspaces, candidate.ruleKey);
         const availableDefinitionActions = this.mergeDefinitionActions(
           definitionCapabilities,
           candidate.definitionId,
@@ -290,24 +294,18 @@ export class ProjectionCatalogService {
     index: number,
     totalDecisions: number,
     locale: SupportedLocale,
-    config: PolicyStudioRuntimeConfig
+    config: PolicyStudioRuntimeConfig,
+    selection?: CatalogSelection
   ): Observable<DecisionSummary> {
+    if (candidate.ruleType === AUTHORIZATION_RULE_TYPE) return throwError(() => new Error('BUSINESS_DEFINITION_REQUIRED'));
     const options = this.requestOptions(config);
     return forkJoin({
-      definitionWithParameters: this.domainRules.getDefinition(candidate.definitionId, options).pipe(
-        switchMap(definition => (this.hasParameterTemplate(definition)
-          ? this.fetchDefinitionParameters(candidate.definitionId, config)
-          : of<DomainRuleParameterCatalog | null>(null)
-        ).pipe(map(serverParameterCatalog => ({ definition, serverParameterCatalog }))))
-      ),
-      factCatalog: this.domainRules.getDefinitionFacts(candidate.definitionId, options),
+      detail: this.readCandidateDetail(candidate, config),
       workspaces: this.domainRules.listChangeWorkspaces(options),
       definitionCapabilities: this.domainRules.getDefinitionCapabilities(options)
     }).pipe(
-      map(({ definitionWithParameters, factCatalog, workspaces, definitionCapabilities }) => {
-        const { definition, serverParameterCatalog } = definitionWithParameters;
-        if (definition.ruleType === AUTHORIZATION_RULE_TYPE) throw new Error('BUSINESS_DEFINITION_REQUIRED');
-        const workspace = this.latestWorkspace(workspaces, candidate.ruleKey);
+      map(({ detail: { definition, serverParameterCatalog, factCatalog }, workspaces, definitionCapabilities }) => {
+        const [{ workspace }] = this.catalogEntries([candidate], workspaces, selection);
         const availableDefinitionActions = this.mergeDefinitionActions(
           definitionCapabilities,
           candidate.definitionId,
@@ -330,26 +328,84 @@ export class ProjectionCatalogService {
     );
   }
 
+  private readCandidateDetail(candidate: DomainRuleCatalogCandidate, config: PolicyStudioRuntimeConfig) {
+    const id = candidate.definitionId;
+    const options = this.requestOptions(config);
+    const definitionWithParameters = this.domainRules.getDefinition(id, options).pipe(
+      switchMap(definition => {
+        if (definition.ruleType === AUTHORIZATION_RULE_TYPE) throw new Error('BUSINESS_DEFINITION_REQUIRED');
+        if (definition.id !== id || definition.ruleKey !== candidate.ruleKey || definition.version !== candidate.version) {
+          throw new Error('CONFIG_DEFINITION_IDENTITY_MISMATCH');
+        }
+        const parameters: Observable<DomainRuleParameterCatalog | null> = this.hasParameterTemplate(definition)
+          ? this.fetchDefinitionParameters(id, config) : of(null);
+        return parameters.pipe(map(serverParameterCatalog => ({ definition, serverParameterCatalog })));
+      })
+    );
+    return forkJoin({ definitionWithParameters, factCatalog: this.domainRules.getDefinitionFacts(id, options) }).pipe(
+      map(({ definitionWithParameters, factCatalog }) => {
+        for (const catalog of [factCatalog, definitionWithParameters.serverParameterCatalog]) {
+          if (catalog && (catalog.definitionId !== id || catalog.ruleKey !== candidate.ruleKey
+            || catalog.definitionVersion !== candidate.version)) throw new Error('CONFIG_CATALOG_IDENTITY_MISMATCH');
+        }
+        return { ...definitionWithParameters, factCatalog };
+      })
+    );
+  }
+
   private loadCatalogPages(config: PolicyStudioRuntimeConfig): Observable<readonly DomainRuleCatalogCandidate[]> {
     const options = this.requestOptions(config);
     return this.domainRules.browseDefinitionCatalog({ page: 0, limit: 12 }, options).pipe(
       expand(page => page.hasMore
         ? this.domainRules.browseDefinitionCatalog({ page: page.page + 1, limit: page.limit }, options)
         : EMPTY),
-      reduce((candidates, page) => [...candidates, ...page.candidates], [] as DomainRuleCatalogCandidate[]),
-      map(candidates => this.latestCatalogCandidates(candidates.filter(candidate => candidate.ruleType !== AUTHORIZATION_RULE_TYPE)))
+      reduce((candidates, page) => [...candidates, ...page.candidates], [] as DomainRuleCatalogCandidate[])
     );
   }
 
-  private latestCatalogCandidates(
-    candidates: readonly DomainRuleCatalogCandidate[]
-  ): readonly DomainRuleCatalogCandidate[] {
-    const latest = new Map<string, DomainRuleCatalogCandidate>();
-    candidates.forEach(candidate => {
-      const current = latest.get(candidate.ruleKey);
-      if (!current || candidate.version > current.version) latest.set(candidate.ruleKey, candidate);
-    });
-    return [...latest.values()];
+  private catalogEntries(
+    candidates: readonly DomainRuleCatalogCandidate[],
+    workspaces: readonly DomainRuleChangeWorkspace[],
+    selection?: CatalogSelection
+  ): CatalogEntry[] {
+    const byId = new Map(candidates.map(candidate => [candidate.definitionId, candidate]));
+    const entries = new Map<string, CatalogEntry>();
+    for (const candidate of candidates) {
+      if (candidate.ruleType === AUTHORIZATION_RULE_TYPE) continue;
+      const current = entries.get(candidate.ruleKey);
+      if (!current || candidate.version > current.candidate.version) entries.set(candidate.ruleKey, { candidate });
+    }
+
+    const selectedVersion = selection?.configDefinitionId && byId.get(selection.configDefinitionId);
+    if (selectedVersion && selectedVersion.ruleKey === selection?.key && selectedVersion.ruleType !== AUTHORIZATION_RULE_TYPE) {
+      entries.set(selectedVersion.ruleKey, { candidate: selectedVersion });
+    }
+
+    const terminal = (workspace: DomainRuleChangeWorkspace) =>
+      workspace.status === 'PROMOTED' || workspace.status === 'ABANDONED' || workspace.status === 'REJECTED';
+    const ordered = [...workspaces].sort((left, right) =>
+      Number(terminal(left)) - Number(terminal(right))
+      || right.updatedAt.localeCompare(left.updatedAt)
+      || left.id.localeCompare(right.id));
+    for (const workspace of ordered) {
+      const entry = entries.get(workspace.ruleKey);
+      if (!entry || entry.workspace) continue;
+      const pinned = selection?.key === workspace.ruleKey && !!selection.workspaceId;
+      if (pinned && workspace.id !== selection?.workspaceId) continue;
+      if (workspace.promotedDefinitionId && workspace.status !== 'PROMOTED') continue;
+      const base = byId.get(workspace.baseDefinitionId);
+      const promoted = workspace.promotedDefinitionId ? byId.get(workspace.promotedDefinitionId) : undefined;
+      if (base && (base.ruleKey !== workspace.ruleKey || base.version !== workspace.baseDefinitionVersion
+        || base.ruleType === AUTHORIZATION_RULE_TYPE)) continue;
+      if (promoted && (promoted.ruleKey !== workspace.ruleKey || promoted.ruleType === AUTHORIZATION_RULE_TYPE)) continue;
+
+      // An open draft uses its base contract. A promoted workspace can be reopened
+      // against the exact promoted definition advertised by Config.
+      const candidate = workspace.status === 'PROMOTED' ? promoted ?? base : base;
+      if (!candidate || (!pinned && terminal(workspace) && candidate.definitionId !== entry.candidate.definitionId)) continue;
+      entries.set(workspace.ruleKey, { candidate, workspace });
+    }
+    return [...entries.values()];
   }
 
   private catalogSummary(
@@ -1221,15 +1277,6 @@ export class ProjectionCatalogService {
     };
   }
 
-  private latestWorkspace(
-    workspaces: readonly DomainRuleChangeWorkspace[],
-    ruleKey: string
-  ): DomainRuleChangeWorkspace | undefined {
-    return workspaces
-      .filter(item => item.ruleKey === ruleKey)
-      .sort((left, right) => (right.updatedAt ?? '').localeCompare(left.updatedAt ?? ''))[0];
-  }
-
   private mergeDefinitionActions(
     definitionCapabilities: DomainRuleDefinitionCapabilities,
     baseDefinitionId: string | null,
@@ -1246,10 +1293,12 @@ export class ProjectionCatalogService {
           capability.definitionId === promotedDefinitionId
           && capability.ruleKey === ruleKey)
       : undefined;
-    return [...new Set([
-      ...(baseCapability?.availableActions ?? []),
-      ...(promotedCapability?.availableActions ?? [])
-    ])];
+    const baseActions = baseCapability?.availableActions ?? [];
+    if (!promotedDefinitionId || baseDefinitionId === promotedDefinitionId) return baseActions;
+    return [
+      ...baseActions.filter(action => action === 'CREATE_NEW_VERSION'),
+      ...(promotedCapability?.availableActions ?? []).filter(action => action === 'PUBLISH')
+    ];
   }
 
   private requestOptions(config: PolicyStudioRuntimeConfig): DomainRuleRequestOptions {

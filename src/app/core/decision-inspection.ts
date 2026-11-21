@@ -91,8 +91,15 @@ export function composeDecisionCondition(original: unknown, edited: unknown): un
   return guarded ? { or: [...guarded.slice(0, -1), edited] } : edited;
 }
 
-export function extractDecisionTableProjection(condition: unknown): DecisionTableProjection {
-  const target = editableDecisionCondition(condition);
+export function isNeutralDecisionCondition(condition: unknown): condition is { readonly '==': readonly [1, 1] } {
+  if (!condition || typeof condition !== 'object' || Array.isArray(condition)) return false;
+  const operands = (condition as JsonObject)['=='];
+  return Object.keys(condition).length === 1 && Array.isArray(operands)
+    && operands.length === 2 && operands[0] === 1 && operands[1] === 1;
+}
+
+// The workspace has already separated any governed outer null guards from this branch.
+export function extractDecisionTableProjection(target: unknown): DecisionTableProjection {
   if (target === null || target === undefined) {
     return { combinator: 'and', clauses: [], lossless: true };
   }
@@ -104,8 +111,8 @@ export function extractDecisionTableProjection(condition: unknown): DecisionTabl
     return { combinator: 'and', clauses: [], lossless: false };
   }
   const [operator, raw] = entries[0];
-  if (operator === '==' && Array.isArray(raw) && raw.length === 2 && raw[0] === 1 && raw[1] === 1) {
-    return { combinator: 'and', clauses: [], lossless: true, emptyCondition: { '==': [1, 1] } };
+  if (isNeutralDecisionCondition(target)) {
+    return { combinator: 'and', clauses: [], lossless: true, emptyCondition: target };
   }
   if ((operator === 'and' || operator === 'or') && Array.isArray(raw)) {
     const parsed = raw.map(node => parseSingleClause(node, false));
