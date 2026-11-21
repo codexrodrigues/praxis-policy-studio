@@ -670,6 +670,38 @@ test('preserves the governed workspace while editing, adding a typed scenario, a
   await page.screenshot({ path: testInfo.outputPath('authoring-sandbox-result.png'), fullPage: false });
 });
 
+test('authors the first condition from a neutral workspace without losing an incomplete tree node', async ({ page }, testInfo) => {
+  await mockGovernedBackend(page, false);
+  await page.route('**/domain-rules/workspaces', route => route.fulfill({
+    json: [{ ...workspace, condition: { '==': [1, 1] } }]
+  }));
+  await page.goto('/catalog');
+  if (testInfo.project.name === 'narrow') {
+    await page.getByRole('button', { name: /O valor solicitado deve respeitar o limite do programa/ }).click();
+  }
+
+  await page.getByRole('button', { name: 'Editar regra', exact: true }).click();
+  await page.getByTestId('representation-mode-table').click();
+  await expect(page.getByTestId('decision-table-add-clause')).toBeEnabled();
+  await page.getByTestId('representation-mode-tree').click();
+  await page.locator('praxis-rule-canvas .empty-state button').click();
+  const field = page.locator('mat-select[formcontrolname="fieldName"]');
+  await expect(field).toBeVisible();
+  await page.getByTestId('representation-mode-expression').click();
+  await page.getByTestId('representation-mode-tree').click();
+  await field.click();
+  await page.getByRole('option', { name: /request.requestedAmount/ }).click();
+  await page.locator('mat-select[formcontrolname="operator"]').click();
+  await page.getByRole('option', { name: 'menor ou igual a', exact: true }).click();
+  await page.locator('.draft-workspace').getByRole('spinbutton', { name: 'Valor' }).fill('15');
+  await expect(page.getByRole('button', { name: 'Salvar draft governado' })).toBeEnabled();
+  await page.getByTestId('representation-mode-table').click();
+  await expect(page.getByTestId('decision-table-value-0')).toHaveValue('15');
+  await page.getByTestId('decision-table-value-0').fill('20');
+  await page.getByTestId('representation-mode-tree').click();
+  await expect(page.locator('.draft-workspace').getByRole('spinbutton', { name: 'Valor' })).toHaveValue('20');
+});
+
 test('keeps incompatible snapshot history visible without offering runtime operations', async ({ page }, testInfo) => {
   await mockGovernedBackend(page, false);
   const operationKey = 'CREATE';

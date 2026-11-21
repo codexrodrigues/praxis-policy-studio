@@ -107,6 +107,20 @@ describe('governed decision editing envelope', () => {
     expect(compileDecisionTableProjection(projection)).toEqual(tabularCondition);
   });
 
+  it('preserves the neutral numeric equality until the first table clause is authored', () => {
+    const neutral = { '==': [1, 1] };
+    const projection = extractDecisionTableProjection(neutral);
+    expect(projection.lossless).toBe(true);
+    expect(projection.clauses).toEqual([]);
+    expect(compileDecisionTableProjection(projection)).toEqual(neutral);
+    expect(compileDecisionTableProjection({
+      ...projection, clauses: [{ factPath: 'request.amount', operator: '<=', rawValue: '15', valueKind: 'number' }]
+    })).toEqual({ '<=': [{ var: 'request.amount' }, 15] });
+    for (const condition of [{ '==': [1, 0] }, { '==': [1, '1'] }, { and: [neutral] }]) {
+      expect(extractDecisionTableProjection(condition).lossless).toBe(false);
+    }
+  });
+
   it('marks nested or coalesce-wrapped conditions as non-lossless so table mode prevents destructive flattening', () => {
     const coalescedCondition = {
       '<=': [{ coalesce: [{ var: 'request.requestedAmount' }, 0] }, 3000]

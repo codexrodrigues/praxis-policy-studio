@@ -530,6 +530,27 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(component.editingScenarioId()).toBeNull();
   });
 
+  it('keeps an editor session while its graph changes and replaces it on a governed reset', () => {
+    const original = { and: [
+      { '>': [{ var: 'request.amount' }, 0] },
+      { '<': [{ var: 'request.amount' }, 100] }
+    ] };
+    component.select({ ...decision('A'), condition: original });
+    capabilities.A[0].next({ workspaceId: 'workspace-A', availableActions: ['VIEW'], blockers: [] });
+    component.openAuthoring();
+    const source = component.authoring.conditionEditorSource();
+    expect(source?.condition).toEqual(original);
+    component.updateDraft(null);
+    expect(component.authoring.conditionEditorSource()).toBe(source);
+    component.updateDraft({ or: [original, { '===': [{ var: 'request.active' }, true] }] });
+    expect(component.authoring.conditionEditorSource()).toBe(source);
+
+    component.resetDraft();
+    component.confirmGovernedOperation();
+    expect(component.authoring.conditionEditorSource()).not.toBe(source);
+    expect(component.draftCondition()).toEqual(original);
+  });
+
   it('uses the governed confirmation before resetting a changed rule draft', () => {
     component.select(decision('A'));
     component.authoringOpen.set(true);

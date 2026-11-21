@@ -13,6 +13,7 @@ export interface DecisionTableProjection {
   readonly combinator: 'and' | 'or';
   readonly clauses: readonly DecisionTableClause[];
   readonly lossless: boolean;
+  readonly emptyCondition?: { readonly '==': readonly [1, 1] };
 }
 
 const comparisonOperators = new Set<DecisionComparisonOperator>([
@@ -103,6 +104,9 @@ export function extractDecisionTableProjection(condition: unknown): DecisionTabl
     return { combinator: 'and', clauses: [], lossless: false };
   }
   const [operator, raw] = entries[0];
+  if (operator === '==' && Array.isArray(raw) && raw.length === 2 && raw[0] === 1 && raw[1] === 1) {
+    return { combinator: 'and', clauses: [], lossless: true, emptyCondition: { '==': [1, 1] } };
+  }
   if ((operator === 'and' || operator === 'or') && Array.isArray(raw)) {
     const parsed = raw.map(node => parseSingleClause(node, false));
     if (parsed.every((item): item is DecisionTableClause => item !== null)) {
@@ -147,7 +151,7 @@ export function extractDecisionTableProjection(condition: unknown): DecisionTabl
 
 export function compileDecisionTableProjection(projection: DecisionTableProjection): unknown {
   const validClauses = projection.clauses.filter(clause => clause.factPath.trim().length > 0);
-  if (validClauses.length === 0) return null;
+  if (validClauses.length === 0) return projection.emptyCondition ?? null;
   const compiled = validClauses.map(clause => ({
     [clause.operator]: [{ var: clause.factPath.trim() }, compileClauseRightOperand(clause)]
   }));

@@ -881,7 +881,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.authoring.autoFixDraftOntology();
   }
 
-  updateEditorState(state: RuleBuilderState): void {
+  updateEditorState(state: RuleBuilderState | null): void {
     this.authoring.updateEditorState(state);
   }
 

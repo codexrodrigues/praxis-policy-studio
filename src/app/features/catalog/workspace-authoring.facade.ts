@@ -50,6 +50,7 @@ export class WorkspaceAuthoringFacade {
   readonly publicationReadiness = signal<PublicationReadiness | null>(null);
   readonly publicationResult = signal<DecisionPublicationResult | null>(null);
 
+  readonly conditionEditorSource = signal<{ readonly condition: unknown } | null>(null);
   readonly draftCondition = signal<unknown | null>(null);
   readonly draftParameters = signal<Readonly<Record<string, unknown>>>({});
   readonly parameterValidationErrors = signal<readonly string[]>([]);
@@ -150,10 +151,9 @@ export class WorkspaceAuthoringFacade {
     if (this.authoringOpen()) return;
     const decision = this.store.selected();
     if (!this.canOpenAuthoring(decision)) return;
-    this.draftCondition.set(effectiveWorkspaceCondition(decision));
+    this.replaceDraftCondition(effectiveWorkspaceCondition(decision));
     this.draftParameters.set(this.effectiveParameters(decision));
     this.parameterValidationErrors.set([]);
-    this.editorState.set(null);
     this.authoringOpen.set(true);
   }
 
@@ -172,6 +172,12 @@ export class WorkspaceAuthoringFacade {
     this.authoringOpen.set(false);
   }
 
+  private replaceDraftCondition(condition: unknown): void {
+    this.draftCondition.set(condition);
+    this.editorState.set(null);
+    this.conditionEditorSource.set(condition == null ? null : { condition: editableDecisionCondition(condition) });
+  }
+
   updateDraft(condition: unknown): void {
     const source = effectiveWorkspaceCondition(this.store.selected());
     this.draftCondition.set(composeDecisionCondition(source, condition));
@@ -180,13 +186,13 @@ export class WorkspaceAuthoringFacade {
   updateDraftParameters(parameters: Readonly<Record<string, unknown>>): void {
     this.draftParameters.set(parameters);
     if (hasAllowOperationalEffect(parameters)) {
-      this.draftCondition.set(null);
+      this.replaceDraftCondition(null);
     }
   }
 
   applyDiffProposal(proposal: SuggestedDraftDiffProposal): void {
     if (proposal.condition !== null && proposal.condition !== undefined) {
-      this.draftCondition.set(proposal.condition);
+      this.replaceDraftCondition(proposal.condition);
     }
     if (proposal.parameters !== null && proposal.parameters !== undefined) {
       this.updateDraftParameters(proposal.parameters);
@@ -197,11 +203,10 @@ export class WorkspaceAuthoringFacade {
     const current = this.draftCondition();
     if (!current) return;
     const rewritten = rewriteDecisionExpressionOntology(this.store.selected(), current);
-    this.draftCondition.set(rewritten);
-    this.editorState.set(null);
+    this.replaceDraftCondition(rewritten);
   }
 
-  updateEditorState(state: RuleBuilderState): void {
+  updateEditorState(state: RuleBuilderState | null): void {
     this.editorState.set(state);
   }
 
@@ -217,18 +222,16 @@ export class WorkspaceAuthoringFacade {
 
   resetDraftState(): void {
     const decision = this.store.selected();
-    this.draftCondition.set(effectiveWorkspaceCondition(decision));
+    this.replaceDraftCondition(effectiveWorkspaceCondition(decision));
     this.draftParameters.set(this.effectiveParameters(decision));
     this.parameterValidationErrors.set([]);
-    this.editorState.set(null);
   }
 
   resetForSelection(decision: DecisionSummary): void {
     this.authoringOpen.set(false);
-    this.draftCondition.set(effectiveWorkspaceCondition(decision));
+    this.replaceDraftCondition(effectiveWorkspaceCondition(decision));
     this.draftParameters.set(this.effectiveParameters(decision));
     this.parameterValidationErrors.set([]);
-    this.editorState.set(null);
     this.publicationReadiness.set(null);
     this.publicationResult.set(null);
     this.store.clearAuthoringMessage();
@@ -238,10 +241,9 @@ export class WorkspaceAuthoringFacade {
   clearAll(): void {
     ++this.reviewsLoadRevision;
     this.authoringOpen.set(false);
-    this.draftCondition.set(null);
+    this.replaceDraftCondition(null);
     this.draftParameters.set({});
     this.parameterValidationErrors.set([]);
-    this.editorState.set(null);
     this.reviews.set([]);
     this.publicationReadiness.set(null);
     this.publicationResult.set(null);
@@ -566,7 +568,7 @@ export class WorkspaceAuthoringFacade {
     const current = this.store.selected();
     const updated = current?.key === workspace.ruleKey ? patch(current) : current;
     if (updated && current?.key === workspace.ruleKey) this.store.selected.set(updated);
-    this.draftCondition.set(effectiveWorkspaceCondition(updated));
+    this.replaceDraftCondition(effectiveWorkspaceCondition(updated));
     this.draftParameters.set(this.effectiveParameters(updated));
     this.testing.resetSandboxState();
     this.publicationReadiness.set(null);
