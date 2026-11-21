@@ -400,6 +400,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
       ]
     });
 
+    expect(JSON.parse(component.scenarioFactsJson())).toEqual({ customer: { additionalEligible: null } });
     component.setScenarioFactValue(component.selected()!.facts[0], '2500.50');
     component.setScenarioFactValue(component.selected()!.facts[1], 'benefit:request, benefit:review');
     component.setScenarioFactNull(component.selected()!.facts[2], true);
@@ -1883,9 +1884,8 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(component.totalAuthoringValidationErrors()).toBe(0);
 
     // 3. Scenario ontological skeleton scaffolding & validation
-    component.scenarioFactDraft.set({});
     component.scaffoldScenarioOntology();
-    expect(component.scenarioFactDraft()).toEqual({
+    expect(component.scenarioFactValues()).toEqual({
       'draft.quantidade': 0,
       'vinculo.situacao': ''
     });
@@ -1924,8 +1924,8 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
       blockers: []
     });
 
-    // Verify Finding A6: selecting another decision cleared scenarioFactDraft from decision A
-    expect(component.scenarioFactDraft()).toEqual({});
+    // Verify Finding A6: selecting another decision cleared the facts from decision A
+    expect(component.scenarioFactValues()).toEqual({});
     expect(component.scenarioFactsFallback()).toBe('{}');
 
     component.openAuthoring();
