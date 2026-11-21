@@ -223,6 +223,28 @@ describe('ProjectionCatalogService', () => {
       expect(actions).toEqual(['CREATE_NEW_VERSION']);
     });
 
+    it.each(['catalog', 'discovery'])('keeps the base independent when the promoted definition is absent from %s', mode => {
+      let row: DecisionSummary | undefined;
+      if (mode === 'discovery') {
+        service.loadDiscoveredCandidate(first, 0, 1, 'en-US', config).subscribe(value => row = value);
+      } else {
+        service.load('en-US', config).subscribe(value => row = value[0]);
+        http.expectOne(request => request.url.endsWith('/definitions/catalog')).flush({
+          page: 0, limit: 12, hasMore: false, candidates: [first]
+        });
+      }
+      http.expectOne(root + '/workspaces').flush([{ ...draft, status: 'PROMOTED', promotedDefinitionId: second.definitionId }]);
+      http.expectOne(root + '/definitions/capabilities').flush({ definitions: [
+        { ...first, availableActions: ['CREATE_NEW_VERSION'] },
+        { ...second, availableActions: ['PUBLISH'] }
+      ] });
+      detail(first);
+      expect(row).toMatchObject({ configDefinitionId: first.definitionId, facts: [{ path: 'request.v1' }],
+        promotedDefinitionId: null, workspaceCondition: null, availableDefinitionActions: ['CREATE_NEW_VERSION'] });
+      expect(row?.workspaceId).toBeUndefined();
+      expect(row?.workspaceEtag).toBeUndefined();
+    });
+
     it('rejects fact metadata returned for another version of the same rule', () => {
       const error = vi.fn();
       service.loadDiscoveredCandidate(second, 0, 1, 'en-US', config).subscribe({ error });

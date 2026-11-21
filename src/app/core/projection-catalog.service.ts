@@ -401,7 +401,7 @@ export class ProjectionCatalogService {
 
       // An open draft uses its base contract. A promoted workspace can be reopened
       // against the exact promoted definition advertised by Config.
-      const candidate = workspace.status === 'PROMOTED' ? promoted ?? base : base;
+      const candidate = workspace.status === 'PROMOTED' ? promoted : base;
       if (!candidate || (!pinned && terminal(workspace) && candidate.definitionId !== entry.candidate.definitionId)) continue;
       entries.set(workspace.ruleKey, { candidate, workspace });
     }
