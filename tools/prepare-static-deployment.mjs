@@ -10,6 +10,11 @@ if (process.env.RULES_STUDIO_ERGON_API_BASE_URL !== undefined) {
   const apiBaseUrl = deploymentOrigin(process.env.RULES_STUDIO_ERGON_API_BASE_URL);
   if (apiBaseUrl === baseUrl) throw new Error('POLICY_STUDIO_DUPLICATE_DEPLOYMENT_ORIGIN');
   hostProfiles.push({ id: 'ergon', labelPtBr: 'Ergon', labelEnUs: 'Ergon', apiBaseUrl });
+} else if (process.env.POLICY_STUDIO_SECONDARY_API_BASE_URL !== undefined) {
+  const apiBaseUrl = deploymentOrigin(process.env.POLICY_STUDIO_SECONDARY_API_BASE_URL);
+  if (apiBaseUrl === baseUrl) throw new Error('POLICY_STUDIO_DUPLICATE_DEPLOYMENT_ORIGIN');
+  const label = process.env.POLICY_STUDIO_SECONDARY_HOST_LABEL?.trim() || 'Workforce Showcase';
+  hostProfiles.push({ id: 'secondary', labelPtBr: label, labelEnUs: label, apiBaseUrl });
 }
 const current = JSON.parse(await readFile(outputPath, 'utf8'));
 

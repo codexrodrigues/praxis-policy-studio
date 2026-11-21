@@ -10,7 +10,7 @@ em `app-config.json` no diretório de saída Angular.
 - publish directory: diretório de saída Angular configurado no build estático (`dist/<app-name>/browser`);
 - environment: `RULES_STUDIO_CONFIG_API_BASE_URL`, contendo somente a origin
   HTTPS do Quickstart, sem path, query, fragmento ou credenciais;
-- environment opcional: `RULES_STUDIO_ERGON_API_BASE_URL`, contendo somente a origin HTTPS do Ergon, distinta do Quickstart;
+- environment opcional: `POLICY_STUDIO_SECONDARY_API_BASE_URL`, contendo somente a origin HTTPS do host corporativo adicional, distinta do Quickstart;
 - rewrite SPA: `/*` para `/index.html`.
 
 A homologação oficial está publicada em
@@ -27,7 +27,7 @@ URL que não seja uma origin HTTPS. Ele altera apenas o `app-config.json` dentro
 ## Sessão e segurança
 
 O seletor **Host governado** inicia no Quickstart. Com as duas variáveis
-configuradas, o build lista Quickstart e Ergon. A seleção de outro host reabre
+configuradas, o build lista o Quickstart e o host corporativo adicional. A seleção de outro host reabre
 o catálogo e descarta a seleção, o escopo recebido por deep-link e o token em
 memória da sessão anterior. Um link do host pode fornecer `apiBaseUrl` com sua
 origin exata e suas coordenadas governadas. O Studio aceita como override
@@ -39,7 +39,7 @@ coordenadas do deep-link ao retornar ao catálogo ou recarregar a página.
 
 Para validar o artefato, confira que `configApiBaseUrl` é a origin do
 Quickstart e que os itens de `hostProfiles` têm as origens HTTPS configuradas.
-Verifique com uma sessão do Ergon que o catálogo PAP, a releitura de um draft
+Verifique com uma sessão autenticada no host corporativo selecionado que o catálogo PAP, a releitura de um draft
 e a consulta de releases chegam ao host selecionado. A publicação, ativação
 e reversão dependem dos papéis e dos gates de aprovação e verificação do host.
 

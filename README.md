@@ -36,7 +36,7 @@ e os digests vêm da última confirmação persistida pelo servidor.
 
 Os contratos e a semântica do produto permanecem neutros em relação ao domínio e ao host consumidor.
 
-Para disponibilizar o Ergon no seletor do mesmo Studio que serve o Quickstart, configure a origem HTTPS do host no build estático. [Configuração e validação do site](docs/render-static-deployment.md)
+Para disponibilizar um host corporativo adicional no seletor do mesmo Studio que serve o Quickstart, configure a origem HTTPS correspondente no build estático. [Configuração e validação do site](docs/render-static-deployment.md)
 
 ## Estado atual
 
