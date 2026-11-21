@@ -13,7 +13,8 @@ const definition = {
 };
 
 const workspace = {
-  id: 'workspace-1', ruleKey: definition.ruleKey, status: 'OPEN', revision: 4,
+  id: 'workspace-1', ruleKey: definition.ruleKey, baseDefinitionId: definition.id, baseDefinitionVersion: definition.version,
+  status: 'OPEN', revision: 4,
   etag: 'workspace-etag-4', parameters: {}, condition: definition.condition,
   submittedTestRunId: 'test-run-1',
   updatedAt: '2026-08-15T05:00:00Z'
@@ -129,7 +130,7 @@ async function governedResponse(
   if (path.includes('/ai/authoring/turn/stream/') && request.method() === 'GET') {
     const streamId = path.split('/').at(-1) ?? '';
     const component = authoringStreams.components.get(streamId);
-    const payload = component === 'policy-decision-explanation'
+    const payload = component === 'rules-decision-explanation'
       ? {
           assistantMessage: 'A decisão limita o valor solicitado ao teto governado e falha fechada quando o valor está ausente.',
           canApply: false,
@@ -584,7 +585,7 @@ test('discovers, selects, and explains an exact governed decision', async ({ pag
 
   await page.getByLabel('O que você precisa encontrar?').fill('regras que limitam o valor do auxílio');
   await page.getByRole('button', { name: 'Descobrir', exact: true }).click();
-  const candidate = page.getByRole('button', { name: /grant\.amount-parameters/ });
+  const candidate = page.getByTestId('discovery-candidate-grant.amount-parameters');
   await expect(candidate).toBeVisible();
   await candidate.click();
   await page.getByRole('button', { name: 'Explicar esta decisão' }).click();
@@ -682,11 +683,26 @@ test('authors the first condition from a neutral workspace without losing an inc
 
   await page.getByRole('button', { name: 'Editar regra', exact: true }).click();
   await page.getByTestId('representation-mode-table').click();
-  await expect(page.getByTestId('decision-table-add-clause')).toBeEnabled();
+  const addClause = page.getByTestId('decision-table-add-clause');
+  const save = page.getByRole('button', { name: 'Salvar draft governado' });
+  await addClause.click();
+  await expect(save).toBeEnabled();
+  await addClause.click();
+  await page.getByTestId('decision-table-combinator').selectOption('or');
+  await page.getByTestId('representation-mode-expression').click();
+  await expect(page.getByTestId('decision-domain-expression')).toContainText(' OU ');
+  await page.getByTestId('representation-mode-table').click();
+  await page.getByTestId('decision-table-remove-1').click();
+  await page.getByTestId('decision-table-remove-0').click();
+  await expect(save).toBeDisabled();
   await page.getByTestId('representation-mode-tree').click();
   await page.locator('praxis-rule-canvas .empty-state button').click();
   const field = page.locator('mat-select[formcontrolname="fieldName"]');
   await expect(field).toBeVisible();
+  await page.getByTestId('representation-mode-table').click();
+  await expect(page.getByTestId('decision-table-combinator')).toBeDisabled();
+  await expect(addClause).toBeDisabled();
+  await expect(save).toBeDisabled();
   await page.getByTestId('representation-mode-expression').click();
   await page.getByTestId('representation-mode-tree').click();
   await field.click();

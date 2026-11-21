@@ -404,7 +404,7 @@ async function mockErgonShowcaseBackend(page: Page): Promise<{
       route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value), headers });
 
     const currentWorkspace = {
-      id: 'ergon-ws-08380',
+      id: 'ergon-ws-08380', baseDefinitionId: 'ergon-def-08380', baseDefinitionVersion: 1,
       ruleKey: 'product.ergon.rn013.erg08380',
       status: workspaceStatus,
       revision: workspaceRevision,
