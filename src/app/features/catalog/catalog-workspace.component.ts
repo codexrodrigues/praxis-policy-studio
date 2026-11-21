@@ -1,5 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, ElementRef, HostListener, OnInit, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, HostListener, OnInit, computed, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute } from '@angular/router';
 import {
   API_URL,
   DomainRuleService,
@@ -15,12 +17,19 @@ import {
   type DomainRuleWorkspaceAction
 } from '@praxisui/core';
 import type { RuleBuilderState } from '@praxisui/visual-builder';
+import { skip } from 'rxjs';
 import { AuthSessionService } from '../../core/auth-session.service';
 import type { DecisionDiscoveryCandidate } from '../../core/decision-discovery.service';
+import { GovernedHostScopeService } from '../../core/governed-host-scope.service';
 import { PolicyStudioI18n } from '../../core/i18n';
 import { ProjectionCatalogService } from '../../core/projection-catalog.service';
+import {
+  isSafeLegalBasisUrl,
+  type RuleDocumentationDescriptor
+} from '../../core/rule-documentation';
 import type { PolicyStudioRuntimeConfig } from '../../core/runtime-config';
 import { RuntimeConfigService } from '../../core/runtime-config.service';
+import { DecisionDocumentationEditorComponent } from '../authoring/decision-documentation-editor.component';
 import { DecisionParametersEditorComponent } from '../authoring/decision-parameters-editor.component';
 import { LocalDraftWorkspaceComponent } from '../authoring/local-draft-workspace.component';
 import { RuleDecisionPlanDagComponent } from './rule-decision-plan-dag.component';
@@ -67,6 +76,7 @@ import { WorkspaceBlockersComponent } from './workspace-blockers.component';
     WorkspaceBlockersComponent,
     ScenarioCatalogComponent,
     ScenarioCreateFormComponent,
+    DecisionDocumentationEditorComponent,
     DecisionParametersEditorComponent,
     DecisionCreateFormComponent,
     AccessDraftReviewComponent,
@@ -89,6 +99,9 @@ import { WorkspaceBlockersComponent } from './workspace-blockers.component';
 export class CatalogWorkspaceComponent implements OnInit {
   private readonly catalog = inject(ProjectionCatalogService);
   private readonly auth = inject(AuthSessionService);
+  private readonly hostScope = inject(GovernedHostScopeService);
+  private readonly route = inject(ActivatedRoute, { optional: true });
+  private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   readonly runtime = inject(RuntimeConfigService);
   readonly store = inject(CatalogSelectionStore);
@@ -139,6 +152,9 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly draftCondition = this.authoring.draftCondition;
   readonly draftParameters = this.authoring.draftParameters;
   readonly parameterValidationErrors = this.authoring.parameterValidationErrors;
+  readonly draftDocumentation = this.authoring.draftDocumentation;
+  readonly documentationValidationErrors = this.authoring.documentationValidationErrors;
+  readonly draftDocumentationChanged = this.authoring.draftDocumentationChanged;
   readonly editorState = this.authoring.editorState;
   readonly ontologyInspection = this.authoring.ontologyInspection;
   readonly ontologicalWarning = this.authoring.ontologicalWarning;
@@ -232,12 +248,71 @@ export class CatalogWorkspaceComponent implements OnInit {
   constructor(readonly i18n: PolicyStudioI18n) {}
 
   ngOnInit(): void {
+    this.route?.queryParamMap
+      .pipe(skip(1), takeUntilDestroyed(this.destroyRef))
+      .subscribe(params => {
+        const hasScopeParam = params.has('tenantId') || params.has('organizationId') || params.has('environment');
+        if (!hasScopeParam) return;
+        const nextTenantId = params.get('tenantId')?.trim() || null;
+        const nextOrganizationId = params.get('organizationId')?.trim() || null;
+        const nextEnvironment = params.get('environment')?.trim() || null;
+        const current = this.hostScope.scope();
+        if (
+          nextTenantId === current.tenantId
+          && nextOrganizationId === current.organizationId
+          && nextEnvironment === current.environment
+        ) {
+          return;
+        }
+        this.hostScope.setScope({
+          tenantId: nextTenantId,
+          organizationId: nextOrganizationId,
+          environment: nextEnvironment
+        });
+        this.loadCatalog();
+      });
     this.loadCatalog();
   }
 
   meaningText(decision: DecisionSummary): string {
     if (decision.meaning.trim() && decision.meaning.trim() !== decision.name.trim()) return decision.meaning;
     return `${this.i18n.text('decisionInDecisionSet')} ${decision.ruleSet}.`;
+  }
+
+  effectiveDocumentation(decision: DecisionSummary | null | undefined): RuleDocumentationDescriptor | null {
+    return this.authoring.effectiveDocumentation(decision);
+  }
+
+  hasCompleteDidacticDocumentation(doc: RuleDocumentationDescriptor | null): boolean {
+    if (!doc) return false;
+    return Boolean(
+      doc.summary?.trim()
+      && doc.whenApplies?.trim()
+      && doc.rationale?.trim()
+      && doc.customizationGuidance?.trim()
+    );
+  }
+
+  customizationGuidanceFallback(decision: DecisionSummary): string {
+    switch (decision.slotOverridePolicy) {
+      case 'FORBIDDEN':
+      case 'LOCKED':
+        return this.i18n.text('customizationGuidanceFallbackForbidden');
+      case 'PARAMETERIZABLE':
+        return this.i18n.text('customizationGuidanceFallbackParameterizable');
+      case 'RESTRICT_ONLY':
+        return this.i18n.text('customizationGuidanceFallbackRestrictOnly');
+      case 'EXTEND_ONLY':
+        return this.i18n.text('customizationGuidanceFallbackExtendOnly');
+      case 'REPLACEABLE':
+        return this.i18n.text('customizationGuidanceFallbackReplaceable');
+      default:
+        return this.i18n.text('customizationGuidanceFallbackDefault');
+    }
+  }
+
+  safeLegalBasisUrl(url: string | null | undefined): string | null {
+    return isSafeLegalBasisUrl(url) ? url!.trim() : null;
   }
 
   authorityLabel(authority: string): string {
@@ -871,6 +946,10 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   updateDraftParameters(parameters: Readonly<Record<string, unknown>>): void {
     this.authoring.updateDraftParameters(parameters);
+  }
+
+  updateDraftDocumentation(documentation: RuleDocumentationDescriptor | null): void {
+    this.authoring.updateDraftDocumentation(documentation);
   }
 
   applyDiffProposal(proposal: SuggestedDraftDiffProposal): void {

@@ -74,21 +74,35 @@ export class CatalogSelectionStore {
   readonly decisions = computed(() => {
     const query = this.query().trim().toLocaleLowerCase();
     return query
-      ? this.allDecisions().filter(item =>
-          [
+      ? this.allDecisions().filter(item => {
+          const doc = item.workspaceDocumentation ?? item.definitionDocumentation ?? item.documentation;
+          const legalBasisTokens = (doc?.legalBasis ?? []).flatMap(entry => [
+            entry.code,
+            entry.title ?? '',
+            entry.article ?? '',
+            entry.jurisdiction ?? '',
+            entry.summary ?? ''
+          ]);
+          return [
             item.code,
             item.name,
             item.domain,
             item.ruleSetKey,
             item.slotKey ?? '',
+            doc?.title ?? '',
+            doc?.summary ?? '',
+            doc?.whenApplies ?? '',
+            doc?.rationale ?? '',
+            doc?.customizationGuidance ?? '',
+            ...legalBasisTokens,
             ...(item.availableRoots ?? []),
             ...(item.conceptRoots ?? []),
             ...item.factPaths
           ]
             .join(' ')
             .toLocaleLowerCase()
-            .includes(query)
-        )
+            .includes(query);
+        })
       : this.allDecisions();
   });
 

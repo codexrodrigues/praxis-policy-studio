@@ -13,17 +13,17 @@ function createDecision(overrides: Partial<DecisionSummary> = {}): DecisionSumma
     order: 1,
     totalDecisions: 2,
     key: 'rn013.qtd_max_limit',
-    code: 'ERG-08390',
+    code: 'WF-08390',
     name: 'Limite de quantidade máxima',
-    domain: 'administracao-pessoal',
+    domain: 'human-resources',
     ruleSet: 'RN-013 Regras de Frequência',
-    ruleSetKey: 'ergon.administracao-pessoal.regras-frequencia.rn013',
-    resourceKey: 'regras-frequencia',
-    serviceKey: 'praxis-ergon-showcase',
+    ruleSetKey: 'workforce.human-resources.attendance-rules.rn013',
+    resourceKey: 'attendance-rules',
+    serviceKey: 'praxis-api-quickstart',
     state: 'verified',
     meaning: 'Controla o teto parametrizável de quantidade máxima.',
     authority: 'Config · definição governada',
-    baselineAuthority: 'ERGON_RULES_STUDIO_SEED',
+    baselineAuthority: 'WORKFORCE_RULES_STUDIO_SEED',
     source: 'definition:1',
     evidenceCount: 1,
     authoringSupported: true,
@@ -34,7 +34,7 @@ function createDecision(overrides: Partial<DecisionSummary> = {}): DecisionSumma
     facts: [],
     nullSemantics: 'FAIL_CLOSED',
     operationKeys: ['validate'],
-    hostContractVersion: 'ergon-policy-studio/1.0',
+    hostContractVersion: 'workforce-policy-studio/1.0',
     evidence: [],
     draftLifecycle: 'REFERENCE_DRAFT_ONLY',
     decisionStage: 'DOMAIN_DECISION',
@@ -42,10 +42,10 @@ function createDecision(overrides: Partial<DecisionSummary> = {}): DecisionSumma
     availableRoots: ['draft', 'tenant', 'context'],
     conceptRoots: ['codigoFrequencia', 'tipoFrequencia'],
     legacyOccurrence: {
-      code: 'ERG-08390',
+      code: 'WF-08390',
       targetField: 'qtdMax',
-      plsqlOrigin: 'PCK_REGRAS_FREQ.MAIN_PRE',
-      plsqlLineage: 'IF v_regras_freq.qtd_max > 180 THEN pkg_legacy_rules.raise_error(8390); END IF;'
+      plsqlOrigin: 'PKG_ATTENDANCE_RULES.MAIN_PRE',
+      plsqlLineage: 'IF v_attendance_rules.qtd_max > 180 THEN pkg_legacy_rules.raise_error(8390); END IF;'
     },
     ...overrides
   };
@@ -60,11 +60,11 @@ describe('RuleDecisionPlanDagComponent', () => {
     });
   });
 
-  it('renders the 5 canonical stages of DecisionStage, slot override policies, ontology roots, and PL/SQL lineage', () => {
+  it('renders the 5 canonical stages of DecisionStage, slot override policies, ontology roots, and legacy lineage', () => {
     const fixture = TestBed.createComponent(RuleDecisionPlanDagComponent);
     const guardDecision = createDecision({
       key: 'rn013.guard_vigencia',
-      code: 'ERG-08380',
+      code: 'WF-08380',
       name: 'Guarda de vigência cronológica',
       decisionStage: 'PROTECTED_GUARD',
       slotOverridePolicy: 'FORBIDDEN',
@@ -90,8 +90,8 @@ describe('RuleDecisionPlanDagComponent', () => {
     expect(rootsBar?.textContent).toContain('codigoFrequencia');
 
     const lineageCard = host.querySelector('[data-testid="dag-legacy-lineage"]');
-    expect(lineageCard?.textContent).toContain('ERG-08390');
-    expect(lineageCard?.textContent).toContain('PCK_REGRAS_FREQ.MAIN_PRE');
+    expect(lineageCard?.textContent).toContain('WF-08390');
+    expect(lineageCard?.textContent).toContain('PKG_ATTENDANCE_RULES.MAIN_PRE');
 
     const spy = vi.fn();
     fixture.componentInstance.decisionSelected.subscribe(spy);
@@ -104,16 +104,16 @@ describe('RuleDecisionPlanDagComponent', () => {
   it('projects simulation trace coloring, divergence badges, and 1-hop cross-RuleSet navigation', () => {
     const fixture = TestBed.createComponent(RuleDecisionPlanDagComponent);
     const domainDecision = createDecision({
-      availableRoots: ['draft', 'vinculo'],
-      conceptRoots: ['vinculo']
+      availableRoots: ['draft', 'employment'],
+      conceptRoots: ['employment']
     });
     const neighborDecision = createDecision({
-      key: 'ferias.vinculo_ativo',
-      code: 'ERG-04110',
-      name: 'Vínculo ativo para férias',
-      ruleSetKey: 'ergon.administracao-pessoal.ferias.rn004',
-      availableRoots: ['draft', 'vinculo'],
-      conceptRoots: ['vinculo']
+      key: 'leave.active_employment',
+      code: 'WF-04110',
+      name: 'Vínculo ativo para afastamento',
+      ruleSetKey: 'workforce.human-resources.leave.rn004',
+      availableRoots: ['draft', 'employment'],
+      conceptRoots: ['employment']
     });
 
     fixture.componentInstance.selected = domainDecision;
@@ -133,7 +133,7 @@ describe('RuleDecisionPlanDagComponent', () => {
         comparison: 'CANDIDATE_MISMATCH',
         candidateMatchesExpected: true,
         activeMatchesExpected: false,
-        candidateReasonCodes: ['ERG-08390'],
+        candidateReasonCodes: ['WF-08390'],
         activeReasonCodes: []
       }]
     };
@@ -154,14 +154,52 @@ describe('RuleDecisionPlanDagComponent', () => {
     fixture.componentInstance.conceptRootSelected.subscribe(rootSpy);
     fixture.componentInstance.decisionSelected.subscribe(decisionSpy);
 
-    const conceptChip = host.querySelector<HTMLButtonElement>('[data-testid="dag-concept-chip-vinculo"]');
+    const conceptChip = host.querySelector<HTMLButtonElement>('[data-testid="dag-concept-chip-employment"]');
     expect(conceptChip).toBeTruthy();
     conceptChip?.click();
-    expect(rootSpy).toHaveBeenCalledWith('vinculo');
+    expect(rootSpy).toHaveBeenCalledWith('employment');
 
-    const neighborBtn = host.querySelector<HTMLButtonElement>('[data-testid="dag-neighbor-ferias.vinculo_ativo"]');
+    const neighborBtn = host.querySelector<HTMLButtonElement>('[data-testid="dag-neighbor-leave.active_employment"]');
     expect(neighborBtn).toBeTruthy();
     neighborBtn?.click();
     expect(decisionSpy).toHaveBeenCalledWith(neighborDecision);
+  });
+
+  it('renders human stage titles in pt-BR/en-US and LOCKED override policy label', () => {
+    const i18n = TestBed.inject(PolicyStudioI18n);
+    const fixture = TestBed.createComponent(RuleDecisionPlanDagComponent);
+    const lockedDecision = createDecision({
+      key: 'workforce.guard.locked_rule',
+      code: 'WF-00099',
+      ruleSetKey: 'workforce.leave-requests',
+      decisionStage: 'PROTECTED_GUARD',
+      slotOverridePolicy: 'LOCKED',
+      authoringSupported: false
+    });
+
+    fixture.componentInstance.selected = lockedDecision;
+    fixture.componentInstance.decisions = [lockedDecision];
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('[data-testid="dag-stage-PROTECTED_GUARD"]')?.textContent)
+      .toContain('Pré-requisitos obrigatórios');
+    expect(host.querySelector('[data-testid="dag-stage-DOMAIN_DECISION"]')?.textContent)
+      .toContain('Regras de negócio');
+    expect(host.querySelector('[data-testid="dag-stage-POST_DECISION"]')?.textContent)
+      .toContain('Validações cruzadas');
+    expect(host.querySelector('[data-testid="dag-stage-TRANSFORMATION_INTENT"]')?.textContent)
+      .toContain('Ajustes automáticos');
+    expect(host.querySelector('[data-testid="dag-stage-EFFECT_INTENT"]')?.textContent)
+      .toContain('Consequências e registros');
+    expect(host.querySelector('[data-testid="dag-node-workforce.guard.locked_rule"]')?.textContent)
+      .toContain('GUARD · BLOQUEADO');
+
+    i18n.locale.set('en-US');
+    fixture.detectChanges();
+    expect(host.querySelector('[data-testid="dag-stage-PROTECTED_GUARD"]')?.textContent)
+      .toContain('Required prerequisites');
+    expect(host.querySelector('[data-testid="dag-node-workforce.guard.locked_rule"]')?.textContent)
+      .toContain('GUARD · LOCKED');
   });
 });

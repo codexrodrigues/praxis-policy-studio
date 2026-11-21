@@ -625,6 +625,7 @@ export class SnapshotExecutionFacade {
           this.rolloutFeedback.set(this.i18n.text('candidatePromoted'));
           this.loadSnapshots();
           this.store.loadLifecycle();
+          this.refreshCatalogAfterPublishOrActivation();
         },
         error: error => {
           if (commandRevision !== this.store.selectionRevision) {
@@ -706,6 +707,7 @@ export class SnapshotExecutionFacade {
             currentVersion.availableAction === 'ROLLBACK' ? 'snapshotRolledBack' : 'snapshotActivated'));
           this.loadSnapshots();
           this.store.loadLifecycle();
+          this.refreshCatalogAfterPublishOrActivation();
         },
         error: error => {
           if (commandRevision !== this.store.selectionRevision) {
@@ -871,6 +873,7 @@ export class SnapshotExecutionFacade {
           this.snapshotFeedback.set(this.i18n.text('snapshotPublished'));
           this.loadSnapshots();
           this.store.loadLifecycle();
+          this.refreshCatalogAfterPublishOrActivation();
         },
         error: error => {
           if (commandRevision !== this.store.selectionRevision) {
@@ -882,6 +885,29 @@ export class SnapshotExecutionFacade {
     } catch (error: unknown) {
       this.failSnapshotOperation(error);
     }
+  }
+
+  private refreshCatalogAfterPublishOrActivation(): void {
+    const state = this.runtime.state();
+    if (state.kind !== 'ready' || state.config.mode !== 'remote') return;
+    const selectedKey = this.store.selected()?.key ?? null;
+    const loadRevision = ++this.store.catalogLoadRevision;
+    this.catalog.load(this.i18n.locale(), {
+      ...state.config,
+      initialDecisionKey: selectedKey ?? state.config.initialDecisionKey
+    }).subscribe({
+      next: decisions => {
+        if (loadRevision !== this.store.catalogLoadRevision || decisions.length === 0) return;
+        this.store.allDecisions.set(decisions);
+        const refreshed = selectedKey ? decisions.find(item => item.key === selectedKey) : undefined;
+        if (refreshed && this.store.selected()?.key === selectedKey) {
+          this.store.selected.set(refreshed);
+        }
+      },
+      error: () => {
+        // Non-blocking catalog refresh after snapshot publish/activation
+      }
+    });
   }
 
   private failSnapshotOperation(error: unknown): void {

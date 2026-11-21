@@ -1,9 +1,16 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { PolicyStudioI18n } from '../../core/i18n';
+import {
+  mergeRuleDocumentation,
+  normalizeAndCompactDocumentation,
+  type RuleDocumentationDescriptor
+} from '../../core/rule-documentation';
 import type { DomainRuleDefinitionRequest } from '@praxisui/core';
+import { DecisionDocumentationEditorComponent } from '../authoring/decision-documentation-editor.component';
 
 @Component({
   selector: 'pax-decision-create-form',
+  imports: [DecisionDocumentationEditorComponent],
   template: `
     <div class="decision-create-shell" data-testid="decision-create-shell">
       <div class="create-header">
@@ -85,6 +92,14 @@ import type { DomainRuleDefinitionRequest } from '@praxisui/core';
             <option value="ALLOW">{{ i18n.text('operationalEffectAllow') }}</option>
           </select>
 
+          <pax-decision-documentation-editor
+            idPrefix="create-doc"
+            [collapsedByDefault]="true"
+            [documentation]="draftDocumentation()"
+            [disabled]="busy()"
+            (documentationChanged)="draftDocumentation.set($event)"
+            (validationErrorsChanged)="documentationErrors.set($event)" />
+
           <button
             type="button"
             class="primary-action"
@@ -155,6 +170,8 @@ export class DecisionCreateFormComponent {
   protected readonly serviceKey = signal('');
   protected readonly actionId = signal('');
   protected readonly effect = signal<'BLOCK' | 'ALLOW'>('BLOCK');
+  protected readonly draftDocumentation = signal<RuleDocumentationDescriptor | null>(null);
+  protected readonly documentationErrors = signal<readonly string[]>([]);
   protected readonly supportsActionId = computed(() => {
     const type = this.ruleType().trim();
     return type === 'approval_policy' || type === 'workflow_action_policy';
@@ -170,6 +187,11 @@ export class DecisionCreateFormComponent {
     const resource = this.resourceKey().trim();
     if (!key || !type || !resource) {
       this.validationFailed.emit(this.i18n.text('decisionIdentityRequired'));
+      return;
+    }
+    const docErrors = this.documentationErrors();
+    if (docErrors.length > 0) {
+      this.validationFailed.emit(docErrors[0] ?? this.i18n.text('didacticValidationBlocked'));
       return;
     }
     const slot = type === 'approval_policy'
@@ -193,6 +215,7 @@ export class DecisionCreateFormComponent {
       parameters['actionId'] = action;
       parameters['workflowAction'] = action;
     }
+    const normalizedDoc = normalizeAndCompactDocumentation(this.draftDocumentation());
     this.createRequested.emit({
       ruleKey: key,
       version: 1,
@@ -201,7 +224,7 @@ export class DecisionCreateFormComponent {
       contextKey: this.contextKey().trim() || resource.split('.')[0] || 'domain',
       resourceKey: resource,
       serviceKey: this.serviceKey().trim() || null,
-      definition: {},
+      definition: mergeRuleDocumentation({}, normalizedDoc),
       parameters,
       condition: null,
       governance: {
@@ -213,5 +236,7 @@ export class DecisionCreateFormComponent {
     this.open.set(false);
     this.ruleKey.set('');
     this.actionId.set('');
+    this.draftDocumentation.set(null);
+    this.documentationErrors.set([]);
   }
 }

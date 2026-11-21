@@ -83,3 +83,18 @@ button, input { font: inherit; }
   .review-list article p { grid-column: auto; }
   .governed-actions { align-items: stretch; flex-direction: column; }
 }
+.didactic-panel { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--pax-color-outline-variant, #c5d0d5); display: grid; gap: .75rem; min-width: 0; }
+.didactic-panel-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; }
+.didactic-fallback-badge { border-radius: 999px; padding: .22rem .6rem; font-size: .72rem; font-weight: 700; background: var(--pax-color-surface-container, #e4eaed); color: var(--pax-color-on-surface-variant, #42545c); }
+.didactic-sections { display: grid; gap: .85rem; margin: 0; min-width: 0; }
+.didactic-sections > div { min-width: 0; }
+.didactic-sections dt { color: var(--pax-color-on-surface-variant, #52636a); font-size: .75rem; font-weight: 750; text-transform: uppercase; letter-spacing: .04em; }
+.didactic-sections dd { margin: .28rem 0 0; line-height: 1.48; color: var(--pax-color-on-surface, #15242a); overflow-wrap: anywhere; }
+.didactic-empty-value { color: var(--pax-color-on-surface-variant, #52636a); font-size: .88rem; }
+.legal-basis-list { list-style: none; margin: .25rem 0 0; padding: 0; display: grid; gap: .55rem; }
+.legal-basis-chip { padding: .6rem .75rem; border-radius: .5rem; border: 1px solid var(--pax-color-outline-variant, #c5d0d5); background: var(--pax-color-surface-container-low, #f1f5f6); display: grid; gap: .22rem; min-width: 0; }
+.legal-basis-chip-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .35rem; font-size: .84rem; }
+.legal-basis-jurisdiction { border-radius: 999px; padding: .1rem .45rem; font-size: .7rem; font-weight: 700; background: var(--pax-color-primary-container, #c6e8f5); color: var(--pax-color-on-primary-container, #073949); }
+.legal-basis-title { color: var(--pax-color-on-surface-variant, #52636a); font-size: .78rem; }
+.legal-basis-summary { margin: 0; font-size: .84rem; line-height: 1.4; }
+.legal-basis-link { justify-self: start; font-size: .78rem; font-weight: 700; color: var(--pax-color-primary, #076487); }

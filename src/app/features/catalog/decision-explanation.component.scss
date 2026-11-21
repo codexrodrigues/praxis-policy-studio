@@ -2,6 +2,7 @@
 .explanation {
   display: grid;
   gap: 1rem;
+  min-width: 0;
   max-width: 68rem;
   margin-top: clamp(1.5rem, 4vw, 3rem);
   padding-block: 1.25rem;

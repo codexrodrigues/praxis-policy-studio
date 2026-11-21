@@ -1,4 +1,5 @@
 import type { DomainRuleDefinitionAction, DomainRuleTestRun } from '@praxisui/core';
+import type { RuleDocumentationDescriptor } from '../../core/rule-documentation';
 
 export type DecisionState = 'technical-draft' | 'verified';
 
@@ -11,6 +12,7 @@ export type DecisionStageId =
 
 export type SlotOverridePolicyId =
   | 'FORBIDDEN'
+  | 'LOCKED'
   | 'PARAMETERIZABLE'
   | 'REPLACEABLE'
   | 'RESTRICT_ONLY'
@@ -73,6 +75,10 @@ export interface DecisionSummary {
   readonly availableRoots?: readonly string[];
   readonly conceptRoots?: readonly string[];
   readonly legacyOccurrence?: DecisionLegacyOccurrence | null;
+  readonly documentation?: RuleDocumentationDescriptor | null;
+  readonly definitionDocumentation?: RuleDocumentationDescriptor | null;
+  readonly workspaceDocumentation?: RuleDocumentationDescriptor | null;
+  readonly decisionKind?: 'BUSINESS' | 'AUTHORIZATION';
 }
 
 export type DecisionParameterValueType = 'STRING' | 'NUMBER' | 'INTEGER' | 'BOOLEAN';

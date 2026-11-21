@@ -189,6 +189,81 @@
       <section class="meaning-block">
         <p class="section-label">{{ i18n.text('meaning') }}</p>
         <p class="meaning">{{ meaningText(current) }}</p>
+
+        @let didactic = effectiveDocumentation(current);
+        <section class="didactic-panel" data-testid="decision-didactic-panel" [attr.aria-label]="i18n.text('didacticDocumentationSection')">
+          <div class="didactic-panel-header">
+            <p class="section-label">{{ i18n.text('didacticDocumentationSection') }}</p>
+            @if (!hasCompleteDidacticDocumentation(didactic)) {
+              <span class="didactic-fallback-badge" data-testid="decision-didactic-fallback">
+                {{ i18n.text('didacticFallbackBadge') }}
+              </span>
+            }
+          </div>
+          <dl class="didactic-sections">
+            @if (didactic?.title && didactic!.title !== current.name) {
+              <div data-testid="didactic-title">
+                <dt>{{ i18n.text('didacticTitleHeading') }}</dt>
+                <dd>{{ didactic!.title }}</dd>
+              </div>
+            }
+            <div data-testid="didactic-summary">
+              <dt>{{ i18n.text('didacticWhatItChecks') }}</dt>
+              <dd>{{ didactic?.summary || meaningText(current) }}</dd>
+            </div>
+            <div data-testid="didactic-when-applies">
+              <dt>{{ i18n.text('didacticWhenApplies') }}</dt>
+              <dd>{{ didactic?.whenApplies || i18n.text('didacticNotInformed') }}</dd>
+            </div>
+            <div data-testid="didactic-rationale">
+              <dt>{{ i18n.text('didacticRationale') }}</dt>
+              <dd>{{ didactic?.rationale || i18n.text('didacticNotInformed') }}</dd>
+            </div>
+            <div data-testid="didactic-legal-basis">
+              <dt>{{ i18n.text('didacticLegalBasis') }}</dt>
+              <dd>
+                @if (didactic?.legalBasis?.length) {
+                  <ul class="legal-basis-list">
+                    @for (basis of didactic!.legalBasis!; track basis.code + ':' + (basis.article ?? '') + ':' + $index) {
+                      <li class="legal-basis-chip" data-testid="didactic-legal-basis-chip">
+                        <div class="legal-basis-chip-head">
+                          <strong>{{ basis.code }}</strong>
+                          @if (basis.article) {
+                            <span>· {{ basis.article }}</span>
+                          }
+                          @if (basis.jurisdiction) {
+                            <span class="legal-basis-jurisdiction">{{ basis.jurisdiction }}</span>
+                          }
+                        </div>
+                        @if (basis.title) {
+                          <small class="legal-basis-title">{{ basis.title }}</small>
+                        }
+                        @if (basis.summary) {
+                          <p class="legal-basis-summary">{{ basis.summary }}</p>
+                        }
+                        @if (safeLegalBasisUrl(basis.url); as safeHref) {
+                          <a
+                            class="legal-basis-link"
+                            [href]="safeHref"
+                            target="_blank"
+                            rel="noopener noreferrer">
+                            {{ i18n.text('legalBasisOpenLink') }}
+                          </a>
+                        }
+                      </li>
+                    }
+                  </ul>
+                } @else {
+                  <span class="didactic-empty-value">{{ i18n.text('didacticNoLegalBasis') }}</span>
+                }
+              </dd>
+            </div>
+            <div data-testid="didactic-customization-guidance">
+              <dt>{{ i18n.text('didacticCustomizationGuidance') }}</dt>
+              <dd>{{ didactic?.customizationGuidance || customizationGuidanceFallback(current) }}</dd>
+            </div>
+          </dl>
+        </section>
       </section>
       <div class="decision-context">
         <dl class="facts">
@@ -378,6 +453,12 @@
             (parametersChanged)="updateDraftParameters($event)"
             (validationErrorsChanged)="parameterValidationErrors.set($event)" />
         }
+        <pax-decision-documentation-editor
+          idPrefix="workspace-doc"
+          [documentation]="draftDocumentation()"
+          [disabled]="authoringBusy()"
+          (documentationChanged)="updateDraftDocumentation($event)"
+          (validationErrorsChanged)="documentationValidationErrors.set($event)" />
         @if (suggestedDiffProposals().length) {
           <div class="assisted-diff-proposals" data-testid="assisted-diff-proposals">
             <p class="section-label">{{ i18n.text('assistedDiffProposalsTitle') }}</p>

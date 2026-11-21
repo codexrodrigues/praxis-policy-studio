@@ -1186,11 +1186,19 @@ test('renders full en-US corporate workstation, authoring chrome, and snapshot i
     await page.getByRole('button', { name: /O valor solicitado deve respeitar o limite do programa/ }).click();
   }
   await expect(page.getByRole('button', { name: /^Understand/ })).toBeVisible();
+  await expect(page.getByTestId('decision-didactic-panel')).toBeVisible();
+  await expect(page.getByTestId('didactic-summary')).toContainText('What it checks');
+  await expect(page.getByTestId('didactic-when-applies')).toContainText('When it applies');
+  await expect(page.getByTestId('didactic-rationale')).toContainText('Why it exists');
+  await expect(page.getByTestId('didactic-legal-basis')).toContainText('Legal basis');
+  await expect(page.getByTestId('didactic-customization-guidance')).toContainText('How the organization can customize');
   await expect(page.getByTestId('decision-maturity-posture')).toBeVisible();
   await expect(page.getByTestId('posture-technical-maturity')).toContainText('Technical structure and fact catalog verified');
   await expect(page.getByTestId('posture-approval-stage')).toContainText('Approved (4-eyes)');
 
   await page.getByRole('button', { name: 'Edit rule', exact: true }).click();
+  await expect(page.getByTestId('workspace-doc-editor')).toBeVisible();
+  await expect(page.getByTestId('workspace-doc-title')).toBeVisible();
   await expect(page.getByTestId('representation-mode-switcher')).toBeVisible();
   await expect(page.getByTestId('representation-mode-tree')).toContainText('Visual tree');
   await expect(page.getByTestId('representation-mode-table')).toContainText('Decision table');
@@ -1611,4 +1619,265 @@ test('switches operators through logout and login in the same host and realm wit
   await expect(page.locator('form.development-login')).toBeVisible();
   expect(anonymousProbes).toBe(1);
   expect(loggedOut).toEqual(['maker', 'operator']);
+});
+
+test('creates, validates, persists, reloads, and clears didactic documentation including legalBasis across desktop and narrow viewports', async ({ page }, testInfo) => {
+  let createdDefinition: Record<string, unknown> | null = null;
+  let savedDocumentation: Record<string, unknown> | null = null;
+  let workspaceRevision = workspace.revision;
+  let workspaceEtag = workspace.etag;
+  const draftPayloads: Array<Record<string, unknown>> = [];
+  const createPayloads: Array<Record<string, unknown>> = [];
+
+  await mockGovernedBackend(page, false);
+
+  await page.route('**/api/praxis/config/domain-rules/definitions/catalog*', async route => {
+    const candidates: Record<string, unknown>[] = [{
+      definitionId: definition.id,
+      ruleKey: definition.ruleKey,
+      version: definition.version,
+      ruleType: 'JSON_LOGIC_DECISION',
+      status: definition.status,
+      resourceKey: definition.resourceKey,
+      serviceKey: definition.serviceKey,
+      contextKey: 'benefits',
+      semanticOwner: 'benefits-policy',
+      updatedAt: '2026-08-16T12:00:00Z'
+    }];
+    if (createdDefinition) {
+      candidates.push({
+        definitionId: createdDefinition['id'],
+        ruleKey: createdDefinition['ruleKey'],
+        version: 1,
+        ruleType: createdDefinition['ruleType'],
+        status: 'draft',
+        resourceKey: createdDefinition['resourceKey'],
+        serviceKey: createdDefinition['serviceKey'],
+        contextKey: createdDefinition['contextKey'],
+        semanticOwner: 'workforce-policy',
+        updatedAt: '2026-08-19T12:00:00Z'
+      });
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        schemaVersion: 'praxis-domain-rule-catalog.v1',
+        page: 0,
+        limit: 12,
+        hasMore: false,
+        candidates
+      })
+    });
+  });
+
+  await page.route('**/api/praxis/config/domain-rules/definitions', async route => {
+    if (route.request().method() === 'POST') {
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      createPayloads.push(body);
+      createdDefinition = {
+        id: 'def-created-didactic-1',
+        ruleKey: body['ruleKey'],
+        version: 1,
+        status: 'draft',
+        ruleType: body['ruleType'],
+        contextKey: body['contextKey'],
+        resourceKey: body['resourceKey'],
+        serviceKey: body['serviceKey'],
+        definition: body['definition'],
+        parameters: body['parameters'],
+        condition: body['condition'] ?? null,
+        governance: body['governance']
+      };
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify(createdDefinition)
+      });
+      return;
+    }
+    await route.fallback();
+  });
+
+  await page.route('**/api/praxis/config/domain-rules/definitions/def-created-didactic-1/facts', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        definitionId: 'def-created-didactic-1',
+        ruleKey: 'workforce.leave.max-duration',
+        definitionVersion: 1,
+        schemaVersion: 'praxis.domain-rule-fact-catalog.v1',
+        facts: []
+      })
+    });
+  });
+
+  await page.route('**/api/praxis/config/domain-rules/definitions/def-created-didactic-1', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(createdDefinition)
+    });
+  });
+
+  await page.route('**/api/praxis/config/domain-rules/workspaces', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{
+        ...workspace,
+        revision: workspaceRevision,
+        etag: workspaceEtag,
+        documentation: savedDocumentation
+      }])
+    });
+  });
+
+  await page.route('**/api/praxis/config/domain-rules/workspaces/workspace-1/draft', async route => {
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    draftPayloads.push(body);
+    expect(route.request().headers()['if-match']).toBe(`"${workspaceEtag}"`);
+    const docPayload = body['documentation'];
+    if (docPayload && typeof docPayload === 'object' && Object.keys(docPayload as object).length === 0) {
+      savedDocumentation = null;
+    } else if (docPayload && typeof docPayload === 'object') {
+      savedDocumentation = docPayload as Record<string, unknown>;
+    }
+    workspaceRevision += 1;
+    workspaceEtag = `workspace-etag-${workspaceRevision}`;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...workspace,
+        revision: workspaceRevision,
+        etag: workspaceEtag,
+        documentation: savedDocumentation
+      })
+    });
+  });
+
+  await page.goto('/catalog');
+
+  // 1. Create new governed decision with full didactic documentation & legalBasis
+  await page.getByTestId('toggle-new-decision').click();
+  await page.getByTestId('new-decision-rule-key').fill('workforce.leave.max-duration');
+  await page.getByTestId('new-decision-context-key').fill('workforce');
+  await page.getByTestId('new-decision-resource-key').fill('workforce.leave-requests');
+  await page.getByTestId('new-decision-service-key').fill('workforce-service');
+
+  await page.getByTestId('create-doc-toggle').click();
+  await page.getByTestId('create-doc-title').fill('Limite máximo de afastamento');
+  await page.getByTestId('create-doc-summary').fill('Garante que o afastamento não ultrapasse 30 dias contínuos.');
+  await page.getByTestId('create-doc-when-applies').fill('Ao solicitar novo afastamento operacional.');
+  await page.getByTestId('create-doc-rationale').fill('Preserva a continuidade do atendimento.');
+  await page.getByTestId('create-doc-customization-guidance').fill('Ajustável pelo órgão dentro da alçada.');
+  await page.getByTestId('create-doc-legal-add').click();
+  await page.getByTestId('create-doc-legal-code-0').fill('Decreto WF-10/2024');
+  await page.getByTestId('create-doc-legal-article-0').fill('Art. 5º');
+  await page.getByTestId('create-doc-legal-url-0').fill('https://normas.example.gov/wf-10');
+
+  await page.getByTestId('submit-new-decision').click();
+  if (testInfo.project.name === 'narrow') {
+    const createdRow = page.getByRole('button', { name: /Limite máximo de afastamento/ });
+    await expect(createdRow).toBeVisible();
+    await createdRow.click();
+  } else {
+    await expect(page.getByText('Decisão governada registrada no Config; o catálogo foi recarregado.')).toBeVisible();
+  }
+
+  expect(createPayloads).toHaveLength(1);
+  expect(createPayloads[0]?.['definition']).toEqual({
+    documentation: {
+      title: 'Limite máximo de afastamento',
+      summary: 'Garante que o afastamento não ultrapasse 30 dias contínuos.',
+      whenApplies: 'Ao solicitar novo afastamento operacional.',
+      rationale: 'Preserva a continuidade do atendimento.',
+      customizationGuidance: 'Ajustável pelo órgão dentro da alçada.',
+      legalBasis: [{
+        code: 'Decreto WF-10/2024',
+        article: 'Art. 5º',
+        url: 'https://normas.example.gov/wf-10'
+      }]
+    }
+  });
+
+  await expect(page.getByTestId('decision-didactic-panel')).toBeVisible();
+  await expect(page.getByTestId('decision-didactic-fallback')).toHaveCount(0);
+  await expect(page.getByTestId('didactic-summary')).toContainText('30 dias contínuos');
+  await expect(page.getByTestId('didactic-legal-basis-chip')).toContainText('Decreto WF-10/2024');
+
+  // 2. Switch to existing governed workspace, verify fallback badge, validate rejection, save & reload
+  if (testInfo.project.name === 'narrow') {
+    await page.getByRole('button', { name: 'Voltar ao catálogo' }).click();
+  }
+  await page.getByRole('button', { name: /O valor solicitado deve respeitar o limite do programa/ }).click();
+  await expect(page.getByTestId('decision-didactic-fallback')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Editar regra', exact: true }).click();
+  await expect(page.getByTestId('workspace-doc-editor')).toBeVisible();
+
+  // Trigger validation rejection with unsafe URL
+  await page.getByTestId('workspace-doc-legal-add').click();
+  await page.getByTestId('workspace-doc-legal-code-0').fill('Portaria WF-99/2025');
+  await page.getByTestId('workspace-doc-legal-url-0').fill('javascript:alert(1)');
+  await expect(page.getByTestId('workspace-doc-legal-url-error-0')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Salvar draft governado' })).toBeDisabled();
+
+  // Fix URL and fill all 5 didactic fields
+  await page.getByTestId('workspace-doc-legal-url-0').fill('https://normas.example.gov/wf-99');
+  await page.getByTestId('workspace-doc-title').fill('Teto financeiro de auxílio extraordinário');
+  await page.getByTestId('workspace-doc-summary').fill('Verifica se o auxílio respeita o limite financeiro do programa.');
+  await page.getByTestId('workspace-doc-when-applies').fill('Na solicitação e revisão de auxílio extraordinário.');
+  await page.getByTestId('workspace-doc-rationale').fill('Garante sustentabilidade orçamentária do benefício.');
+  await page.getByTestId('workspace-doc-customization-guidance').fill('O órgão pode ajustar o teto via parâmetros no Studio.');
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+
+  await page.getByRole('button', { name: 'Salvar draft governado' }).click();
+  await expect(page.getByText('Draft salvo com controle de concorrência.')).toBeVisible();
+  expect(draftPayloads[0]?.['documentation']).toEqual({
+    title: 'Teto financeiro de auxílio extraordinário',
+    summary: 'Verifica se o auxílio respeita o limite financeiro do programa.',
+    whenApplies: 'Na solicitação e revisão de auxílio extraordinário.',
+    rationale: 'Garante sustentabilidade orçamentária do benefício.',
+    customizationGuidance: 'O órgão pode ajustar o teto via parâmetros no Studio.',
+    legalBasis: [{
+      code: 'Portaria WF-99/2025',
+      url: 'https://normas.example.gov/wf-99'
+    }]
+  });
+
+  await page.getByRole('button', { name: /^Entender/ }).click();
+  await expect(page.getByTestId('decision-didactic-fallback')).toHaveCount(0);
+  await expect(page.getByTestId('didactic-summary')).toContainText('limite financeiro do programa');
+  await expect(page.getByTestId('didactic-legal-basis-chip').locator('a')).toHaveAttribute('rel', 'noopener noreferrer');
+
+  // 3. Reload page and verify didactic documentation survives reload
+  await page.reload();
+  if (testInfo.project.name === 'narrow') {
+    await page.getByRole('button', { name: /O valor solicitado deve respeitar o limite do programa/ }).click();
+  }
+  await expect(page.getByTestId('decision-didactic-fallback')).toHaveCount(0);
+  await expect(page.getByTestId('didactic-summary')).toContainText('limite financeiro do programa');
+  await expect(page.getByTestId('didactic-legal-basis-chip')).toContainText('Portaria WF-99/2025');
+
+  // 4. Clear didactic documentation -> verify {} is sent on PUT draft and fallback badge returns
+  await page.getByRole('button', { name: 'Editar regra', exact: true }).click();
+  await page.getByTestId('workspace-doc-legal-remove-0').click();
+  await page.getByTestId('workspace-doc-title').fill('');
+  await page.getByTestId('workspace-doc-summary').fill('');
+  await page.getByTestId('workspace-doc-when-applies').fill('');
+  await page.getByTestId('workspace-doc-rationale').fill('');
+  await page.getByTestId('workspace-doc-customization-guidance').fill('');
+  await page.getByRole('button', { name: 'Salvar draft governado' }).click();
+  await expect(page.getByText('Draft salvo com controle de concorrência.')).toBeVisible();
+  expect(draftPayloads[1]?.['documentation']).toEqual({});
+
+  await page.getByRole('button', { name: /^Entender/ }).click();
+  await expect(page.getByTestId('decision-didactic-fallback')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 });

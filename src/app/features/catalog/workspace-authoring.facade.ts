@@ -13,6 +13,12 @@ import {
 } from '../../core/decision-inspection';
 import { PolicyStudioI18n } from '../../core/i18n';
 import { ProjectionCatalogService } from '../../core/projection-catalog.service';
+import {
+  DOMAIN_RULE_DOCUMENTATION_KEY,
+  extractRuleDocumentation,
+  normalizeAndCompactDocumentation,
+  type RuleDocumentationDescriptor
+} from '../../core/rule-documentation';
 import { RuntimeConfigService } from '../../core/runtime-config.service';
 import { semanticDecisionDiff } from '../../core/semantic-decision-diff';
 import type {
@@ -53,6 +59,8 @@ export class WorkspaceAuthoringFacade {
   readonly draftCondition = signal<unknown | null>(null);
   readonly draftParameters = signal<Readonly<Record<string, unknown>>>({});
   readonly parameterValidationErrors = signal<readonly string[]>([]);
+  readonly draftDocumentation = signal<RuleDocumentationDescriptor | null>(null);
+  readonly documentationValidationErrors = signal<readonly string[]>([]);
   readonly editorState = signal<RuleBuilderState | null>(null);
 
   readonly ontologyInspection = computed<DecisionOntologyInspection>(() =>
@@ -69,6 +77,7 @@ export class WorkspaceAuthoringFacade {
   readonly totalAuthoringValidationErrors = computed(() =>
     (this.editorState()?.validationErrors?.length ?? 0)
     + this.parameterValidationErrors().length
+    + this.documentationValidationErrors().length
     + this.ontologyInspection().invalidVars.length
   );
   readonly originalExpression = computed(() => formatDecisionExpression(this.store.selected()?.condition));
@@ -83,9 +92,18 @@ export class WorkspaceAuthoringFacade {
       '$.parameters'
     ).length > 0;
   });
+  readonly draftDocumentationChanged = computed(() => {
+    const decision = this.store.selected();
+    if (!decision) return false;
+    const baseline = normalizeAndCompactDocumentation(this.effectiveDocumentation(decision)) ?? {};
+    const candidate = normalizeAndCompactDocumentation(this.draftDocumentation()) ?? {};
+    return semanticDecisionDiff(baseline, candidate, '$.documentation').length > 0;
+  });
   readonly draftChanged = computed(() => canonicalDecisionExpression(
     effectiveWorkspaceCondition(this.store.selected())) !==
-    canonicalDecisionExpression(this.draftCondition()) || this.draftParametersChanged());
+    canonicalDecisionExpression(this.draftCondition())
+    || this.draftParametersChanged()
+    || this.draftDocumentationChanged());
   readonly semanticDiff = computed(() => {
     const decision = this.store.selected();
     const conditionDiff = semanticDecisionDiff(
@@ -94,14 +112,21 @@ export class WorkspaceAuthoringFacade {
         ? this.draftCondition()
         : effectiveWorkspaceCondition(decision)
     );
-    if (!this.hasEditableParameters(decision)) return conditionDiff;
-    const candidateParameters = this.authoringOpen()
-      ? this.draftParameters()
-      : this.effectiveParameters(decision);
-    return [
-      ...conditionDiff,
-      ...semanticDecisionDiff(decision?.parameters ?? {}, candidateParameters, '$.parameters')
-    ];
+    const paramDiff = this.hasEditableParameters(decision)
+      ? semanticDecisionDiff(
+          decision?.parameters ?? {},
+          this.authoringOpen() ? this.draftParameters() : this.effectiveParameters(decision),
+          '$.parameters'
+        )
+      : [];
+    const baseDoc = normalizeAndCompactDocumentation(
+      decision?.definitionDocumentation ?? (!decision?.workspaceId ? decision?.documentation : null) ?? null
+    ) ?? {};
+    const candidateDoc = normalizeAndCompactDocumentation(
+      this.authoringOpen() ? this.draftDocumentation() : this.effectiveDocumentation(decision)
+    ) ?? {};
+    const docDiff = semanticDecisionDiff(baseDoc, candidateDoc, '$.documentation');
+    return [...conditionDiff, ...paramDiff, ...docDiff];
   });
   readonly editorConfig = computed<RuleBuilderConfig | null>(() => {
     const decision = this.store.selected();
@@ -137,13 +162,19 @@ export class WorkspaceAuthoringFacade {
   }
 
   canOpenAuthoring(decision: DecisionSummary | null | undefined): boolean {
-    return !!decision?.authoringSupported
-      && (!!decision.condition || this.hasEditableParameters(decision))
-      && this.store.hasWorkspaceAction('VIEW');
+    return !!decision?.authoringSupported && this.store.hasWorkspaceAction('VIEW');
   }
 
   effectiveParameters(decision: DecisionSummary | null | undefined): Readonly<Record<string, unknown>> {
     return effectiveDecisionParameters(decision);
+  }
+
+  effectiveDocumentation(decision: DecisionSummary | null | undefined): RuleDocumentationDescriptor | null {
+    if (!decision) return null;
+    if (decision.workspaceId && decision.workspaceDocumentation !== undefined) {
+      return decision.workspaceDocumentation;
+    }
+    return decision.definitionDocumentation ?? decision.documentation ?? null;
   }
 
   openAuthoring(): void {
@@ -153,6 +184,8 @@ export class WorkspaceAuthoringFacade {
     this.draftCondition.set(effectiveWorkspaceCondition(decision));
     this.draftParameters.set(this.effectiveParameters(decision));
     this.parameterValidationErrors.set([]);
+    this.draftDocumentation.set(this.effectiveDocumentation(decision));
+    this.documentationValidationErrors.set([]);
     this.editorState.set(null);
     this.authoringOpen.set(true);
   }
@@ -182,6 +215,10 @@ export class WorkspaceAuthoringFacade {
     if (hasAllowOperationalEffect(parameters)) {
       this.draftCondition.set(null);
     }
+  }
+
+  updateDraftDocumentation(documentation: RuleDocumentationDescriptor | null): void {
+    this.draftDocumentation.set(documentation);
   }
 
   applyDiffProposal(proposal: SuggestedDraftDiffProposal): void {
@@ -220,6 +257,8 @@ export class WorkspaceAuthoringFacade {
     this.draftCondition.set(effectiveWorkspaceCondition(decision));
     this.draftParameters.set(this.effectiveParameters(decision));
     this.parameterValidationErrors.set([]);
+    this.draftDocumentation.set(this.effectiveDocumentation(decision));
+    this.documentationValidationErrors.set([]);
     this.editorState.set(null);
   }
 
@@ -228,6 +267,8 @@ export class WorkspaceAuthoringFacade {
     this.draftCondition.set(effectiveWorkspaceCondition(decision));
     this.draftParameters.set(this.effectiveParameters(decision));
     this.parameterValidationErrors.set([]);
+    this.draftDocumentation.set(this.effectiveDocumentation(decision));
+    this.documentationValidationErrors.set([]);
     this.editorState.set(null);
     this.publicationReadiness.set(null);
     this.publicationResult.set(null);
@@ -241,6 +282,8 @@ export class WorkspaceAuthoringFacade {
     this.draftCondition.set(null);
     this.draftParameters.set({});
     this.parameterValidationErrors.set([]);
+    this.draftDocumentation.set(null);
+    this.documentationValidationErrors.set([]);
     this.editorState.set(null);
     this.reviews.set([]);
     this.publicationReadiness.set(null);
@@ -328,11 +371,19 @@ export class WorkspaceAuthoringFacade {
     ) !== canonicalDecisionExpression(this.draftCondition());
     const hasTemplate = (decision.parameterCatalog?.parameters.length ?? 0) > 0;
     const conditionPayload = hasTemplate && !conditionChanged ? null : this.draftCondition();
-    this.catalog.saveWorkspaceDraft({
+    const workspaceRef = {
       id: decision.workspaceId,
       etag: decision.workspaceEtag,
       parameters: nextParameters as Record<string, unknown>
-    }, conditionPayload, state.config, nextParameters).subscribe({
+    };
+    const documentationChanged = this.draftDocumentationChanged();
+    const documentationPayload = documentationChanged
+      ? (normalizeAndCompactDocumentation(this.draftDocumentation()) ?? {})
+      : undefined;
+    const save$ = documentationChanged
+      ? this.catalog.saveWorkspaceDraft(workspaceRef, conditionPayload, state.config, nextParameters, documentationPayload)
+      : this.catalog.saveWorkspaceDraft(workspaceRef, conditionPayload, state.config, nextParameters);
+    save$.subscribe({
       next: workspace => {
         if (!this.store.isCurrentCommand(commandRevision, commandRuleKey, commandWorkspaceId)) {
           this.store.authoringBusy.set(false);
@@ -519,6 +570,37 @@ export class WorkspaceAuthoringFacade {
           this.store.authoringBusy.set(false);
           this.store.authoringFeedback.set(this.i18n.text(
             publication.status === 'published' ? 'definitionPublished' : 'publicationBlocked'));
+          if (publication.status === 'published') {
+            const patchPublished = (item: DecisionSummary): DecisionSummary => ({
+              ...item,
+              configStatus: 'active'
+            });
+            this.store.allDecisions.update(items =>
+              items.map(item => item.key === commandRuleKey ? patchPublished(item) : item));
+            const selected = this.store.selected();
+            if (selected?.key === commandRuleKey) {
+              this.store.selected.set(patchPublished(selected));
+            }
+            if (state.config.mode === 'remote') {
+              const loadRevision = ++this.store.catalogLoadRevision;
+              this.catalog.load(this.i18n.locale(), {
+                ...state.config,
+                initialDecisionKey: commandRuleKey
+              }).subscribe({
+                next: decisions => {
+                  if (loadRevision !== this.store.catalogLoadRevision || decisions.length === 0) return;
+                  this.store.allDecisions.set(decisions);
+                  const refreshed = decisions.find(item => item.key === commandRuleKey);
+                  if (refreshed && this.store.selected()?.key === commandRuleKey) {
+                    this.store.selected.set(refreshed);
+                  }
+                },
+                error: () => {
+                  // Non-blocking catalog refresh after publication
+                }
+              });
+            }
+          }
           this.store.loadLifecycle();
           this.store.loadTimeline();
           this.snapshots.loadSnapshots();
@@ -550,24 +632,42 @@ export class WorkspaceAuthoringFacade {
   }
 
   applyWorkspace(workspace: DomainRuleChangeWorkspace): void {
-    const patch = (decision: DecisionSummary): DecisionSummary => ({
-      ...decision,
-      workspaceId: workspace.id,
-      workspaceStatus: workspace.status,
-      workspaceEtag: workspace.etag,
-      workspaceRevision: workspace.revision,
-      promotedDefinitionId: workspace.promotedDefinitionId ?? decision.promotedDefinitionId ?? null,
-      configStatus: workspace.promotedDefinitionId ? 'approved' : decision.configStatus,
-      workspaceCondition: workspace.condition ?? null,
-      workspaceParameters: workspace.parameters,
-      parameterCatalog: this.catalog.overlayParameterCatalog(decision.parameterCatalog, workspace.parameters)
-    });
+    const hasWorkspaceDoc = Object.prototype.hasOwnProperty.call(workspace, DOMAIN_RULE_DOCUMENTATION_KEY)
+      && (workspace as { documentation?: unknown }).documentation !== undefined;
+    const parsedWorkspaceDoc = hasWorkspaceDoc
+      ? extractRuleDocumentation((workspace as { documentation?: unknown }).documentation)
+      : undefined;
+    const patch = (decision: DecisionSummary): DecisionSummary => {
+      const nextWorkspaceDoc = parsedWorkspaceDoc !== undefined
+        ? parsedWorkspaceDoc
+        : decision.workspaceDocumentation;
+      const nextDefinitionDoc = workspace.promotedDefinitionId
+        ? (parsedWorkspaceDoc !== undefined ? parsedWorkspaceDoc : (decision.workspaceDocumentation ?? decision.definitionDocumentation))
+        : decision.definitionDocumentation;
+      return {
+        ...decision,
+        workspaceId: workspace.id,
+        workspaceStatus: workspace.status,
+        workspaceEtag: workspace.etag,
+        workspaceRevision: workspace.revision,
+        promotedDefinitionId: workspace.promotedDefinitionId ?? decision.promotedDefinitionId ?? null,
+        configStatus: workspace.promotedDefinitionId ? 'approved' : decision.configStatus,
+        workspaceCondition: workspace.condition ?? null,
+        workspaceParameters: workspace.parameters,
+        workspaceDocumentation: nextWorkspaceDoc,
+        definitionDocumentation: nextDefinitionDoc,
+        documentation: (nextWorkspaceDoc !== undefined ? nextWorkspaceDoc : null) ?? nextDefinitionDoc ?? decision.documentation ?? null,
+        parameterCatalog: this.catalog.overlayParameterCatalog(decision.parameterCatalog, workspace.parameters)
+      };
+    };
     this.store.allDecisions.update(items => items.map(item => item.key === workspace.ruleKey ? patch(item) : item));
     const current = this.store.selected();
     const updated = current?.key === workspace.ruleKey ? patch(current) : current;
     if (updated && current?.key === workspace.ruleKey) this.store.selected.set(updated);
     this.draftCondition.set(effectiveWorkspaceCondition(updated));
     this.draftParameters.set(this.effectiveParameters(updated));
+    this.draftDocumentation.set(this.effectiveDocumentation(updated));
+    this.documentationValidationErrors.set([]);
     this.testing.resetSandboxState();
     this.publicationReadiness.set(null);
     this.publicationResult.set(null);

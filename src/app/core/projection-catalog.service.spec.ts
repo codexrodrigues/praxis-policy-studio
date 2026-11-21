@@ -382,30 +382,30 @@ describe('ProjectionCatalogService', () => {
     });
 
     let completeCohort: import('@praxisui/core').DomainRuleSnapshotHeadSetResponse | null = null;
-    service.snapshotHeadSet('ergon.administracao-pessoal.funcoes.chefia', [
-      'createErgonFuncaoConfianca',
-      'updateErgonFuncaoConfianca'
+    service.snapshotHeadSet('workforce.human-resources.leadership-roles', [
+      'createLeadershipRole',
+      'updateLeadershipRole'
     ], config).subscribe(value => completeCohort = value);
     const headSetReq = http.expectOne(request =>
       request.url === '/api/praxis/config/domain-rules/snapshots/head-set'
-      && request.params.get('ruleSetKey') === 'ergon.administracao-pessoal.funcoes.chefia'
-      && request.params.getAll('operationKeys')?.join(',') === 'createErgonFuncaoConfianca,updateErgonFuncaoConfianca');
+      && request.params.get('ruleSetKey') === 'workforce.human-resources.leadership-roles'
+      && request.params.getAll('operationKeys')?.join(',') === 'createLeadershipRole,updateLeadershipRole');
     headSetReq.flush({
-      tenantId: 'ergon',
+      tenantId: 'workforce',
       environment: 'prod',
-      ruleSetKey: 'ergon.administracao-pessoal.funcoes.chefia',
+      ruleSetKey: 'workforce.human-resources.leadership-roles',
       heads: {},
       fingerprint: 'sha256:cohort-intact'
     });
     expect(completeCohort).toEqual(expect.objectContaining({
-      ruleSetKey: 'ergon.administracao-pessoal.funcoes.chefia',
+      ruleSetKey: 'workforce.human-resources.leadership-roles',
       fingerprint: 'sha256:cohort-intact'
     }));
 
     let incompleteCohort: import('@praxisui/core').DomainRuleSnapshotHeadSetResponse | null | undefined;
-    service.snapshotHeadSet('ergon.administracao-pessoal.funcoes.chefia', [
-      'createErgonFuncaoConfianca',
-      'updateErgonFuncaoConfianca'
+    service.snapshotHeadSet('workforce.human-resources.leadership-roles', [
+      'createLeadershipRole',
+      'updateLeadershipRole'
     ], config).subscribe(value => incompleteCohort = value);
     http.expectOne(request => request.url === '/api/praxis/config/domain-rules/snapshots/head-set')
       .flush({ message: 'Not found' }, { status: 404, statusText: 'Not Found' });
@@ -1063,7 +1063,7 @@ describe('ProjectionCatalogService', () => {
     });
   });
 
-  it('hydrates Ergon slot metadata including EXTEND_ONLY policy, 1-hop roots, and PL/SQL lineage', () => {
+  it('hydrates workforce slot metadata including EXTEND_ONLY policy, 1-hop roots, and legacy lineage', () => {
     let decisions: readonly import('../features/catalog/catalog.fixture').DecisionSummary[] = [];
     service.load('pt-BR', {
       mode: 'remote', configApiBaseUrl: '', locale: 'pt-BR',
@@ -1078,64 +1078,64 @@ describe('ProjectionCatalogService', () => {
     http.expectOne(request => request.url.endsWith('/definitions/catalog')).flush({
       schemaVersion: 'praxis-domain-rule-catalog.v1', page: 0, limit: 12, hasMore: false,
       candidates: [{
-        definitionId: 'ergon-def-1',
-        ruleKey: 'ergon.administracao-pessoal.frequencias.rn013.custom-extension',
+        definitionId: 'wf-def-1',
+        ruleKey: 'workforce.human-resources.attendance.rn013.custom-extension',
         version: 1,
         ruleType: 'selection_eligibility',
         status: 'draft',
-        contextKey: 'administracao-pessoal.frequencias',
-        resourceKey: 'ergon.administracao-pessoal.frequencias.rn013',
-        serviceKey: 'praxis-ergon-showcase'
+        contextKey: 'human-resources.attendance',
+        resourceKey: 'workforce.human-resources.attendance.rn013',
+        serviceKey: 'praxis-api-quickstart'
       }]
     });
-    http.expectOne('/api/praxis/config/domain-rules/definitions/ergon-def-1').flush({
-      id: 'ergon-def-1',
-      ruleKey: 'ergon.administracao-pessoal.frequencias.rn013.custom-extension',
+    http.expectOne('/api/praxis/config/domain-rules/definitions/wf-def-1').flush({
+      id: 'wf-def-1',
+      ruleKey: 'workforce.human-resources.attendance.rn013.custom-extension',
       version: 1,
       status: 'draft',
-      resourceKey: 'ergon.administracao-pessoal.frequencias.rn013',
-      serviceKey: 'praxis-ergon-showcase',
+      resourceKey: 'workforce.human-resources.attendance.rn013',
+      serviceKey: 'praxis-api-quickstart',
       definition: {
-        ruleSetKey: 'ergon.administracao-pessoal.frequencias.rn013',
-        operationalResourceKey: 'administracao-pessoal.frequencias',
+        ruleSetKey: 'workforce.human-resources.attendance.rn013',
+        operationalResourceKey: 'human-resources.attendance',
         slotKey: 'rn013.custom-extension',
-        presentationLabel: 'CERG-09100 — Extensão governada do órgão',
+        presentationLabel: 'CWF-09100 — Extensão governada do órgão',
         messagePtBr: 'Extensão governada do órgão para lançamento de frequência.',
         decisionStage: 'POST_DECISION',
         overridePolicy: 'EXTEND_ONLY',
         cardinality: 'ORDERED_LIST',
-        availableRoots: ['draft', 'context', 'vinculo'],
-        conceptRoots: ['vinculo'],
+        availableRoots: ['draft', 'context', 'employment'],
+        conceptRoots: ['employment'],
         legacyOccurrence: {
-          code: 'CERG-09100',
+          code: 'CWF-09100',
           targetField: 'quantidade',
-          plsqlOrigin: 'PCK_REGRAS_FREQ.MAIN_POS',
-          plsqlLineage: 'IF v_qtd > 180 THEN PACK_HADES.TRATA_ERRO'
+          plsqlOrigin: 'PKG_ATTENDANCE_RULES.MAIN_POS',
+          plsqlLineage: 'IF v_qtd > 180 THEN PKG_LEGACY_RULES.RAISE_ERROR'
         }
       },
       condition: { '<=': [{ var: 'draft.quantidade' }, 180] },
       parameters: { nullSemantics: 'FAIL_CLOSED', operationKeys: ['EVALUATE'] },
-      governance: { lifecycleBoundary: 'REFERENCE_DRAFT_ONLY', sourceKind: 'ERGON_RULES_STUDIO_SEED' }
+      governance: { lifecycleBoundary: 'REFERENCE_DRAFT_ONLY', sourceKind: 'WORKFORCE_RULES_STUDIO_SEED' }
     });
-    http.expectOne('/api/praxis/config/domain-rules/definitions/ergon-def-1/facts')
-      .flush(factCatalog('ergon-def-1', 'ergon.administracao-pessoal.frequencias.rn013.custom-extension'));
+    http.expectOne('/api/praxis/config/domain-rules/definitions/wf-def-1/facts')
+      .flush(factCatalog('wf-def-1', 'workforce.human-resources.attendance.rn013.custom-extension'));
 
     expect(decisions).toHaveLength(1);
-    expect(decisions[0]?.ruleSetKey).toBe('ergon.administracao-pessoal.frequencias.rn013');
-    expect(decisions[0]?.resourceKey).toBe('administracao-pessoal.frequencias');
+    expect(decisions[0]?.ruleSetKey).toBe('workforce.human-resources.attendance.rn013');
+    expect(decisions[0]?.resourceKey).toBe('human-resources.attendance');
     expect(decisions[0]?.slotKey).toBe('rn013.custom-extension');
-    expect(decisions[0]?.name).toBe('CERG-09100 — Extensão governada do órgão');
+    expect(decisions[0]?.name).toBe('CWF-09100 — Extensão governada do órgão');
     expect(decisions[0]?.meaning).toBe('Extensão governada do órgão para lançamento de frequência.');
     expect(decisions[0]?.decisionStage).toBe('POST_DECISION');
     expect(decisions[0]?.slotOverridePolicy).toBe('EXTEND_ONLY');
     expect(decisions[0]?.slotCardinality).toBe('ORDERED_LIST');
-    expect(decisions[0]?.availableRoots).toEqual(['draft', 'context', 'vinculo']);
-    expect(decisions[0]?.conceptRoots).toEqual(['vinculo']);
+    expect(decisions[0]?.availableRoots).toEqual(['draft', 'context', 'employment']);
+    expect(decisions[0]?.conceptRoots).toEqual(['employment']);
     expect(decisions[0]?.legacyOccurrence).toEqual({
-      code: 'CERG-09100',
+      code: 'CWF-09100',
       targetField: 'quantidade',
-      plsqlOrigin: 'PCK_REGRAS_FREQ.MAIN_POS',
-      plsqlLineage: 'IF v_qtd > 180 THEN PACK_HADES.TRATA_ERRO'
+      plsqlOrigin: 'PKG_ATTENDANCE_RULES.MAIN_POS',
+      plsqlLineage: 'IF v_qtd > 180 THEN PKG_LEGACY_RULES.RAISE_ERROR'
     });
   });
 
@@ -1154,28 +1154,28 @@ describe('ProjectionCatalogService', () => {
     http.expectOne(request => request.url.endsWith('/definitions/catalog')).flush({
       schemaVersion: 'praxis-domain-rule-catalog.v1', page: 0, limit: 12, hasMore: false,
       candidates: [{
-        definitionId: 'ergon-def-guard',
-        ruleKey: 'product.ergon.rn013.erg00019',
+        definitionId: 'wf-def-guard',
+        ruleKey: 'product.workforce.rn013.wf00019',
         version: 1,
         ruleType: 'selection_eligibility',
         status: 'draft',
-        contextKey: 'administracao-pessoal.regras-frequencia',
-        resourceKey: 'ergon.administracao-pessoal.regras-frequencia.rn013',
-        serviceKey: 'praxis-ergon-showcase'
+        contextKey: 'human-resources.attendance-rules',
+        resourceKey: 'workforce.human-resources.attendance-rules.rn013',
+        serviceKey: 'praxis-api-quickstart'
       }]
     });
-    http.expectOne('/api/praxis/config/domain-rules/definitions/ergon-def-guard').flush({
-      id: 'ergon-def-guard',
-      ruleKey: 'product.ergon.rn013.erg00019',
+    http.expectOne('/api/praxis/config/domain-rules/definitions/wf-def-guard').flush({
+      id: 'wf-def-guard',
+      ruleKey: 'product.workforce.rn013.wf00019',
       version: 1,
       status: 'draft',
-      resourceKey: 'ergon.administracao-pessoal.regras-frequencia.rn013',
-      serviceKey: 'praxis-ergon-showcase',
+      resourceKey: 'workforce.human-resources.attendance-rules.rn013',
+      serviceKey: 'praxis-api-quickstart',
       definition: {
-        ruleSetKey: 'ergon.administracao-pessoal.regras-frequencia.rn013',
-        operationalResourceKey: 'administracao-pessoal.regras-frequencia-estatutaria',
+        ruleSetKey: 'workforce.human-resources.attendance-rules.rn013',
+        operationalResourceKey: 'human-resources.statutory-attendance-rules',
         slotKey: 'rn013.periodo_ordem_valida',
-        presentationLabel: 'ERG-00019 — Data final anterior à inicial',
+        presentationLabel: 'WF-00019 — Data final anterior à inicial',
         messagePtBr: 'Data final não pode ser anterior à data inicial.',
         decisionStage: 'PROTECTED_GUARD',
         overridePolicy: 'FORBIDDEN',
@@ -1185,20 +1185,20 @@ describe('ProjectionCatalogService', () => {
       },
       condition: { '<=': [{ var: 'draft.quantidade' }, 180] },
       parameters: { nullSemantics: 'FAIL_CLOSED', operationKeys: ['validate'] },
-      governance: { lifecycleBoundary: 'REFERENCE_DRAFT_ONLY', sourceKind: 'ERGON_RULES_STUDIO_SEED' }
+      governance: { lifecycleBoundary: 'REFERENCE_DRAFT_ONLY', sourceKind: 'WORKFORCE_RULES_STUDIO_SEED' }
     });
-    http.expectOne('/api/praxis/config/domain-rules/definitions/ergon-def-guard/facts')
-      .flush(factCatalog('ergon-def-guard', 'product.ergon.rn013.erg00019'));
+    http.expectOne('/api/praxis/config/domain-rules/definitions/wf-def-guard/facts')
+      .flush(factCatalog('wf-def-guard', 'product.workforce.rn013.wf00019'));
 
     expect(decisions).toHaveLength(1);
-    expect(decisions[0]?.key).toBe('product.ergon.rn013.erg00019');
+    expect(decisions[0]?.key).toBe('product.workforce.rn013.wf00019');
     expect(decisions[0]?.decisionStage).toBe('PROTECTED_GUARD');
     expect(decisions[0]?.slotOverridePolicy).toBe('FORBIDDEN');
     expect(decisions[0]?.authoringSupported).toBe(false);
     expect(decisions[0]?.reviewStatus).toBe('CATALOG_IDENTITY_ONLY');
   });
 
-  it('hydrates at least one representative per RuleSet in large catalogs (>36 items) and propagates 1-hop ontology roots and inferred ERG codes to unhydrated siblings', () => {
+  it('hydrates at least one representative per RuleSet in large catalogs (>36 items) and propagates 1-hop ontology roots and inferred WF codes to unhydrated siblings', () => {
     let decisions: readonly import('../features/catalog/catalog.fixture').DecisionSummary[] = [];
     service.load('pt-BR', {
       mode: 'remote', configApiBaseUrl: '', locale: 'pt-BR',
@@ -1216,16 +1216,16 @@ describe('ProjectionCatalogService', () => {
       return {
         definitionId: `def-${idx}`,
         ruleKey: isSecondRuleSet
-          ? `product.ergon.freq.erg0044${idx - 30}`
-          : `product.ergon.rn013.erg083${String(idx).padStart(2, '0')}`,
+          ? `product.workforce.freq.wf0044${idx - 30}`
+          : `product.workforce.rn013.wf083${String(idx).padStart(2, '0')}`,
         version: 1,
         ruleType: 'selection_eligibility',
         status: 'draft' as const,
-        contextKey: 'administracao-pessoal.frequencias',
+        contextKey: 'human-resources.attendance',
         resourceKey: isSecondRuleSet
-          ? 'ergon.administracao-pessoal.frequencias.lancamento'
-          : 'ergon.administracao-pessoal.regras-frequencia.rn013',
-        serviceKey: 'praxis-ergon-showcase'
+          ? 'workforce.human-resources.attendance.entry'
+          : 'workforce.human-resources.attendance-rules.rn013',
+        serviceKey: 'praxis-api-quickstart'
       };
     });
 
@@ -1237,7 +1237,7 @@ describe('ProjectionCatalogService', () => {
       candidates
     });
 
-    // First 36 items of RN-013 + item 37 (first representative of RN-017) are hydrated eagerly; item 38 remains lazy
+    // First 36 items of RN-013 + item 37 (first representative of second RuleSet) are hydrated eagerly; item 38 remains lazy
     for (let idx = 1; idx <= 37; idx++) {
       const isSecondRuleSet = idx === 37;
       http.expectOne(`/api/praxis/config/domain-rules/definitions/def-${idx}`).flush({
@@ -1246,16 +1246,16 @@ describe('ProjectionCatalogService', () => {
         version: 1,
         status: 'draft',
         resourceKey: candidates[idx - 1]!.resourceKey,
-        serviceKey: 'praxis-ergon-showcase',
+        serviceKey: 'praxis-api-quickstart',
         definition: {
           ruleSetKey: candidates[idx - 1]!.resourceKey,
           operationalResourceKey: isSecondRuleSet
-            ? 'administracao-pessoal.frequencias'
-            : 'administracao-pessoal.regras-frequencia-estatutaria',
+            ? 'human-resources.attendance'
+            : 'human-resources.statutory-attendance-rules',
           slotKey: `slot.${idx}`,
-          falseReasonCode: isSecondRuleSet ? 'ERG-00447' : `ERG-083${String(idx).padStart(2, '0')}`,
-          availableRoots: ['draft', 'tipoFrequencia', 'context'],
-          conceptRoots: ['tipoFrequencia']
+          falseReasonCode: isSecondRuleSet ? 'WF-00447' : `WF-083${String(idx).padStart(2, '0')}`,
+          availableRoots: ['draft', 'attendanceType', 'context'],
+          conceptRoots: ['attendanceType']
         },
         condition: { '==': [1, 1] },
         parameters: { nullSemantics: 'FAIL_CLOSED', operationKeys: ['validate'] },
@@ -1270,10 +1270,149 @@ describe('ProjectionCatalogService', () => {
     const lazySibling = decisions[37]!;
     expect(hydratedRepresentative.detailHydrated).toBe(true);
     expect(lazySibling.detailHydrated).toBe(false);
-    expect(lazySibling.code).toBe('ERG-00448');
-    expect(lazySibling.ruleSetKey).toBe('ergon.administracao-pessoal.frequencias.lancamento');
-    expect(lazySibling.resourceKey).toBe('administracao-pessoal.frequencias');
-    expect(lazySibling.availableRoots).toEqual(['draft', 'tipoFrequencia', 'context']);
-    expect(lazySibling.conceptRoots).toEqual(['tipoFrequencia']);
+    expect(lazySibling.code).toBe('WF-00448');
+    expect(lazySibling.ruleSetKey).toBe('workforce.human-resources.attendance.entry');
+    expect(lazySibling.resourceKey).toBe('human-resources.attendance');
+    expect(lazySibling.availableRoots).toEqual(['draft', 'attendanceType', 'context']);
+    expect(lazySibling.conceptRoots).toEqual(['attendanceType']);
+  });
+
+  it('hydrates didactic documentation, LOCKED/EXTENSIBLE policies, and workspace draft documentation wire payloads', () => {
+    const config = {
+      mode: 'remote' as const,
+      configApiBaseUrl: '',
+      locale: 'pt-BR' as const,
+      projectionPath: null,
+      initialDecisionKey: null
+    };
+    let decisions: readonly import('../features/catalog/catalog.fixture').DecisionSummary[] = [];
+    service.load('pt-BR', config).subscribe(value => decisions = value);
+
+    http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([
+      {
+        id: 'ws-custom',
+        ruleKey: 'workforce.leave.custom-limit',
+        status: 'OPEN',
+        revision: 2,
+        etag: 'etag-custom-2',
+        condition: null,
+        parameters: {},
+        documentation: {
+          title: 'Limite customizado pelo órgão',
+          summary: 'Valida o teto local de dias.',
+          whenApplies: 'Na solicitação de afastamento.',
+          rationale: 'Adequação à portaria interna.',
+          customizationGuidance: 'Ajustável no Studio.',
+          legalBasis: [{ code: 'Portaria 12/2025', url: 'https://normas.example.gov/p12' }]
+        },
+        updatedAt: '2026-08-18T10:00:00Z'
+      }
+    ]);
+    http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities').flush({
+      tenantId: 't1',
+      environment: 'dev',
+      definitions: []
+    });
+    http.expectOne(request => request.url.endsWith('/definitions/catalog')).flush({
+      schemaVersion: 'praxis-domain-rule-catalog.v1',
+      page: 0,
+      limit: 12,
+      hasMore: false,
+      candidates: [
+        {
+          definitionId: 'def-locked',
+          ruleKey: 'workforce.leave.locked-guard',
+          version: 1,
+          ruleType: 'validation',
+          status: 'active',
+          contextKey: 'workforce',
+          resourceKey: 'workforce.leave-requests'
+        },
+        {
+          definitionId: 'def-custom',
+          ruleKey: 'workforce.leave.custom-limit',
+          version: 1,
+          ruleType: 'validation',
+          status: 'draft',
+          contextKey: 'workforce',
+          resourceKey: 'workforce.leave-requests'
+        }
+      ]
+    });
+
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-locked').flush({
+      id: 'def-locked',
+      ruleKey: 'workforce.leave.locked-guard',
+      version: 1,
+      status: 'active',
+      ruleType: 'validation',
+      definition: {
+        overridePolicy: 'LOCKED',
+        decisionStage: 'PROTECTED_GUARD',
+        documentation: {
+          title: 'Guarda normativa bloqueada',
+          summary: 'Impede sobreposição de períodos.'
+        }
+      },
+      condition: { '==': [1, 1] },
+      parameters: {}
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-locked/facts')
+      .flush(factCatalog('def-locked', 'workforce.leave.locked-guard'));
+
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-custom').flush({
+      id: 'def-custom',
+      ruleKey: 'workforce.leave.custom-limit',
+      version: 1,
+      status: 'draft',
+      ruleType: 'validation',
+      definition: {
+        overridePolicy: 'EXTENSIBLE',
+        documentation: {
+          title: 'Limite padrão do produto',
+          summary: 'Valida o teto padrão.'
+        }
+      },
+      condition: null,
+      parameters: { validationPolicy: { effect: 'BLOCK' } }
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-custom/facts')
+      .flush(factCatalog('def-custom', 'workforce.leave.custom-limit'));
+
+    expect(decisions).toHaveLength(2);
+    const locked = decisions.find(item => item.key === 'workforce.leave.locked-guard')!;
+    expect(locked.slotOverridePolicy).toBe('LOCKED');
+    expect(locked.authoringSupported).toBe(false);
+    expect(locked.name).toBe('Guarda normativa bloqueada');
+    expect(locked.meaning).toBe('Impede sobreposição de períodos.');
+    expect(locked.definitionDocumentation?.title).toBe('Guarda normativa bloqueada');
+
+    const custom = decisions.find(item => item.key === 'workforce.leave.custom-limit')!;
+    expect(custom.slotOverridePolicy).toBe('EXTEND_ONLY');
+    expect(custom.authoringSupported).toBe(true);
+    expect(custom.definitionDocumentation?.title).toBe('Limite padrão do produto');
+    expect(custom.workspaceDocumentation?.title).toBe('Limite customizado pelo órgão');
+    expect(custom.documentation?.legalBasis).toEqual([{
+      code: 'Portaria 12/2025',
+      url: 'https://normas.example.gov/p12'
+    }]);
+
+    // 4-arg call omits documentation; 5-arg call forwards object or {}
+    service.saveWorkspaceDraft({ id: 'ws-custom', etag: 'etag-custom-2', parameters: {} }, null, config).subscribe();
+    const omitReq = http.expectOne('/api/praxis/config/domain-rules/workspaces/ws-custom/draft');
+    expect('documentation' in omitReq.request.body).toBe(false);
+    omitReq.flush({ id: 'ws-custom', etag: 'etag-custom-3', parameters: {} });
+
+    service.saveWorkspaceDraft(
+      { id: 'ws-custom', etag: 'etag-custom-3', parameters: {} },
+      null,
+      config,
+      {},
+      {}
+    ).subscribe();
+    const clearReq = http.expectOne('/api/praxis/config/domain-rules/workspaces/ws-custom/draft');
+    expect(clearReq.request.headers.get('If-Match')).toBe('"etag-custom-3"');
+    expect(clearReq.request.body.documentation).toEqual({});
+    clearReq.flush({ id: 'ws-custom', etag: 'etag-custom-4', parameters: {}, documentation: null });
   });
 });

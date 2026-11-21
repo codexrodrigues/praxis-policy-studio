@@ -50,36 +50,36 @@ const CANONICAL_STAGES: readonly {
     id: 'PROTECTED_GUARD',
     index: 1,
     codeLabel: '01 · GUARD',
-    titlePtBr: 'Guardas Protegidas',
-    titleEnUs: 'Protected Guards'
+    titlePtBr: 'Pré-requisitos obrigatórios',
+    titleEnUs: 'Required prerequisites'
   },
   {
     id: 'DOMAIN_DECISION',
     index: 2,
     codeLabel: '02 · DOMAIN',
-    titlePtBr: 'Decisão de Domínio',
-    titleEnUs: 'Domain Decision'
+    titlePtBr: 'Regras de negócio',
+    titleEnUs: 'Business rules'
   },
   {
     id: 'POST_DECISION',
     index: 3,
     codeLabel: '03 · POST',
-    titlePtBr: 'Pós-decisão',
-    titleEnUs: 'Post-decision'
+    titlePtBr: 'Validações cruzadas',
+    titleEnUs: 'Cross-validations'
   },
   {
     id: 'TRANSFORMATION_INTENT',
     index: 4,
     codeLabel: '04 · TRANSFORM',
-    titlePtBr: 'Intenção de Transformação',
-    titleEnUs: 'Transformation Intent'
+    titlePtBr: 'Ajustes automáticos',
+    titleEnUs: 'Automatic adjustments'
   },
   {
     id: 'EFFECT_INTENT',
     index: 5,
     codeLabel: '05 · EFFECT',
-    titlePtBr: 'Intenção de Efeito',
-    titleEnUs: 'Effect Intent'
+    titlePtBr: 'Consequências e registros',
+    titleEnUs: 'Consequences and records'
   }
 ];
 
@@ -309,6 +309,8 @@ const CANONICAL_STAGES: readonly {
       background: var(--surface-subtle, rgba(128, 128, 128, 0.04));
       display: grid;
       gap: 0.75rem;
+      min-width: 0;
+      max-width: 100%;
     }
     .dag-header {
       display: flex;
@@ -369,10 +371,10 @@ const CANONICAL_STAGES: readonly {
       display: grid;
       align-content: start;
       gap: 0.45rem;
-      opacity: 0.78;
+      background: var(--pax-color-surface-container-low, #f4f6f7);
     }
     .dag-lane.populated {
-      opacity: 1;
+      background: var(--pax-color-surface-container-lowest, #fff);
     }
     .dag-lane.selected-lane {
       border-color: currentColor;
@@ -387,7 +389,7 @@ const CANONICAL_STAGES: readonly {
     .lane-code {
       font-family: monospace;
       font-size: 0.68rem;
-      opacity: 0.72;
+      color: var(--pax-color-on-surface-variant, #42545c);
     }
     .lane-count {
       font-family: monospace;
@@ -410,6 +412,8 @@ const CANONICAL_STAGES: readonly {
       display: grid;
       gap: 0.15rem;
       color: inherit;
+      min-width: 0;
+      max-width: 100%;
     }
     .dag-node.selected {
       border-width: 2px;
@@ -429,12 +433,16 @@ const CANONICAL_STAGES: readonly {
     }
     .node-top {
       display: flex;
+      flex-wrap: wrap;
       justify-content: space-between;
       align-items: center;
       gap: 0.35rem;
+      min-width: 0;
     }
     .node-code {
       font-size: 0.7rem;
+      overflow-wrap: anywhere;
+      min-width: 0;
     }
     .policy-pill {
       font-size: 0.64rem;
@@ -484,7 +492,7 @@ const CANONICAL_STAGES: readonly {
     .lane-empty {
       margin: 0;
       font-size: 0.72rem;
-      opacity: 0.6;
+      color: var(--pax-color-on-surface-variant, #42545c);
     }
     .trace-summary-bar,
     .ontology-roots-bar,
@@ -507,7 +515,7 @@ const CANONICAL_STAGES: readonly {
     }
     .roots-label {
       font-weight: 600;
-      opacity: 0.85;
+      color: var(--pax-color-on-surface-variant, #42545c);
     }
     .root-chip {
       padding: 0.1rem 0.4rem;
@@ -551,7 +559,7 @@ const CANONICAL_STAGES: readonly {
     .lineage-detail {
       display: block;
       width: 100%;
-      opacity: 0.78;
+      color: var(--pax-color-on-surface-variant, #42545c);
     }
   `]
 })
@@ -739,7 +747,7 @@ export class RuleDecisionPlanDagComponent {
     if (decision.decisionStage) return decision.decisionStage;
     const key = decision.key.toLowerCase();
     const ruleType = (decision.ruleType ?? '').toLowerCase();
-    if (key.includes('guard') || decision.slotOverridePolicy === 'FORBIDDEN') {
+    if (key.includes('guard') || decision.slotOverridePolicy === 'FORBIDDEN' || decision.slotOverridePolicy === 'LOCKED') {
       return 'PROTECTED_GUARD';
     }
     if (key.includes('transform') || ruleType.includes('determination') || ruleType.includes('calculation')) {
@@ -765,6 +773,7 @@ export class RuleDecisionPlanDagComponent {
     if (this.isPtBr()) {
       switch (policy) {
         case 'FORBIDDEN': return 'GUARD · FIXO';
+        case 'LOCKED': return this.i18n.text('overridePolicyLocked');
         case 'PARAMETERIZABLE': return 'PARAMETRIZÁVEL';
         case 'REPLACEABLE': return 'SUBSTITUÍVEL';
         case 'RESTRICT_ONLY': return 'RESTRITIVO (+AND)';
@@ -773,6 +782,7 @@ export class RuleDecisionPlanDagComponent {
     }
     switch (policy) {
       case 'FORBIDDEN': return 'GUARD · FIXED';
+      case 'LOCKED': return this.i18n.text('overridePolicyLocked');
       case 'PARAMETERIZABLE': return 'PARAMETERIZABLE';
       case 'REPLACEABLE': return 'REPLACEABLE';
       case 'RESTRICT_ONLY': return 'RESTRICT ONLY';

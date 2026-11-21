@@ -4,7 +4,7 @@ import { ElementRef } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { BrowserTestingModule, platformBrowserTesting } from '@angular/platform-browser/testing';
-import { of, Subject } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthSessionService } from '../../core/auth-session.service';
 import { PolicyStudioI18n } from '../../core/i18n';
@@ -78,7 +78,9 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
   let runSandbox: ReturnType<typeof vi.fn>;
   const operationalTestAction = vi.fn();
   const runOperationalTest = vi.fn();
+  const loginSession = vi.fn();
   const logoutSession = vi.fn();
+  const hasSessionCheck = vi.fn();
   let logoutResult: Subject<void>;
   let component: CatalogWorkspaceComponent;
 
@@ -118,9 +120,13 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     operateSnapshot.mockReset();
     operationalTestAction.mockReset();
     runOperationalTest.mockReset();
+    loginSession.mockReset();
     logoutSession.mockReset();
+    hasSessionCheck.mockReset();
+    loginSession.mockReturnValue(of(void 0));
     logoutResult = new Subject<void>();
     logoutSession.mockReturnValue(logoutResult.asObservable());
+    hasSessionCheck.mockReturnValue(of(true));
     operationalTestAction.mockReturnValue(of(null));
     cancelRollout.mockReturnValue(of(void 0));
     loadCatalog.mockReturnValue(of([]));
@@ -140,7 +146,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
       ScenarioSandboxFacade,
       WorkspaceAuthoringFacade,
       { provide: ElementRef, useValue: new ElementRef(document.createElement('div')) },
-      { provide: AuthSessionService, useValue: { logout: logoutSession } },
+      { provide: AuthSessionService, useValue: { login: loginSession, logout: logoutSession, hasSession: hasSessionCheck } },
       { provide: RuntimeConfigService, useValue: { state: () => ({ kind: 'ready', config }), mode: () => 'fixture' } },
       { provide: ProjectionCatalogService, useValue: {
         load: loadCatalog,
@@ -1742,16 +1748,16 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     const originalUrl = window.location.href;
     const decisionsList: DecisionSummary[] = [
       { ...decision('request.authorization-integrity'), ruleSetKey: 'quickstart.benefit.v1' },
-      { ...decision('funcao.vigencia-retroativa'), ruleSetKey: 'urn:praxis:ergon:ruleset:funcao-confianca' },
+      { ...decision('role.retroactive-effect'), ruleSetKey: 'urn:praxis:workforce:ruleset:leadership-role' },
       {
         ...decision('rn013.sale-days.limit.product'),
         slotKey: 'rn013.sale-days.limit',
-        ruleSetKey: 'urn:praxis:ergon:ruleset:funcao-confianca'
+        ruleSetKey: 'urn:praxis:workforce:ruleset:leadership-role'
       },
       {
-        ...decision('ERG-03185'),
-        slotKey: 'slot.erg-03185',
-        ruleSetKey: 'urn:praxis:ergon:ruleset:funcao-confianca'
+        ...decision('WF-03185'),
+        slotKey: 'slot.wf-03185',
+        ruleSetKey: 'urn:praxis:workforce:ruleset:leadership-role'
       }
     ];
 
@@ -1759,7 +1765,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
       window.history.replaceState(
         {},
         '',
-        '/?ruleSetKey=urn:praxis:ergon:ruleset:funcao-confianca&slotKey=rn013.sale-days.limit'
+        '/?ruleSetKey=urn:praxis:workforce:ruleset:leadership-role&slotKey=rn013.sale-days.limit'
       );
       const matched = component.resolveInitialDecision(decisionsList, 'request.authorization-integrity');
       expect(matched?.key).toBe('rn013.sale-days.limit.product');
@@ -1767,31 +1773,31 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
       window.history.replaceState(
         {},
         '',
-        '/?ruleSetKey=urn:praxis:ergon:ruleset:funcao-confianca&slotKey=slot.erg-03185&decisionKey=ERG-03185'
+        '/?ruleSetKey=urn:praxis:workforce:ruleset:leadership-role&slotKey=slot.wf-03185&decisionKey=WF-03185'
       );
       const matchedByDecisionKey = component.resolveInitialDecision(decisionsList, 'request.authorization-integrity');
-      expect(matchedByDecisionKey?.key).toBe('ERG-03185');
+      expect(matchedByDecisionKey?.key).toBe('WF-03185');
 
-      window.history.replaceState({}, '', '/?ruleSetKey=urn:praxis:ergon:ruleset:funcao-confianca');
+      window.history.replaceState({}, '', '/?ruleSetKey=urn:praxis:workforce:ruleset:leadership-role');
       const matchedByRuleSet = component.resolveInitialDecision(decisionsList, 'request.authorization-integrity');
-      expect(matchedByRuleSet?.key).toBe('funcao.vigencia-retroativa');
+      expect(matchedByRuleSet?.key).toBe('role.retroactive-effect');
 
       const withResource: DecisionSummary[] = [
         ...decisionsList,
         {
-          ...decision('ferias.limite-dias'),
-          slotKey: 'ferias.limite-dias',
-          ruleSetKey: 'urn:praxis:ergon:ruleset:ferias-gozo.create',
-          resourceKey: 'administracao-pessoal.ferias-gozo'
+          ...decision('leave.max-days'),
+          slotKey: 'leave.max-days',
+          ruleSetKey: 'urn:praxis:workforce:ruleset:leave-request.create',
+          resourceKey: 'human-resources.leave-requests'
         }
       ];
-      window.history.replaceState({}, '', '/?resourceKey=administracao-pessoal.ferias-gozo&bindingKey=ferias.limite-dias');
+      window.history.replaceState({}, '', '/?resourceKey=human-resources.leave-requests&bindingKey=leave.max-days');
       const matchedByResourceAndBinding = component.resolveInitialDecision(withResource, 'request.authorization-integrity');
-      expect(matchedByResourceAndBinding?.key).toBe('ferias.limite-dias');
+      expect(matchedByResourceAndBinding?.key).toBe('leave.max-days');
 
-      window.history.replaceState({}, '', '/?resourceKey=administracao-pessoal.ferias-gozo');
+      window.history.replaceState({}, '', '/?resourceKey=human-resources.leave-requests');
       const matchedByResourceOnly = component.resolveInitialDecision(withResource, 'request.authorization-integrity');
-      expect(matchedByResourceOnly?.key).toBe('ferias.limite-dias');
+      expect(matchedByResourceOnly?.key).toBe('leave.max-days');
 
       loadCatalog.mockReturnValue(of(decisionsList));
       component.narrowDetailOpen.set(false);
@@ -1808,11 +1814,11 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
   });
 
   it('validates and auto-fixes ontological roots in authoring, scaffolds scenario ontology skeletons, and filters catalog by 1-hop root', () => {
-    const ergonDecision: DecisionSummary = {
+    const workforceDecision: DecisionSummary = {
       ...decision('A'),
-      availableRoots: ['draft', 'vinculo'],
-      conceptRoots: ['vinculo'],
-      factPaths: ['draft.quantidade', 'vinculo.situacao'],
+      availableRoots: ['draft', 'employment'],
+      conceptRoots: ['employment'],
+      factPaths: ['draft.quantidade', 'employment.status'],
       facts: [
         {
           path: 'draft.quantidade',
@@ -1826,12 +1832,12 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
           redaction: 'NONE'
         },
         {
-          path: 'vinculo.situacao',
+          path: 'employment.status',
           valueType: 'string',
           nullable: false,
           label: 'Situação do vínculo',
           description: 'Situação funcional.',
-          providerRef: 'vinculo.sit',
+          providerRef: 'employment.status',
           evidenceRefs: [],
           sensitivity: 'NON_SENSITIVE',
           redaction: 'NONE'
@@ -1847,8 +1853,8 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
       factPaths: ['cargo.codigo']
     };
 
-    component.allDecisions.set([ergonDecision, otherDecision]);
-    component.select(ergonDecision);
+    component.allDecisions.set([workforceDecision, otherDecision]);
+    component.select(workforceDecision);
     capabilities.A[0].next({
       workspaceId: 'workspace-A',
       availableActions: ['VIEW', 'UPDATE_DRAFT', 'MANAGE_SCENARIOS'],
@@ -1856,7 +1862,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     });
 
     // 1. Catalog 1-hop root filter
-    component.filterByOntologyRoot('vinculo');
+    component.filterByOntologyRoot('employment');
     expect(component.decisions().map(d => d.key)).toEqual(['A']);
     component.clearQuery();
     expect(component.decisions()).toHaveLength(2);
@@ -1887,11 +1893,11 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     component.scaffoldScenarioOntology();
     expect(component.scenarioFactDraft()).toEqual({
       'draft.quantidade': 0,
-      'vinculo.situacao': ''
+      'employment.status': ''
     });
     expect(JSON.parse(component.scenarioFactsJson())).toEqual({
       draft: { quantidade: 0 },
-      vinculo: { situacao: '' }
+      employment: { status: '' }
     });
     expect(component.scenarioOntologyWarning()).toBeNull();
 
@@ -1943,5 +1949,56 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
       cargo: { codigo: null },
       retroactiveDays: 20
     });
+  });
+
+  it('indexes didactic fields and legalBasis in catalog search and renders didactic panel + policy fallback', () => {
+    const documentedDecision: DecisionSummary = {
+      ...decision('workforce.leave.documented'),
+      name: 'Elegibilidade de afastamento',
+      slotOverridePolicy: 'LOCKED',
+      authoringSupported: false,
+      documentation: {
+        title: 'Elegibilidade de afastamento remunerado',
+        summary: 'Valida o saldo disponível antes do afastamento.',
+        whenApplies: 'Ao solicitar afastamento remunerado.',
+        rationale: 'Previne saldo negativo em folha.',
+        customizationGuidance: 'Regra protegida para integridade cadastral.',
+        legalBasis: [{
+          code: 'Decreto WF-44/2025',
+          article: 'Art. 7º',
+          jurisdiction: 'Federal',
+          url: 'https://normas.example.gov/wf-44'
+        }]
+      }
+    };
+    const partialDecision: DecisionSummary = {
+      ...decision('workforce.leave.partial'),
+      name: 'Regra parametrizável sem curadoria completa',
+      slotOverridePolicy: 'PARAMETERIZABLE',
+      documentation: null
+    };
+
+    component.allDecisions.set([documentedDecision, partialDecision]);
+    component.updateQuery('WF-44/2025');
+    expect(component.decisions().map(item => item.key)).toEqual(['workforce.leave.documented']);
+    component.updateQuery('saldo negativo');
+    expect(component.decisions().map(item => item.key)).toEqual(['workforce.leave.documented']);
+    component.clearQuery();
+
+    component.select(documentedDecision);
+    const activeDoc = component.effectiveDocumentation(component.selected());
+    expect(activeDoc?.title).toBe('Elegibilidade de afastamento remunerado');
+    expect(component.hasCompleteDidacticDocumentation(activeDoc)).toBe(true);
+    expect(component.safeLegalBasisUrl(activeDoc?.legalBasis?.[0]?.url)).toBe('https://normas.example.gov/wf-44');
+    expect(component.safeLegalBasisUrl('javascript:alert(1)')).toBeNull();
+
+    component.select(partialDecision);
+    const partialDoc = component.effectiveDocumentation(component.selected());
+    expect(component.hasCompleteDidacticDocumentation(partialDoc)).toBe(false);
+    expect(component.customizationGuidanceFallback(partialDecision)).toContain('parâmetros declarados');
+    expect(component.customizationGuidanceFallback({
+      ...partialDecision,
+      slotOverridePolicy: 'LOCKED'
+    })).toContain('Regra fixa');
   });
 });

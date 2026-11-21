@@ -25,11 +25,17 @@ import {
 } from '../features/catalog/catalog.fixture';
 import { collectFactPaths, formatDecisionExpression } from './decision-inspection';
 import {
+  DOMAIN_RULE_DOCUMENTATION_KEY,
+  extractRuleDocumentation,
+  type RuleDocumentationDescriptor
+} from './rule-documentation';
+import {
   DomainRuleService,
   ResourceDiscoveryService,
   type ResourceActionCatalogItem,
   type RestApiResponse,
   type DomainRuleChangeWorkspace,
+  type DomainRuleChangeWorkspaceUpdateRequest,
   type DomainRuleCatalogCandidate,
   type DomainRuleCompositionApproval,
   type DomainRuleCompositionManifest,
@@ -220,8 +226,22 @@ export class ProjectionCatalogService {
         const executorKind = this.stringValue(definitionBody, 'executorKind');
         const isForbiddenSlot =
           slotPlanMeta.slotOverridePolicy === 'FORBIDDEN'
+          || slotPlanMeta.slotOverridePolicy === 'LOCKED'
           || executorKind === 'JAVA'
           || executorKind === 'JAVA_EXECUTOR';
+        const definitionDocumentation = this.resolveDefinitionDocumentation(definitionBody, decision);
+        const hasWorkspaceDocField = !!workspace
+          && Object.prototype.hasOwnProperty.call(workspace, DOMAIN_RULE_DOCUMENTATION_KEY)
+          && (workspace as { documentation?: unknown }).documentation !== undefined;
+        const workspaceDocumentation = workspace
+          ? (hasWorkspaceDocField
+              ? extractRuleDocumentation((workspace as { documentation?: unknown }).documentation)
+              : definitionDocumentation)
+          : null;
+        const documentation = workspaceDocumentation ?? definitionDocumentation ?? null;
+        const decisionKind = (definition?.ruleType ?? candidate.ruleType) === 'authorization_policy'
+          ? 'AUTHORIZATION' as const
+          : 'BUSINESS' as const;
         return {
           order: decision.order,
           // Projection order is scoped to the governed decision set, not to the
@@ -229,14 +249,14 @@ export class ProjectionCatalogService {
           totalDecisions: projection.decisionRefs.length,
           key: decision.decisionKey,
           code: decision.reasonCode ?? decision.decisionKey,
-          name: decision.presentationLabel,
+          name: decision.presentationLabel || documentation?.title || decision.decisionKey,
           domain: projection.presentationLabels.domain[locale] ?? projection.ruleSetRef.boundedContextKey,
           ruleSet: projection.presentationLabels.ruleSet[locale] ?? projection.ruleSetRef.ruleSetKey,
           ruleSetKey: projection.ruleSetRef.ruleSetKey,
           resourceKey: projection.ruleSetRef.operationalResourceKey?.trim() || null,
           serviceKey: definition?.serviceKey?.trim() || null,
           state: decision.semanticStatus === 'REFERENCE_IMPLEMENTED' ? 'verified' as const : 'technical-draft' as const,
-          meaning: decision.presentationLabel,
+          meaning: decision.presentationLabel || documentation?.summary || decision.decisionKey,
           authority: `${projection.authorityEvidence.currentAuthority} · ${projection.authorityEvidence.baselineAuthority}`,
           baselineAuthority: projection.authorityEvidence.baselineAuthority,
           source: decision.semanticSourceRef,
@@ -267,9 +287,13 @@ export class ProjectionCatalogService {
           evidence: projection.sourceArtifacts,
           draftLifecycle: this.stringValue(definition?.governance, 'lifecycleBoundary'),
           ruleType: definition?.ruleType ?? candidate.ruleType,
+          decisionKind,
           parameters: definition?.parameters ?? {},
           parameterCatalog,
           detailHydrated: definition !== undefined,
+          documentation,
+          definitionDocumentation,
+          workspaceDocumentation,
           ...slotPlanMeta
         };
       });
@@ -377,6 +401,7 @@ export class ProjectionCatalogService {
     const executorKind = this.stringValue(definitionBody, 'executorKind');
     const isForbiddenSlot =
       slotPlanMeta.slotOverridePolicy === 'FORBIDDEN'
+      || slotPlanMeta.slotOverridePolicy === 'LOCKED'
       || executorKind === 'JAVA'
       || executorKind === 'JAVA_EXECUTOR';
     const hasConditionFacts =
@@ -386,6 +411,19 @@ export class ProjectionCatalogService {
     const authoringSupported = !isForbiddenSlot && (hasConditionFacts
       || (parameterCatalog?.parameters.length ?? 0) > 0
       || this.hasEditableOperationalPolicy(definition));
+    const definitionDocumentation = this.resolveDefinitionDocumentation(definitionBody, undefined);
+    const hasWorkspaceDocField = !!workspace
+      && Object.prototype.hasOwnProperty.call(workspace, DOMAIN_RULE_DOCUMENTATION_KEY)
+      && (workspace as { documentation?: unknown }).documentation !== undefined;
+    const workspaceDocumentation = workspace
+      ? (hasWorkspaceDocField
+          ? extractRuleDocumentation((workspace as { documentation?: unknown }).documentation)
+          : definitionDocumentation)
+      : null;
+    const documentation = workspaceDocumentation ?? definitionDocumentation ?? null;
+    const decisionKind = (definition?.ruleType ?? candidate.ruleType) === 'authorization_policy'
+      ? 'AUTHORIZATION' as const
+      : 'BUSINESS' as const;
     const code = this.stringValue(definitionBody, 'falseReasonCode')
       ?? this.stringValue(definitionBody, 'reasonCode')
       ?? this.stringValue(parametersBody, 'reasonCode')
@@ -395,15 +433,18 @@ export class ProjectionCatalogService {
       ?? this.localizedText(definitionBody?.['title'], locale)
       ?? this.stringValue(definitionBody, 'presentationLabel')
       ?? this.stringValue(definitionBody, 'title')
+      ?? documentation?.title
       ?? candidate.ruleKey;
     const meaning = this.localizedText(definitionBody?.['descriptions'], locale)
       ?? this.localizedText(definitionBody?.['description'], locale)
       ?? this.stringValue(definitionBody, 'description')
       ?? this.stringValue(definitionBody, 'messagePtBr')
       ?? this.operationalPolicyString(parametersBody, 'message')
+      ?? documentation?.summary
       ?? this.localizedText(definitionBody?.['labels'], locale)
       ?? this.localizedText(definitionBody?.['title'], locale)
       ?? this.stringValue(definitionBody, 'presentationLabel')
+      ?? documentation?.title
       ?? candidate.ruleKey;
     const ruleSetKey = this.stringValue(definitionBody, 'ruleSetKey')
       ?? this.stringValue(parametersBody, 'ruleSetKey')
@@ -466,15 +507,19 @@ export class ProjectionCatalogService {
       evidence,
       draftLifecycle: this.stringValue(definition?.governance, 'lifecycleBoundary'),
       ruleType: definition?.ruleType ?? candidate.ruleType,
+      decisionKind,
       parameters: definition?.parameters ?? {},
       parameterCatalog,
       detailHydrated: definition !== undefined,
+      documentation,
+      definitionDocumentation,
+      workspaceDocumentation,
       ...slotPlanMeta
     };
   }
 
   private inferReasonCodeFromRuleKey(ruleKey: string): string {
-    const match = /(?:^|[._:-])(c?erg)[-_]?(\d{4,5})$/i.exec(ruleKey.trim());
+    const match = /(?:^|[._:-])(c?erg|wf)[-_]?(\d{4,5})$/i.exec(ruleKey.trim());
     if (match) {
       return `${match[1].toUpperCase()}-${match[2]}`;
     }
@@ -563,37 +608,77 @@ export class ProjectionCatalogService {
   }
 
   private fixtureSummaries(projection: DomainProjection, locale: SupportedLocale): readonly DecisionSummary[] {
-    return projection.decisionRefs.map(decision => ({
-      order: decision.order,
-      totalDecisions: projection.decisionRefs.length,
-      key: decision.decisionKey,
-      code: decision.reasonCode ?? decision.decisionKey,
-      name: decision.presentationLabel,
-      domain: projection.presentationLabels.domain[locale] ?? projection.ruleSetRef.boundedContextKey,
-      ruleSet: projection.presentationLabels.ruleSet[locale] ?? projection.ruleSetRef.ruleSetKey,
-      ruleSetKey: projection.ruleSetRef.ruleSetKey,
-      resourceKey: projection.ruleSetRef.operationalResourceKey?.trim() || null,
-      serviceKey: null,
-      state: decision.semanticStatus === 'REFERENCE_IMPLEMENTED' ? 'verified' : 'technical-draft',
-      meaning: decision.presentationLabel,
-      authority: `${projection.authorityEvidence.currentAuthority} · ${projection.authorityEvidence.baselineAuthority}`,
-      baselineAuthority: projection.authorityEvidence.baselineAuthority,
-      source: decision.semanticSourceRef,
-      evidenceCount: projection.sourceArtifacts.length,
-      authoringSupported: false,
-      availableDefinitionActions: [],
-      reviewStatus: decision.reviewStatus,
-      expression: null,
-      condition: null,
-      factPaths: decision.factPaths,
-      facts: this.projectionFacts(decision.factPaths, projection.factSchemas),
-      nullSemantics: null,
-      operationKeys: projection.ruleSetRef.operationKeys,
-      hostContractVersion: projection.ruleSetRef.hostContractVersion ?? null,
-      evidence: projection.sourceArtifacts,
-      draftLifecycle: null,
-      ...this.extractSlotPlanMetadata(null, decision)
-    }));
+    return projection.decisionRefs.map(decision => {
+      const definitionDocumentation = this.resolveDefinitionDocumentation(null, decision);
+      return {
+        order: decision.order,
+        totalDecisions: projection.decisionRefs.length,
+        key: decision.decisionKey,
+        code: decision.reasonCode ?? decision.decisionKey,
+        name: decision.presentationLabel || definitionDocumentation?.title || decision.decisionKey,
+        domain: projection.presentationLabels.domain[locale] ?? projection.ruleSetRef.boundedContextKey,
+        ruleSet: projection.presentationLabels.ruleSet[locale] ?? projection.ruleSetRef.ruleSetKey,
+        ruleSetKey: projection.ruleSetRef.ruleSetKey,
+        resourceKey: projection.ruleSetRef.operationalResourceKey?.trim() || null,
+        serviceKey: null,
+        state: decision.semanticStatus === 'REFERENCE_IMPLEMENTED' ? 'verified' : 'technical-draft',
+        meaning: decision.presentationLabel || definitionDocumentation?.summary || decision.decisionKey,
+        authority: `${projection.authorityEvidence.currentAuthority} · ${projection.authorityEvidence.baselineAuthority}`,
+        baselineAuthority: projection.authorityEvidence.baselineAuthority,
+        source: decision.semanticSourceRef,
+        evidenceCount: projection.sourceArtifacts.length,
+        authoringSupported: false,
+        availableDefinitionActions: [],
+        reviewStatus: decision.reviewStatus,
+        expression: null,
+        condition: null,
+        factPaths: decision.factPaths,
+        facts: this.projectionFacts(decision.factPaths, projection.factSchemas),
+        nullSemantics: null,
+        operationKeys: projection.ruleSetRef.operationKeys,
+        hostContractVersion: projection.ruleSetRef.hostContractVersion ?? null,
+        evidence: projection.sourceArtifacts,
+        draftLifecycle: null,
+        decisionKind: 'BUSINESS' as const,
+        documentation: definitionDocumentation,
+        definitionDocumentation,
+        workspaceDocumentation: null,
+        ...this.extractSlotPlanMetadata(null, decision)
+      };
+    });
+  }
+
+  private resolveDefinitionDocumentation(
+    definitionBody: Record<string, unknown> | null,
+    decisionRef?: DomainProjection['decisionRefs'][number]
+  ): RuleDocumentationDescriptor | null {
+    const nested = extractRuleDocumentation(definitionBody?.[DOMAIN_RULE_DOCUMENTATION_KEY]);
+    if (nested) return nested;
+    if (definitionBody && [
+      'summary',
+      'whenApplies',
+      'rationale',
+      'legalBasis',
+      'customizationGuidance'
+    ].some(field => definitionBody[field] !== undefined && definitionBody[field] !== null)) {
+      const rootDoc = extractRuleDocumentation(definitionBody);
+      if (rootDoc) return rootDoc;
+    }
+    const refRecord = this.record(decisionRef);
+    if (!refRecord) return null;
+    const refNested = extractRuleDocumentation(refRecord[DOMAIN_RULE_DOCUMENTATION_KEY]);
+    if (refNested) return refNested;
+    if ([
+      'title',
+      'summary',
+      'whenApplies',
+      'rationale',
+      'legalBasis',
+      'customizationGuidance'
+    ].some(field => refRecord[field] !== undefined && refRecord[field] !== null)) {
+      return extractRuleDocumentation(refRecord);
+    }
+    return null;
   }
 
   private extractSlotPlanMetadata(
@@ -623,15 +708,19 @@ export class ProjectionCatalogService {
       : null;
 
     const rawPolicy = this.stringValue(definitionBody, 'overridePolicy') ?? decisionRef?.overridePolicy ?? null;
+    const normalizedPolicy = rawPolicy?.trim().toUpperCase() === 'EXTENSIBLE'
+      ? 'EXTEND_ONLY'
+      : rawPolicy?.trim().toUpperCase() ?? null;
     const validPolicies: readonly SlotOverridePolicyId[] = [
       'FORBIDDEN',
+      'LOCKED',
       'PARAMETERIZABLE',
       'REPLACEABLE',
       'RESTRICT_ONLY',
       'EXTEND_ONLY'
     ];
-    const slotOverridePolicy = rawPolicy && validPolicies.includes(rawPolicy as SlotOverridePolicyId)
-      ? (rawPolicy as SlotOverridePolicyId)
+    const slotOverridePolicy = normalizedPolicy && validPolicies.includes(normalizedPolicy as SlotOverridePolicyId)
+      ? (normalizedPolicy as SlotOverridePolicyId)
       : null;
 
     const slotCardinality = this.stringValue(definitionBody, 'cardinality') ?? decisionRef?.cardinality ?? null;
@@ -683,13 +772,23 @@ export class ProjectionCatalogService {
     workspace: Pick<DomainRuleChangeWorkspace, 'id' | 'etag' | 'parameters'>,
     condition: unknown,
     config: PolicyStudioRuntimeConfig,
-    parameters?: Readonly<Record<string, unknown>>
+    parameters?: Readonly<Record<string, unknown>>,
+    documentation?: RuleDocumentationDescriptor | Record<string, unknown> | null
   ): Observable<DomainRuleChangeWorkspace> {
-    return this.domainRules.updateChangeWorkspaceDraft(workspace.id, {
+    const payload: Record<string, unknown> = {
       condition: this.record(condition),
       parameters: (parameters ?? workspace.parameters) as Record<string, unknown>,
       rationale: 'Rules Studio visual authoring round-trip'
-    }, workspace.etag, this.requestOptions(config));
+    };
+    if (documentation !== undefined) {
+      payload['documentation'] = documentation;
+    }
+    return this.domainRules.updateChangeWorkspaceDraft(
+      workspace.id,
+      payload as unknown as DomainRuleChangeWorkspaceUpdateRequest,
+      workspace.etag,
+      this.requestOptions(config)
+    );
   }
 
   scenarios(workspaceId: string, config: PolicyStudioRuntimeConfig): Observable<DomainRuleTestScenario[]> {
@@ -882,7 +981,7 @@ export class ProjectionCatalogService {
     return this.domainRules.publish({
       ruleDefinitionId: definitionId,
       applyEligibleMaterializations: true,
-      publicationNotes: { source: 'praxis-rules-studio', intent: 'publish-governed-definition' }
+      publicationNotes: { source: 'praxis-policy-studio', intent: 'publish-governed-definition' }
     }, this.requestOptions(config)).pipe(map(publication => ({
       status: publication.publicationStatus ?? null,
       readiness: publication.publicationReadiness ?? null,
