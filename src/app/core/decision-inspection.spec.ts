@@ -75,6 +75,11 @@ describe('governed decision editing envelope', () => {
     ] });
   });
 
+  it('keeps a second, nested guard read-only inside the configurable branch', () => {
+    const outer = { or: [original.or[0], original] };
+    expect(extractDecisionTableProjection(editableDecisionCondition(outer)).lossless).toBe(false);
+  });
+
   it('does not infer an envelope when the preceding branches are business conditions', () => {
     const businessOr = { or: [{ '>': [maximum, 10] }, { '>=': [maximum, minimum] }] };
     expect(editableDecisionCondition(businessOr)).toEqual(businessOr);
@@ -105,6 +110,20 @@ describe('governed decision editing envelope', () => {
     });
 
     expect(compileDecisionTableProjection(projection)).toEqual(tabularCondition);
+  });
+
+  it('preserves the neutral numeric equality until the first table clause is authored', () => {
+    const neutral = { '==': [1, 1] };
+    const projection = extractDecisionTableProjection(neutral);
+    expect(projection.lossless).toBe(true);
+    expect(projection.clauses).toEqual([]);
+    expect(compileDecisionTableProjection(projection)).toEqual(neutral);
+    expect(compileDecisionTableProjection({
+      ...projection, clauses: [{ factPath: 'request.amount', operator: '<=', rawValue: '15', valueKind: 'number' }]
+    })).toEqual({ '<=': [{ var: 'request.amount' }, 15] });
+    for (const condition of [{ '==': [1, 0] }, { '==': [1, '1'] }, { and: [neutral] }]) {
+      expect(extractDecisionTableProjection(condition).lossless).toBe(false);
+    }
   });
 
   it('marks nested or coalesce-wrapped conditions as non-lossless so table mode prevents destructive flattening', () => {

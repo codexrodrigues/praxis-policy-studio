@@ -530,6 +530,55 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(component.editingScenarioId()).toBeNull();
   });
 
+  it('keeps an editor session while its graph changes and replaces it on a governed reset', () => {
+    const original = { and: [
+      { '>': [{ var: 'request.amount' }, 0] },
+      { '<': [{ var: 'request.amount' }, 100] }
+    ] };
+    component.select({ ...decision('A'), condition: original });
+    capabilities.A[0].next({ workspaceId: 'workspace-A', availableActions: ['VIEW'], blockers: [] });
+    component.openAuthoring();
+    const source = component.authoring.conditionEditorSource();
+    expect(source?.condition).toEqual(original);
+    component.updateDraft(null);
+    expect(component.authoring.conditionEditorSource()).toBe(source);
+    component.updateDraft({ or: [original, { '===': [{ var: 'request.active' }, true] }] });
+    expect(component.authoring.conditionEditorSource()).toBe(source);
+
+    component.resetDraft();
+    component.confirmGovernedOperation();
+    expect(component.authoring.conditionEditorSource()).not.toBe(source);
+    expect(component.draftCondition()).toEqual(original);
+  });
+
+  it.each([
+    { label: 'neutral', original: { '==': [1, 1] }, restoreOriginal: true },
+    { label: 'guarded neutral', original: { or: [
+      { '===': [{ coalesce: [{ var: 'request.amount' }] }, null] }, { '==': [1, 1] }
+    ] }, restoreOriginal: true },
+    { label: 'ordinary', original: { '>': [{ var: 'request.amount' }, 5] }, restoreOriginal: false }
+  ])('resolves an emptied $label editing session against its original branch', ({ original, restoreOriginal }) => {
+    component.select({ ...decision('A'), condition: original });
+    component.openAuthoring();
+    component.updateDraft({ '<': [{ var: 'request.amount' }, 100] });
+    expect(component.draftChanged()).toBe(true);
+    component.updateDraft(null);
+    expect(component.draftCondition()).toEqual(restoreOriginal ? original : null);
+    expect(component.draftChanged()).toBe(!restoreOriginal);
+  });
+
+  it('blocks saving an incomplete graph even before node validation emits its diagnostics', () => {
+    component.select({ ...decision('A'), condition: { '==': [1, 1] } });
+    capabilities.A[0].next({ workspaceId: 'workspace-A', availableActions: ['VIEW', 'UPDATE_DRAFT'], blockers: [] });
+    component.openAuthoring();
+    component.updateEditorState({ isDirty: true, rootNodes: ['node-1'], validationErrors: [] } as any);
+    component.updateDraft(null);
+    expect(component.draftCondition()).toBeNull();
+    expect(component.totalAuthoringValidationErrors()).toBe(1);
+    component.saveGovernedDraft();
+    expect(saveWorkspaceDraft).not.toHaveBeenCalled();
+  });
+
   it('uses the governed confirmation before resetting a changed rule draft', () => {
     component.select(decision('A'));
     component.authoringOpen.set(true);
@@ -1162,10 +1211,25 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
       }
     );
 
-    component.updateDraftParameters({
-      validationPolicy: { effect: 'ALLOW' }
-    });
+    component.updateEditorState({ isDirty: true, rootNodes: ['incomplete'], validationErrors: [] } as any);
+    expect(component.totalAuthoringValidationErrors()).toBe(1);
+    capabilities.A[1].next({ workspaceId: 'workspace-A', availableActions: ['VIEW', 'UPDATE_DRAFT'], blockers: [] });
+    const allowParameters = { parameterValues: { maxRetroactiveDays: 45 }, validationPolicy: { effect: 'ALLOW' } };
+    saveWorkspaceDraft.mockReturnValueOnce(of({
+      id: 'workspace-A', ruleKey: 'A', status: 'OPEN', etag: 'etag-allow', revision: 3,
+      condition: null, parameters: allowParameters
+    }));
+    component.updateDraftParameters(allowParameters);
     expect(component.draftCondition()).toBeNull();
+    expect(component.authoring.conditionEditorSource()).toBeNull();
+    expect(component.totalAuthoringValidationErrors()).toBe(0);
+    expect(component.draftChanged()).toBe(true);
+    component.saveGovernedDraft();
+    expect(saveWorkspaceDraft).toHaveBeenLastCalledWith(
+      expect.objectContaining({ etag: 'etag-updated' }), null, config, allowParameters
+    );
+    expect(component.draftChanged()).toBe(false);
+    expect(component.authoring.conditionEditorSource()).toBeNull();
   });
 
   it('registers a new governed decision and prepares, approves, and publishes a candidate snapshot in remote mode', () => {
@@ -1397,6 +1461,9 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     });
 
     component.reloadGovernedEvidence();
+    expect(loadCatalog).toHaveBeenCalledWith('pt-BR', expect.anything(), expect.objectContaining({
+      key: initialDecision.key, workspaceId: initialDecision.workspaceId, configDefinitionId: initialDecision.configDefinitionId
+    }));
     reviews.A[1].next([{
       id: 'rev-1',
       workspaceId: 'workspace-A',
@@ -1868,7 +1935,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     component.draftCondition.set({ '<=': [{ var: 'facts.quantidade' }, 120] });
     component.updateEditorState({
       mode: 'visual',
-      rootIds: [],
+      rootNodes: [],
       nodes: {},
       selectedNodeIds: [],
       validationErrors: [{ nodeId: 'n1', message: 'Invalid field', severity: 'error' }],

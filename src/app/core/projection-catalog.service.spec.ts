@@ -6,6 +6,7 @@ import { BrowserTestingModule, platformBrowserTesting } from '@angular/platform-
 import { API_URL, DomainRuleService, type ResourceActionCatalogItem } from '@praxisui/core';
 import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { DecisionSummary } from '../features/catalog/catalog.fixture';
 import { ProjectionCatalogService } from './projection-catalog.service';
 
 TestBed.initTestEnvironment(BrowserTestingModule, platformBrowserTesting());
@@ -49,8 +50,8 @@ const requestedAmountFact = {
   sensitivity: 'SENSITIVE', redaction: 'MASK'
 };
 
-function factCatalog(definitionId: string, ruleKey: string, facts: readonly unknown[] = []) {
-  return { definitionId, ruleKey, definitionVersion: 1,
+function factCatalog(definitionId: string, ruleKey: string, facts: readonly unknown[] = [], definitionVersion = 1) {
+  return { definitionId, ruleKey, definitionVersion,
     schemaVersion: 'praxis.domain-rule-fact-catalog.v1', facts };
 }
 
@@ -102,7 +103,8 @@ describe('ProjectionCatalogService', () => {
       && request.params.get('limit') === '12');
     expect(definitions.request.withCredentials).toBe(false);
     http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([{
-      id: 'workspace-1', ruleKey: 'grant.amount-parameters', status: 'APPROVED', updatedAt: '2026-08-13T10:00:00Z'
+      id: 'workspace-1', ruleKey: 'grant.amount-parameters', baseDefinitionId: 'v2', baseDefinitionVersion: 2,
+      status: 'APPROVED', updatedAt: '2026-08-13T10:00:00Z'
     }]);
     http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities').flush({
       tenantId: 'default', environment: 'dev', definitions: [{
@@ -126,7 +128,7 @@ describe('ProjectionCatalogService', () => {
       governance: { lifecycleBoundary: 'REFERENCE_DRAFT_ONLY' }
     });
     http.expectOne('/api/praxis/config/domain-rules/definitions/v2/facts')
-      .flush(factCatalog('v2', 'grant.amount-parameters', [requestedAmountFact]));
+      .flush(factCatalog('v2', 'grant.amount-parameters', [requestedAmountFact], 2));
 
     expect(decisions).toHaveLength(1);
     expect(decisions[0]?.configDefinitionId).toBe('v2');
@@ -141,6 +143,135 @@ describe('ProjectionCatalogService', () => {
     expect(decisions[0]?.condition).toEqual({ '<=': [{ var: 'request.requestedAmount' }, 3000] });
     expect(decisions[0]?.order).toBe(1);
     expect(decisions[0]?.totalDecisions).toBe(2);
+  });
+
+  describe('workspace and definition version identity', () => {
+    const ruleKey = 'benefit.amount';
+    const config = { mode: 'remote' as const, configApiBaseUrl: '', locale: 'en-US' as const,
+      projectionPath: null, initialDecisionKey: null };
+    const root = '/api/praxis/config/domain-rules';
+    const first = { definitionId: 'business-1', ruleKey, version: 1, ruleType: 'validation', status: 'draft' as const,
+      contextKey: null, resourceKey: null, serviceKey: null, semanticOwner: null, updatedAt: null };
+    const second = { ...first, definitionId: 'business-2', version: 2 };
+    const access = { ...second, definitionId: 'access-3', version: 3, ruleType: 'authorization_policy' };
+    const draft = { id: 'draft-1', ruleKey, baseDefinitionId: first.definitionId, baseDefinitionVersion: 1,
+      status: 'OPEN', etag: 'etag-1', updatedAt: '2026-08-01', parameters: {},
+      condition: { '<': [{ var: 'request.v1' }, 10] } };
+
+    function list(workspaces: unknown[], selection?: Pick<DecisionSummary, 'key' | 'configDefinitionId' | 'workspaceId'>) {
+      let rows: readonly DecisionSummary[] = [];
+      service.load('en-US', config, selection).subscribe(value => rows = value);
+      http.expectOne(request => request.url.endsWith('/definitions/catalog')).flush({
+        page: 0, limit: 12, hasMore: false, candidates: [access, second, first]
+      });
+      http.expectOne(root + '/workspaces').flush(workspaces);
+      http.expectOne(root + '/definitions/capabilities').flush({ definitions: [
+        { ...first, availableActions: ['CREATE_NEW_VERSION', 'PUBLISH'] },
+        { ...second, availableActions: [] }
+      ] });
+      return () => rows;
+    }
+
+    function detail(candidate: typeof first) {
+      const path = 'request.v' + candidate.version;
+      http.expectOne(root + '/definitions/' + candidate.definitionId).flush({
+        id: candidate.definitionId, ruleKey, version: candidate.version, ruleType: candidate.ruleType,
+        condition: { '<=': [{ var: path }, 20] }
+      });
+      http.expectOne(root + '/definitions/' + candidate.definitionId + '/facts')
+        .flush(factCatalog(candidate.definitionId, ruleKey, [{ ...requestedAmountFact, path }], candidate.version));
+    }
+
+    it('reopens an older editable workspace with its own facts and ignores unrelated newer identities', () => {
+      const rows = list([draft, { ...draft, id: 'access', baseDefinitionId: access.definitionId, baseDefinitionVersion: 3,
+        updatedAt: '2026-08-04' }, { ...draft, id: 'wrong-version', baseDefinitionId: second.definitionId,
+        updatedAt: '2026-08-03' }, { ...draft, id: 'rejected', status: 'REJECTED', updatedAt: '2026-08-05' },
+        { ...draft, id: 'abandoned', baseDefinitionId: second.definitionId,
+        baseDefinitionVersion: 2, status: 'ABANDONED', updatedAt: '2026-08-02' }]);
+      detail(first);
+      expect(rows()).toHaveLength(1);
+      expect(rows()[0]).toMatchObject({ configDefinitionId: first.definitionId, configVersion: 1,
+        workspaceId: draft.id, workspaceEtag: draft.etag, workspaceCondition: draft.condition,
+        facts: [{ path: 'request.v1' }], availableDefinitionActions: ['CREATE_NEW_VERSION', 'PUBLISH'] });
+    });
+
+    it('refreshes the selected draft even when another workspace on a new definition has a later update', () => {
+      const newer = { ...draft, id: 'draft-2', baseDefinitionId: second.definitionId, baseDefinitionVersion: 2,
+        etag: 'etag-2', updatedAt: '2026-08-02' };
+      const rows = list([newer, draft], { key: ruleKey, configDefinitionId: first.definitionId, workspaceId: draft.id });
+      detail(first);
+      expect(rows()[0]).toMatchObject({ workspaceId: draft.id, workspaceEtag: draft.etag,
+        configDefinitionId: first.definitionId, facts: [{ path: 'request.v1' }] });
+      const latest = list([newer, draft]);
+      detail(second);
+      expect(latest()[0]).toMatchObject({ workspaceId: newer.id, workspaceEtag: newer.etag,
+        configDefinitionId: second.definitionId, facts: [{ path: 'request.v2' }] });
+    });
+
+    it('reads the promoted definition and uses its actions for publication', () => {
+      const rows = list([{ ...draft, status: 'PROMOTED', promotedDefinitionId: second.definitionId }]);
+      detail(second);
+      expect(rows()[0]).toMatchObject({ configDefinitionId: second.definitionId, promotedDefinitionId: second.definitionId,
+        workspaceId: draft.id, facts: [{ path: 'request.v2' }], availableDefinitionActions: [] });
+      let actions: DecisionSummary['availableDefinitionActions'] = [];
+      service.definitionActions(first.definitionId, ruleKey, 1, second.definitionId, config)
+        .subscribe(result => actions = result);
+      http.expectOne(root + '/definitions/capabilities').flush({ definitions: [
+        { ...first, availableActions: ['CREATE_NEW_VERSION', 'PUBLISH'] },
+        { ...second, availableActions: ['CREATE_NEW_VERSION'] }
+      ] });
+      expect(actions).toEqual(['CREATE_NEW_VERSION']);
+    });
+
+    it.each(['catalog', 'discovery'])('keeps the base independent when the promoted definition is absent from %s', mode => {
+      let row: DecisionSummary | undefined;
+      if (mode === 'discovery') {
+        service.loadDiscoveredCandidate(first, 0, 1, 'en-US', config).subscribe(value => row = value);
+      } else {
+        service.load('en-US', config).subscribe(value => row = value[0]);
+        http.expectOne(request => request.url.endsWith('/definitions/catalog')).flush({
+          page: 0, limit: 12, hasMore: false, candidates: [first]
+        });
+      }
+      http.expectOne(root + '/workspaces').flush([{ ...draft, status: 'PROMOTED', promotedDefinitionId: second.definitionId }]);
+      http.expectOne(root + '/definitions/capabilities').flush({ definitions: [
+        { ...first, availableActions: ['CREATE_NEW_VERSION'] },
+        { ...second, availableActions: ['PUBLISH'] }
+      ] });
+      detail(first);
+      expect(row).toMatchObject({ configDefinitionId: first.definitionId, facts: [{ path: 'request.v1' }],
+        promotedDefinitionId: null, workspaceCondition: null, availableDefinitionActions: ['CREATE_NEW_VERSION'] });
+      expect(row?.workspaceId).toBeUndefined();
+      expect(row?.workspaceEtag).toBeUndefined();
+    });
+
+    it('rejects fact metadata returned for another version of the same rule', () => {
+      const error = vi.fn();
+      service.loadDiscoveredCandidate(second, 0, 1, 'en-US', config).subscribe({ error });
+      http.expectOne(root + '/workspaces').flush([]);
+      http.expectOne(root + '/definitions/capabilities').flush({ definitions: [] });
+      http.expectOne(root + '/definitions/' + second.definitionId).flush({
+        id: second.definitionId, ruleKey, version: second.version, ruleType: second.ruleType
+      });
+      http.expectOne(root + '/definitions/' + second.definitionId + '/facts')
+        .flush(factCatalog(first.definitionId, ruleKey, [requestedAmountFact], first.version));
+      expect(error).toHaveBeenCalledWith(new Error('CONFIG_CATALOG_IDENTITY_MISMATCH'));
+    });
+
+    it('hydrates an explicitly discovered version without borrowing another workspace or ACCESS definition', () => {
+      let row: DecisionSummary | undefined;
+      service.loadDiscoveredCandidate(second, 0, 1, 'en-US', config).subscribe(value => row = value);
+      http.expectOne(root + '/workspaces').flush([draft, { ...draft, baseDefinitionId: access.definitionId,
+        baseDefinitionVersion: 3, updatedAt: '2026-08-03' }]);
+      http.expectOne(root + '/definitions/capabilities').flush({ definitions: [] });
+      detail(second);
+      expect(row).toMatchObject({ configDefinitionId: second.definitionId, facts: [{ path: 'request.v2' }] });
+      expect(row?.workspaceId).toBeUndefined();
+      const error = vi.fn();
+      service.loadDiscoveredCandidate(access, 0, 1, 'en-US', config).subscribe({ error });
+      expect(error).toHaveBeenCalledWith(new Error('BUSINESS_DEFINITION_REQUIRED'));
+      http.expectNone(root + '/definitions/' + access.definitionId);
+    });
   });
 
   it('navigates multiple governed domains without making a projection authoritative', () => {
@@ -171,7 +302,7 @@ describe('ProjectionCatalogService', () => {
       id: 'proc-v2', ruleKey: 'procurement.suppliers.eligibility', version: 2, status: 'draft'
     });
     http.expectOne('/api/praxis/config/domain-rules/definitions/proc-v2/facts')
-      .flush(factCatalog('proc-v2', 'procurement.suppliers.eligibility'));
+      .flush(factCatalog('proc-v2', 'procurement.suppliers.eligibility', [], 2));
 
     expect(decisions.map(decision => decision.domain)).toEqual(['hr.payroll', 'procurement']);
     expect(decisions.map(decision => decision.configDefinitionId)).toEqual(['hr-v1', 'proc-v2']);
@@ -662,7 +793,7 @@ describe('ProjectionCatalogService', () => {
       });
     http.expectOne('/api/praxis/config/domain-rules/workspaces')
       .flush([{
-        id: 'workspace-hr',
+        id: 'workspace-hr', baseDefinitionId: 'definition-hr', baseDefinitionVersion: 3,
         ruleKey: 'hr.payroll.retroactive_limit',
         status: 'DRAFT',
         revision: 2,
@@ -714,7 +845,7 @@ describe('ProjectionCatalogService', () => {
       .flush({
         definitionId: 'definition-hr',
         ruleKey: 'hr.payroll.retroactive_limit',
-        version: 3,
+        definitionVersion: 3,
         schemaVersion: 'praxis.domain-rule-fact-catalog.v1',
         facts: [{
           path: 'retroactiveDays',
@@ -732,7 +863,7 @@ describe('ProjectionCatalogService', () => {
       .flush({
         definitionId: 'definition-hr',
         ruleKey: 'hr.payroll.retroactive_limit',
-        version: 3,
+        definitionVersion: 3,
         schemaVersion: 'praxis.domain-rule-parameter-catalog.v1',
         templateKey: 'hr.payroll.retroactive_limit.template',
         templateVersion: '1.0.0',

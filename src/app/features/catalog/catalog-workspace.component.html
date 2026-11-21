@@ -360,11 +360,13 @@
           </div>
           <button type="button" class="quiet-button" (click)="closeAuthoring()">{{ i18n.text('close') }}</button>
         </header>
-        @if (draftCondition() !== null) {
+        @if (authoring.conditionEditorSource(); as source) {
           @defer (when authoringOpen()) {
           <pax-local-draft-workspace
             [config]="authoringConfig"
             [condition]="editorCondition()"
+            [source]="source"
+            [treeInvalid]="authoring.treeValidationErrors() > 0"
             (conditionChanged)="updateDraft($event)"
             (stateChanged)="updateEditorState($event)" />
           } @placeholder {

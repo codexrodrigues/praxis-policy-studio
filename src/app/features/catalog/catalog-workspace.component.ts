@@ -656,7 +656,8 @@ export class CatalogWorkspaceComponent implements OnInit {
         index,
         total,
         this.i18n.locale(),
-        state.config
+        state.config,
+        decision
       ).subscribe({
         next: hydrated => {
           if (selectionRevision !== this.store.selectionRevision || this.hasUnsavedWork()) return;
@@ -708,7 +709,8 @@ export class CatalogWorkspaceComponent implements OnInit {
         siblingIndex,
         total,
         this.i18n.locale(),
-        state.config
+        state.config,
+        sibling
       ).subscribe({
         next: hydratedSibling => {
           if (selectionRevision !== this.store.selectionRevision) return;
@@ -774,7 +776,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.catalog.load(this.i18n.locale(), {
       ...state.config,
       initialDecisionKey: currentKey
-    }).subscribe({
+    }, current).subscribe({
       next: decisions => {
         if (loadRevision !== this.store.catalogLoadRevision) return;
         this.authoringBusy.set(false);
@@ -798,7 +800,7 @@ export class CatalogWorkspaceComponent implements OnInit {
         this.loadWorkspaceCapabilities(selectionRevision);
         this.loadOperationalTestAction(selectionRevision);
         this.loadSnapshots();
-        if (wasAuthoringOpen && refreshed.authoringSupported) {
+        if (wasAuthoringOpen && refreshed.authoringSupported && refreshed.workspaceId === current.workspaceId) {
           this.authoringOpen.set(true);
         }
         this.authoringFeedback.set(this.i18n.text('governedEvidenceReloaded'));
@@ -881,7 +883,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.authoring.autoFixDraftOntology();
   }
 
-  updateEditorState(state: RuleBuilderState): void {
+  updateEditorState(state: RuleBuilderState | null): void {
     this.authoring.updateEditorState(state);
   }
 

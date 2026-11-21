@@ -1,7 +1,8 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, linkedSignal, output, signal, untracked } from '@angular/core';
 import { RuleEditorComponent, type RuleBuilderConfig, type RuleBuilderState } from '@praxisui/visual-builder';
 import {
   compileDecisionTableProjection,
+  editableDecisionCondition,
   extractDecisionTableProjection,
   formatDecisionExpression,
   type DecisionComparisonOperator,
@@ -29,7 +30,7 @@ interface FieldOption {
         data-testid="representation-mode-tree"
         [class.active-mode]="representationMode() === 'tree'"
         [attr.aria-pressed]="representationMode() === 'tree'"
-        (click)="representationMode.set('tree')">
+        (click)="showTree()">
         {{ i18n.text('representationModeTree') }}
       </button>
       <button
@@ -52,16 +53,18 @@ interface FieldOption {
       </button>
     </div>
 
-    @switch (representationMode()) {
-      @case ('tree') {
+    <div [hidden]="representationMode() !== 'tree'">
+      @for (session of treeSessions(); track session.key) {
         <praxis-rule-editor
           [embedded]="true"
           mode="condition"
           [config]="config()"
-          [initialCondition]="$any(condition())"
+          [initialCondition]="$any(session.condition)"
           (conditionChanged)="conditionChanged.emit($event)"
           (stateChanged)="stateChanged.emit($event)" />
       }
+    </div>
+    @switch (representationMode()) {
       @case ('table') {
         <section class="representation-surface" data-testid="decision-table-representation" [attr.aria-label]="i18n.text('representationModeTable')">
           <div class="table-combinator">
@@ -69,7 +72,7 @@ interface FieldOption {
               <span>{{ i18n.text('decisionTableCombinator') }}</span>
               <select
                 data-testid="decision-table-combinator"
-                [disabled]="!tableProjection().lossless"
+                [disabled]="!tableEditable() || tableProjection().clauses.length < 2"
                 [value]="tableProjection().combinator"
                 (change)="updateCombinator($any($event.target).value)">
                 <option value="and">{{ i18n.text('decisionTableCombinatorAnd') }}</option>
@@ -80,12 +83,14 @@ interface FieldOption {
               type="button"
               class="quiet-button"
               data-testid="decision-table-add-clause"
-              [disabled]="!tableProjection().lossless"
+              [disabled]="!tableEditable() || !fieldOptions().length"
               (click)="addTableClause()">
               {{ i18n.text('decisionTableAddClause') }}
             </button>
           </div>
-          @if (!tableProjection().lossless) {
+          @if (treeInvalid()) {
+            <p class="representation-note" role="status">{{ i18n.text('decisionTableIncompleteTreeHint') }}</p>
+          } @else if (!tableProjection().lossless) {
             <p class="representation-note" role="status" data-testid="decision-table-readonly-hint">{{ i18n.text('decisionTableComplexHint') }}</p>
           }
           @if (tableProjection().clauses.length) {
@@ -102,7 +107,7 @@ interface FieldOption {
                     <select
                       [attr.aria-label]="i18n.text('decisionTableFactColumn') + ' ' + (idx + 1)"
                       [attr.data-testid]="'decision-table-fact-' + idx"
-                      [disabled]="!tableProjection().lossless"
+                      [disabled]="!tableEditable()"
                       [value]="clause.factPath"
                       (change)="updateClauseFact(idx, $any($event.target).value)">
                       @for (field of fieldOptions(); track field.path) {
@@ -117,7 +122,7 @@ interface FieldOption {
                     <select
                       [attr.aria-label]="i18n.text('decisionTableOperatorColumn') + ' ' + (idx + 1)"
                       [attr.data-testid]="'decision-table-operator-' + idx"
-                      [disabled]="!tableProjection().lossless"
+                      [disabled]="!tableEditable()"
                       [value]="clause.operator"
                       (change)="updateClauseOperator(idx, $any($event.target).value)">
                       @for (op of operators; track op) {
@@ -130,7 +135,7 @@ interface FieldOption {
                       type="text"
                       [attr.aria-label]="i18n.text('decisionTableValueColumn') + ' ' + (idx + 1)"
                       [attr.data-testid]="'decision-table-value-' + idx"
-                      [disabled]="!tableProjection().lossless"
+                      [disabled]="!tableEditable()"
                       [value]="clause.rawValue"
                       (input)="updateClauseValue(idx, $any($event.target).value)" />
                   </div>
@@ -139,7 +144,7 @@ interface FieldOption {
                       type="button"
                       class="quiet-button"
                       [attr.data-testid]="'decision-table-remove-' + idx"
-                      [disabled]="!tableProjection().lossless"
+                      [disabled]="!tableEditable()"
                       (click)="removeTableClause(idx)">
                       {{ i18n.text('decisionTableRemoveClause') }}
                     </button>
@@ -196,11 +201,26 @@ interface FieldOption {
 export class LocalDraftWorkspaceComponent {
   readonly config = input.required<RuleBuilderConfig>();
   readonly condition = input.required<unknown>();
+  readonly treeInvalid = input.required<boolean>();
+  readonly source = input.required<{ readonly condition: unknown }>();
   readonly conditionChanged = output<unknown>();
-  readonly stateChanged = output<RuleBuilderState>();
+  readonly stateChanged = output<RuleBuilderState | null>();
   readonly i18n = inject(PolicyStudioI18n);
 
   readonly representationMode = signal<DecisionRepresentationMode>('tree');
+  // Keep the graph and its undo history until an external replacement or a table edit.
+  readonly treeSessions = linkedSignal(() => {
+    const source = this.source();
+    return untracked(this.representationMode) === 'tree' ? this.newTreeSession(editableDecisionCondition(source.condition)) : [];
+  });
+
+  showTree(): void {
+    if (!this.treeSessions().length) {
+      this.treeSessions.set(this.newTreeSession(this.condition()));
+    }
+    this.representationMode.set('tree');
+  }
+
   readonly operators: readonly DecisionComparisonOperator[] = ['<=', '<', '>=', '>', '===', '!==', '==', '!=', 'in'];
 
   readonly fieldOptions = computed<readonly FieldOption[]>(() => {
@@ -220,6 +240,8 @@ export class LocalDraftWorkspaceComponent {
     extractDecisionTableProjection(this.condition())
   );
 
+  readonly tableEditable = computed(() => this.tableProjection().lossless && !this.treeInvalid());
+
   readonly domainExpression = computed<string | null>(() =>
     formatDecisionExpression(this.condition(), this.factLabels())
   );
@@ -235,14 +257,15 @@ export class LocalDraftWorkspaceComponent {
   updateCombinator(combinatorRaw: string): void {
     const combinator: 'and' | 'or' = combinatorRaw === 'or' ? 'or' : 'and';
     const current = this.tableProjection();
-    this.emitTableProjection({ ...current, combinator });
+    if (current.clauses.length >= 2) this.emitTableProjection({ ...current, combinator });
   }
 
   addTableClause(): void {
     const current = this.tableProjection();
     const firstField = this.fieldOptions()[0];
-    const factPath = firstField?.path ?? 'value';
-    const valueKind = this.inferValueKind(firstField?.valueType, '<=');
+    if (!firstField) return;
+    const factPath = firstField.path;
+    const valueKind = this.inferValueKind(firstField.valueType, '<=');
     const defaultRaw = valueKind === 'number' ? '0' : valueKind === 'boolean' ? 'true' : '';
     const nextClause: DecisionTableClause = {
       factPath,
@@ -308,6 +331,10 @@ export class LocalDraftWorkspaceComponent {
     this.emitTableProjection({ ...current, clauses });
   }
 
+  private newTreeSession(condition: unknown) {
+    return [{ key: Symbol('tree-session'), condition }];
+  }
+
   private inferValueKind(
     valueType: string | undefined,
     operator: DecisionComparisonOperator
@@ -319,8 +346,10 @@ export class LocalDraftWorkspaceComponent {
   }
 
   private emitTableProjection(projection: DecisionTableProjection): void {
-    if (!this.tableProjection().lossless) return;
+    if (!this.tableEditable()) return;
     const compiled = compileDecisionTableProjection(projection);
+    this.treeSessions.set([]);
+    this.stateChanged.emit(null);
     this.conditionChanged.emit(compiled);
   }
 }
