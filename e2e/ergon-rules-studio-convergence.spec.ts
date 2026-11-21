@@ -835,6 +835,171 @@ async function mockErgonShowcaseBackend(page: Page): Promise<{
   return { operationalProofCalls, candidatePublishCalls };
 }
 
+test('projects the CNAB restriction catalog and sends all three nullable boolean values', async ({ page }) => {
+  const resourceKey = 'folha-pagamento.remessas-bancarias-cnab';
+  const ruleSetKey = `ergon.${resourceKey}.folha`;
+  const ruleKey = 'remessas-bancarias-cnab.cerg-13706';
+  const definitionId = 'cnab-definition';
+  const workspaceId = 'cnab-workspace';
+  const scenarioId = 'cnab-scenario';
+  const operation = 'GERAR_TRANSMITIR_CNAB';
+  const creditLabel = 'Folha tem data de crédito';
+  const consolidationLabel = 'Folha tem data de consolidação';
+  const rule = {
+    definitionId, ruleKey, version: 2, ruleType: 'backend_validation', status: 'draft',
+    contextKey: 'workforce.payroll', resourceKey: ruleSetKey, serviceKey: 'praxis-ergon-showcase'
+  };
+  const facts = [
+    { path: 'context.operation', valueType: 'string', nullable: false, label: 'Operação' },
+    { path: 'draft.codigoBanco', valueType: 'string', nullable: false, label: 'Código do banco' },
+    { path: 'folhaPagamento.present', valueType: 'boolean', nullable: false, label: 'Folha vinculada' },
+    { path: 'folhaPagamento.situacao', valueType: 'string', nullable: true, label: 'Situação da folha' },
+    { path: 'folhaPagamento.dataConsolidacaoPresente', valueType: 'boolean', nullable: true, label: consolidationLabel },
+    { path: 'folhaPagamento.dataCreditoBancarioPresente', valueType: 'boolean', nullable: true, label: creditLabel }
+  ].map(({ label, ...fact }) => ({
+    ...fact,
+    labels: { 'pt-BR': label },
+    descriptions: { 'pt-BR': label },
+    providerRef: 'Slice13FolhaMotorRuleFacts.ofRemessaBancariaCnabCredito',
+    evidenceRefs: [ruleSetKey],
+    sensitivity: fact.path === 'draft.codigoBanco' ? 'SENSITIVE' : 'NON_SENSITIVE',
+    redaction: fact.path === 'draft.codigoBanco' ? 'MASK' : 'NONE'
+  }));
+  const workspace = {
+    id: workspaceId, ruleKey, status: 'OPEN', revision: 1, etag: 'cnab-workspace-1',
+    condition: { '===': [1, 1] }, parameters: {}
+  };
+  type ScenarioInput = { scenarioKey: string; name: string; facts: Record<string, unknown>; expectedDecision: string };
+  type SavedScenario = ScenarioInput & { id: string; workspaceId: string; status: string; revision: number; etag: string };
+  const legacy: SavedScenario = {
+    id: 'cnab-legacy', workspaceId, scenarioKey: 'cnab-legacy', name: 'Cenário parcial existente',
+    facts: { context: { operation }, folhaPagamento: { dataConsolidacaoPresente: null } },
+    expectedDecision: 'INCONCLUSIVE', status: 'ACTIVE', revision: 1, etag: 'cnab-legacy-1'
+  };
+  let savedScenarios = [legacy];
+
+  await mockErgonShowcaseBackend(page);
+  await page.route('**/api/praxis/config/domain-rules/**', async route => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname.split('/domain-rules/')[1];
+    const json = (body: unknown, status?: number) => route.fulfill({ json: body, status });
+    switch (path) {
+      case 'definitions/catalog':
+        return json({ schemaVersion: 'praxis-domain-rule-catalog.v1', page: 0, limit: 12, hasMore: false, candidates: [rule] });
+      case 'definitions/capabilities':
+        return json({ tenantId: '1', environment: 'local', definitions: [] });
+      case `definitions/${definitionId}`:
+        return json({
+          ...rule, id: definitionId, condition: workspace.condition,
+          definition: {
+            ruleSetKey, operationalResourceKey: resourceKey, slotKey: ruleKey,
+            presentationLabel: 'Restrição local CNAB', falseReasonCode: 'CERG-CNAB-RESTRICAO-LOCAL',
+            overridePolicy: 'RESTRICT_ONLY', decisionStage: 'DOMAIN_DECISION', executorKind: 'JSON_LOGIC',
+            availableRoots: ['context', 'draft', 'folhaPagamento'], requiredFactPaths: []
+          },
+          parameters: { operationKeys: ['validate'] }
+        });
+      case `definitions/${definitionId}/facts`:
+        return json({
+          schemaVersion: 'praxis.domain-rule-fact-catalog.v1',
+          definitionId, ruleKey, definitionVersion: 2, facts
+        });
+      case 'workspaces':
+        return json([workspace]);
+      case `workspaces/${workspaceId}`:
+        return json(workspace);
+      case `workspaces/${workspaceId}/capabilities`:
+        return json({ ...workspace, workspaceId, availableActions: ['VIEW', 'MANAGE_SCENARIOS'], blockers: [] });
+      case `workspaces/${workspaceId}/scenarios`: {
+        if (request.method() === 'GET') return json(savedScenarios);
+        const scenario = { ...request.postDataJSON() as ScenarioInput, id: scenarioId, workspaceId,
+          status: 'ACTIVE', revision: 1, etag: 'cnab-scenario-1' };
+        savedScenarios.push(scenario);
+        return json(scenario, 201);
+      }
+      case `workspaces/${workspaceId}/scenarios/${scenarioId}`:
+      case `workspaces/${workspaceId}/scenarios/${legacy.id}`: {
+        const id = path.split('/').at(-1)!;
+        const scenario = { ...request.postDataJSON() as ScenarioInput, id, workspaceId,
+          status: 'ACTIVE', revision: 2, etag: `${id}-2` };
+        savedScenarios = savedScenarios.map(item => item.id === id ? scenario : item);
+        return json(scenario);
+      }
+      default:
+        return route.fallback();
+    }
+  });
+
+  await page.goto(`/catalog?decisionKey=${ruleKey}`);
+  await page.getByRole('button', { name: /^Regra/ }).click();
+  await expect(page.locator('.fact-list li code')).toHaveText(facts.map(fact => fact.path));
+  await expect(page.locator('.fact-list li').filter({ hasText: 'draft.codigoBanco' })).toContainText('SENSITIVE / MASK');
+
+  await page.getByRole('button', { name: 'Testar regra', exact: true }).click();
+  const form = page.locator('pax-scenario-create-form');
+  const credit = form.getByRole('combobox', { name: creditLabel, exact: true });
+  const consolidation = form.getByRole('combobox', { name: consolidationLabel, exact: true });
+  await expect(credit).toHaveValue('');
+  await expect(consolidation).toHaveValue('');
+  await expect(credit.locator('option')).toHaveText(['Usar valor nulo', 'Não', 'Sim']);
+  const scaffold = form.getByTestId('scaffold-scenario-ontology');
+  await scaffold.click();
+  await expect(credit).toHaveValue('');
+  await expect(consolidation).toHaveValue('');
+  await form.getByTestId('apply-scenario-suggestion-DENY').click();
+  await expect(credit).toHaveValue('');
+  await expect(consolidation).toHaveValue('');
+  await consolidation.selectOption('false');
+  await scaffold.click();
+  await expect(credit).toHaveValue('');
+  await expect(consolidation).toHaveValue('false');
+  await form.getByLabel('Operação', { exact: true }).fill(operation);
+  await form.getByLabel('Código do banco', { exact: true }).fill('001');
+  await form.getByLabel('Situação da folha', { exact: true }).fill('CONSOLIDADA');
+  await form.getByRole('combobox', { name: 'Folha vinculada', exact: true }).selectOption('true');
+
+  const createRequest = page.waitForRequest(request => request.method() === 'POST'
+    && request.url().endsWith(`/workspaces/${workspaceId}/scenarios`));
+  await form.getByRole('button', { name: 'Adicionar cenário' }).click();
+  const created = (await createRequest).postDataJSON() as ScenarioInput;
+  expect(created.facts).toEqual({
+    context: { operation },
+    draft: { codigoBanco: '001' },
+    folhaPagamento: { present: true, situacao: 'CONSOLIDADA', dataConsolidacaoPresente: false, dataCreditoBancarioPresente: null }
+  });
+
+  const editScenario = (name: string) => page.locator('.scenario-list article')
+    .filter({ has: page.getByText(name, { exact: true }) }).getByRole('button', { name: 'Editar cenário' }).click();
+  await editScenario(created.name);
+  const edit = page.getByRole('region', { name: 'Editar cenário' });
+  const editCredit = edit.getByRole('combobox', { name: creditLabel, exact: true });
+  const editConsolidation = edit.getByRole('combobox', { name: consolidationLabel, exact: true });
+  await expect(editCredit).toHaveValue('');
+  await expect(editConsolidation).toHaveValue('false');
+  await editCredit.selectOption('true');
+  await editConsolidation.selectOption('');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const editRequest = page.waitForRequest(request => request.method() === 'PUT'
+    && request.url().endsWith(`/workspaces/${workspaceId}/scenarios/${scenarioId}`));
+  await edit.getByRole('button', { name: 'Salvar cenário' }).click();
+  const update = await editRequest;
+  expect(update.headers()['if-match']).toBe('"cnab-scenario-1"');
+  expect((update.postDataJSON() as ScenarioInput).facts).toEqual({
+    ...created.facts,
+    folhaPagamento: { present: true, situacao: 'CONSOLIDADA', dataConsolidacaoPresente: null, dataCreditoBancarioPresente: true }
+  });
+  await expect(page.getByRole('status').filter({ hasText: 'Cenário atualizado' })).toBeVisible();
+
+  await editScenario(legacy.name);
+  await expect(editCredit).toHaveValue('omitted');
+  await expect(editConsolidation).toHaveValue('');
+  await expect(editCredit.locator('option:checked')).toHaveText('Sem valor informado');
+  const legacyRequest = page.waitForRequest(request => request.method() === 'PUT'
+    && request.url().endsWith(`/workspaces/${workspaceId}/scenarios/${legacy.id}`));
+  await edit.getByRole('button', { name: 'Salvar cenário' }).click();
+  expect((await legacyRequest).postDataJSON().facts).toEqual(legacy.facts);
+});
+
 test('resolves Ergon deep-link, renders 6-stage DAG with FORBIDDEN guards & PL/SQL lineage, runs sandbox divergence trace, and executes host-driven operational proof', async ({
   page
 }) => {

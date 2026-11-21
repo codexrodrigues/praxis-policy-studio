@@ -46,7 +46,7 @@ describe('ScenarioCreateFormComponent', () => {
           { '===': [{ var: 'activeEnrollment' }, true] }
         ]
       },
-      factPaths: ['requestedAmount', 'activeEnrollment'],
+      factPaths: ['requestedAmount', 'activeEnrollment', 'accountConfirmed'],
       facts: [
         {
           path: 'requestedAmount',
@@ -63,7 +63,18 @@ describe('ScenarioCreateFormComponent', () => {
           path: 'activeEnrollment',
           label: 'Vínculo ativo',
           valueType: 'boolean',
-          nullable: false,
+          nullable: true,
+          description: '',
+          providerRef: 'test-provider',
+          evidenceRefs: [],
+          sensitivity: 'NON_SENSITIVE',
+          redaction: 'NONE'
+        },
+        {
+          path: 'accountConfirmed',
+          label: 'Conta confirmada',
+          valueType: 'boolean',
+          nullable: true,
           description: '',
           providerRef: 'test-provider',
           evidenceRefs: [],
@@ -89,7 +100,8 @@ describe('ScenarioCreateFormComponent', () => {
       expectedReasonCodes: [],
       factValues: {
         requestedAmount: 3000,
-        activeEnrollment: true
+        activeEnrollment: true,
+        accountConfirmed: null
       }
     });
     expect(suggestions[1]).toEqual({
@@ -100,7 +112,8 @@ describe('ScenarioCreateFormComponent', () => {
       expectedReasonCodes: ['GRANT-10'],
       factValues: {
         requestedAmount: 3100,
-        activeEnrollment: false
+        activeEnrollment: false,
+        accountConfirmed: null
       }
     });
 

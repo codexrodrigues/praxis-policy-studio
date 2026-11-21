@@ -510,7 +510,7 @@ function suggestedFactValue(
   }
 
   if (fact.valueType === 'number') return outcome === 'ALLOW' ? 100 : 999999;
-  if (fact.valueType === 'boolean') return outcome === 'ALLOW';
+  if (fact.valueType === 'boolean') return fact.nullable ? null : outcome === 'ALLOW';
   if (fact.valueType === 'date') return outcome === 'ALLOW' ? '2026-01-15' : '2099-12-31';
   if (fact.valueType === 'number-array' || fact.valueType === 'array<number>') return outcome === 'ALLOW' ? [100] : [999999];
   if (fact.valueType === 'string-array') return outcome === 'ALLOW' ? ['VALID'] : ['INVALID'];
@@ -1104,7 +1104,7 @@ export function scaffoldDecisionOntologyFacts(
 
   const defaultForFact = (fact: DecisionFact | undefined): unknown => {
     if (!fact) return null;
-    if (fact.valueType === 'boolean') return false;
+    if (fact.valueType === 'boolean') return fact.nullable ? null : false;
     if (fact.valueType === 'number') return 0;
     if (fact.valueType === 'date') return '2026-01-15';
     if (
@@ -1125,7 +1125,7 @@ export function scaffoldDecisionOntologyFacts(
   }
 
   const nestedPayload = nestedFactPayload(flatValues);
-  if (fallbackJson && fallbackJson.trim()) {
+  if (decision.facts.length === 0 && fallbackJson?.trim()) {
     try {
       const parsed = JSON.parse(fallbackJson);
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {

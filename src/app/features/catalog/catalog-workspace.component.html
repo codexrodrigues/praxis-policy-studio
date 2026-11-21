@@ -524,7 +524,7 @@
           </div>
           <strong>{{ scenarios().length }}</strong>
         </header>
-        <pax-scenario-create-form [facts]="current.facts" [factValues]="scenarioFactDraft()"
+        <pax-scenario-create-form [facts]="current.facts" [factValues]="scenarioFactValues()"
           [factsJson]="scenarioFactsJson()" [fallbackJson]="scenarioFactsFallback()"
           [busy]="authoringBusy()" [canManage]="hasWorkspaceAction('MANAGE_SCENARIOS')"
           [suggestions]="suggestedScenarios()"

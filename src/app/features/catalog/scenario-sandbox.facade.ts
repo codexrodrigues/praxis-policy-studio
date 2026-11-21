@@ -47,8 +47,17 @@ export class ScenarioSandboxFacade {
 
   readonly scenarios = signal<readonly DomainRuleTestScenario[]>([]);
   readonly scenarioFactDraft = signal<Readonly<Record<string, unknown>>>({});
+  readonly scenarioFactValues = computed(() => {
+    const values = { ...this.scenarioFactDraft() };
+    for (const fact of this.store.selected()?.facts ?? []) {
+      if (fact.valueType === 'boolean' && fact.nullable && values[fact.path] === undefined) {
+        values[fact.path] = null;
+      }
+    }
+    return values;
+  });
   readonly scenarioFactsFallback = signal('{}');
-  readonly scenarioFactsJson = computed(() => JSON.stringify(nestedFactPayload(this.scenarioFactDraft()), null, 2));
+  readonly scenarioFactsJson = computed(() => JSON.stringify(nestedFactPayload(this.scenarioFactValues()), null, 2));
   readonly activeScenarios = computed(() => this.scenarios().filter(item => item.status === 'ACTIVE'));
   readonly suggestedScenarios = computed(() => buildSuggestedScenarioTemplates(this.store.selected()));
   readonly canScaffoldScenarioOntology = computed(() => {
@@ -398,7 +407,9 @@ export class ScenarioSandboxFacade {
     this.editingScenarioId.set(scenarioId);
     this.editingScenarioDirty.set(false);
     this.editingScenarioFactDraft.set(Object.fromEntries(
-      (this.store.selected()?.facts ?? []).map(fact => [fact.path, valueAtFactPath(scenario.facts, fact.path)])
+      (this.store.selected()?.facts ?? [])
+        .map(fact => [fact.path, valueAtFactPath(scenario.facts, fact.path)] as const)
+        .filter(([, value]) => value !== undefined)
     ));
     this.store.clearAuthoringMessage();
   }

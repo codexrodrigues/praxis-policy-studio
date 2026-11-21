@@ -173,7 +173,7 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly sandboxFeedback = this.testing.sandboxFeedback;
   readonly sandboxError = this.testing.sandboxError;
   readonly scenarios = this.testing.scenarios;
-  readonly scenarioFactDraft = this.testing.scenarioFactDraft;
+  readonly scenarioFactValues = this.testing.scenarioFactValues;
   readonly scenarioFactsFallback = this.testing.scenarioFactsFallback;
   readonly scenarioFactsJson = this.testing.scenarioFactsJson;
   readonly activeScenarios = this.testing.activeScenarios;
