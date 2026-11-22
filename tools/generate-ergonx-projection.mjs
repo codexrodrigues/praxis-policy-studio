@@ -13,9 +13,9 @@ const migrationRevision = execFileSync('git', ['-C', migrationRoot, 'rev-parse',
 const sources = [
   ['tools/migration-factory/rn013-full-block-config-payload.psm1', 'CONFIG_MATERIALIZER'],
   ['ms-administracao-pessoal/src/main/java/com/example/praxis/msadministracaopessoal/administracaopessoal/rule/RegraFrequenciaMainPreHostContract.java', 'HOST_CONTRACT'],
-  ['docs/migracao/ERGadm00036/rule-migration/rn013-full-block-dynamic-executor-selection.md', 'EXECUTOR_SELECTION'],
-  ['docs/migracao/ERGadm00036/rule-migration/rn013-full-block-functional-live-proof-2026-08-11.json', 'FUNCTIONAL_EVIDENCE'],
-  ['docs/migracao/ERGadm00036/rule-migration/rule-traceability-matrix.md', 'TRACEABILITY']
+  ['docs/migracao/WF-SCREEN-00036/rule-migration/rn013-full-block-dynamic-executor-selection.md', 'EXECUTOR_SELECTION'],
+  ['docs/migracao/WF-SCREEN-00036/rule-migration/rn013-full-block-functional-live-proof-2026-08-11.json', 'FUNCTIONAL_EVIDENCE'],
+  ['docs/migracao/WF-SCREEN-00036/rule-migration/rule-traceability-matrix.md', 'TRACEABILITY']
 ];
 const commandDtoPath = 'ms-administracao-pessoal/src/main/java/com/example/praxis/msadministracaopessoal/administracaopessoal/dto/RegraFrequenciaCommandDTO.java';
 const evidenceRoots = [
@@ -94,7 +94,7 @@ const projection = {
   },
   resourceLinks: [
     { relation: 'authoring-impact', resourceKey: 'administracao-pessoal.regras-frequencia' },
-    { relation: 'consumer-screen', logicalScreenKey: 'ERGadm00036', resolution: 'HOST_OWNED' }
+    { relation: 'consumer-screen', logicalScreenKey: 'WF-SCREEN-00036', resolution: 'HOST_OWNED' }
   ],
   presentationLabels: {
     domain: { 'pt-BR': 'Frequência e afastamentos', 'en-US': 'Frequency and absence' },

@@ -9,7 +9,7 @@ const hostProfiles = [{ id: 'quickstart', labelPtBr: 'Quickstart', labelEnUs: 'Q
 if (process.env.RULES_STUDIO_ERGON_API_BASE_URL !== undefined) {
   const apiBaseUrl = deploymentOrigin(process.env.RULES_STUDIO_ERGON_API_BASE_URL);
   if (apiBaseUrl === baseUrl) throw new Error('POLICY_STUDIO_DUPLICATE_DEPLOYMENT_ORIGIN');
-  hostProfiles.push({ id: 'ergon', labelPtBr: 'Ergon', labelEnUs: 'Ergon', apiBaseUrl });
+  hostProfiles.push({ id: 'ergon', labelPtBr: 'Workforce Showcase', labelEnUs: 'Workforce Showcase', apiBaseUrl });
 } else if (process.env.POLICY_STUDIO_SECONDARY_API_BASE_URL !== undefined) {
   const apiBaseUrl = deploymentOrigin(process.env.POLICY_STUDIO_SECONDARY_API_BASE_URL);
   if (apiBaseUrl === baseUrl) throw new Error('POLICY_STUDIO_DUPLICATE_DEPLOYMENT_ORIGIN');

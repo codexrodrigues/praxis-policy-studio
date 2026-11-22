@@ -15,17 +15,17 @@
       "sha256": "8F6F178A8792FBBE84929E43E4EB0A204214B6EBF86E35B3BA35787CDAC1200E"
     },
     {
-      "path": "docs/migracao/ERGadm00036/rule-migration/rn013-full-block-dynamic-executor-selection.md",
+      "path": "docs/migracao/WF-SCREEN-00036/rule-migration/rn013-full-block-dynamic-executor-selection.md",
       "kind": "EXECUTOR_SELECTION",
       "sha256": "6539F00F2CDE04172D6804BB76DDF39D38BB0282F12217B76369230B941BACAD"
     },
     {
-      "path": "docs/migracao/ERGadm00036/rule-migration/rn013-full-block-functional-live-proof-2026-08-11.json",
+      "path": "docs/migracao/WF-SCREEN-00036/rule-migration/rn013-full-block-functional-live-proof-2026-08-11.json",
       "kind": "FUNCTIONAL_EVIDENCE",
       "sha256": "E900BCE56FE9529ACED5DA1944588C953C7CAB23E2AB4BBA2083E806E1E02C5D"
     },
     {
-      "path": "docs/migracao/ERGadm00036/rule-migration/rule-traceability-matrix.md",
+      "path": "docs/migracao/WF-SCREEN-00036/rule-migration/rule-traceability-matrix.md",
       "kind": "TRACEABILITY",
       "sha256": "717D62F5A77809718201CD6A6F18CABE6ECBC787F3A4B52C0898E57072A1B009"
     },
@@ -129,7 +129,7 @@
     {
       "order": 1,
       "decisionKey": "regra-frequencia.quantidade-maxima.nao-negativa",
-      "reasonCode": "ERG-08380",
+      "reasonCode": "WF-08380",
       "presentationLabel": "A quantidade maxima de dias, quando informada, nao pode ser negativa.",
       "semanticStatus": "TECHNICAL_DRAFT_READY",
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
@@ -143,7 +143,7 @@
     {
       "order": 2,
       "decisionKey": "regra-frequencia.quantidade-minima.nao-negativa",
-      "reasonCode": "ERG-08381",
+      "reasonCode": "WF-08381",
       "presentationLabel": "A quantidade minima de dias, quando informada, nao pode ser negativa.",
       "semanticStatus": "TECHNICAL_DRAFT_READY",
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
@@ -157,7 +157,7 @@
     {
       "order": 3,
       "decisionKey": "regra-frequencia.quantidade-maxima.coerente-com-minima",
-      "reasonCode": "ERG-08382",
+      "reasonCode": "WF-08382",
       "presentationLabel": "A quantidade maxima de dias nao pode ser menor que a quantidade minima.",
       "semanticStatus": "TECHNICAL_DRAFT_READY",
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
@@ -172,7 +172,7 @@
     {
       "order": 4,
       "decisionKey": "regra-frequencia.maximo-consecutivo-mes.nao-negativo",
-      "reasonCode": "ERG-08383",
+      "reasonCode": "WF-08383",
       "presentationLabel": "O maximo de dias consecutivos no mes, quando informado, nao pode ser negativo.",
       "semanticStatus": "TECHNICAL_DRAFT_READY",
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
@@ -186,7 +186,7 @@
     {
       "order": 5,
       "decisionKey": "regra-frequencia.maximo-consecutivo-ano.nao-negativo",
-      "reasonCode": "ERG-08384",
+      "reasonCode": "WF-08384",
       "presentationLabel": "O maximo de dias consecutivos no ano, quando informado, nao pode ser negativo.",
       "semanticStatus": "TECHNICAL_DRAFT_READY",
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
@@ -200,7 +200,7 @@
     {
       "order": 6,
       "decisionKey": "regra-frequencia.maximo-interpolado-mes.nao-negativo",
-      "reasonCode": "ERG-08385",
+      "reasonCode": "WF-08385",
       "presentationLabel": "O maximo de dias intercalados no mes, quando informado, nao pode ser negativo.",
       "semanticStatus": "TECHNICAL_DRAFT_READY",
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
@@ -214,7 +214,7 @@
     {
       "order": 7,
       "decisionKey": "regra-frequencia.maximo-interpolado-ano.nao-negativo",
-      "reasonCode": "ERG-08386",
+      "reasonCode": "WF-08386",
       "presentationLabel": "O maximo de dias intercalados no ano, quando informado, nao pode ser negativo.",
       "semanticStatus": "TECHNICAL_DRAFT_READY",
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
@@ -228,7 +228,7 @@
     {
       "order": 8,
       "decisionKey": "regra-frequencia.intervalo-prorrogacao.nao-negativo",
-      "reasonCode": "ERG-08387",
+      "reasonCode": "WF-08387",
       "presentationLabel": "O intervalo de prorrogacao em dias, quando informado, nao pode ser negativo.",
       "semanticStatus": "TECHNICAL_DRAFT_READY",
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
@@ -242,7 +242,7 @@
     {
       "order": 9,
       "decisionKey": "regra-frequencia.intervalo-minimo.nao-negativo",
-      "reasonCode": "ERG-08388",
+      "reasonCode": "WF-08388",
       "presentationLabel": "O intervalo minimo em dias, quando informado, nao pode ser negativo.",
       "semanticStatus": "TECHNICAL_DRAFT_READY",
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
@@ -256,7 +256,7 @@
     {
       "order": 10,
       "decisionKey": "regra-frequencia.maximo-consecutivo-mes.limite-calendario",
-      "reasonCode": "ERG-08389",
+      "reasonCode": "WF-08389",
       "presentationLabel": "O maximo de dias consecutivos no mes nao pode ultrapassar 31.",
       "semanticStatus": "TECHNICAL_DRAFT_READY",
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
@@ -270,7 +270,7 @@
     {
       "order": 11,
       "decisionKey": "regra-frequencia.maximo-interpolado-mes.limite-calendario",
-      "reasonCode": "ERG-08390",
+      "reasonCode": "WF-08390",
       "presentationLabel": "O maximo de dias intercalados no mes nao pode ultrapassar 31.",
       "semanticStatus": "TECHNICAL_DRAFT_READY",
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
@@ -284,7 +284,7 @@
     {
       "order": 12,
       "decisionKey": "regra-frequencia.maximo-consecutivo-ano.limite-calendario",
-      "reasonCode": "ERG-08391",
+      "reasonCode": "WF-08391",
       "presentationLabel": "O maximo de dias consecutivos no ano nao pode ultrapassar 366.",
       "semanticStatus": "TECHNICAL_DRAFT_READY",
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
@@ -298,7 +298,7 @@
     {
       "order": 13,
       "decisionKey": "regra-frequencia.maximo-interpolado-ano.limite-calendario",
-      "reasonCode": "ERG-08392",
+      "reasonCode": "WF-08392",
       "presentationLabel": "O maximo de dias intercalados no ano nao pode ultrapassar 366.",
       "semanticStatus": "TECHNICAL_DRAFT_READY",
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
@@ -312,7 +312,7 @@
     {
       "order": 14,
       "decisionKey": "regra-frequencia.periodo.ordem-valida",
-      "reasonCode": "ERG-00019",
+      "reasonCode": "WF-00019",
       "presentationLabel": "A data final da vigencia, quando informada, nao pode ser anterior a data inicial.",
       "semanticStatus": "TECHNICAL_DRAFT_READY",
       "reviewStatus": "BUSINESS_REVIEW_PENDING",
@@ -465,7 +465,7 @@
     },
     {
       "relation": "consumer-screen",
-      "logicalScreenKey": "ERGadm00036",
+      "logicalScreenKey": "WF-SCREEN-00036",
       "resolution": "HOST_OWNED"
     }
   ],

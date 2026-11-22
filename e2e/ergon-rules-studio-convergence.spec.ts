@@ -28,8 +28,8 @@ const ERGON_SLOTS: readonly ErgonSeededSlot[] = [
     id: 'ergon-def-00019',
     ruleKey: 'product.ergon.rn013.erg00019',
     slotKey: 'rn013.periodo_ordem_valida',
-    code: 'ERG-00019',
-    presentationLabel: 'ERG-00019 — Data final não pode ser anterior à data inicial.',
+    code: 'WF-00019',
+    presentationLabel: 'WF-00019 — Data final não pode ser anterior à data inicial.',
     messagePtBr: 'Data final não pode ser anterior à data inicial.',
     decisionStage: 'PROTECTED_GUARD',
     overridePolicy: 'FORBIDDEN',
@@ -41,16 +41,16 @@ const ERGON_SLOTS: readonly ErgonSeededSlot[] = [
         { '>=': [{ date: [{ var: 'draft.dtfim' }] }, { date: [{ var: 'draft.dtini' }] }] }
       ]
     },
-    plsqlOrigin: 'PCK_REGRAS_FREQ.MAIN_PRE',
-    plsqlLineage: 'IF v_row_new.dtfim < v_row_new.dtini THEN HADES_ERRO_PACK.TRATA_ERRO(Ergon, 19); END IF;',
+    plsqlOrigin: 'pkg_legacy_rules.regras_freq.MAIN_PRE',
+    plsqlLineage: 'IF v_row_new.dtfim < v_row_new.dtini THEN HADES_ERRO_PACK.TRATA_ERRO(Workforce, 19); END IF;',
     targetField: 'dtfim'
   },
   {
     id: 'ergon-def-08380',
     ruleKey: 'product.ergon.rn013.erg08380',
     slotKey: 'rn013.qtd_max_non_negative',
-    code: 'ERG-08380',
-    presentationLabel: 'ERG-08380 — Quantidade máxima de dias deve estar dentro dos limites permitidos.',
+    code: 'WF-08380',
+    presentationLabel: 'WF-08380 — Quantidade máxima de dias deve estar dentro dos limites permitidos.',
     messagePtBr: 'Quantidade máxima de dias deve estar dentro dos limites permitidos.',
     decisionStage: 'DOMAIN_DECISION',
     overridePolicy: 'PARAMETERIZABLE',
@@ -67,16 +67,16 @@ const ERGON_SLOTS: readonly ErgonSeededSlot[] = [
         }
       ]
     },
-    plsqlOrigin: 'PCK_REGRAS_FREQ.MAIN_PRE',
-    plsqlLineage: 'IF v_row_new.qtd_max < 0 THEN HADES_ERRO_PACK.TRATA_ERRO(Ergon, 8380); END IF;',
+    plsqlOrigin: 'pkg_legacy_rules.regras_freq.MAIN_PRE',
+    plsqlLineage: 'IF v_row_new.qtd_max < 0 THEN HADES_ERRO_PACK.TRATA_ERRO(Workforce, 8380); END IF;',
     targetField: 'qtdMaxDias'
   },
   {
     id: 'ergon-def-08381',
     ruleKey: 'product.ergon.rn013.erg08381',
     slotKey: 'rn013.qtd_min_non_negative',
-    code: 'ERG-08381',
-    presentationLabel: 'ERG-08381 — Quantidade mínima de dias não pode ser negativa.',
+    code: 'WF-08381',
+    presentationLabel: 'WF-08381 — Quantidade mínima de dias não pode ser negativa.',
     messagePtBr: 'Quantidade mínima de dias não pode ser negativa.',
     decisionStage: 'DOMAIN_DECISION',
     overridePolicy: 'RESTRICT_ONLY',
@@ -88,16 +88,16 @@ const ERGON_SLOTS: readonly ErgonSeededSlot[] = [
         { '>=': [{ var: 'draft.qtdMinDias' }, 0] }
       ]
     },
-    plsqlOrigin: 'PCK_REGRAS_FREQ.MAIN_PRE',
-    plsqlLineage: 'IF v_row_new.qtd_min < 0 THEN HADES_ERRO_PACK.TRATA_ERRO(Ergon, 8381); END IF;',
+    plsqlOrigin: 'pkg_legacy_rules.regras_freq.MAIN_PRE',
+    plsqlLineage: 'IF v_row_new.qtd_min < 0 THEN HADES_ERRO_PACK.TRATA_ERRO(Workforce, 8381); END IF;',
     targetField: 'qtdMinDias'
   },
   {
     id: 'ergon-def-08382',
     ruleKey: 'product.ergon.rn013.erg08382',
     slotKey: 'rn013.qtd_max_coherent_with_min',
-    code: 'ERG-08382',
-    presentationLabel: 'ERG-08382 — A quantidade máxima não pode ser menor que a quantidade mínima.',
+    code: 'WF-08382',
+    presentationLabel: 'WF-08382 — A quantidade máxima não pode ser menor que a quantidade mínima.',
     messagePtBr: 'A quantidade máxima não pode ser menor que a quantidade mínima.',
     decisionStage: 'DOMAIN_DECISION',
     overridePolicy: 'FORBIDDEN',
@@ -110,16 +110,16 @@ const ERGON_SLOTS: readonly ErgonSeededSlot[] = [
         { '>=': [{ var: 'draft.qtdMaxDias' }, { var: 'draft.qtdMinDias' }] }
       ]
     },
-    plsqlOrigin: 'PCK_REGRAS_FREQ.MAIN_PRE',
-    plsqlLineage: 'IF v_row_new.qtd_max < v_row_new.qtd_min THEN HADES_ERRO_PACK.TRATA_ERRO(Ergon, 8382); END IF;',
+    plsqlOrigin: 'pkg_legacy_rules.regras_freq.MAIN_PRE',
+    plsqlLineage: 'IF v_row_new.qtd_max < v_row_new.qtd_min THEN HADES_ERRO_PACK.TRATA_ERRO(Workforce, 8382); END IF;',
     targetField: 'qtdMaxDias'
   },
   {
     id: 'ergon-def-08385',
     ruleKey: 'product.ergon.rn013.erg08385',
     slotKey: 'rn013.interp_mes_non_negative',
-    code: 'ERG-08385',
-    presentationLabel: 'ERG-08385 — Quantidade máxima interpolada no mês não pode ser negativa.',
+    code: 'WF-08385',
+    presentationLabel: 'WF-08385 — Quantidade máxima interpolada no mês não pode ser negativa.',
     messagePtBr: 'Quantidade máxima interpolada no mês não pode ser negativa.',
     decisionStage: 'DOMAIN_DECISION',
     overridePolicy: 'REPLACEABLE',
@@ -131,32 +131,32 @@ const ERGON_SLOTS: readonly ErgonSeededSlot[] = [
         { '>=': [{ var: 'draft.qtdMaxInterpMes' }, 0] }
       ]
     },
-    plsqlOrigin: 'PCK_REGRAS_FREQ.MAIN_PRE',
-    plsqlLineage: 'IF v_row_new.qtd_max_interp_mes < 0 THEN HADES_ERRO_PACK.TRATA_ERRO(Ergon, 8385); END IF;',
+    plsqlOrigin: 'pkg_legacy_rules.regras_freq.MAIN_PRE',
+    plsqlLineage: 'IF v_row_new.qtd_max_interp_mes < 0 THEN HADES_ERRO_PACK.TRATA_ERRO(Workforce, 8385); END IF;',
     targetField: 'qtdMaxInterpMes'
   },
   {
     id: 'ergon-def-08393',
     ruleKey: 'product.ergon.rn013.erg08393',
     slotKey: 'rn013.concomitancia_vigencia_overlap',
-    code: 'ERG-08393',
-    presentationLabel: 'ERG-08393 — Concomitância de vigência no escopo funcional.',
+    code: 'WF-08393',
+    presentationLabel: 'WF-08393 — Concomitância de vigência no escopo funcional.',
     messagePtBr: 'Já existe regra de frequência vigente e concomitante para a mesma combinação funcional.',
     decisionStage: 'POST_DECISION',
     overridePolicy: 'FORBIDDEN',
     cardinality: 'SINGLE',
     executorKind: 'JAVA',
     condition: { '==': [1, 1] },
-    plsqlOrigin: 'PCK_REGRAS_FREQ.MAIN_POS',
-    plsqlLineage: 'IF PACK_HADES.EH_CONCOMITANTE(...) THEN HADES_ERRO_PACK.TRATA_ERRO(Ergon, 8393); END IF;',
+    plsqlOrigin: 'pkg_legacy_rules.regras_freq.MAIN_POS',
+    plsqlLineage: 'IF pkg_legacy_rules.core.EH_CONCOMITANTE(...) THEN HADES_ERRO_PACK.TRATA_ERRO(Workforce, 8393); END IF;',
     targetField: 'dtini'
   },
   {
     id: 'ergon-def-00446',
     ruleKey: 'product.ergon.freq.erg00446',
     slotKey: 'freq.limite_retroatividade_lancamento',
-    code: 'ERG-00446',
-    presentationLabel: 'ERG-00446 — Limite máximo de dias para lançamento retroativo de frequência.',
+    code: 'WF-00446',
+    presentationLabel: 'WF-00446 — Limite máximo de dias para lançamento retroativo de frequência.',
     messagePtBr: 'Lançamento excede o limite de retroatividade permitido pelo órgão.',
     decisionStage: 'DOMAIN_DECISION',
     overridePolicy: 'PARAMETERIZABLE',
@@ -168,8 +168,8 @@ const ERGON_SLOTS: readonly ErgonSeededSlot[] = [
         { '<=': [{ var: 'draft.retroactiveDays' }, 60] }
       ]
     },
-    plsqlOrigin: 'PCK_FREQUENCIAS.MAIN_PRE',
-    plsqlLineage: 'IF v_dias_retro > 60 THEN HADES_ERRO_PACK.TRATA_ERRO(Ergon, 446); END IF;',
+    plsqlOrigin: 'pkg_legacy_rules.frequencias.MAIN_PRE',
+    plsqlLineage: 'IF v_dias_retro > 60 THEN HADES_ERRO_PACK.TRATA_ERRO(Workforce, 446); END IF;',
     targetField: 'dtini',
     ruleSetKey: RN017_RULESET_KEY
   }
@@ -568,7 +568,7 @@ async function mockErgonShowcaseBackend(page: Page): Promise<{
           id: 'ergon-scn-orgao2',
           workspaceId: currentWorkspace.id,
           scenarioKey: 'CUSTOMIZACAO_ORGAO_2',
-          name: 'Excesso de quantidade máxima para o órgão (ERG-08380)',
+          name: 'Excesso de quantidade máxima para o órgão (WF-08380)',
           expectedDecision: 'DENY',
           status: 'ACTIVE',
           facts: {
@@ -663,7 +663,7 @@ async function mockErgonShowcaseBackend(page: Page): Promise<{
               comparison: 'CANDIDATE_ONLY_MATCH',
               candidateMatchesExpected: true,
               activeMatchesExpected: false,
-              candidateReasonCodes: ['ERG-08380'],
+              candidateReasonCodes: ['WF-08380'],
               activeReasonCodes: []
             }
           ]
@@ -755,7 +755,7 @@ async function mockErgonShowcaseBackend(page: Page): Promise<{
                 expectedDecision: 'DENY',
                 actualDecision: 'DENY',
                 passed: true,
-                reasonCodes: ['ERG-08380'],
+                reasonCodes: ['WF-08380'],
                 operationalEvidence: {
                   operationMode: 'UPDATE',
                   beforeStateDigest: 'd'.repeat(64),
@@ -835,7 +835,7 @@ async function mockErgonShowcaseBackend(page: Page): Promise<{
   return { operationalProofCalls, candidatePublishCalls };
 }
 
-test('resolves Ergon deep-link, renders 6-stage DAG with FORBIDDEN guards & PL/SQL lineage, runs sandbox divergence trace, and executes host-driven operational proof', async ({
+test('resolves Workforce deep-link, renders 6-stage DAG with FORBIDDEN guards & PL/SQL lineage, runs sandbox divergence trace, and executes host-driven operational proof', async ({
   page
 }) => {
   const { operationalProofCalls } = await mockErgonShowcaseBackend(page);
@@ -844,33 +844,33 @@ test('resolves Ergon deep-link, renders 6-stage DAG with FORBIDDEN guards & PL/S
     `/catalog?ruleSetKey=${encodeURIComponent(RN013_RULESET_KEY)}&slotKey=rn013.qtd_max_non_negative&decisionKey=product.ergon.rn013.erg08380`
   );
 
-  // 1. Verify deep-link selection of ERG-08380 and 6-stage DAG rendering
+  // 1. Verify deep-link selection of WF-08380 and 6-stage DAG rendering
   await expect(page.getByTestId('rule-decision-plan-dag')).toBeVisible();
   await expect(page.getByTestId('dag-ruleset-key')).toContainText(RN013_RULESET_KEY);
 
-  // Verify PROTECTED_GUARD (ERG-00019), DOMAIN_DECISION (ERG-08380, ERG-08381, ERG-08382, ERG-08385), and POST_DECISION (ERG-08393)
-  await expect(page.getByTestId('dag-stage-PROTECTED_GUARD')).toContainText('ERG-00019');
-  await expect(page.getByTestId('dag-stage-DOMAIN_DECISION')).toContainText('ERG-08380');
-  await expect(page.getByTestId('dag-stage-DOMAIN_DECISION')).toContainText('ERG-08382');
-  await expect(page.getByTestId('dag-stage-DOMAIN_DECISION')).toContainText('ERG-08385');
-  await expect(page.getByTestId('dag-stage-POST_DECISION')).toContainText('ERG-08393');
+  // Verify PROTECTED_GUARD (WF-00019), DOMAIN_DECISION (WF-08380, WF-08381, WF-08382, WF-08385), and POST_DECISION (WF-08393)
+  await expect(page.getByTestId('dag-stage-PROTECTED_GUARD')).toContainText('WF-00019');
+  await expect(page.getByTestId('dag-stage-DOMAIN_DECISION')).toContainText('WF-08380');
+  await expect(page.getByTestId('dag-stage-DOMAIN_DECISION')).toContainText('WF-08382');
+  await expect(page.getByTestId('dag-stage-DOMAIN_DECISION')).toContainText('WF-08385');
+  await expect(page.getByTestId('dag-stage-POST_DECISION')).toContainText('WF-08393');
 
-  // Verify PL/SQL lineage card for ERG-08380
-  await expect(page.getByTestId('dag-legacy-lineage')).toContainText('ERG-08380');
-  await expect(page.getByTestId('dag-legacy-lineage')).toContainText('PCK_REGRAS_FREQ.MAIN_PRE');
+  // Verify PL/SQL lineage card for WF-08380
+  await expect(page.getByTestId('dag-legacy-lineage')).toContainText('WF-08380');
+  await expect(page.getByTestId('dag-legacy-lineage')).toContainText('pkg_legacy_rules.regras_freq.MAIN_PRE');
 
   // Verify 1-hop ontology roots and cross-RuleSet neighborhood navigation
   await expect(page.getByTestId('dag-ontology-roots')).toContainText('draft');
   await expect(page.getByTestId('dag-concept-chip-tipoFrequencia')).toBeVisible();
 
-  // 2. Click FORBIDDEN guard ERG-00019 in the DAG and verify read-only posture (Finding L5)
+  // 2. Click FORBIDDEN guard WF-00019 in the DAG and verify read-only posture (Finding L5)
   await page.getByTestId('dag-node-product.ergon.rn013.erg00019').click();
-  await expect(page.getByTestId('dag-legacy-lineage')).toContainText('ERG-00019');
+  await expect(page.getByTestId('dag-legacy-lineage')).toContainText('WF-00019');
   await expect(page.getByTestId('dag-legacy-lineage')).toContainText('dtfim');
 
-  // Return to PARAMETERIZABLE slot ERG-08380 via DAG click
+  // Return to PARAMETERIZABLE slot WF-08380 via DAG click
   await page.getByTestId('dag-node-product.ergon.rn013.erg08380').click();
-  await expect(page.getByTestId('dag-legacy-lineage')).toContainText('ERG-08380');
+  await expect(page.getByTestId('dag-legacy-lineage')).toContainText('WF-08380');
 
   // 3. Run Sandbox Simulation and verify visual divergence trace on the DAG (Fase C7 + C8)
   await page.getByRole('button', { name: 'Testar regra', exact: true }).click();
@@ -899,7 +899,7 @@ test('resolves Ergon deep-link, renders 6-stage DAG with FORBIDDEN guards & PL/S
   expect(violations.violations).toEqual([]);
 });
 
-test('navigates 1-hop ontology neighborhood to RN-017 (ERG-00446) and executes candidate composition & snapshot publication', async ({
+test('navigates 1-hop ontology neighborhood to RN-017 (WF-00446) and executes candidate composition & snapshot publication', async ({
   page
 }) => {
   const { candidatePublishCalls } = await mockErgonShowcaseBackend(page);
@@ -910,20 +910,20 @@ test('navigates 1-hop ontology neighborhood to RN-017 (ERG-00446) and executes c
 
   await expect(page.getByTestId('rule-decision-plan-dag')).toBeVisible();
 
-  // 1. Click 1-hop ontology chip tipoFrequencia and jump directly to neighbor RN-017 (ERG-00446) via DAG
+  // 1. Click 1-hop ontology chip tipoFrequencia and jump directly to neighbor RN-017 (WF-00446) via DAG
   await page.getByTestId('dag-concept-chip-tipoFrequencia').click();
   await page
     .getByTestId('dag-neighbor-group-tipoFrequencia')
     .getByTestId('dag-neighbor-product.ergon.freq.erg00446')
     .click();
 
-  // Verify RN-017 (ERG-00446) lineage and extracted expression fact draft.retroactiveDays (Finding L6)
+  // Verify RN-017 (WF-00446) lineage and extracted expression fact draft.retroactiveDays (Finding L6)
   await expect(page.getByTestId('dag-ruleset-key')).toContainText(RN017_RULESET_KEY);
-  await expect(page.getByTestId('dag-legacy-lineage')).toContainText('PCK_FREQUENCIAS.MAIN_PRE');
+  await expect(page.getByTestId('dag-legacy-lineage')).toContainText('pkg_legacy_rules.frequencias.MAIN_PRE');
   await page.getByRole('button', { name: /^Regra/ }).click();
   await expect(page.locator('.fact-list')).toContainText('draft.retroactiveDays');
 
-  // 2. Return to Entender, jump back to ERG-08380 via 1-hop neighbor link, and execute candidate composition & snapshot publication in 04 · Operar
+  // 2. Return to Entender, jump back to WF-08380 via 1-hop neighbor link, and execute candidate composition & snapshot publication in 04 · Operar
   await page.getByRole('button', { name: /^Entender/ }).click();
   await page
     .getByTestId('dag-neighbor-group-tipoFrequencia')

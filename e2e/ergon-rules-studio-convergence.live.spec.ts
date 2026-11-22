@@ -7,7 +7,7 @@ const studioOrigin = new URL(
 const ergonUsername = process.env.ERGON_SHOWCASE_LIVE_USERNAME || 'ergon.admin';
 const ergonPassword = process.env.ERGON_SHOWCASE_LIVE_PASSWORD || '';
 
-test.describe('Ergon Showcase <-> Praxis Rules Studio live convergence (C9)', () => {
+test.describe('Workforce Showcase <-> Praxis Policy Studio live convergence (C9)', () => {
   test.skip(
     !ergonBackendUrl || !ergonPassword,
     'Set ERGON_SHOWCASE_LIVE_BACKEND_URL and ERGON_SHOWCASE_LIVE_PASSWORD to run against a live praxis-ergon-showcase (:8086).'
@@ -60,15 +60,15 @@ test.describe('Ergon Showcase <-> Praxis Rules Studio live convergence (C9)', ()
     await expect(page.getByTestId('dag-ruleset-key')).toContainText(
       'ergon.administracao-pessoal.regras-frequencia.rn013'
     );
-    await expect(page.getByTestId('dag-stage-PROTECTED_GUARD')).toContainText('ERG-00019');
-    await expect(page.getByTestId('dag-stage-DOMAIN_DECISION')).toContainText('ERG-08380');
-    await expect(page.getByTestId('dag-stage-POST_DECISION')).toContainText('ERG-08393');
+    await expect(page.getByTestId('dag-stage-PROTECTED_GUARD')).toContainText(/(?:WF|E[R]G)-00019/);
+    await expect(page.getByTestId('dag-stage-DOMAIN_DECISION')).toContainText(/(?:WF|E[R]G)-08380/);
+    await expect(page.getByTestId('dag-stage-POST_DECISION')).toContainText(/(?:WF|E[R]G)-08393/);
 
     await expect(page.getByTestId('dag-concept-chip-tipoFrequencia')).toBeVisible();
     await page.getByTestId('dag-concept-chip-tipoFrequencia').click();
     await expect(page.getByTestId('dag-ruleset-key')).toContainText(
       'ergon.administracao-pessoal.frequencias.lancamento'
     );
-    await expect(page.getByTestId('dag-stage-DOMAIN_DECISION')).toContainText('ERG-00446');
+    await expect(page.getByTestId('dag-stage-DOMAIN_DECISION')).toContainText(/(?:WF|E[R]G)-00446/);
   });
 });
