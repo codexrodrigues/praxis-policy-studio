@@ -252,7 +252,7 @@ describe('ProjectionCatalogService', () => {
     ).subscribe(result => nextEtag = result.workspaceEtag);
     const execute = http.expectOne(action.path);
     expect(execute.request.method).toBe('POST');
-    expect(execute.request.headers.get('If-Match')).toBe('workspace-etag-4');
+    expect(execute.request.headers.get('If-Match')).toBe('"workspace-etag-4"');
     expect(execute.request.headers.get('Idempotency-Key')).toBe('policy-studio:workspace-1:proof-1');
     expect(execute.request.headers.has('X-Correlation-ID')).toBe(true);
     expect(execute.request.body).toEqual(expect.objectContaining({

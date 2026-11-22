@@ -6,6 +6,7 @@ import type {
   DomainRuleWorkspaceCapabilities,
   DomainRuleWorkspaceReview
 } from '@praxisui/core';
+import { editableDecisionCondition } from '../../core/decision-inspection';
 import type {
   DecisionFact,
   DecisionLifecycleSummary,
@@ -461,8 +462,15 @@ function collectConditionHints(
       const resolvedRight = rightVar
         ? resolveParameterReference(rightVar, parameters, parameterCatalog)
         : args[1];
-      if (resolvedRight !== undefined && !hints.has(leftVar)) {
-        hints.set(leftVar, { operator, targetValue: resolvedRight });
+      if (resolvedRight !== undefined && resolvedRight !== null) {
+        const existing = hints.get(leftVar);
+        const shouldReplace =
+          !existing
+          || ((existing.operator === '>=' || existing.operator === '>')
+            && ['<=', '<', '==', '===', 'in'].includes(operator));
+        if (shouldReplace) {
+          hints.set(leftVar, { operator, targetValue: resolvedRight });
+        }
       }
       return;
     }
@@ -478,7 +486,7 @@ function suggestedFactValue(
 ): unknown {
   if (hint) {
     const { operator, targetValue } = hint;
-    if (fact.valueType === 'number' && typeof targetValue === 'number' && Number.isFinite(targetValue)) {
+    if (typeof targetValue === 'number' && Number.isFinite(targetValue)) {
       if (outcome === 'ALLOW') {
         if (operator === '<') return Math.max(0, targetValue - 1);
         if (operator === '>') return targetValue + 1;
@@ -529,7 +537,7 @@ export function buildSuggestedScenarioTemplates(
     : effectiveWorkspaceCondition(decision);
 
   const hints = new Map<string, ConditionFactHint>();
-  collectConditionHints(condition, effectiveParams, decision.parameterCatalog, hints);
+  collectConditionHints(editableDecisionCondition(condition), effectiveParams, decision.parameterCatalog, hints);
 
   const rawSlug = decision.key.split('.').pop() || 'scenario';
   const slug = rawSlug.toLowerCase().replace(/[^a-z0-9-_]+/g, '-');

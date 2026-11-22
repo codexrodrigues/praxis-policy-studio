@@ -99,6 +99,7 @@ export interface DecisionParameterDescriptor {
   readonly allowedValues?: readonly unknown[];
   readonly unit?: string | null;
   readonly origin?: string | null;
+  readonly expressionPointers?: readonly string[];
 }
 
 export interface DecisionParameterCatalog {

@@ -13,6 +13,8 @@ describe('WorkspaceBlockersComponent', () => {
     const component = TestBed.runInInjectionContext(() => new WorkspaceBlockersComponent());
     expect(component.label('ACTIVE_SCENARIO_REQUIRED'))
       .toBe('Cadastre e ative ao menos um cenário antes de solicitar revisão.');
+    expect(component.label('REVIEWER_MUST_DIFFER_FROM_AUTHOR'))
+      .toBe('A revisão independente exige um aprovador diferente do autor da mudança.');
     expect(component.label('FUTURE_BLOCKER')).toContain('ainda não reconhece');
   });
 });

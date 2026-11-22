@@ -392,7 +392,7 @@ export class ProjectionCatalogService {
     const governanceBody = this.record(definition?.governance);
     const parametersBody = this.record(definition?.parameters);
     const conditionFactPaths = collectFactPaths(definition?.condition);
-    const facts = this.decisionFacts(factCatalog, locale);
+    const facts = this.decisionFacts(factCatalog, locale, definition?.condition);
     const parameterCatalog = this.overlayParameterCatalog(
       this.parameterCatalog(definition, serverParameterCatalog),
       workspace?.parameters
@@ -495,8 +495,8 @@ export class ProjectionCatalogService {
       workspaceParameters: workspace?.parameters ?? {},
       expression: formatDecisionExpression(definition?.condition),
       condition: definition?.condition ?? null,
-      factPaths: factCatalog?.facts.length
-        ? factCatalog.facts.map(fact => fact.path)
+      factPaths: facts.length
+        ? facts.map(fact => fact.path)
         : requiredFactPaths?.length
           ? requiredFactPaths
           : conditionFactPaths,
@@ -546,18 +546,59 @@ export class ProjectionCatalogService {
       }));
   }
 
-  private decisionFacts(factCatalog: DomainRuleFactCatalog | undefined, locale: SupportedLocale): DecisionSummary['facts'] {
-    return factCatalog?.facts.map(fact => ({
-      path: fact.path,
-      valueType: fact.valueType,
-      nullable: fact.nullable,
-      label: fact.labels[locale] ?? fact.labels['en-US'] ?? fact.path,
-      description: fact.descriptions[locale] ?? fact.descriptions['en-US'] ?? '',
-      providerRef: fact.providerRef,
-      evidenceRefs: fact.evidenceRefs,
-      sensitivity: fact.sensitivity,
-      redaction: fact.redaction
-    })) ?? [];
+  private decisionFacts(
+    factCatalog: DomainRuleFactCatalog | undefined,
+    locale: SupportedLocale,
+    condition?: unknown
+  ): DecisionSummary['facts'] {
+    const rawFacts = factCatalog?.facts ?? [];
+    const allPaths = rawFacts.map(fact => fact.path);
+    return rawFacts
+      .filter(fact => fact.path.includes('.') || !allPaths.some(other => other.startsWith(`${fact.path}.`)))
+      .map(fact => ({
+        path: fact.path,
+        valueType: fact.valueType === 'string' && this.conditionImpliesNumericFact(condition, fact.path)
+          ? 'number'
+          : fact.valueType,
+        nullable: fact.nullable,
+        label: fact.labels[locale] ?? fact.labels['en-US'] ?? fact.path,
+        description: fact.descriptions[locale] ?? fact.descriptions['en-US'] ?? '',
+        providerRef: fact.providerRef,
+        evidenceRefs: fact.evidenceRefs,
+        sensitivity: fact.sensitivity,
+        redaction: fact.redaction
+      }));
+  }
+
+  private conditionImpliesNumericFact(node: unknown, factPath: string): boolean {
+    if (!node || typeof node !== 'object') return false;
+    if (Array.isArray(node)) {
+      return node.some(item => this.conditionImpliesNumericFact(item, factPath));
+    }
+    const entries = Object.entries(node as Record<string, unknown>);
+    if (entries.length === 1) {
+      const [op, rawArgs] = entries[0];
+      const relational = op === '<' || op === '<=' || op === '>' || op === '>=';
+      const equality = op === '==' || op === '===' || op === '!=' || op === '!==';
+      if ((relational || equality) && Array.isArray(rawArgs) && rawArgs.length === 2) {
+        const [lhs, rhs] = rawArgs;
+        if (this.matchesVarPath(lhs, factPath) && (relational || typeof rhs === 'number')) {
+          return true;
+        }
+        if (this.matchesVarPath(rhs, factPath) && (relational || typeof lhs === 'number')) {
+          return true;
+        }
+      }
+    }
+    return entries.some(([, value]) => this.conditionImpliesNumericFact(value, factPath));
+  }
+
+  private matchesVarPath(expr: unknown, factPath: string): boolean {
+    if (!expr || typeof expr !== 'object' || Array.isArray(expr)) return false;
+    const record = expr as Record<string, unknown>;
+    if (record['var'] === factPath) return true;
+    return Array.isArray(record['coalesce']) && record['coalesce'].length > 0
+      && this.matchesVarPath(record['coalesce'][0], factPath);
   }
 
   private catalogEvidence(
@@ -884,7 +925,7 @@ export class ProjectionCatalogService {
       return throwError(() => new Error('OPERATIONAL_ACTION_CONTRACT_UNAVAILABLE'));
     }
     const headers = new HttpHeaders()
-      .set('If-Match', workspaceEtag)
+      .set('If-Match', this.formatStrongIfMatch(workspaceEtag))
       .set('Idempotency-Key', idempotencyKey)
       .set('X-Correlation-ID', createClientRequestId());
     const body: Record<string, unknown> = {
@@ -1244,11 +1285,15 @@ export class ProjectionCatalogService {
     if (!trimmed) {
       return headers.set('If-None-Match', '*');
     }
-    if (/^W\//i.test(trimmed)) {
+    return headers.set('If-Match', this.formatStrongIfMatch(trimmed));
+  }
+
+  private formatStrongIfMatch(etag: string | null | undefined): string {
+    const trimmed = etag?.trim() ?? '';
+    if (!trimmed || /^W\//i.test(trimmed)) {
       throw new Error('Strong entity tag is required');
     }
-    const strong = /^"[^"\r\n]*"$/.test(trimmed) ? trimmed : `"${trimmed}"`;
-    return headers.set('If-Match', strong);
+    return /^"[^"\r\n]*"$/.test(trimmed) ? trimmed : `"${trimmed}"`;
   }
 
   private hasParameterTemplate(definition: DomainRuleDefinition | undefined): boolean {
@@ -1278,14 +1323,15 @@ export class ProjectionCatalogService {
     const rawParameters = Array.isArray(template?.['parameters'])
       ? (template!['parameters'] as unknown[])
       : [];
-    const uiMetadata = new Map<string, { label: string | null; description: string | null }>();
+    const uiMetadata = new Map<string, { label: string | null; description: string | null; expressionPointers: readonly string[] }>();
     rawParameters
       .map(item => this.record(item))
       .filter((item): item is Record<string, unknown> => item !== null && typeof item['name'] === 'string')
       .forEach(item => {
         uiMetadata.set(String(item['name']).trim(), {
           label: this.stringValue(item, 'label'),
-          description: this.stringValue(item, 'description')
+          description: this.stringValue(item, 'description'),
+          expressionPointers: this.stringArrayValue(item, 'expressionPointers') ?? []
         });
       });
 
@@ -1314,7 +1360,8 @@ export class ProjectionCatalogService {
           maximum: param.maximum ?? null,
           allowedValues: param.allowedValues ?? undefined,
           unit: param.unit ?? null,
-          origin: param.origin
+          origin: param.origin,
+          ...(meta?.expressionPointers.length ? { expressionPointers: meta.expressionPointers } : {})
         };
       })
     };

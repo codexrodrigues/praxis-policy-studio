@@ -30,6 +30,7 @@ export class CatalogSelectionStore {
   readonly i18n = inject(PolicyStudioI18n);
 
   readonly query = signal('');
+  readonly contextScopeFilter = signal<string | null>(null);
   readonly allDecisions = signal<readonly DecisionSummary[]>([]);
   readonly selected = signal<DecisionSummary | null>(null);
   readonly narrowDetailOpen = signal(false);
@@ -72,9 +73,15 @@ export class CatalogSelectionStore {
   readonly workspaceCapabilitiesError = signal(false);
 
   readonly decisions = computed(() => {
+    const scope = this.contextScopeFilter()?.trim() || null;
+    const scoped = scope
+      ? this.allDecisions().filter(item =>
+          item.ruleSetKey === scope || item.resourceKey === scope || item.domain === scope
+        )
+      : this.allDecisions();
     const query = this.query().trim().toLocaleLowerCase();
     return query
-      ? this.allDecisions().filter(item => {
+      ? scoped.filter(item => {
           const doc = item.workspaceDocumentation ?? item.definitionDocumentation ?? item.documentation;
           const legalBasisTokens = (doc?.legalBasis ?? []).flatMap(entry => [
             entry.code,
@@ -103,12 +110,13 @@ export class CatalogSelectionStore {
             .toLocaleLowerCase()
             .includes(query);
         })
-      : this.allDecisions();
+      : scoped;
   });
 
   readonly selectionOutsideFilter = computed(() => {
     const selected = this.selected();
-    return !!this.query().trim() && !!selected && !this.decisions().some(item => item.key === selected.key);
+    const hasFilter = !!this.query().trim() || !!this.contextScopeFilter()?.trim();
+    return hasFilter && !!selected && !this.decisions().some(item => item.key === selected.key);
   });
 
   readonly eligibleSnapshotSources = computed<readonly SnapshotSourceCandidate[]>(() => {

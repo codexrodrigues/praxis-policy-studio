@@ -206,14 +206,76 @@ export class WorkspaceAuthoringFacade {
   }
 
   updateDraft(condition: unknown): void {
-    const source = effectiveWorkspaceCondition(this.store.selected());
-    this.draftCondition.set(composeDecisionCondition(source, condition));
+    const decision = this.store.selected();
+    const source = effectiveWorkspaceCondition(decision);
+    const composed = composeDecisionCondition(source, condition);
+    this.draftCondition.set(composed);
+    this.syncParametersFromConditionPointers(decision, composed);
   }
 
   updateDraftParameters(parameters: Readonly<Record<string, unknown>>): void {
     this.draftParameters.set(parameters);
     if (hasAllowOperationalEffect(parameters)) {
       this.draftCondition.set(null);
+      return;
+    }
+    this.syncConditionFromParameterPointers(this.store.selected(), parameters);
+  }
+
+  private syncParametersFromConditionPointers(decision: DecisionSummary | null | undefined, condition: unknown): void {
+    const params = decision?.parameterCatalog?.parameters;
+    if (!params?.length || !condition) return;
+    const currentParams = this.draftParameters();
+    const rawValues = currentParams['parameterValues'];
+    const currentValues = rawValues && typeof rawValues === 'object' && !Array.isArray(rawValues)
+      ? { ...(rawValues as Record<string, unknown>) }
+      : {};
+    let changed = false;
+    for (const descriptor of params) {
+      const pointer = descriptor.expressionPointers?.[0];
+      if (!pointer) continue;
+      const pointerValue = readJsonPointer(condition, pointer);
+      if (pointerValue === undefined || pointerValue === null || typeof pointerValue === 'object') continue;
+      if ((descriptor.type === 'NUMBER' || descriptor.type === 'INTEGER') && typeof pointerValue !== 'number') continue;
+      if (descriptor.type === 'BOOLEAN' && typeof pointerValue !== 'boolean') continue;
+      if (!Object.is(currentValues[descriptor.name], pointerValue)) {
+        currentValues[descriptor.name] = pointerValue;
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.draftParameters.set({
+        ...currentParams,
+        parameterValues: currentValues
+      });
+    }
+  }
+
+  private syncConditionFromParameterPointers(
+    decision: DecisionSummary | null | undefined,
+    parameters: Readonly<Record<string, unknown>>
+  ): void {
+    const params = decision?.parameterCatalog?.parameters;
+    const rawValues = parameters['parameterValues'];
+    if (!params?.length || !rawValues || typeof rawValues !== 'object' || Array.isArray(rawValues)) return;
+    const values = rawValues as Readonly<Record<string, unknown>>;
+    let updatedCondition = this.draftCondition() ?? effectiveWorkspaceCondition(decision);
+    if (!updatedCondition) return;
+    let changed = false;
+    for (const descriptor of params) {
+      if (!descriptor.expressionPointers?.length || !(descriptor.name in values)) continue;
+      const paramValue = values[descriptor.name];
+      if (paramValue === undefined || typeof paramValue === 'object' && paramValue !== null) continue;
+      for (const pointer of descriptor.expressionPointers) {
+        if (readJsonPointer(updatedCondition, pointer) !== undefined
+          && !Object.is(readJsonPointer(updatedCondition, pointer), paramValue)) {
+          updatedCondition = writeJsonPointer(updatedCondition, pointer, paramValue);
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      this.draftCondition.set(updatedCondition);
     }
   }
 
@@ -675,4 +737,53 @@ export class WorkspaceAuthoringFacade {
     this.loadReviews();
     this.store.loadWorkspaceCapabilities();
   }
+}
+
+function decodeJsonPointer(pointer: string): readonly string[] | null {
+  if (!pointer.startsWith('/')) return null;
+  return pointer.slice(1).split('/').map(segment => segment.replace(/~1/g, '/').replace(/~0/g, '~'));
+}
+
+function readJsonPointer(root: unknown, pointer: string): unknown {
+  const segments = decodeJsonPointer(pointer);
+  if (!segments) return undefined;
+  let current: unknown = root;
+  for (const segment of segments) {
+    if (Array.isArray(current)) {
+      const index = Number(segment);
+      if (!Number.isInteger(index) || index < 0 || index >= current.length) return undefined;
+      current = current[index];
+    } else if (current && typeof current === 'object') {
+      current = (current as Record<string, unknown>)[segment];
+    } else {
+      return undefined;
+    }
+  }
+  return current;
+}
+
+function writeJsonPointer(root: unknown, pointer: string, nextValue: unknown): unknown {
+  const segments = decodeJsonPointer(pointer);
+  if (!segments || segments.length === 0) return root;
+  const setAt = (node: unknown, depth: number): unknown => {
+    const segment = segments[depth];
+    const isLeaf = depth === segments.length - 1;
+    if (Array.isArray(node)) {
+      const index = Number(segment);
+      if (!Number.isInteger(index) || index < 0 || index >= node.length) return node;
+      const copy = [...node];
+      copy[index] = isLeaf ? nextValue : setAt(copy[index], depth + 1);
+      return copy;
+    }
+    if (node && typeof node === 'object') {
+      const record = node as Record<string, unknown>;
+      if (!(segment in record)) return node;
+      return {
+        ...record,
+        [segment]: isLeaf ? nextValue : setAt(record[segment], depth + 1)
+      };
+    }
+    return node;
+  };
+  return setAt(root, 0);
 }

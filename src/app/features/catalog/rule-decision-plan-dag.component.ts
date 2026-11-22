@@ -361,8 +361,13 @@ const CANONICAL_STAGES: readonly {
     }
     .dag-lanes {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 0.6rem;
+    }
+    @media (max-width: 1100px) {
+      .dag-lanes {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      }
     }
     .dag-lane {
       border: 1px solid var(--line, rgba(128, 128, 128, 0.22));

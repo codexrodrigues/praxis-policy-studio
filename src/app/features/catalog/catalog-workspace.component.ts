@@ -110,6 +110,7 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly snapshots = inject(SnapshotExecutionFacade);
 
   readonly query = this.store.query;
+  readonly contextScopeFilter = this.store.contextScopeFilter;
   readonly allDecisions = this.store.allDecisions;
   readonly selected = this.store.selected;
   readonly narrowDetailOpen = this.store.narrowDetailOpen;
@@ -456,6 +457,7 @@ export class CatalogWorkspaceComponent implements OnInit {
         this.sessionActive.set(state.config.mode === 'remote');
         this.logoutFailed.set(false);
         this.allDecisions.set(decisions);
+        this.contextScopeFilter.set(this.resolveDeepLinkScopeFilter(decisions));
         const initial = this.resolveInitialDecision(decisions, state.config.initialDecisionKey);
         if (initial) this.select(initial, true, this.hasExplicitDeepLink());
         else this.clearSelection();
@@ -551,6 +553,17 @@ export class CatalogWorkspaceComponent implements OnInit {
     );
   }
 
+  private resolveDeepLinkScopeFilter(decisions: readonly DecisionSummary[]): string | null {
+    if (typeof window === 'undefined' || !window.location?.search || !decisions.length) return null;
+    const params = new URLSearchParams(window.location.search);
+    const scope = params.get('ruleSetKey')?.trim() || params.get('resourceKey')?.trim() || null;
+    if (!scope) return null;
+    const matches = decisions.some(
+      item => item.ruleSetKey === scope || item.resourceKey === scope || item.domain === scope
+    );
+    return matches ? scope : null;
+  }
+
   private resolveForbiddenResponse(config: PolicyStudioRuntimeConfig, catalogRevision: number): void {
     this.auth.hasSession(config).subscribe({
       next: active => {
@@ -628,6 +641,10 @@ export class CatalogWorkspaceComponent implements OnInit {
   clearQuery(): void {
     this.query.set('');
     requestAnimationFrame(() => this.host.nativeElement.querySelector<HTMLInputElement>('.search input')?.focus());
+  }
+
+  clearContextScopeFilter(): void {
+    this.contextScopeFilter.set(null);
   }
 
   navigateToSection(sectionId: string): void {

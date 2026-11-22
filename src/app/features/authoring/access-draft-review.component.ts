@@ -46,6 +46,11 @@ export class AccessDraftReviewComponent {
     this.error.set(null);
   }
 
+  applyGeneratedDraft(value: string): void {
+    this.editSource(value);
+    this.review();
+  }
+
   review(): void {
     this.error.set(null);
     try {

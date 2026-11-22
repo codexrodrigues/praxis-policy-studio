@@ -48,6 +48,15 @@
       }
     </label>
 
+    @if (contextScopeFilter(); as scopeFilter) {
+      <div class="scope-filter-chip" data-testid="context-scope-filter" role="status">
+        <span>{{ i18n.text('contextScopeActive') }}: <code>{{ scopeFilter }}</code></span>
+        <button type="button" class="quiet-button" data-testid="clear-context-scope-filter" (click)="clearContextScopeFilter()">
+          {{ i18n.text('showAllDecisions') }}
+        </button>
+      </div>
+    }
+
     <div class="decision-list" [attr.aria-label]="i18n.text('availableDecisions')">
       @if (loading()) {
         <p class="empty" aria-live="polite">{{ i18n.text('loading') }}</p>

@@ -250,4 +250,66 @@ describe('WorkspaceAuthoringFacade didactic documentation flow', () => {
     expect(store.selected()?.configStatus).toBe('active');
     expect(store.selected()?.documentation?.title).toBe('Título publicado');
   });
+
+  it('synchronizes condition literals and parameterValues bidirectionally via expressionPointers', () => {
+    const initialCondition = {
+      or: [
+        { '==': [{ var: 'draft.retroactiveDays' }, null] },
+        { and: [{ '>=': [{ var: 'draft.retroactiveDays' }, 0] }, { '<=': [{ var: 'draft.retroactiveDays' }, 60] }] }
+      ]
+    };
+    const decision = makeDecision({
+      condition: initialCondition,
+      parameters: { parameterValues: { maxRetroactiveDays: 60 } },
+      workspaceParameters: { parameterValues: { maxRetroactiveDays: 60 } },
+      parameterCatalog: {
+        definitionId: 'def-1',
+        ruleKey: 'workforce.leave.max-days',
+        version: 1,
+        schemaVersion: '1.0',
+        templateKey: 'retroactive-bounds',
+        templateVersion: '1.0',
+        parameters: [
+          {
+            name: 'maxRetroactiveDays',
+            type: 'INTEGER',
+            required: true,
+            nullable: false,
+            readOnly: false,
+            defaultValue: 60,
+            minimum: 0,
+            maximum: 180,
+            unit: 'days',
+            origin: 'TEMPLATE',
+            expressionPointers: ['/or/1/and/1/<=/1']
+          }
+        ]
+      }
+    });
+    store.allDecisions.set([decision]);
+    store.selected.set(decision);
+    store.workspaceCapabilities.set({
+      workspaceId: 'ws-1',
+      ruleKey: decision.key,
+      status: 'OPEN',
+      revision: 1,
+      etag: 'etag-1',
+      availableActions: ['VIEW', 'UPDATE_DRAFT'],
+      blockers: []
+    });
+    facade.openAuthoring();
+
+    facade.updateDraft({
+      and: [{ '>=': [{ var: 'draft.retroactiveDays' }, 0] }, { '<=': [{ var: 'draft.retroactiveDays' }, 30] }]
+    });
+    expect(facade.draftParameters()['parameterValues']).toEqual({ maxRetroactiveDays: 30 });
+
+    facade.updateDraftParameters({ parameterValues: { maxRetroactiveDays: 45 } });
+    expect(facade.draftCondition()).toEqual({
+      or: [
+        { '==': [{ var: 'draft.retroactiveDays' }, null] },
+        { and: [{ '>=': [{ var: 'draft.retroactiveDays' }, 0] }, { '<=': [{ var: 'draft.retroactiveDays' }, 45] }] }
+      ]
+    });
+  });
 });

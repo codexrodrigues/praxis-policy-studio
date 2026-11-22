@@ -1,7 +1,7 @@
 <details class="review">
   <summary>{{ i18n.text('accessReview') }}</summary>
   <p>{{ i18n.text('accessHint') }}</p>
-  <pax-pap-catalog [config]="config()" />
+  <pax-pap-catalog [config]="config()" (draftGenerated)="applyGeneratedDraft($event)" />
   <label for="access-source">{{ i18n.text('accessSource') }}</label>
   <textarea id="access-source" rows="5" spellcheck="false" [disabled]="busy()" [value]="source()"
     (input)="editSource($any($event.target).value)"></textarea>

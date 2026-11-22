@@ -82,6 +82,24 @@ describe('governed decision editing envelope', () => {
 
     const directNullPolicy = { or: [{ '===': [maximum, null] }, { '>=': [maximum, minimum] }] };
     expect(editableDecisionCondition(directNullPolicy)).toEqual(directNullPolicy);
+
+    const looseNullGuardEnvelope = {
+      or: [
+        { '==': [{ var: 'draft.retroactiveDays' }, null] },
+        { and: [{ '>=': [{ var: 'draft.retroactiveDays' }, 0] }, { '<=': [{ var: 'draft.retroactiveDays' }, 60] }] }
+      ]
+    };
+    expect(editableDecisionCondition(looseNullGuardEnvelope)).toEqual({
+      and: [{ '>=': [{ var: 'draft.retroactiveDays' }, 0] }, { '<=': [{ var: 'draft.retroactiveDays' }, 60] }]
+    });
+    expect(composeDecisionCondition(looseNullGuardEnvelope, {
+      and: [{ '>=': [{ var: 'draft.retroactiveDays' }, 0] }, { '<=': [{ var: 'draft.retroactiveDays' }, 30] }]
+    })).toEqual({
+      or: [
+        { '==': [{ var: 'draft.retroactiveDays' }, null] },
+        { and: [{ '>=': [{ var: 'draft.retroactiveDays' }, 0] }, { '<=': [{ var: 'draft.retroactiveDays' }, 30] }] }
+      ]
+    });
   });
 
   it('projects and compiles tabular decision clauses without exposing raw JSON', () => {

@@ -36,6 +36,48 @@
         <p>{{ selected.resourceKey }} · {{ selected.factContractId }}<br><code>{{ selected.factContractDigest }}</code></p>
         <pre>{{ reference() | json }}</pre>
       </details>
+      <div class="pap-draft-builder" data-testid="pap-draft-builder">
+        <h4>{{ i18n.text('papDraftTitle') }}</h4>
+        <div class="pap-draft-grid">
+          <label>{{ i18n.text('papDraftAuthority') }}
+            <select [value]="draftAuthority()" (change)="setDraftAuthority($any($event.target).value)">
+              <option value="GRANT">GRANT</option>
+              <option value="RESTRICT">RESTRICT</option>
+            </select>
+          </label>
+          <label>{{ i18n.text('papDraftEffect') }}
+            <select [value]="draftEffect()" (change)="setDraftEffect($any($event.target).value)">
+              <option value="ALLOW">ALLOW</option>
+              <option value="DENY">DENY</option>
+            </select>
+          </label>
+          @if (selectedFacts().length) {
+            <label>{{ i18n.text('papDraftFact') }}
+              <select [value]="draftFactPath()" (change)="draftFactPath.set($any($event.target).value)">
+                @for (fact of selectedFacts(); track fact.factPath) {
+                  <option [value]="fact.factPath">{{ fact.factPath }}</option>
+                }
+              </select>
+            </label>
+            <label>{{ i18n.text('papDraftOperator') }}
+              <select [value]="draftOperator()" (change)="draftOperator.set($any($event.target).value)">
+                <option value="!=">!=</option>
+                <option value="==">==</option>
+                <option value="in">in</option>
+              </select>
+            </label>
+            <label>{{ i18n.text('papDraftValue') }}
+              <input type="text" [value]="draftExpectedValue()" (input)="draftExpectedValue.set($any($event.target).value)">
+            </label>
+          }
+          <label>{{ i18n.text('papDraftReason') }}
+            <input type="text" [value]="draftReasonCode()" (input)="draftReasonCode.set($any($event.target).value)">
+          </label>
+        </div>
+        <button type="button" data-testid="pap-generate-draft" (click)="generateDraft()">
+          {{ i18n.text('papGenerateDraft') }}
+        </button>
+      </div>
     } @else { <p role="status">{{ i18n.text('papEmpty') }}</p> }
   }
 </section>

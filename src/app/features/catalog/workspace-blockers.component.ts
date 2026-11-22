@@ -31,6 +31,7 @@ export class WorkspaceBlockersComponent {
       case 'REVIEWED_TEST_RUN_PROVENANCE_AMBIGUOUS': return this.i18n.text('snapshotBlockerProvenanceAmbiguous');
       case 'TEST_EVIDENCE_POLICY_INVALID': return this.i18n.text('snapshotBlockerPolicyInvalid');
       case 'TEST_EVIDENCE_GATE_UNAVAILABLE': return this.i18n.text('snapshotBlockerGateUnavailable');
+      case 'REVIEWER_MUST_DIFFER_FROM_AUTHOR': return this.i18n.text('workspaceBlockerReviewerMustDiffer');
       default: return this.i18n.text('snapshotBlockerUnknown');
     }
   }

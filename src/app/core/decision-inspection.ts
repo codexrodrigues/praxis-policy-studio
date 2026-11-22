@@ -238,12 +238,18 @@ function nullGuardedDisjunction(value: unknown): readonly unknown[] | null {
 
 function isExplicitNullGuard(value: unknown): boolean {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const equality = (value as JsonObject)['==='];
-  if (!Array.isArray(equality) || equality.length !== 2 || equality[1] !== null) return false;
+  const record = value as JsonObject;
+  const strictEq = record['==='];
+  const looseEq = record['=='];
+  const equality = Array.isArray(strictEq) ? strictEq : Array.isArray(looseEq) ? looseEq : null;
+  if (!equality || equality.length !== 2 || equality[1] !== null) return false;
   const left = equality[0];
   if (!left || typeof left !== 'object' || Array.isArray(left)) return false;
-  const coalesce = (left as JsonObject)['coalesce'];
-  return Array.isArray(coalesce) && coalesce.length > 0;
+  const leftObj = left as JsonObject;
+  if (Array.isArray(leftObj['coalesce']) && leftObj['coalesce'].length > 0) {
+    return true;
+  }
+  return Array.isArray(looseEq) && typeof leftObj['var'] === 'string' && leftObj['var'].trim().length > 0;
 }
 
 function visit(value: unknown, consumer: (candidate: unknown) => void): void {
