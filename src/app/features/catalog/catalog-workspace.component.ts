@@ -190,6 +190,7 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly operationalScenarioModes = this.testing.operationalScenarioModes;
   readonly operationalConfirmationOpen = this.testing.operationalConfirmationOpen;
   readonly operationalSelections = this.testing.operationalSelections;
+  readonly operationalPartialCoverage = this.testing.operationalPartialCoverage;
   readonly sandboxRun = this.testing.sandboxRun;
 
   readonly snapshotHead = this.snapshots.snapshotHead;
@@ -1027,6 +1028,10 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   setOperationalScenarioMode(scenarioId: string, value: string): void {
     this.testing.setOperationalScenarioMode(scenarioId, value);
+  }
+
+  selectAllActiveOperationalScenarios(mode: 'CREATE' | 'UPDATE' = 'CREATE'): void {
+    this.testing.selectAllActiveOperationalScenarios(mode);
   }
 
   reviewOperationalTest(): void {

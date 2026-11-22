@@ -119,7 +119,9 @@ export class AccessDraftReviewComponent {
       next: definition => {
         this.busy.set(false);
         try {
-          if (definition.id !== id || definition.ruleType !== AUTHORIZATION_RULE_TYPE || definition.status !== 'draft') {
+          if (definition.id !== id
+            || definition.ruleType !== AUTHORIZATION_RULE_TYPE
+            || !['draft', 'proposed', 'approved'].includes(definition.status ?? '')) {
             throw new Error('ACCESS_DRAFT_REQUIRED');
           }
           if (receipt && expected && (!matchesSubmittedDraft(expected, definition)
@@ -137,6 +139,35 @@ export class AccessDraftReviewComponent {
       error: failure => {
         this.busy.set(false);
         this.error.set(this.errorFor(failure, 'accessReadFailed'));
+      }
+    });
+  }
+
+  approve(): void {
+    const current = this.stored();
+    const config = this.config();
+    if (!current || config.mode !== 'remote' || this.busy()) return;
+    if (current.status !== 'draft' && current.status !== 'proposed') return;
+    this.busy.set(true);
+    this.error.set(null);
+    this.auth.hasSession(config).pipe(
+      switchMap(active => {
+        if (!active) {
+          this.busy.set(false);
+          this.error.set('authenticationRequired');
+          return EMPTY;
+        }
+        return this.catalog.approveAccessDefinition(current.id, config);
+      }),
+      takeUntilDestroyed(this.destroy)
+    ).subscribe({
+      next: approved => {
+        this.busy.set(false);
+        this.stored.set(approved);
+      },
+      error: failure => {
+        this.busy.set(false);
+        this.error.set(this.errorFor(failure, 'accessApproveFailed'));
       }
     });
   }

@@ -83,6 +83,12 @@ export class ScenarioSandboxFacade {
       ? [{ scenarioId: scenario.id, operationMode }]
       : [];
   }));
+  readonly operationalPartialCoverage = computed(() => {
+    const activeIds = new Set(this.activeScenarios().map(item => item.id));
+    if (activeIds.size <= 1) return false;
+    const selectedActiveCount = this.operationalSelections().filter(item => activeIds.has(item.scenarioId)).length;
+    return selectedActiveCount > 0 && selectedActiveCount < activeIds.size;
+  });
 
   readonly sandboxRun = signal<PolicySandboxRun | null>(null);
 
@@ -202,6 +208,16 @@ export class ScenarioSandboxFacade {
   setOperationalScenarioMode(scenarioId: string, value: string): void {
     const mode = value === 'CREATE' || value === 'UPDATE' ? value : '';
     this.operationalScenarioModes.update(current => ({ ...current, [scenarioId]: mode }));
+    this.pendingOperationalCommand = null;
+    this.operationalConfirmationOpen.set(false);
+  }
+
+  selectAllActiveOperationalScenarios(mode: 'CREATE' | 'UPDATE' = 'CREATE'): void {
+    const next: Record<string, 'CREATE' | 'UPDATE' | ''> = { ...this.operationalScenarioModes() };
+    for (const scenario of this.activeScenarios()) {
+      next[scenario.id] = mode;
+    }
+    this.operationalScenarioModes.set(next);
     this.pendingOperationalCommand = null;
     this.operationalConfirmationOpen.set(false);
   }

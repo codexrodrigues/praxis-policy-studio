@@ -2001,4 +2001,51 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
       slotOverridePolicy: 'LOCKED'
     })).toContain('Regra fixa');
   });
+
+  it('selects all active scenarios for operational proof in one click and tracks partial coverage', () => {
+    component.select(decision('A'));
+    component.scenarios.set([
+      { id: 'scenario-1', scenarioKey: 'allow-1', status: 'ACTIVE' },
+      { id: 'scenario-2', scenarioKey: 'deny-2', status: 'ACTIVE' },
+      { id: 'scenario-disabled', scenarioKey: 'disabled-3', status: 'DISABLED' }
+    ] as any);
+
+    expect(component.operationalSelections()).toEqual([]);
+    expect(component.operationalPartialCoverage()).toBe(false);
+
+    component.setOperationalScenarioMode('scenario-1', 'CREATE');
+    expect(component.operationalSelections()).toEqual([
+      { scenarioId: 'scenario-1', operationMode: 'CREATE' }
+    ]);
+    expect(component.operationalPartialCoverage()).toBe(true);
+
+    component.selectAllActiveOperationalScenarios('CREATE');
+    expect(component.operationalSelections()).toEqual([
+      { scenarioId: 'scenario-1', operationMode: 'CREATE' },
+      { scenarioId: 'scenario-2', operationMode: 'CREATE' }
+    ]);
+    expect(component.operationalPartialCoverage()).toBe(false);
+  });
+
+  it('filters catalog decisions by contextScopeFilter and restores all decisions when cleared', () => {
+    const first = {
+      ...decision('rule.alpha'),
+      ruleSetKey: 'domain.alpha',
+      resourceKey: 'domain.alpha.res'
+    };
+    const second = {
+      ...decision('rule.beta'),
+      ruleSetKey: 'domain.beta',
+      resourceKey: 'domain.beta.res'
+    };
+    component.allDecisions.set([first, second]);
+    expect(component.decisions().map(item => item.key)).toEqual(['rule.alpha', 'rule.beta']);
+
+    component.contextScopeFilter.set('domain.alpha');
+    expect(component.decisions().map(item => item.key)).toEqual(['rule.alpha']);
+
+    component.clearContextScopeFilter();
+    expect(component.contextScopeFilter()).toBeNull();
+    expect(component.decisions().map(item => item.key)).toEqual(['rule.alpha', 'rule.beta']);
+  });
 });

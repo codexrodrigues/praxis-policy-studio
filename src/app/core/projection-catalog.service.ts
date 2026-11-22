@@ -801,6 +801,14 @@ export class ProjectionCatalogService {
     return this.domainRules.getDefinition(id, this.requestOptions(config));
   }
 
+  approveAccessDefinition(id: string, config: PolicyStudioRuntimeConfig): Observable<DomainRuleDefinition> {
+    return this.domainRules.transitionDefinitionStatus(
+      id,
+      { status: 'approved', validationResult: { review: 'approved', source: 'praxis-policy-studio' } },
+      this.requestOptions(config)
+    );
+  }
+
   createWorkspace(
     baseDefinitionId: string,
     title: string,

@@ -42,6 +42,11 @@
       @if (result.tenantId || result.environment || result.createdBy) {
         <p>{{ [result.tenantId, result.environment, result.createdBy].filter(present).join(' · ') }}</p>
       }
+      @if (result.status === 'draft' || result.status === 'proposed') {
+        <button type="button" data-testid="access-approve-definition" [disabled]="busy()" (click)="approve()">
+          {{ i18n.text('accessApprove') }}
+        </button>
+      }
       <details><summary>{{ i18n.text('accessStored') }}</summary><pre>{{ result | json }}</pre></details>
     </section>
   }

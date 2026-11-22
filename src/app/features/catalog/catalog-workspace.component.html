@@ -582,10 +582,25 @@
               <strong id="operational-command-title">{{ action.title }}</strong>
               <p>{{ action.description }}</p>
               <small>{{ i18n.text('operationalSelectionCount') }}: {{ operationalSelections().length }}</small>
+              @if (operationalPartialCoverage()) {
+                <small class="authority-note" data-testid="operational-partial-coverage-hint">
+                  {{ i18n.text('operationalPartialCoverageHint') }}
+                </small>
+              }
             </div>
-            <button type="button" [disabled]="authoringBusy() || !action.availability.allowed || !current.workspaceEtag || !operationalSelections().length" (click)="reviewOperationalTest()">
-              {{ i18n.text('reviewOperationalTest') }}
-            </button>
+            <div class="authoring-actions">
+              <button
+                type="button"
+                class="quiet-button"
+                data-testid="select-all-operational-create"
+                [disabled]="authoringBusy() || !activeScenarios().length"
+                (click)="selectAllActiveOperationalScenarios('CREATE')">
+                {{ i18n.text('selectAllOperationalCreate') }}
+              </button>
+              <button type="button" [disabled]="authoringBusy() || !action.availability.allowed || !current.workspaceEtag || !operationalSelections().length" (click)="reviewOperationalTest()">
+                {{ i18n.text('reviewOperationalTest') }}
+              </button>
+            </div>
           </section>
           @if (!action.availability.allowed) {
             <p class="empty">{{ i18n.text('operationalActionUnavailable') }}</p>
