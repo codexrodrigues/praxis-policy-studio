@@ -58,6 +58,7 @@ export interface DecisionSummary {
   readonly expression: string | null;
   readonly condition: unknown | null;
   readonly factPaths: readonly string[];
+  readonly evaluatedFactPaths?: readonly string[];
   readonly facts: readonly DecisionFact[];
   readonly nullSemantics: string | null;
   readonly operationKeys: readonly string[];
@@ -123,6 +124,10 @@ export interface DecisionFact {
   readonly evidenceRefs: readonly string[];
   readonly sensitivity: 'NON_SENSITIVE' | 'PERSONAL' | 'SENSITIVE' | 'SECRET';
   readonly redaction: 'NONE' | 'MASK' | 'HASH' | 'OMIT';
+  readonly hint?: string | null;
+  readonly groupLabel?: string | null;
+  readonly unit?: string | null;
+  readonly valuePresentation?: string | null;
 }
 
 export interface DecisionEvidence {

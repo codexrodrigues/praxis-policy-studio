@@ -1,6 +1,11 @@
 import type { DecisionComparisonOperator } from './decision-inspection';
 import { extractDecisionTableProjection } from './decision-inspection';
-import { humanizeTechnicalSlug, looksLikeTechnicalSlug } from './humanize-labels';
+import {
+  formatFactDisplayLabel,
+  humanizeFactSensitivityPosture,
+  humanizeFactValueTypeLabel
+} from './fact-presentation';
+import { humanizeTechnicalSlug } from './humanize-labels';
 import { POLICY_STUDIO_COPY } from './i18n';
 import type { RuleParameterDisplayEntry } from './rule-parameters-display';
 import type { SupportedLocale } from './runtime-config';
@@ -50,15 +55,7 @@ export function humanizeFactLabel(
   locale: SupportedLocale,
   viewDepth: StudioViewDepth
 ): string {
-  const raw = fact.label?.trim() ?? '';
-  if (!raw || viewDepth === 'technical') {
-    return raw || fact.path;
-  }
-  const stripped = raw.replace(/^(draft|tenant|context|record|subject)\s*:\s*/i, '').trim() || raw;
-  const isCamelCaseIdentifier = !/\s/.test(stripped) && /[a-z][A-Z]/.test(stripped);
-  return looksLikeTechnicalSlug(stripped) || isCamelCaseIdentifier
-    ? humanizeTechnicalSlug(stripped, undefined, locale)
-    : stripped;
+  return formatFactDisplayLabel(fact, locale, viewDepth, true);
 }
 
 export function buildReadableRuleSummary(
@@ -132,65 +129,14 @@ export function humanizeFactValueType(
   valueType: string | null | undefined,
   locale: SupportedLocale
 ): string {
-  const normalized = valueType?.trim().toLowerCase() ?? '';
-  const dict = POLICY_STUDIO_COPY[locale];
-  switch (normalized) {
-    case 'integer':
-    case 'int':
-    case 'int32':
-    case 'int64':
-      return dict.factTypeInteger;
-    case 'number':
-      return locale === 'pt-BR' ? 'Número' : 'Number';
-    case 'decimal':
-    case 'float':
-    case 'double':
-      return dict.factTypeDecimal;
-    case 'string':
-    case 'text':
-      return dict.factTypeString;
-    case 'boolean':
-    case 'bool':
-      return dict.factTypeBoolean;
-    case 'date':
-      return dict.factTypeDate;
-    case 'datetime':
-    case 'timestamp':
-      return dict.factTypeDateTime;
-    case 'string-array':
-    case 'date-array':
-    case 'number-array':
-    case 'array<number>':
-    case 'array':
-      return dict.factTypeList;
-    default:
-      return valueType?.trim() || (locale === 'pt-BR' ? 'Valor' : 'Value');
-  }
+  return humanizeFactValueTypeLabel(valueType, locale);
 }
 
 export function humanizeFactSensitivity(
   sensitivity: string | null | undefined,
   locale: SupportedLocale
 ): { readonly label: string; readonly tone: 'neutral' | 'info' | 'warning' | 'danger' } {
-  const normalized = sensitivity?.trim().toUpperCase() ?? '';
-  const dict = POLICY_STUDIO_COPY[locale];
-  switch (normalized) {
-    case 'NON_SENSITIVE':
-    case 'PUBLIC':
-      return { label: dict.factSensitivityPublic, tone: 'neutral' };
-    case 'PERSONAL':
-      return { label: locale === 'pt-BR' ? 'Dado pessoal' : 'Personal data', tone: 'info' };
-    case 'INTERNAL':
-      return { label: dict.factSensitivityInternal, tone: 'info' };
-    case 'SENSITIVE':
-    case 'PII':
-      return { label: dict.factSensitivitySensitive, tone: 'warning' };
-    case 'SECRET':
-    case 'RESTRICTED':
-      return { label: dict.factSensitivityRestricted, tone: 'danger' };
-    default:
-      return { label: dict.factSensitivityDefault, tone: 'neutral' };
-  }
+  return humanizeFactSensitivityPosture(sensitivity, locale);
 }
 
 export function humanizeBaselineAuthority(

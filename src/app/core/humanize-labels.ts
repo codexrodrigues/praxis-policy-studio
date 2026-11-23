@@ -110,7 +110,30 @@ const PT_BR_WORD_ACCENTS: Readonly<Record<string, string>> = {
   usuario: 'Usuário',
   historico: 'Histórico',
   catalogo: 'Catálogo',
-  esocial: 'eSocial'
+  esocial: 'eSocial',
+  vinculo: 'Vínculo',
+  vinculos: 'Vínculos',
+  saida: 'Saída',
+  saidas: 'Saídas',
+  minimo: 'Mínimo',
+  maximo: 'Máximo',
+  estatutaria: 'Estatutária',
+  estatutarias: 'Estatutárias',
+  ocorrencia: 'Ocorrência',
+  ocorrencias: 'Ocorrências',
+  duracao: 'Duração',
+  vigencia: 'Vigência',
+  referencia: 'Referência',
+  competencia: 'Competência',
+  dependencia: 'Dependência',
+  situacao: 'Situação',
+  matricula: 'Matrícula',
+  exercicio: 'Exercício',
+  obrigatorio: 'Obrigatório',
+  obrigatoria: 'Obrigatória',
+  criterio: 'Critério',
+  criterios: 'Critérios',
+  quantidade: 'Quantidade'
 };
 
 function splitSegmentWords(segment: string): string[] {

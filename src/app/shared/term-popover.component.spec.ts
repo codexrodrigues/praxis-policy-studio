@@ -102,4 +102,28 @@ describe('TermPopoverComponent', () => {
     expect(actionSpy).toHaveBeenCalledTimes(1);
     expect(component.open()).toBe(false);
   });
+
+  it('renders optional operational hint callout and metadata pills when provided', () => {
+    fixture = TestBed.createComponent(TermPopoverComponent);
+    fixture.componentRef.setInput('term', 'Data de início');
+    fixture.componentRef.setInput('summary', 'Data em que a ocorrência começa.');
+    fixture.componentRef.setInput('hintLabel', 'Orientação');
+    fixture.componentRef.setInput('hint', 'Deve ser anterior à vacância.');
+    fixture.componentRef.setInput('metaTags', [
+      { label: 'Data', tone: 'neutral' },
+      { label: 'Opcional', tone: 'info' }
+    ]);
+    fixture.componentRef.setInput('detail', null);
+    fixture.detectChanges();
+
+    const trigger = fixture.debugElement.query(By.css('.pax-term-trigger')).nativeElement as HTMLButtonElement;
+    trigger.click();
+    fixture.detectChanges();
+
+    const card = fixture.debugElement.query(By.css('.pax-term-card')).nativeElement as HTMLElement;
+    expect(card.querySelector('.pax-term-card-hint')?.textContent).toContain('Orientação');
+    expect(card.querySelector('.pax-term-card-hint')?.textContent).toContain('Deve ser anterior à vacância.');
+    expect(card.querySelectorAll('.pax-term-card-meta-pill').length).toBe(2);
+    expect(card.querySelector('.pax-term-card-detail')).toBeNull();
+  });
 });

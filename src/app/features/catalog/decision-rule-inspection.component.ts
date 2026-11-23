@@ -2,11 +2,14 @@ import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, comput
 import {
   buildReadableRuleSummary,
   humanizeBaselineAuthority,
-  humanizeFactLabel,
-  humanizeFactSensitivity,
-  humanizeFactValueType,
   humanizeSemanticDiffKind
 } from '../../core/decision-rule-presentation';
+import {
+  formatFactPopoverModel,
+  humanizeFactSensitivityPosture,
+  partitionDecisionFacts,
+  type FactPopoverModel
+} from '../../core/fact-presentation';
 import { PolicyStudioI18n } from '../../core/i18n';
 import type { RuleDocumentationDescriptor } from '../../core/rule-documentation';
 import type { RuleParameterDisplayEntry } from '../../core/rule-parameters-display';
@@ -178,23 +181,38 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
             }
           }
 
+          @let partitioned = partitionedFacts();
           <ul class="fact-list fact-cards">
-            @for (fact of current.facts; track fact.path) {
+            @for (fact of partitioned.evaluatedFacts; track fact.path) {
+              @let model = factCardModel(fact);
               @let sensitivity = factSensitivity(fact);
               <li class="fact-card">
                 <div class="fact-card-head">
-                  <strong>{{ factDisplayLabel(fact) }}</strong>
+                  <div class="fact-card-title-group">
+                    <span class="fact-origin-tag">
+                      <pax-icon [name]="model.group.icon" [size]="12" />
+                      <span>{{ model.group.label }}</span>
+                    </span>
+                    <strong>{{ model.chipLabel }}</strong>
+                  </div>
                   <span class="sensitivity-pill" [attr.data-tone]="sensitivity.tone">
                     {{ sensitivity.label }}
                   </span>
                 </div>
-                @if (fact.description) {
-                  <p class="fact-desc">{{ fact.description }}</p>
+                <p class="fact-desc">{{ model.summary }}</p>
+                @if (model.hint) {
+                  <p class="fact-hint-note">
+                    <pax-icon name="info" [size]="12" />
+                    <span>{{ model.hint }}</span>
+                  </p>
                 }
                 <div class="fact-meta">
-                  <span>{{ factTypeLabel(fact) }}</span>
-                  <span>·</span>
-                  <span>{{ i18n.text(fact.nullable ? 'factNullable' : 'factRequired') }}</span>
+                  @for (tag of model.metaTags; track tag.label + ':' + $index; let last = $last) {
+                    <span>{{ tag.label }}</span>
+                    @if (!last) {
+                      <span>·</span>
+                    }
+                  }
                 </div>
                 @if (viewDepthSignal() === 'technical') {
                   <div class="fact-tech-meta studio-mono">
@@ -207,6 +225,42 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
               <li class="inspection-empty fact-gap">{{ i18n.text('factCatalogUnavailable') }}</li>
             }
           </ul>
+
+          @if (partitioned.catalogOnlyFacts.length > 0) {
+            <details class="catalog-facts-disclosure" data-testid="rule-other-catalog-facts">
+              <summary>
+                <span>{{ i18n.format('ruleOtherCatalogFactsHeading', { count: partitioned.catalogOnlyFacts.length }) }}</span>
+              </summary>
+              <ul class="fact-list fact-cards catalog-only-cards">
+                @for (fact of partitioned.catalogOnlyFacts; track fact.path) {
+                  @let model = factCardModel(fact);
+                  <li class="fact-card is-catalog-only">
+                    <div class="fact-card-head">
+                      <div class="fact-card-title-group">
+                        <span class="fact-origin-tag">{{ model.group.label }}</span>
+                        <strong>{{ model.chipLabel }}</strong>
+                      </div>
+                    </div>
+                    <p class="fact-desc">{{ model.summary }}</p>
+                    @if (model.hint) {
+                      <p class="fact-hint-note">
+                        <pax-icon name="info" [size]="12" />
+                        <span>{{ model.hint }}</span>
+                      </p>
+                    }
+                    <div class="fact-meta">
+                      @for (tag of model.metaTags; track tag.label + ':' + $index; let last = $last) {
+                        <span>{{ tag.label }}</span>
+                        @if (!last) {
+                          <span>·</span>
+                        }
+                      }
+                    </div>
+                  </li>
+                }
+              </ul>
+            </details>
+          }
         </section>
       </div>
     </div>
@@ -250,8 +304,10 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
   styles: [`
     :host {
       display: grid;
+      grid-template-columns: minmax(0, 1fr);
       gap: var(--pax-space-5);
       min-width: 0;
+      max-width: 100%;
     }
 
     .rule-inspection-head {
@@ -301,18 +357,24 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
     .rule-main-col,
     .rule-facts-col {
       display: grid;
+      grid-template-columns: minmax(0, 1fr);
       gap: var(--pax-space-4);
       min-width: 0;
+      max-width: 100%;
     }
 
     .rule-surface-card {
       display: grid;
+      grid-template-columns: minmax(0, 1fr);
       gap: var(--pax-space-3);
       padding: var(--pax-space-4);
       border: 1px solid var(--pax-color-outline-variant);
       border-radius: var(--pax-radius-lg);
       background: var(--pax-color-surface-container-low);
       min-width: 0;
+      max-width: 100%;
+      box-sizing: border-box;
+      overflow: hidden;
     }
 
     .card-head {
@@ -371,6 +433,8 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
     .clause-fact {
       font-weight: 700;
       color: var(--pax-color-on-surface);
+      min-width: 0;
+      overflow-wrap: anywhere;
     }
 
     .clause-operator {
@@ -379,13 +443,17 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
 
     .clause-value {
       display: inline-flex;
+      flex-wrap: wrap;
       align-items: center;
       gap: 0.25rem;
+      min-width: 0;
+      max-width: 100%;
       padding: 0.125rem var(--pax-space-2);
       border-radius: var(--pax-radius-sm);
       background: var(--pax-color-surface-container);
       color: var(--pax-color-on-surface);
       font-weight: 700;
+      overflow-wrap: anywhere;
     }
 
     .clause-value.is-param {
@@ -503,6 +571,8 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
       color: var(--pax-color-on-surface-variant);
       font-size: var(--pax-text-xs);
       line-height: var(--pax-lh-xs);
+      min-width: 0;
+      overflow-wrap: anywhere;
     }
 
     .privacy-bridge-btn {
@@ -539,27 +609,89 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
       margin: 0;
       padding: 0;
       display: grid;
+      grid-template-columns: minmax(0, 1fr);
       gap: var(--pax-space-2);
+      min-width: 0;
     }
 
     .fact-card {
       display: grid;
+      grid-template-columns: minmax(0, 1fr);
       gap: 0.25rem;
       padding: var(--pax-space-3);
       border-radius: var(--pax-radius-md);
       border: 1px solid var(--pax-color-outline-variant);
       background: var(--pax-color-surface);
+      min-width: 0;
+      max-width: 100%;
+      box-sizing: border-box;
     }
 
     .fact-card-head {
       display: flex;
-      align-items: center;
+      flex-wrap: wrap;
+      align-items: flex-start;
       justify-content: space-between;
       gap: var(--pax-space-2);
+      min-width: 0;
+    }
+
+    .fact-card-title-group {
+      display: grid;
+      gap: 0.125rem;
+      min-width: 0;
+    }
+
+    .fact-origin-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      color: var(--pax-color-primary);
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .fact-hint-note {
+      margin: 0;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.375rem;
+      padding: 0.25rem var(--pax-space-2);
+      border-radius: var(--pax-radius-sm);
+      border-left: 2px solid var(--pax-color-primary);
+      background: var(--pax-color-surface-container-low);
+      color: var(--pax-color-on-surface-variant);
+      font-size: var(--pax-text-xs);
+      line-height: var(--pax-lh-xs);
+    }
+
+    .fact-hint-note pax-icon {
+      margin-top: 0.1rem;
+      color: var(--pax-color-primary);
+    }
+
+    .catalog-facts-disclosure {
+      margin-top: var(--pax-space-2);
+      border-top: 1px dashed var(--pax-color-outline-variant);
+      padding-top: var(--pax-space-2);
+    }
+
+    .catalog-facts-disclosure summary {
+      cursor: pointer;
+      color: var(--pax-color-on-surface-variant);
+      font-size: var(--pax-text-xs);
+      font-weight: 600;
+      margin-bottom: var(--pax-space-2);
+    }
+
+    .fact-card.is-catalog-only {
+      background: var(--pax-color-surface-container-low);
     }
 
     .fact-card-head strong {
       font-size: var(--pax-text-sm);
+      min-width: 0;
       overflow-wrap: anywhere;
     }
 
@@ -712,20 +844,20 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
 
     @media (max-width: 860px) {
       .rule-columns {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
       }
     }
 
     @media (max-width: 760px) {
       .version-compare-card {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
       }
       .compare-arrow {
         transform: rotate(90deg);
         justify-self: start;
       }
       .diff-row {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
       }
     }
   `]
@@ -817,18 +949,22 @@ export class DecisionRuleInspectionComponent {
     );
   });
 
+  readonly partitionedFacts = computed(() => partitionDecisionFacts(this.decisionSignal()));
+
+  factCardModel(fact: DecisionFact): FactPopoverModel {
+    return formatFactPopoverModel(fact, this.i18n.locale(), this.viewDepthSignal());
+  }
+
   factDisplayLabel(fact: DecisionFact): string {
-    return humanizeFactLabel(fact, this.i18n.locale(), this.viewDepthSignal());
+    return this.factCardModel(fact).chipLabel;
   }
 
   factTypeLabel(fact: DecisionFact): string {
-    return this.viewDepthSignal() === 'technical'
-      ? fact.valueType
-      : humanizeFactValueType(fact.valueType, this.i18n.locale());
+    return this.factCardModel(fact).metaTags[0]?.label ?? fact.valueType;
   }
 
   factSensitivity(fact: DecisionFact) {
-    return humanizeFactSensitivity(fact.sensitivity, this.i18n.locale());
+    return humanizeFactSensitivityPosture(fact.sensitivity, this.i18n.locale());
   }
 
   baselineAuthorityText(): string {

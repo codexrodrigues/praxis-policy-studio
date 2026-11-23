@@ -80,7 +80,21 @@ No modo remoto, uma sessão ausente exibe o login explícito do ambiente de dese
 
 Abra `http://localhost:4302/catalog` (ou navegue por deep-link contextual a partir da UI do host consumidor: `/catalog?ruleSetKey=...&slotKey=...&decisionKey=...`, que resolve diretamente o slot solicitado e abre o detalhe automaticamente mesmo em viewports estreitos).
 
-### Jornada da interface
+### Shell multi-módulo e jornada da interface
+
+O Studio organiza a experiência sobre um shell lazy persistente ([STUDIO_SHELL_ROUTES](src/app/shell/studio-shell.routes.ts)) dividido em quatro rotas modulares:
+
+- `/overview`: mapa executivo do portfólio governado (KPIs, distribuição por domínios/tipos, filtro de trabalho pendente e atualização explícita contra o servidor).
+- `/catalog`: workstation focal com explorador redimensionável (`280–440px`, seletor rápido de área e painel `Filtros`), canvas central de cinco tarefas (`Entender`, `Regra`, `Testar`, `Operar`, `Histórico`) e inspetor lateral recolhível (`Propriedades`, `Assistente IA`, `Técnico`).
+- `/reviews`: fila 4-olhos dedicada para acompanhar rascunhos em elaboração, submissões em revisão, aprovações e rejeições, com filtro por status, busca e abertura direta no catálogo.
+- `/access`: trilha ortogonal separada para políticas de autorização e privacidade OPA (`decisionKind = AUTHORIZATION`), acessível diretamente pela barra lateral ou pelo contexto pontual de uma regra de negócio (`accessBridgeContext`).
+
+Invariantes de navegação, teclado e segurança no shell:
+
+- **Barra lateral e atalhos:** a barra lateral expansível (`224px` ↔ `60px`, faixa compacta em viewports estreitas) responde a `Ctrl/Cmd+B`; `Ctrl/Cmd+K` abre a paleta de comandos global (capaz inclusive de trocar de regra ao vivo dentro de `/catalog`); `Shift+D` alterna a lente `Negócio | </> Técnico`; `[` e `]` recolhem/abrem o explorador e o inspetor quando o módulo ativo os habilita.
+- **Proteção de trabalho local (`canDeactivate`):** sair de `/catalog` para outro módulo com rascunho ou cenário alterado localmente solicita confirmação explícita antes de descartar o estado das facades de autoria.
+- **Higiene de URL entre módulos:** parâmetros de ambiente/host (`tenantId`, `organizationId`, `environment`, `apiBaseUrl`) são preservados entre rotas, enquanto parâmetros contextuais de deep-link (`resourceKey`, `ruleSetKey`, `slotKey`, `bindingKey`, `decisionKey`, `operationKey`) são consumidos na entrada inicial e descartados em navegações intencionais por sidebar, `/overview`, `/reviews` ou `Ctrl+K`.
+- **Linguagem de negócio e títulos dinâmicos:** `Route.data.titleKey` via `StudioTitleStrategy` e os catálogos `pt-BR`/`en-US` mantêm títulos, códigos, status e fallback fail-closed coerentes em ambos os idiomas.
 
 A decisão selecionada é organizada pelas tarefas `Entender`, `Regra`, `Testar`,
 `Operar` e `Histórico`. Cada tarefa abre apenas a superfície de trabalho
@@ -88,8 +102,7 @@ correspondente, preservando a decisão, o workspace e alterações locais enquan
 o operador alterna entre compreender, editar e testar. A interface usa linguagem
 de negócio na superfície principal e mantém IDs, status brutos e referências do
 Config em detalhes técnicos. `Testar` só fica navegável quando existe um
-workspace governado; a UI
-explica essa dependência sem transformar ausência de capability em novo login.
+workspace governado; a UI explica essa dependência sem transformar ausência de capability em novo login.
 Em viewports estreitos, catálogo e decisão deixam de competir pelo mesmo espaço:
 o operador seleciona uma decisão, trabalha em uma página dedicada e retorna ao
 catálogo sem perder seleção, workspace ou draft. Códigos e chaves canônicas ficam

@@ -1524,4 +1524,88 @@ describe('ProjectionCatalogService', () => {
     expect(hydratedList[0]?.workspaceStatus).toBe('OPEN');
     expect(hydratedList[0]?.availableDefinitionActions).toContain('CREATE_NEW_VERSION');
   });
+
+  it('extracts rule-scoped evaluatedFactPaths and optional v2 metadata from fact descriptors', () => {
+    const config = {
+      mode: 'remote' as const, configApiBaseUrl: '', locale: 'pt-BR' as const,
+      projectionPath: null, initialDecisionKey: null
+    };
+    let summaries: readonly import('../features/catalog/catalog.fixture').DecisionSummary[] = [];
+
+    service.load('pt-BR', config).subscribe(value => { summaries = value; });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/catalog?page=0&limit=12').flush({
+      page: 0, limit: 12, hasMore: false, candidates: [{
+        definitionId: 'def-v2',
+        ruleKey: 'benefits.amount-limit',
+        version: 1,
+        ruleType: 'validation',
+        status: 'active',
+        contextKey: 'benefits',
+        resourceKey: 'benefits.requests',
+        serviceKey: 'benefits-service',
+        updatedAt: '2026-11-23T12:00:00Z'
+      }]
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities').flush({
+      tenantId: 'rio', environment: 'local', definitions: []
+    });
+    http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([]);
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-v2').flush({
+      id: 'def-v2',
+      ruleKey: 'benefits.amount-limit',
+      version: 1,
+      ruleType: 'validation',
+      status: 'active',
+      serviceKey: 'benefits-service',
+      definition: {
+        ruleSetKey: 'benefits.requests',
+        requiredFactPaths: ['draft.amount', 'neighborhood.history']
+      },
+      condition: { '<=': [{ var: 'draft.amount' }, { var: 'params.cap' }] },
+      parameters: {}
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-v2/facts').flush({
+      definitionId: 'def-v2',
+      ruleKey: 'benefits.amount-limit',
+      definitionVersion: 1,
+      schemaVersion: 'praxis.domain-rule-fact-catalog.v1',
+      facts: [
+        {
+          path: 'draft.amount',
+          valueType: 'number',
+          nullable: false,
+          labels: { 'pt-BR': 'Valor solicitado', 'en-US': 'Requested amount' },
+          descriptions: { 'pt-BR': 'Valor do pedido.' },
+          hints: { 'pt-BR': 'Deve ser positivo.' },
+          groupLabels: { 'pt-BR': 'Dados da solicitação' },
+          unit: 'BRL',
+          valuePresentation: 'CURRENCY',
+          providerRef: 'benefits',
+          evidenceRefs: [],
+          sensitivity: 'NON_SENSITIVE',
+          redaction: 'NONE'
+        },
+        {
+          path: 'neighborhood.history',
+          valueType: 'string-array',
+          nullable: true,
+          labels: { 'pt-BR': 'Histórico', 'en-US': 'History' },
+          descriptions: { 'pt-BR': 'Pedidos anteriores.' },
+          providerRef: 'benefits',
+          evidenceRefs: [],
+          sensitivity: 'NON_SENSITIVE',
+          redaction: 'NONE'
+        }
+      ]
+    });
+
+    expect(summaries[0]?.evaluatedFactPaths).toEqual(['draft.amount']);
+    expect(summaries[0]?.facts[0]).toMatchObject({
+      path: 'draft.amount',
+      hint: 'Deve ser positivo.',
+      groupLabel: 'Dados da solicitação',
+      unit: 'BRL',
+      valuePresentation: 'CURRENCY'
+    });
+  });
 });

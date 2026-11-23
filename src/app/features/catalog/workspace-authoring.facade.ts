@@ -378,6 +378,7 @@ export class WorkspaceAuthoringFacade {
             this.store.allDecisions.set(decisions);
             const match = decisions.find(item => item.key === created.ruleKey);
             if (match) onSelectDecision(match);
+            this.store.authoringFeedback.set(this.i18n.text('decisionCreated'));
           }
         });
       },

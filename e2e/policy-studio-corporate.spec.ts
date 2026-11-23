@@ -1972,3 +1972,448 @@ test('supports Figma-style progressive workspace shell, Shift+D depth lens, dark
   await expect(page.getByTestId('access-authorization-workspace')).toHaveCount(0);
   await expect(page.locator('.workspace')).toBeVisible();
 });
+
+test('hardens multi-module navigation, Ctrl+K in-route selection, dirty-draft route guard, and responsive sidebar/explorer controls', async ({ page }, testInfo) => {
+  let catalogReads = 0;
+  const alphaDoc = {
+    title: 'Limite financeiro do benefício Alfa',
+    summary: 'Regra Alfa para teste multi-módulo.'
+  };
+  const betaDoc = {
+    title: 'Elegibilidade de afastamento Beta',
+    summary: 'Regra Beta pendente em elaboração.'
+  };
+  const alphaDef = {
+    id: 'def-alpha-1',
+    ruleKey: 'alpha.amount-cap',
+    version: 1,
+    status: 'approved',
+    ruleType: 'JSON_LOGIC_DECISION',
+    contextKey: 'benefits',
+    resourceKey: 'benefits.alpha',
+    serviceKey: 'benefits-service',
+    condition: { '<=': [{ var: 'request.requestedAmount' }, 3000] },
+    parameters: {
+      nullSemantics: 'FAIL_CLOSED',
+      operationKeys: ['CREATE'],
+      'praxis.domainRuleDocumentation': alphaDoc
+    },
+    definition: { documentation: alphaDoc },
+    documentation: alphaDoc
+  };
+  const betaDef = {
+    id: 'def-beta-1',
+    ruleKey: 'beta.eligibility-check',
+    version: 1,
+    status: 'draft',
+    ruleType: 'validation',
+    contextKey: 'leave',
+    resourceKey: 'leave.beta',
+    serviceKey: 'leave-service',
+    condition: { '>=': [{ var: 'request.days' }, 1] },
+    parameters: {
+      nullSemantics: 'FAIL_CLOSED',
+      operationKeys: ['CREATE'],
+      'praxis.domainRuleDocumentation': betaDoc
+    },
+    definition: { documentation: betaDoc },
+    documentation: betaDoc
+  };
+  const alphaWorkspace = {
+    id: 'ws-alpha-1', ruleKey: alphaDef.ruleKey, status: 'OPEN', revision: 2,
+    etag: 'ws-alpha-etag-2', parameters: alphaDef.parameters, condition: alphaDef.condition,
+    documentation: alphaDoc,
+    updatedAt: '2026-11-23T12:00:00Z'
+  };
+  const betaWorkspace = {
+    id: 'ws-beta-1', ruleKey: betaDef.ruleKey, status: 'OPEN', revision: 1,
+    etag: 'ws-beta-etag-1', parameters: betaDef.parameters, condition: betaDef.condition,
+    documentation: betaDoc,
+    updatedAt: '2026-11-23T12:00:00Z'
+  };
+
+  await page.route('**/app-config.json', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      mode: 'remote',
+      configApiBaseUrl: '',
+      locale: 'pt-BR',
+      projectionPath: null,
+      initialDecisionKey: alphaDef.ruleKey
+    })
+  }));
+  await page.route('**/auth/session', route => route.fulfill({ status: 204 }));
+  await page.route('**/api/**', async route => {
+    const reqUrl = new URL(route.request().url());
+    const pathname = reqUrl.pathname;
+    const json = (body: unknown, status = 200) =>
+      route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+
+    if (pathname.endsWith('/definitions/catalog')) {
+      catalogReads += 1;
+      return json({
+        schemaVersion: 'praxis-domain-rule-catalog.v1',
+        page: 0,
+        limit: 12,
+        hasMore: false,
+        candidates: [
+          {
+            definitionId: alphaDef.id, ruleKey: alphaDef.ruleKey, version: 1,
+            ruleType: alphaDef.ruleType, status: alphaDef.status,
+            contextKey: alphaDef.contextKey, resourceKey: alphaDef.resourceKey,
+            serviceKey: alphaDef.serviceKey, semanticOwner: 'benefits-owner', updatedAt: '2026-11-23T12:00:00Z'
+          },
+          {
+            definitionId: betaDef.id, ruleKey: betaDef.ruleKey, version: 1,
+            ruleType: betaDef.ruleType, status: betaDef.status,
+            contextKey: betaDef.contextKey, resourceKey: betaDef.resourceKey,
+            serviceKey: betaDef.serviceKey, semanticOwner: 'leave-owner', updatedAt: '2026-11-23T12:00:00Z'
+          }
+        ]
+      });
+    }
+    if (pathname.endsWith('/definitions/capabilities')) {
+      return json({
+        tenantId: 'rio',
+        environment: 'stage',
+        definitions: [
+          { definitionId: alphaDef.id, ruleKey: alphaDef.ruleKey, version: 1, availableActions: ['CREATE_NEW_VERSION'] },
+          { definitionId: betaDef.id, ruleKey: betaDef.ruleKey, version: 1, availableActions: ['CREATE_NEW_VERSION'] }
+        ]
+      });
+    }
+    if (pathname.endsWith('/definitions')) return json([alphaDef, betaDef]);
+    if (pathname.endsWith(`/definitions/${alphaDef.id}`)) return json(alphaDef);
+    if (pathname.endsWith(`/definitions/${betaDef.id}`)) return json(betaDef);
+    if (pathname.endsWith(`/definitions/${alphaDef.id}/facts`)) {
+      return json({
+        definitionId: alphaDef.id, ruleKey: alphaDef.ruleKey, definitionVersion: 1,
+        schemaVersion: 'praxis.domain-rule-fact-catalog.v1',
+        facts: [{
+          path: 'request.requestedAmount', valueType: 'number', nullable: false,
+          labels: { 'pt-BR': 'Valor solicitado', 'en-US': 'Requested amount' },
+          descriptions: { 'pt-BR': 'Valor da solicitação.', 'en-US': 'Requested value.' },
+          sensitivity: 'INTERNAL'
+        }]
+      });
+    }
+    if (pathname.endsWith(`/definitions/${betaDef.id}/facts`)) {
+      return json({
+        definitionId: betaDef.id, ruleKey: betaDef.ruleKey, definitionVersion: 1,
+        schemaVersion: 'praxis.domain-rule-fact-catalog.v1',
+        facts: [{
+          path: 'request.days', valueType: 'number', nullable: false,
+          labels: { 'pt-BR': 'Quantidade de dias', 'en-US': 'Days count' },
+          descriptions: { 'pt-BR': 'Dias informados.', 'en-US': 'Requested days.' },
+          sensitivity: 'INTERNAL'
+        }]
+      });
+    }
+    if (pathname.endsWith('/parameters')) return json({ schemaVersion: 'praxis.domain-rule-parameters.v1', parameters: [] });
+    if (pathname.endsWith('/workspaces')) return json([alphaWorkspace, betaWorkspace]);
+    if (pathname.endsWith(`/workspaces/${alphaWorkspace.id}/capabilities`)) {
+      return json({ availableActions: ['VIEW', 'SAVE_DRAFT', 'SUBMIT'] });
+    }
+    if (pathname.endsWith(`/workspaces/${betaWorkspace.id}/capabilities`)) {
+      return json({ availableActions: ['VIEW', 'SAVE_DRAFT', 'SUBMIT'] });
+    }
+    if (pathname.endsWith('/lifecycle')) return json({ workspaceId: null, latestTestRun: null, testRuns: [], reviews: [] });
+    if (pathname.endsWith('/scenarios')) return json([]);
+    if (pathname.endsWith('/snapshots/head/status') || pathname.endsWith('/rollouts') || pathname.endsWith('/rollout-policies')) {
+      return json({ availableActions: [] });
+    }
+    if (pathname.endsWith('/snapshots') || pathname.endsWith('/reviews') || pathname.endsWith('/timeline')) return json([]);
+    return route.fallback();
+  });
+
+  // 1. Arrive via host deep-link with scope params
+  await page.goto('/catalog?resourceKey=benefits.alpha&tenantId=rio&organizationId=ALL&environment=stage');
+  await expect(page.locator('#decision-title')).toHaveText('Limite financeiro do benefício Alfa');
+  expect(catalogReads).toBe(1);
+
+  // Environment menu popover opens cleanly and closes on Escape
+  await page.getByTestId('studio-environment-trigger').click();
+  await expect(page.getByTestId('studio-environment-popover')).toBeVisible();
+  await expect(page.getByTestId('studio-environment-popover')).toContainText('rio');
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('studio-environment-popover')).toHaveCount(0);
+
+  // 2. Navigate to Overview via sidebar: deep-link params stripped, environment params preserved
+  await page.getByTestId('nav-module-overview').click();
+  await expect(page.getByTestId('catalog-portfolio-overview')).toBeVisible();
+  const overviewUrl = new URL(page.url());
+  expect(overviewUrl.pathname).toBe('/overview');
+  expect(overviewUrl.searchParams.get('tenantId')).toBe('rio');
+  expect(overviewUrl.searchParams.get('organizationId')).toBe('ALL');
+  expect(overviewUrl.searchParams.get('environment')).toBe('stage');
+  expect(overviewUrl.searchParams.has('resourceKey')).toBe(false);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+
+  // Open Beta rule directly from Overview without being clobbered back to Alpha deep-link
+  await page.getByTestId('portfolio-queue-item-beta.eligibility-check').click();
+  await expect(page.locator('#decision-title')).toHaveText('Elegibilidade de afastamento Beta');
+
+  // 3. Navigate to Reviews queue, refresh explicitly, search and open Beta in Rule mode
+  await page.getByTestId('nav-module-reviews').click();
+  await expect(page.getByTestId('reviews-page')).toBeVisible();
+  await page.getByTestId('reviews-refresh-btn').click();
+  expect(catalogReads).toBe(2);
+  await page.getByTestId('reviews-search-input').fill('afastamento Beta');
+  await expect(page.getByTestId('reviews-item-beta.eligibility-check')).toBeVisible();
+  await expect(page.getByTestId('reviews-item-alpha.amount-cap')).toHaveCount(0);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.getByTestId('reviews-open-beta.eligibility-check').click();
+  await expect(page.locator('#decision-title')).toHaveText('Elegibilidade de afastamento Beta');
+  await expect(page.locator('.decision-navigation').getByRole('button', { name: /^Regra/ })).toHaveAttribute('aria-current', 'page');
+
+  // 4. Ctrl+K decision switch INSIDE /catalog must update both title and capabilities/facts
+  await page.keyboard.press('Control+k');
+  await expect(page.getByTestId('command-palette-dialog')).toBeVisible();
+  await page.getByTestId('command-palette-input').fill('benefício Alfa');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#decision-title')).toHaveText('Limite financeiro do benefício Alfa');
+  await expect(page.getByTestId('decision-subtitle')).toHaveCount(0);
+
+  // 5. Dirty draft protection on module route leave (canDeactivate)
+  await page.getByRole('button', { name: 'Editar regra', exact: true }).click();
+  await expect(page.locator('.draft-workspace')).toBeVisible();
+  await page.locator('.draft-workspace').getByRole('spinbutton', { name: 'Valor' }).fill('2800');
+  await expect(page.locator('.draft-workspace .draft-compare section.changed')).toBeVisible();
+  await page.getByTestId('nav-module-overview').click();
+  await expect(page.getByRole('button', { name: 'Continuar editando', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Continuar editando', exact: true }).click();
+  await expect(page).toHaveURL(/\/catalog/);
+  await expect(page.locator('.draft-workspace').getByRole('spinbutton', { name: 'Valor' })).toHaveValue('2800');
+
+  await page.getByTestId('nav-module-overview').click();
+  await page.getByRole('button', { name: 'Descartar alterações', exact: true }).click();
+  await expect(page.getByTestId('catalog-portfolio-overview')).toBeVisible();
+  await expect(page).toHaveURL(/\/overview/);
+
+  // 6. Desktop rail collapse checks + narrow viewport overflow guard
+  await page.getByTestId('workspace-track-business').click();
+  if (testInfo.project.name === 'desktop') {
+    await page.getByTestId('studio-sidebar-toggle').click();
+    await expect(page.getByTestId('nav-badge-dot-reviews')).toBeVisible();
+    await page.getByTestId('studio-sidebar-toggle').click();
+    await page.getByTestId('explorer-filters-toggle').click();
+    await expect(page.getByTestId('explorer-filters-panel')).toBeVisible();
+    await page.getByTestId('explorer-collapse-btn').click();
+    await page.getByTestId('inspector-collapse-btn').click();
+    await expect(page.locator('.workspace.explorer-collapsed.inspector-collapsed')).toBeVisible();
+    await page.getByTestId('studio-toggle-explorer').click();
+    await page.getByTestId('studio-toggle-inspector').click();
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test('scopes evaluated facts with rich popovers and navigates 5-stage pipeline without tall empty towers', async ({ page }) => {
+  const mkRuleDef = (idx: number, stage: 'PROTECTED_GUARD' | 'DOMAIN_DECISION', overridePolicy: 'FORBIDDEN' | 'PARAMETERIZABLE') => ({
+    id: `def-stage-${idx}`,
+    ruleKey: `benefits.stage-rule-${idx}`,
+    version: 1,
+    status: 'approved',
+    ruleType: 'validation',
+    contextKey: 'benefits',
+    resourceKey: 'benefits.requests',
+    serviceKey: 'benefits-service',
+    condition: stage === 'PROTECTED_GUARD'
+      ? { '<=': [{ var: 'draft.dtini' }, { var: 'employment.dtvac' }] }
+      : { '<=': [{ var: 'draft.amount' }, 5000] },
+    parameters: {
+      nullSemantics: 'FAIL_CLOSED',
+      operationKeys: ['CREATE'],
+      'praxis.domainRuleDocumentation': {
+        title: `Regra estruturada ${idx}`,
+        summary: `Validação ${idx} para etapa ${stage}.`
+      }
+    },
+    definition: {
+      ruleSetKey: 'benefits.requests',
+      slotKey: `slot_${idx}`,
+      decisionStage: stage,
+      overridePolicy,
+      requiredFactPaths: ['draft.dtini', 'employment.dtvac', 'draft.amount', 'neighborhood.history'],
+      documentation: {
+        title: `Regra estruturada ${idx}`,
+        summary: `Validação ${idx} para etapa ${stage}.`
+      }
+    }
+  });
+
+  const defs = [
+    mkRuleDef(1, 'PROTECTED_GUARD', 'FORBIDDEN'),
+    ...Array.from({ length: 8 }, (_, idx) => mkRuleDef(idx + 2, 'DOMAIN_DECISION', 'PARAMETERIZABLE'))
+  ];
+
+  const factCatalogBody = (defId: string, ruleKey: string) => ({
+    definitionId: defId,
+    ruleKey,
+    definitionVersion: 1,
+    schemaVersion: 'praxis.domain-rule-fact-catalog.v1',
+    facts: [
+      {
+        path: 'draft.dtini',
+        valueType: 'date',
+        nullable: true,
+        labels: { 'pt-BR': 'draft: dtini', 'en-US': 'draft: dtini' },
+        descriptions: { 'pt-BR': 'Data de início da solicitação. Orientação operacional: Deve ser igual ou posterior ao ingresso.' },
+        providerRef: 'benefits.request',
+        evidenceRefs: [],
+        sensitivity: 'NON_SENSITIVE',
+        redaction: 'NONE'
+      },
+      {
+        path: 'employment.dtvac',
+        valueType: 'date',
+        nullable: true,
+        labels: { 'pt-BR': 'vinculo: dtvac', 'en-US': 'employment: vacDate' },
+        descriptions: { 'pt-BR': 'Data de encerramento do vínculo.' },
+        groupLabels: { 'pt-BR': 'Vínculo', 'en-US': 'Employment' },
+        providerRef: 'workforce.employment',
+        evidenceRefs: [],
+        sensitivity: 'PERSONAL',
+        redaction: 'MASK'
+      },
+      {
+        path: 'draft.amount',
+        valueType: 'number',
+        nullable: false,
+        labels: { 'pt-BR': 'Valor solicitado', 'en-US': 'Requested amount' },
+        descriptions: { 'pt-BR': 'Quantia solicitada no pedido.' },
+        providerRef: 'benefits.request',
+        evidenceRefs: [],
+        sensitivity: 'NON_SENSITIVE',
+        redaction: 'NONE'
+      },
+      {
+        path: 'neighborhood.history',
+        valueType: 'string-array',
+        nullable: true,
+        labels: { 'pt-BR': 'neighborhood: historicoAnterior', 'en-US': 'neighborhood: priorHistory' },
+        descriptions: { 'pt-BR': 'Fato de avaliação do RuleSet benefits.requests (neighborhood.history).' },
+        providerRef: 'benefits.neighborhood',
+        evidenceRefs: [],
+        sensitivity: 'NON_SENSITIVE',
+        redaction: 'NONE'
+      }
+    ]
+  });
+
+  await page.route('**/app-config.json', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      mode: 'remote',
+      configApiBaseUrl: '',
+      locale: 'pt-BR',
+      projectionPath: null,
+      initialDecisionKey: defs[0]!.ruleKey
+    })
+  }));
+  await page.route('**/auth/session', route => route.fulfill({ status: 204 }));
+  await page.route('**/api/**', async route => {
+    const pathname = new URL(route.request().url()).pathname;
+    const json = (body: unknown, status = 200) =>
+      route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+
+    if (pathname.endsWith('/definitions/catalog')) {
+      return json({
+        schemaVersion: 'praxis-domain-rule-catalog.v1',
+        page: 0,
+        limit: 12,
+        hasMore: false,
+        candidates: defs.map(def => ({
+          definitionId: def.id,
+          ruleKey: def.ruleKey,
+          version: def.version,
+          ruleType: def.ruleType,
+          status: def.status,
+          contextKey: def.contextKey,
+          resourceKey: def.resourceKey,
+          serviceKey: def.serviceKey,
+          semanticOwner: 'benefits-owner',
+          updatedAt: '2026-11-23T12:00:00Z'
+        }))
+      });
+    }
+    if (pathname.endsWith('/definitions/capabilities')) {
+      return json({ tenantId: 'rio', environment: 'local', definitions: [] });
+    }
+    if (pathname.endsWith('/definitions')) return json(defs);
+    for (const def of defs) {
+      if (pathname.endsWith(`/definitions/${def.id}`)) return json(def);
+      if (pathname.endsWith(`/definitions/${def.id}/facts`)) return json(factCatalogBody(def.id, def.ruleKey));
+    }
+    if (pathname.endsWith('/parameters')) return json({ schemaVersion: 'praxis.domain-rule-parameters.v1', parameters: [] });
+    if (pathname.endsWith('/workspaces')) return json([]);
+    if (pathname.endsWith('/lifecycle')) return json({ workspaceId: null, latestTestRun: null, testRuns: [], reviews: [] });
+    if (pathname.endsWith('/scenarios')) return json([]);
+    if (pathname.endsWith('/snapshots/head/status') || pathname.endsWith('/rollouts') || pathname.endsWith('/rollout-policies')) {
+      return json({ availableActions: [] });
+    }
+    if (pathname.endsWith('/snapshots') || pathname.endsWith('/reviews') || pathname.endsWith('/timeline')) return json([]);
+    return route.fallback();
+  });
+
+  await page.goto('/catalog?resourceKey=benefits.requests');
+  await expect(page.locator('#decision-title')).toHaveText('Regra estruturada 1');
+
+  // 1. Scoped evaluated facts (2 of 4) grouped without raw prefix/nullable leaks
+  const factsStrip = page.getByTestId('evaluated-facts-strip');
+  await expect(factsStrip).toBeVisible();
+  await expect(factsStrip.getByTestId('evaluated-facts-scope-badge')).toContainText('2 de 4 dados da operação');
+  await expect(factsStrip).toContainText('Dados do registro');
+  await expect(factsStrip).toContainText('Vínculo');
+  await expect(factsStrip).not.toContainText('Histórico Anterior');
+
+  // Open chip popover and confirm rich hint + Opcional (never "nullable" or "Path:")
+  await factsStrip.locator('.pax-term-trigger').first().click();
+  const popover = page.locator('.pax-term-card');
+  await expect(popover).toBeVisible();
+  await expect(popover).toContainText('Orientação');
+  await expect(popover).toContainText('Deve ser igual ou posterior ao ingresso.');
+  await expect(popover).toContainText('Opcional');
+  await expect(popover).not.toContainText('nullable');
+  await expect(popover).not.toContainText('Path:');
+  await page.keyboard.press('Escape');
+
+  // Expand remaining catalog facts on demand
+  await factsStrip.getByTestId('evaluated-facts-catalog-toggle').click();
+  await expect(factsStrip.getByTestId('evaluated-facts-catalog-panel')).toBeVisible();
+  await expect(factsStrip.getByTestId('evaluated-facts-catalog-panel')).toContainText('Histórico Anterior');
+
+  // 2. Interactive 5-stage horizontal stepper & focused stage panel
+  const dag = page.getByTestId('rule-decision-plan-dag');
+  await expect(dag.getByTestId('dag-focused-stage-panel')).toBeVisible();
+  await expect(dag.getByTestId('dag-causal-subtitle')).toContainText('Etapa 1 de 5 · Pré-requisitos obrigatórios');
+
+  // Stage 02 has 8 rules: capped at 6 initially with expand button + jump-back CTA
+  await dag.getByTestId('dag-stage-DOMAIN_DECISION').click();
+  await expect(dag.getByTestId('dag-focused-stage-panel').locator('.dag-node')).toHaveCount(6);
+  await expect(dag.getByTestId('dag-jump-current-stage')).toBeVisible();
+  await dag.getByTestId('dag-stage-expand-btn').click();
+  await expect(dag.getByTestId('dag-focused-stage-panel').locator('.dag-node')).toHaveCount(8);
+
+  // Stage 04 is empty: renders compact empty banner without tall tower
+  await dag.getByTestId('dag-stage-TRANSFORMATION_INTENT').click();
+  await expect(dag.getByTestId('dag-focused-empty-stage')).toBeVisible();
+  await dag.getByTestId('dag-jump-current-stage').click();
+  await expect(dag.getByTestId('dag-node-benefits.stage-rule-1')).toBeVisible();
+
+  // Switch to all-stages view cleanly
+  await dag.getByTestId('dag-view-all').click();
+  await expect(dag.getByTestId('dag-all-stages-panel')).toBeVisible();
+  await dag.getByTestId('dag-view-focused').click();
+
+  // 3. Switch to 02 Regra and check scoped cards + collapsed remaining facts
+  await page.locator('.decision-navigation').getByRole('button', { name: /^Regra/ }).click();
+  await expect(page.locator('#decision-rule .rule-facts-col > section > .fact-cards > .fact-card')).toHaveCount(2);
+  const otherDisclosure = page.getByTestId('rule-other-catalog-facts');
+  await expect(otherDisclosure).toBeVisible();
+  await expect(otherDisclosure).not.toHaveAttribute('open', '');
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+});

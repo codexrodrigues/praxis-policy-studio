@@ -1,8 +1,9 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ScrollingModule, CdkVirtualScrollViewport } from '@angular/cdk/scrolling';
-import { ChangeDetectionStrategy, Component, ViewChild, computed, effect, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ViewChild, computed, effect, inject, input, output, signal } from '@angular/core';
 import type { DomainRuleDefinitionRequest } from '@praxisui/core';
 import {
+  buildCatalogPortfolioSummary,
   classifyDecisionWorkflowBucket,
   isAutonomyFilterReliable,
   isStageGroupingReliable,
@@ -16,7 +17,12 @@ import {
   looksLikeTechnicalSlug
 } from '../../core/humanize-labels';
 import { PolicyStudioI18n, type CopyKey } from '../../core/i18n';
-import type { StudioViewDepth } from '../../core/studio-shell-state.service';
+import {
+  DEFAULT_EXPLORER_WIDTH_PX,
+  MAX_EXPLORER_WIDTH_PX,
+  MIN_EXPLORER_WIDTH_PX,
+  type StudioViewDepth
+} from '../../core/studio-shell-state.service';
 import { StudioIconComponent, type StudioIconName } from '../../shared/studio-icon.component';
 import type { DecisionStageId, DecisionSummary } from './catalog.fixture';
 import { DecisionCreateFormComponent } from './decision-create-form.component';
@@ -32,6 +38,13 @@ export interface ExplorerGlobalGroup {
   readonly label: string;
   readonly scopeKey: string | null;
   readonly items: readonly DecisionSummary[];
+}
+
+export interface ExplorerQuickScopeDomain {
+  readonly domainKey: string;
+  readonly label: string;
+  readonly count: number;
+  readonly options: readonly { readonly scopeKey: string; readonly label: string; readonly count: number }[];
 }
 
 export type ExplorerVirtualRow =
@@ -58,13 +71,13 @@ export class DecisionExplorerRailComponent {
   readonly i18n = inject(PolicyStudioI18n);
 
   readonly decisions = input.required<readonly DecisionSummary[]>();
+  readonly allCatalogDecisions = input<readonly DecisionSummary[]>([]);
   readonly totalCatalogCount = input(0);
   readonly selected = input<DecisionSummary | null>(null);
   readonly query = input('');
   readonly contextScopeFilter = input<string | null>(null);
   readonly activeRuleTypeFilter = input<string | null>(null);
   readonly globalLens = input<ExplorerGlobalLens>('domain');
-  readonly portfolioOverviewOpen = input(false);
   readonly loading = input(true);
   readonly loadError = input<string | null>(null);
   readonly authenticationRequired = input(false);
@@ -78,6 +91,7 @@ export class DecisionExplorerRailComponent {
   readonly authoringBusy = input(false);
   readonly isRemoteMode = input(false);
   readonly viewDepth = input<StudioViewDepth>('business');
+  readonly widthPx = input(DEFAULT_EXPLORER_WIDTH_PX);
 
   readonly queryChanged = output<string>();
   readonly clearQueryRequested = output<void>();
@@ -85,7 +99,9 @@ export class DecisionExplorerRailComponent {
   readonly clearRuleTypeRequested = output<void>();
   readonly scopeSelected = output<string>();
   readonly globalLensChanged = output<ExplorerGlobalLens>();
-  readonly portfolioOverviewToggled = output<void>();
+  readonly collapseRequested = output<void>();
+  readonly widthChanged = output<number>();
+  readonly resetWidthRequested = output<void>();
   readonly decisionSelected = output<DecisionSummary>();
   readonly loginRequested = output<{ readonly username: string; readonly password: string; readonly form: HTMLFormElement }>();
   readonly retryCatalogRequested = output<void>();
@@ -93,9 +109,59 @@ export class DecisionExplorerRailComponent {
   readonly createRequested = output<DomainRuleDefinitionRequest>();
   readonly validationFailed = output<string>();
 
+  private readonly destroyRef = inject(DestroyRef);
+  private stopResizeDrag: (() => void) | null = null;
+
   @ViewChild(CdkVirtualScrollViewport) private virtualViewport?: CdkVirtualScrollViewport;
 
   readonly autonomyFilter = signal<ExplorerAutonomyFilter>('all');
+  readonly filtersPanelOpen = signal(false);
+  readonly minWidthPx = MIN_EXPLORER_WIDTH_PX;
+  readonly maxWidthPx = MAX_EXPLORER_WIDTH_PX;
+
+  readonly scopeSourceDecisions = computed(() => {
+    const all = this.allCatalogDecisions();
+    return all.length > 0 ? all : this.decisions();
+  });
+
+  readonly quickScopeDomains = computed<readonly ExplorerQuickScopeDomain[]>(() => {
+    const source = this.scopeSourceDecisions();
+    if (source.length <= 1) return [];
+    const summary = buildCatalogPortfolioSummary(source, this.i18n.locale(), this.viewDepth());
+    return summary.domains.map(domain => ({
+      domainKey: domain.domainKey,
+      label: domain.label,
+      count: domain.totalCount,
+      options: domain.functionalities.map(func => ({
+        scopeKey: func.scopeKey,
+        label: func.label,
+        count: func.count
+      }))
+    }));
+  });
+
+  readonly hasMultipleQuickScopes = computed(() => {
+    const domains = this.quickScopeDomains();
+    if (domains.length > 1) return true;
+    return (domains[0]?.options.length ?? 0) > 1;
+  });
+
+  readonly activeQuickScopeLabel = computed(() => {
+    const scope = this.contextScopeFilter()?.trim();
+    if (!scope) {
+      return this.allScopesLabel();
+    }
+    for (const domain of this.quickScopeDomains()) {
+      if (domain.domainKey === scope) {
+        return `${domain.label} (${domain.count})`;
+      }
+      const match = domain.options.find(opt => opt.scopeKey === scope);
+      if (match) {
+        return `${match.label} (${match.count})`;
+      }
+    }
+    return this.displayScopeFilter(scope);
+  });
 
   readonly autonomyFilterAvailable = computed(() =>
     isAutonomyFilterReliable(this.decisions())
@@ -104,6 +170,22 @@ export class DecisionExplorerRailComponent {
   readonly effectiveAutonomyFilter = computed<ExplorerAutonomyFilter>(() =>
     this.autonomyFilterAvailable() ? this.autonomyFilter() : 'all'
   );
+
+  readonly activeFiltersCount = computed(() => {
+    let count = 0;
+    if (this.effectiveAutonomyFilter() !== 'all') count += 1;
+    if (!this.hasStageMetadata() && this.globalLens() !== 'domain') count += 1;
+    return count;
+  });
+
+  readonly hasExpandableFilterControls = computed(() => {
+    if (this.decisions().length <= 1) return false;
+    if (this.autonomyFilterAvailable()) {
+      const counts = this.autonomyCounts();
+      return counts.param > 0 || counts.editable > 0 || counts.locked > 0 || counts.legal > 0;
+    }
+    return !this.hasStageMetadata();
+  });
 
   readonly autonomyCounts = computed(() => {
     const list = this.decisions();
@@ -269,6 +351,7 @@ export class DecisionExplorerRailComponent {
   });
 
   constructor() {
+    this.destroyRef.onDestroy(() => this.stopResizeDrag?.());
     effect(() => {
       this.contextScopeFilter();
       this.autonomyFilter.set('all');
@@ -284,8 +367,102 @@ export class DecisionExplorerRailComponent {
     });
   }
 
+  toggleFiltersPanel(): void {
+    this.filtersPanelOpen.update(open => !open);
+  }
+
   selectAutonomyFilter(filter: ExplorerAutonomyFilter): void {
     this.autonomyFilter.set(filter);
+  }
+
+  onQuickScopeChanged(value: string): void {
+    const normalized = value.trim();
+    if (!normalized) {
+      this.clearContextScopeRequested.emit();
+      return;
+    }
+    this.scopeSelected.emit(normalized);
+  }
+
+  allScopesLabel(): string {
+    const total = this.totalCatalogCount() || this.scopeSourceDecisions().length;
+    return this.i18n.format('explorerAllScopes', { count: total });
+  }
+
+  activeAutonomyLabel(): string {
+    switch (this.effectiveAutonomyFilter()) {
+      case 'param':
+        return this.i18n.text('overrideParameterizableShort');
+      case 'editable':
+        return this.i18n.text('overrideEditableShort');
+      case 'locked':
+        return this.i18n.text('overrideForbiddenShort');
+      case 'legal':
+        return this.i18n.text('explorerFilterLegal');
+      default:
+        return this.i18n.text('explorerFilterAll');
+    }
+  }
+
+  startResize(event: PointerEvent): void {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    this.stopResizeDrag?.();
+    const handle = event.currentTarget as HTMLElement | null;
+    try {
+      handle?.setPointerCapture?.(event.pointerId);
+    } catch {
+      // Ignore synthetic events where pointerId is inactive.
+    }
+    const startX = event.clientX;
+    const startWidth = this.widthPx();
+    const docBody = typeof document !== 'undefined' ? document.body : null;
+    const prevUserSelect = docBody?.style.userSelect ?? '';
+    const prevCursor = docBody?.style.cursor ?? '';
+    if (docBody) {
+      docBody.style.userSelect = 'none';
+      docBody.style.cursor = 'col-resize';
+    }
+    const onMove = (moveEvent: PointerEvent) => {
+      this.widthChanged.emit(startWidth + (moveEvent.clientX - startX));
+    };
+    const cleanup = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', cleanup);
+      window.removeEventListener('pointercancel', cleanup);
+      if (docBody) {
+        docBody.style.userSelect = prevUserSelect;
+        docBody.style.cursor = prevCursor;
+      }
+      try {
+        if (handle?.hasPointerCapture?.(event.pointerId)) {
+          handle.releasePointerCapture(event.pointerId);
+        }
+      } catch {
+        // Ignore already-released pointer captures.
+      }
+      if (this.stopResizeDrag === cleanup) {
+        this.stopResizeDrag = null;
+      }
+    };
+    this.stopResizeDrag = cleanup;
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', cleanup);
+    window.addEventListener('pointercancel', cleanup);
+  }
+
+  onResizeKeydown(event: KeyboardEvent): void {
+    const step = 16;
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      this.widthChanged.emit(this.widthPx() + step);
+    } else if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      this.widthChanged.emit(this.widthPx() - step);
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      this.resetWidthRequested.emit();
+    }
   }
 
   displayRuleTypeFilter(ruleType: string): string {

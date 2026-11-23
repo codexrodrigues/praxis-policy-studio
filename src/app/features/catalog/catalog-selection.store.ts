@@ -5,8 +5,8 @@ import type {
   DomainRuleWorkspaceAction,
   DomainRuleWorkspaceCapabilities
 } from '@praxisui/core';
+import { classifyDecisionWorkflowBucket, type ExplorerGlobalLens } from '../../core/catalog-portfolio';
 import { PolicyStudioI18n } from '../../core/i18n';
-import type { ExplorerGlobalLens } from '../../core/catalog-portfolio';
 import { ProjectionCatalogService } from '../../core/projection-catalog.service';
 import { RuntimeConfigService } from '../../core/runtime-config.service';
 import { StudioShellStateService } from '../../core/studio-shell-state.service';
@@ -21,6 +21,7 @@ import type { SnapshotSourceCandidate } from './snapshot-cockpit.component';
 
 export interface PendingGovernedConfirmation extends GovernedConfirmationView {
   readonly execute: () => void;
+  readonly onCancel?: () => void;
 }
 
 export type DecisionWorkMode = 'understand' | 'rule' | 'test' | 'operate' | 'history';
@@ -42,8 +43,12 @@ export class CatalogSelectionStore {
   readonly contextScopeFilter = signal<string | null>(null);
   readonly activeRuleTypeFilter = signal<string | null>(null);
   readonly explorerGlobalLens = signal<ExplorerGlobalLens>('domain');
-  readonly portfolioOverviewOpen = signal(false);
   readonly allDecisions = signal<readonly DecisionSummary[]>([]);
+  readonly loadedEnvironmentSignature = signal<string | null>(null);
+  readonly pendingSelectionKey = signal<string | null>(null);
+  readonly pendingWorkMode = signal<DecisionWorkMode | null>(null);
+  readonly deepLinkConsumed = signal(false);
+  readonly postLoginReturnRoute = signal<string | null>(null);
   readonly selected = signal<DecisionSummary | null>(null);
   readonly narrowDetailOpen = signal(false);
   readonly activeMode = signal<DecisionWorkMode>('understand');
@@ -51,6 +56,9 @@ export class CatalogSelectionStore {
     const state = this.runtime.state();
     return state.kind === 'ready' ? state.config : null;
   });
+  readonly reviewQueueDecisions = computed(() =>
+    this.allDecisions().filter(item => classifyDecisionWorkflowBucket(item) !== 'STABLE')
+  );
 
   readonly loadError = signal<string | null>(null);
   readonly loading = signal(true);
@@ -378,14 +386,15 @@ export class CatalogSelectionStore {
     });
   }
 
-  openUnsavedWorkConfirmation(target: string, execute: () => void): void {
+  openUnsavedWorkConfirmation(target: string, execute: () => void, onCancel?: () => void): void {
     this.governedConfirmation.set({
       title: this.i18n.text('unsavedWorkTitle'),
       message: this.i18n.text('discardChanges'),
       target,
       confirmLabel: this.i18n.text('discardLocalChanges'),
       cancelLabel: this.i18n.text('keepEditing'),
-      execute
+      execute,
+      onCancel
     });
   }
 
@@ -396,7 +405,9 @@ export class CatalogSelectionStore {
   }
 
   cancelGovernedOperation(): void {
+    const pending = this.governedConfirmation();
     this.governedConfirmation.set(null);
+    pending?.onCancel?.();
   }
 
   invalidateSharedLoadsAndReset(): void {

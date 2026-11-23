@@ -1,4 +1,6 @@
 import { Injectable, signal } from '@angular/core';
+import { FACTS_PIPELINE_COPY_EN_US, FACTS_PIPELINE_COPY_PT_BR } from './i18n/facts-pipeline.i18n';
+import { SHELL_COPY_EN_US, SHELL_COPY_PT_BR } from './i18n/shell.i18n';
 import { SupportedLocale } from './runtime-config';
 
 const copy = {
@@ -653,8 +655,8 @@ const copy = {
     productCatalogLink: 'Praxis Policy Studio — catálogo',
     primaryNavigation: 'Navegação principal',
     decisionCatalogRegion: 'Catálogo de decisões',
-    factNullable: 'nullable',
-    factRequired: 'obrigatório',
+    factNullable: 'Opcional',
+    factRequired: 'Obrigatório',
     authorityDraftComparison: 'Comparação de autoridade e draft',
     loadedDraftConditionComparison: 'Comparação entre condição carregada e draft local',
     parameterRequired: 'Obrigatório',
@@ -919,7 +921,9 @@ const copy = {
     commandActionNavRule: 'Ir para aba 02 Regra',
     commandActionNavTest: 'Ir para aba 03 Testar',
     commandActionNavOperate: 'Ir para aba 04 Operar',
-    commandActionNavHistory: 'Ir para aba 05 Histórico'
+    commandActionNavHistory: 'Ir para aba 05 Histórico',
+    ...SHELL_COPY_PT_BR,
+    ...FACTS_PIPELINE_COPY_PT_BR
   },
   'en-US': {
     papBrowse: 'Browse host decision points',
@@ -1572,8 +1576,8 @@ const copy = {
     productCatalogLink: 'Praxis Policy Studio — catalog',
     primaryNavigation: 'Primary navigation',
     decisionCatalogRegion: 'Decision catalog',
-    factNullable: 'nullable',
-    factRequired: 'required',
+    factNullable: 'Optional',
+    factRequired: 'Required',
     authorityDraftComparison: 'Authority and draft comparison',
     loadedDraftConditionComparison: 'Loaded condition and local draft comparison',
     parameterRequired: 'Required',
@@ -1838,7 +1842,9 @@ const copy = {
     commandActionNavRule: 'Jump to 02 Rule',
     commandActionNavTest: 'Jump to 03 Test',
     commandActionNavOperate: 'Jump to 04 Operate',
-    commandActionNavHistory: 'Jump to 05 History'
+    commandActionNavHistory: 'Jump to 05 History',
+    ...SHELL_COPY_EN_US,
+    ...FACTS_PIPELINE_COPY_EN_US
   }
 } as const;
 

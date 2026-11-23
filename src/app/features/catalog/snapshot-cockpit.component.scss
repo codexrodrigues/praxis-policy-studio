@@ -1,7 +1,7 @@
 :host { display: block; }
 p { margin: 0; }
 .section-label { color: var(--pax-color-primary, #076487); font-size: var(--pax-text-xs, 0.75rem); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
-.snapshot-cockpit { display: grid; gap: 1rem; max-width: 68rem; margin-top: clamp(2rem, 5vw, 4rem); padding-block: 1.5rem; border-block: 1px solid var(--pax-color-outline-variant, #b9c6cb); }
+.snapshot-cockpit { display: grid; gap: 1rem; max-width: 68rem; container-type: inline-size; margin-top: clamp(2rem, 5vw, 4rem); padding-block: 1.5rem; border-block: 1px solid var(--pax-color-outline-variant, #b9c6cb); }
 .snapshot-cockpit > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
 .snapshot-cockpit > header p:last-child, .snapshot-prerequisites, .snapshot-version-identity small { color: var(--pax-color-on-surface-variant, #52636a); }
 .snapshot-cockpit > header p:last-child { margin-top: .35rem; }
@@ -79,6 +79,16 @@ p { margin: 0; }
 .outcome-strip strong { font-size: 1.2rem; }
 .outcome-strip [data-outcome='ALLOW'] { border-inline-start-color: var(--pax-color-tertiary, #187457); }
 .outcome-strip [data-outcome='DENY'], .outcome-strip [data-outcome='TECHNICAL_ERROR'] { border-inline-start-color: var(--pax-color-error, #ba1a1a); }
+@container (max-width: 44rem) {
+  .snapshot-cockpit > header, .snapshot-version-list > article, .execution-observations > header, .rollout-policy > header, .rollout-policy-versions article { grid-template-columns: 1fr; display: grid; }
+  .snapshot-cockpit > header > code { text-align: start; }
+  .snapshot-version-list dl, .facts, .execution-totals { grid-template-columns: 1fr 1fr; }
+  .execution-observations > header code { text-align: start; }
+  .outcome-strip { grid-template-columns: 1fr 1fr; }
+  .rollout-policy > header code { text-align: start; }
+  .rollout-policy-form { grid-template-columns: 1fr; }
+  .rollout-policy-timeline li { grid-template-columns: 1fr; gap: .15rem; }
+}
 @media (max-width: 760px) {
   .snapshot-cockpit > header, .snapshot-version-list > article, .execution-observations > header, .rollout-policy > header, .rollout-policy-versions article { grid-template-columns: 1fr; display: grid; }
   .snapshot-cockpit > header > code { text-align: start; }

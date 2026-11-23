@@ -1,27 +1,25 @@
 <aside class="catalog-pane" [attr.aria-label]="i18n.text('decisionCatalogRegion')">
   <header class="pane-heading">
-    <div class="heading-copy">
-      <p class="studio-eyebrow">{{ displayDomainEyebrow() }}</p>
-      <div class="heading-title-row">
-        <div class="heading-title-meta">
+    <div class="heading-title-row">
+      <div class="heading-title-meta">
+        <p class="studio-eyebrow">{{ displayDomainEyebrow() }}</p>
+        <div class="title-count-row">
           <h2 id="catalog-title">{{ i18n.text('catalog') }}</h2>
           <span class="count studio-mono" data-testid="explorer-decision-count" [attr.aria-label]="filteredDecisions().length + ' ' + i18n.text(filteredDecisions().length === 1 ? 'decision' : 'decisions')">
             {{ filteredDecisions().length }}
           </span>
         </div>
-        @if (totalCatalogCount() > 1) {
-          <button
-            type="button"
-            class="portfolio-toggle-btn"
-            data-testid="explorer-portfolio-toggle"
-            [class.active]="portfolioOverviewOpen()"
-            [attr.aria-pressed]="portfolioOverviewOpen()"
-            (click)="portfolioOverviewToggled.emit()">
-            <pax-icon name="layout-grid" [size]="14" />
-            <span>{{ i18n.text('explorerPortfolioToggle') }}</span>
-          </button>
-        }
       </div>
+
+      <button
+        type="button"
+        class="pane-collapse-btn"
+        data-testid="explorer-collapse-btn"
+        [attr.aria-label]="i18n.text('explorerCollapse')"
+        [attr.title]="i18n.text('explorerCollapse')"
+        (click)="collapseRequested.emit()">
+        <pax-icon name="panel-left" [size]="14" />
+      </button>
     </div>
   </header>
 
@@ -30,19 +28,60 @@
   }
 
   <div class="explorer-controls">
-    <label class="search">
-      <pax-icon class="search-glyph" name="search" [size]="16" />
-      <span class="visually-hidden">{{ i18n.text('localCatalogFilter') }}</span>
-      <input
-        [value]="query()"
-        (input)="queryChanged.emit($any($event.target).value)"
-        [placeholder]="i18n.text('localCatalogFilterHint')">
-      @if (query()) {
-        <button type="button" (click)="clearQueryRequested.emit()" [attr.aria-label]="i18n.text('clearSearch')">
-          <pax-icon name="x" [size]="14" />
+    @if (hasMultipleQuickScopes()) {
+      <div class="quick-scope-picker">
+        <label class="visually-hidden" for="explorer-quick-scope">{{ i18n.text('explorerScopeSelectLabel') }}</label>
+        <span class="quick-scope-label" aria-hidden="true">{{ activeQuickScopeLabel() }}</span>
+        <pax-icon class="scope-chevron" name="chevron-down" [size]="14" />
+        <select
+          id="explorer-quick-scope"
+          data-testid="explorer-quick-scope-select"
+          [value]="contextScopeFilter() ?? ''"
+          (change)="onQuickScopeChanged($any($event.target).value)">
+          <option value="">{{ allScopesLabel() }}</option>
+          @for (domain of quickScopeDomains(); track domain.domainKey) {
+            <optgroup [label]="domain.label + ' (' + domain.count + ')'">
+              <option [value]="domain.domainKey">{{ domain.label }} ({{ domain.count }})</option>
+              @for (func of domain.options; track func.scopeKey) {
+                <option [value]="func.scopeKey">↳ {{ func.label }} ({{ func.count }})</option>
+              }
+            </optgroup>
+          }
+        </select>
+      </div>
+    }
+
+    <div class="search-and-filters-row">
+      <label class="search">
+        <pax-icon class="search-glyph" name="search" [size]="14" />
+        <span class="visually-hidden">{{ i18n.text('localCatalogFilter') }}</span>
+        <input
+          [value]="query()"
+          (input)="queryChanged.emit($any($event.target).value)"
+          [placeholder]="i18n.text('localCatalogFilterHint')">
+        @if (query()) {
+          <button type="button" (click)="clearQueryRequested.emit()" [attr.aria-label]="i18n.text('clearSearch')">
+            <pax-icon name="x" [size]="12" />
+          </button>
+        }
+      </label>
+
+      @if (hasExpandableFilterControls()) {
+        <button
+          type="button"
+          class="filters-trigger-btn"
+          data-testid="explorer-filters-toggle"
+          [class.active]="filtersPanelOpen() || activeFiltersCount() > 0"
+          [attr.aria-expanded]="filtersPanelOpen()"
+          (click)="toggleFiltersPanel()">
+          <pax-icon name="filter" [size]="12" />
+          <span>{{ i18n.text('explorerFiltersToggle') }}</span>
+          @if (activeFiltersCount() > 0) {
+            <span class="filter-active-badge studio-mono">{{ activeFiltersCount() }}</span>
+          }
         </button>
       }
-    </label>
+    </div>
 
     @if (contextScopeFilter(); as scopeFilter) {
       <div class="scope-filter-chip" data-testid="context-scope-filter" role="status">
@@ -72,104 +111,120 @@
       </div>
     }
 
-    @if (autonomyFilterAvailable() && decisions().length > 1) {
-      @let counts = autonomyCounts();
-      @if (counts.param > 0 || counts.editable > 0 || counts.locked > 0 || counts.legal > 0) {
-        <div class="autonomy-filter-strip" role="group" [attr.aria-label]="i18n.text('explorerAutonomyFilterLabel')" data-testid="explorer-autonomy-filter">
-          <button
-            type="button"
-            class="autonomy-pill-btn"
-            data-testid="autonomy-filter-all"
-            [class.active]="effectiveAutonomyFilter() === 'all'"
-            [attr.aria-pressed]="effectiveAutonomyFilter() === 'all'"
-            (click)="selectAutonomyFilter('all')">
-            <span>{{ i18n.text('explorerFilterAll') }}</span>
-            <span class="pill-count studio-mono">{{ counts.all }}</span>
-          </button>
-          @if (counts.param > 0) {
-            <button
-              type="button"
-              class="autonomy-pill-btn"
-              data-tone="param"
-              data-testid="autonomy-filter-param"
-              [class.active]="effectiveAutonomyFilter() === 'param'"
-              [attr.aria-pressed]="effectiveAutonomyFilter() === 'param'"
-              (click)="selectAutonomyFilter('param')">
-              <pax-icon name="sliders" [size]="12" />
-              <span>{{ i18n.text('overrideParameterizableShort') }}</span>
-              <span class="pill-count studio-mono">{{ counts.param }}</span>
-            </button>
-          }
-          @if (counts.editable > 0) {
-            <button
-              type="button"
-              class="autonomy-pill-btn"
-              data-tone="editable"
-              data-testid="autonomy-filter-editable"
-              [class.active]="effectiveAutonomyFilter() === 'editable'"
-              [attr.aria-pressed]="effectiveAutonomyFilter() === 'editable'"
-              (click)="selectAutonomyFilter('editable')">
-              <pax-icon name="pencil" [size]="12" />
-              <span>{{ i18n.text('overrideEditableShort') }}</span>
-              <span class="pill-count studio-mono">{{ counts.editable }}</span>
-            </button>
-          }
-          @if (counts.locked > 0) {
-            <button
-              type="button"
-              class="autonomy-pill-btn"
-              data-tone="locked"
-              data-testid="autonomy-filter-locked"
-              [class.active]="effectiveAutonomyFilter() === 'locked'"
-              [attr.aria-pressed]="effectiveAutonomyFilter() === 'locked'"
-              (click)="selectAutonomyFilter('locked')">
-              <pax-icon name="lock" [size]="12" />
-              <span>{{ i18n.text('overrideForbiddenShort') }}</span>
-              <span class="pill-count studio-mono">{{ counts.locked }}</span>
-            </button>
-          }
-          @if (counts.legal > 0) {
-            <button
-              type="button"
-              class="autonomy-pill-btn"
-              data-tone="legal"
-              data-testid="autonomy-filter-legal"
-              [class.active]="effectiveAutonomyFilter() === 'legal'"
-              [attr.aria-pressed]="effectiveAutonomyFilter() === 'legal'"
-              (click)="selectAutonomyFilter('legal')">
-              <pax-icon name="book-open" [size]="12" />
-              <span>{{ i18n.text('explorerFilterLegal') }}</span>
-              <span class="pill-count studio-mono">{{ counts.legal }}</span>
-            </button>
-          }
+    @if (!filtersPanelOpen() && effectiveAutonomyFilter() !== 'all') {
+      <div class="scope-filter-chip active-autonomy-chip" role="status">
+        <div class="scope-filter-copy">
+          <span class="scope-filter-kicker">{{ i18n.text('policyLabelPrefix') }}</span>
+          <strong class="scope-filter-value">{{ activeAutonomyLabel() }}</strong>
         </div>
-      }
-    } @else if (!hasStageMetadata() && decisions().length > 1) {
-      <div class="global-lens-bar" role="group" [attr.aria-label]="i18n.text('explorerLensGroupLabel')" data-testid="explorer-global-lens">
-        <button
-          type="button"
-          data-testid="global-lens-domain"
-          [class.active]="globalLens() === 'domain'"
-          [attr.aria-pressed]="globalLens() === 'domain'"
-          (click)="globalLensChanged.emit('domain')">
-          {{ i18n.text('explorerLensDomain') }}
+        <button type="button" class="quiet-button scope-clear-btn" (click)="selectAutonomyFilter('all')">
+          {{ i18n.text('clearRuleTypeFilter') }}
         </button>
-        <button
-          type="button"
-          data-testid="global-lens-type"
-          [class.active]="globalLens() === 'type'"
-          [attr.aria-pressed]="globalLens() === 'type'"
-          (click)="globalLensChanged.emit('type')">
-          {{ i18n.text('explorerLensType') }}
-        </button>
-        <button
-          type="button"
-          data-testid="global-lens-workflow"
-          [class.active]="globalLens() === 'workflow'"
-          [attr.aria-pressed]="globalLens() === 'workflow'"
-          (click)="globalLensChanged.emit('workflow')">
-          {{ i18n.text('explorerLensWorkflow') }}
-        </button>
+      </div>
+    }
+
+    @if (filtersPanelOpen() && hasExpandableFilterControls()) {
+      <div class="filters-popover-panel" data-testid="explorer-filters-panel">
+        @if (autonomyFilterAvailable() && decisions().length > 1) {
+          @let counts = autonomyCounts();
+          @if (counts.param > 0 || counts.editable > 0 || counts.locked > 0 || counts.legal > 0) {
+            <div class="autonomy-filter-strip" role="group" [attr.aria-label]="i18n.text('explorerAutonomyFilterLabel')" data-testid="explorer-autonomy-filter">
+              <button
+                type="button"
+                class="autonomy-pill-btn"
+                data-testid="autonomy-filter-all"
+                [class.active]="effectiveAutonomyFilter() === 'all'"
+                [attr.aria-pressed]="effectiveAutonomyFilter() === 'all'"
+                (click)="selectAutonomyFilter('all')">
+                <span>{{ i18n.text('explorerFilterAll') }}</span>
+                <span class="pill-count studio-mono">{{ counts.all }}</span>
+              </button>
+              @if (counts.param > 0) {
+                <button
+                  type="button"
+                  class="autonomy-pill-btn"
+                  data-tone="param"
+                  data-testid="autonomy-filter-param"
+                  [class.active]="effectiveAutonomyFilter() === 'param'"
+                  [attr.aria-pressed]="effectiveAutonomyFilter() === 'param'"
+                  (click)="selectAutonomyFilter('param')">
+                  <pax-icon name="sliders" [size]="12" />
+                  <span>{{ i18n.text('overrideParameterizableShort') }}</span>
+                  <span class="pill-count studio-mono">{{ counts.param }}</span>
+                </button>
+              }
+              @if (counts.editable > 0) {
+                <button
+                  type="button"
+                  class="autonomy-pill-btn"
+                  data-tone="editable"
+                  data-testid="autonomy-filter-editable"
+                  [class.active]="effectiveAutonomyFilter() === 'editable'"
+                  [attr.aria-pressed]="effectiveAutonomyFilter() === 'editable'"
+                  (click)="selectAutonomyFilter('editable')">
+                  <pax-icon name="pencil" [size]="12" />
+                  <span>{{ i18n.text('overrideEditableShort') }}</span>
+                  <span class="pill-count studio-mono">{{ counts.editable }}</span>
+                </button>
+              }
+              @if (counts.locked > 0) {
+                <button
+                  type="button"
+                  class="autonomy-pill-btn"
+                  data-tone="locked"
+                  data-testid="autonomy-filter-locked"
+                  [class.active]="effectiveAutonomyFilter() === 'locked'"
+                  [attr.aria-pressed]="effectiveAutonomyFilter() === 'locked'"
+                  (click)="selectAutonomyFilter('locked')">
+                  <pax-icon name="lock" [size]="12" />
+                  <span>{{ i18n.text('overrideForbiddenShort') }}</span>
+                  <span class="pill-count studio-mono">{{ counts.locked }}</span>
+                </button>
+              }
+              @if (counts.legal > 0) {
+                <button
+                  type="button"
+                  class="autonomy-pill-btn"
+                  data-tone="legal"
+                  data-testid="autonomy-filter-legal"
+                  [class.active]="effectiveAutonomyFilter() === 'legal'"
+                  [attr.aria-pressed]="effectiveAutonomyFilter() === 'legal'"
+                  (click)="selectAutonomyFilter('legal')">
+                  <pax-icon name="book-open" [size]="12" />
+                  <span>{{ i18n.text('explorerFilterLegal') }}</span>
+                  <span class="pill-count studio-mono">{{ counts.legal }}</span>
+                </button>
+              }
+            </div>
+          }
+        } @else if (!hasStageMetadata() && decisions().length > 1) {
+          <div class="global-lens-bar" role="group" [attr.aria-label]="i18n.text('explorerLensGroupLabel')" data-testid="explorer-global-lens">
+            <button
+              type="button"
+              data-testid="global-lens-domain"
+              [class.active]="globalLens() === 'domain'"
+              [attr.aria-pressed]="globalLens() === 'domain'"
+              (click)="globalLensChanged.emit('domain')">
+              {{ i18n.text('explorerLensDomain') }}
+            </button>
+            <button
+              type="button"
+              data-testid="global-lens-type"
+              [class.active]="globalLens() === 'type'"
+              [attr.aria-pressed]="globalLens() === 'type'"
+              (click)="globalLensChanged.emit('type')">
+              {{ i18n.text('explorerLensType') }}
+            </button>
+            <button
+              type="button"
+              data-testid="global-lens-workflow"
+              [class.active]="globalLens() === 'workflow'"
+              [attr.aria-pressed]="globalLens() === 'workflow'"
+              (click)="globalLensChanged.emit('workflow')">
+              {{ i18n.text('explorerLensWorkflow') }}
+            </button>
+          </div>
+        }
       </div>
     }
   </div>
@@ -319,4 +374,18 @@
         (validationFailed)="validationFailed.emit($event)" />
     </footer>
   }
+
+  <div
+    class="explorer-resize-handle"
+    role="separator"
+    tabindex="0"
+    data-testid="explorer-resize-handle"
+    aria-orientation="vertical"
+    [attr.aria-label]="i18n.text('explorerResizeLabel')"
+    [attr.aria-valuemin]="minWidthPx"
+    [attr.aria-valuemax]="maxWidthPx"
+    [attr.aria-valuenow]="widthPx()"
+    (pointerdown)="startResize($event)"
+    (dblclick)="resetWidthRequested.emit()"
+    (keydown)="onResizeKeydown($event)"></div>
 </aside>

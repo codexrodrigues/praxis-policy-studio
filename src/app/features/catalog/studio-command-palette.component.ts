@@ -206,15 +206,19 @@ interface CommandPaletteGroup {
 
     .palette-results {
       overflow-y: auto;
+      overflow-x: hidden;
       padding: var(--pax-space-2);
       display: grid;
+      grid-template-columns: minmax(0, 1fr);
       gap: var(--pax-space-3);
       align-content: start;
     }
 
     .palette-group {
       display: grid;
+      grid-template-columns: minmax(0, 1fr);
       gap: 0.125rem;
+      min-width: 0;
     }
 
     .palette-group-title {
@@ -230,6 +234,10 @@ interface CommandPaletteGroup {
 
     .palette-option {
       width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+      overflow: hidden;
       display: flex;
       align-items: center;
       gap: var(--pax-space-3);
@@ -295,6 +303,10 @@ interface CommandPaletteGroup {
 
     .option-badge {
       flex-shrink: 0;
+      max-width: 9.5rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
       padding: 0.0625rem var(--pax-space-2);
       border-radius: var(--pax-radius-pill);
       background: var(--pax-color-surface-container);
@@ -429,6 +441,8 @@ export class StudioCommandPaletteComponent {
       labels: {
         openPortfolioTitle: this.i18n.text('commandActionOpenPortfolio'),
         openPortfolioSubtitle: this.i18n.text('commandActionOpenPortfolioSub'),
+        openReviewsTitle: this.i18n.text('commandActionOpenReviews'),
+        openReviewsSubtitle: this.i18n.text('commandActionOpenReviewsSub'),
         toggleDepthTitle:
           this.viewDepthSignal() === 'business'
             ? this.i18n.text('commandActionToggleDepthTech')

@@ -42,9 +42,11 @@ $studio-surfaces: (
 );
 
 :root {
-  --pax-topbar-height: 3.25rem;
-  --pax-explorer-width: 17.5rem;
-  --pax-inspector-width: 22.5rem;
+  --pax-topbar-height: 3rem;
+  --pax-global-nav-width: 14rem;
+  --pax-global-nav-collapsed-width: 3.75rem;
+  --pax-explorer-width: 21rem;
+  --pax-inspector-width: 20.5rem;
 
   --pax-color-primary: var(--md-sys-color-primary, #076487);
   --pax-color-on-primary: var(--md-sys-color-on-primary, #ffffff);

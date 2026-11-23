@@ -192,4 +192,31 @@ describe('DecisionExplorerRailComponent', () => {
     component.selectAutonomyFilter('legal');
     expect(component.filteredDecisions().map(item => item.key)).toEqual([second.key]);
   });
+
+  it('builds quick scope dropdown options and toggles expandable filters panel', () => {
+    const component = TestBed.runInInjectionContext(() => new DecisionExplorerRailComponent());
+    const d1 = {
+      ...makeDecision(1),
+      domain: 'human-resources.attendance',
+      ruleSet: 'human-resources.attendance.launch',
+      ruleSetKey: 'human-resources.attendance.launch'
+    };
+    const d2 = {
+      ...makeDecision(2),
+      domain: 'payroll.benefits',
+      ruleSet: 'payroll.benefits.calc',
+      ruleSetKey: 'payroll.benefits.calc'
+    };
+    Object.defineProperty(component, 'decisions', { configurable: true, value: signal([d1, d2]) });
+
+    expect(component.hasMultipleQuickScopes()).toBe(true);
+    expect(component.quickScopeDomains().map(d => d.domainKey)).toEqual([
+      'human-resources.attendance',
+      'payroll.benefits'
+    ]);
+
+    expect(component.filtersPanelOpen()).toBe(false);
+    component.toggleFiltersPanel();
+    expect(component.filtersPanelOpen()).toBe(true);
+  });
 });

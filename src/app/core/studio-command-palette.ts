@@ -7,6 +7,7 @@ import type { StudioIconName } from '../shared/studio-icon.component';
 
 export type CommandPaletteActionId =
   | 'open-portfolio'
+  | 'open-reviews'
   | 'toggle-depth'
   | 'open-access-privacy'
   | 'open-ai'
@@ -49,6 +50,8 @@ export type CommandPaletteItem =
 export interface CommandPaletteLabels {
   readonly openPortfolioTitle: string;
   readonly openPortfolioSubtitle: string;
+  readonly openReviewsTitle?: string;
+  readonly openReviewsSubtitle?: string;
   readonly toggleDepthTitle: string;
   readonly toggleDepthSubtitle: string;
   readonly openAccessTitle: string;
@@ -117,6 +120,17 @@ export function buildCommandPaletteResults(
       badge: null,
       icon: 'layout-grid',
       actionId: 'open-portfolio'
+    });
+  }
+  if (labels.openReviewsTitle) {
+    actions.push({
+      kind: 'action',
+      id: 'action:open-reviews',
+      title: labels.openReviewsTitle,
+      subtitle: labels.openReviewsSubtitle ?? '',
+      badge: null,
+      icon: 'inbox',
+      actionId: 'open-reviews'
     });
   }
   actions.push({

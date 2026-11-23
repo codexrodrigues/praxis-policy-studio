@@ -31,6 +31,15 @@
         <span>{{ i18n.text('inspectorTabTechnical') }}</span>
       </button>
     </div>
+    <button
+      type="button"
+      class="inspector-close-btn"
+      data-testid="inspector-collapse-btn"
+      [attr.aria-label]="i18n.text('inspectorCollapse')"
+      [attr.title]="i18n.text('inspectorCollapse')"
+      (click)="collapseRequested.emit()">
+      <pax-icon name="x" [size]="14" />
+    </button>
   </header>
 
   <div class="inspector-body">

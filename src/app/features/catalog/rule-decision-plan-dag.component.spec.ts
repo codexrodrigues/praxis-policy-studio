@@ -215,4 +215,65 @@ describe('RuleDecisionPlanDagComponent', () => {
     expect(host.querySelector('[data-testid="dag-node-workforce.guard.locked_rule"]')?.textContent)
       .toContain('GUARD · BLOQUEADO');
   });
+
+  it('defaults business mode to an interactive 5-stage focused panel with 6-card cap, jump-back button, and keyboard navigation', () => {
+    const fixture = TestBed.createComponent(RuleDecisionPlanDagComponent);
+    const domainRules = Array.from({ length: 8 }, (_, idx) =>
+      createDecision({
+        key: `workforce.domain.rule_${idx + 1}`,
+        code: `WF-00${idx + 1}`,
+        name: `Regra de negócio ${idx + 1}`,
+        decisionStage: 'DOMAIN_DECISION',
+        slotOverridePolicy: 'PARAMETERIZABLE'
+      })
+    );
+    const guardRule = createDecision({
+      key: 'workforce.guard.rule_0',
+      code: 'WF-000',
+      name: 'Pré-requisito obrigatório',
+      decisionStage: 'PROTECTED_GUARD',
+      slotOverridePolicy: 'FORBIDDEN',
+      authoringSupported: false
+    });
+
+    fixture.componentInstance.selected = guardRule;
+    fixture.componentInstance.decisions = [guardRule, ...domainRules];
+    fixture.componentInstance.viewDepth = 'business';
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('[data-testid="dag-focused-stage-panel"]')).toBeTruthy();
+    expect(host.querySelector('[data-testid="dag-causal-subtitle"]')?.textContent).toContain(
+      'Etapa 1 de 5 · Pré-requisitos obrigatórios — esta regra atua nesta etapa.'
+    );
+    expect(host.querySelector('[data-testid="dag-jump-current-stage"]')).toBeNull();
+
+    const domainStep = host.querySelector<HTMLButtonElement>('[data-testid="dag-stage-DOMAIN_DECISION"]')!;
+    domainStep.click();
+    fixture.detectChanges();
+
+    expect(host.querySelectorAll('[data-testid="dag-focused-stage-panel"] .dag-node').length).toBe(6);
+    expect(host.querySelector('[data-testid="dag-jump-current-stage"]')).toBeTruthy();
+    const expandBtn = host.querySelector<HTMLButtonElement>('[data-testid="dag-stage-expand-btn"]')!;
+    expect(expandBtn.textContent).toContain('Ver todas as 8 regras desta etapa');
+    expandBtn.click();
+    fixture.detectChanges();
+    expect(host.querySelectorAll('[data-testid="dag-focused-stage-panel"] .dag-node').length).toBe(8);
+
+    const emptyStep = host.querySelector<HTMLButtonElement>('[data-testid="dag-stage-TRANSFORMATION_INTENT"]')!;
+    emptyStep.click();
+    fixture.detectChanges();
+    expect(host.querySelector('[data-testid="dag-focused-empty-stage"]')?.textContent).toContain(
+      'Ajustes automáticos'
+    );
+
+    host.querySelector<HTMLButtonElement>('[data-testid="dag-jump-current-stage"]')!.click();
+    fixture.detectChanges();
+    expect(host.querySelector('[data-testid="dag-node-workforce.guard.rule_0"]')).toBeTruthy();
+
+    host.querySelector<HTMLButtonElement>('[data-testid="dag-view-all"]')!.click();
+    fixture.detectChanges();
+    expect(host.querySelector('[data-testid="dag-all-stages-panel"]')).toBeTruthy();
+    expect(host.querySelector('[data-testid="dag-focused-stage-panel"]')).toBeNull();
+  });
 });

@@ -38,7 +38,7 @@ import type { DecisionSummary } from './catalog.fixture';
     }
   </header>
 
-  <section class="kpi-strip" [attr.aria-label]="i18n.text('portfolioEyebrow')">
+  <div class="kpi-strip" role="group" [attr.aria-label]="i18n.text('portfolioEyebrow')">
     <div class="kpi-tile" data-testid="portfolio-kpi-total">
       <span class="kpi-label">{{ i18n.text('portfolioKpiTotalRules') }}</span>
       <strong class="kpi-value studio-mono">{{ portfolio.totalRules }}</strong>
@@ -69,7 +69,7 @@ import type { DecisionSummary } from './catalog.fixture';
         <strong class="kpi-value studio-mono">0</strong>
       </div>
     }
-  </section>
+  </div>
 
   @if (portfolio.activeWorkflowDecisions.length > 0) {
     <section class="portfolio-section" data-testid="portfolio-active-queue" aria-labelledby="portfolio-queue-title">
@@ -112,7 +112,9 @@ import type { DecisionSummary } from './catalog.fixture';
 
   <section class="portfolio-section" aria-labelledby="portfolio-tabs-label">
     <div class="portfolio-tabs-bar">
-      <span class="visually-hidden" id="portfolio-tabs-label">{{ i18n.text('portfolioEyebrow') }}</span>
+      <span class="visually-hidden" id="portfolio-tabs-label">
+        {{ activeTab() === 'domains' ? i18n.text('portfolioTabDomains') : i18n.text('portfolioTabTypes') }}
+      </span>
       <div class="portfolio-tabs" role="tablist">
         <button
           type="button"

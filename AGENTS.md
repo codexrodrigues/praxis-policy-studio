@@ -9,9 +9,13 @@ Aplica-se a todo o repositório.
 - O Studio é experience plane; não possui lifecycle, snapshot, ETag ou autoridade.
 - `praxis-config-starter` é o control plane.
 - **Separação Ortogonal na Praxis Decision Platform (`BUSINESS` vs. `AUTHORIZATION`):**
-  - O `praxis-policy-studio` atua como o **Praxis Decision Studio** unificado sobre o control plane `/api/praxis/config/domain-rules/**`, separando claramente duas experiências distintas:
-    - **Regras de Negócio (`decisionKind = BUSINESS`):** invariantes transacionais, elegibilidade e validações em JSON Logic executadas pelo `praxis-rules-engine`.
-    - **Políticas de Acesso, Mascaramento e Privacidade (`decisionKind = AUTHORIZATION`, `ruleType = "authorization_policy"`):** políticas RBAC/ABAC/LGPD compiladas em unidades Rego (`targetLayer = "policy_engine"`, `targetArtifactType = "opa-policy"`) e executadas por `praxis-authz-starter` / `praxis-authz-enforcement-core` / `praxis-authz-opa`.
+  - O `praxis-policy-studio` atua como o **Praxis Decision Studio** unificado sobre o control plane `/api/praxis/config/domain-rules/**` através de um shell lazy multi-módulo (`/overview`, `/catalog`, `/reviews`, `/access`), separando claramente duas experiências distintas:
+    - **Regras de Negócio (`decisionKind = BUSINESS`):** visão executiva em `/overview`, catálogo/edição/sandbox/cockpit em `/catalog` e fila 4-olhos em `/reviews` para invariantes transacionais, elegibilidade e validações em JSON Logic executadas pelo `praxis-rules-engine`.
+    - **Políticas de Acesso, Mascaramento e Privacidade (`decisionKind = AUTHORIZATION`, `ruleType = "authorization_policy"`):** trilha isolada em `/access` para políticas RBAC/ABAC/LGPD compiladas em unidades Rego (`targetLayer = "policy_engine"`, `targetArtifactType = "opa-policy"`) e executadas por `praxis-authz-starter` / `praxis-authz-enforcement-core` / `praxis-authz-opa`.
+- **Higiene de Rotas, Estado Não Salvo e Sessão Multi-Operador:**
+  - Navegações intencionais entre `/overview`, `/catalog`, `/reviews` e `/access` preservam exclusivamente parâmetros de escopo/host (`tenantId`, `organizationId`, `environment`, `apiBaseUrl`) e jamais reaplicam deep-links (`resourceKey`, `ruleSetKey`, `decisionKey`) já consumidos;
+  - Saídas da rota `/catalog` com alterações locais não salvas passam obrigatoriamente pelo guarda `canDeactivate` (`confirmRouteLeave`);
+  - O `/auth/logout` em qualquer rota invalida imediatamente decisões, rascunhos, caches compartilhados (`invalidateSharedLoadsAndReset`), filtros, contexto de ponte (`/access`), breadcrumbs e capabilities de módulo (`StudioCapabilitiesService.reset()`).
 - `praxis-rules-engine` possui compilação e avaliação determinística de regras de negócio (`decisionKind = BUSINESS`).
 - O host consumidor possui facts, autorização, transação e efeitos.
 - Projeções de domínio são read-only, baseadas em refs/digests e não copiam semântica.

@@ -1,80 +1,57 @@
-@if (activeWorkspaceTrack() === 'authorization') {
-  <pax-access-authorization-workspace
-    [config]="policyConfig()"
-    [isRemoteMode]="runtime.mode() === 'remote'"
-    [sessionActive]="sessionActive()"
+<div
+  class="workspace"
+  [class.explorer-collapsed]="!explorerOpen()"
+  [class.inspector-collapsed]="!inspectorOpen()"
+  [class.decision-open]="narrowDetailOpen()"
+  [class.inspector-ai-active]="inspectorOpen() && inspectorTab() === 'ai'"
+  [style.--pax-explorer-width.px]="shell.explorerWidthPx()"
+  [attr.data-view-depth]="viewDepth()">
+
+  @if (!selected()) {
+    <h1 class="visually-hidden">{{ i18n.text(authenticationRequired() ? 'authOnboardingTitle' : 'catalog') }}</h1>
+  }
+
+  <pax-decision-explorer-rail
+    class="explorer-slot"
+    [decisions]="decisions()"
+    [allCatalogDecisions]="allDecisions()"
+    [totalCatalogCount]="allDecisions().length"
+    [selected]="selected()"
+    [query]="query()"
+    [contextScopeFilter]="contextScopeFilter()"
+    [activeRuleTypeFilter]="activeRuleTypeFilter()"
+    [globalLens]="explorerGlobalLens()"
     [loading]="loading()"
     [loadError]="loadError()"
+    [authenticationRequired]="authenticationRequired()"
     [permissionLimited]="permissionLimited()"
-    [signingOut]="signingOut()"
-    [bridgeContext]="shell.accessBridgeContext()"
-    (clearBridgeContextRequested)="shell.clearAccessBridgeContext()"
-    (backToBusinessRequested)="setBusinessTrack()" />
-} @else {
-  <div
-    class="workspace"
-    [class.decision-open]="narrowDetailOpen()"
-    [class.inspector-ai-active]="inspectorOpen() && inspectorTab() === 'ai'"
-    [attr.data-view-depth]="viewDepth()">
+    [authenticating]="authenticating()"
+    [authenticationFailed]="authenticationFailed()"
+    [sessionActive]="sessionActive()"
+    [logoutFailed]="logoutFailed()"
+    [selectionOutsideFilter]="selectionOutsideFilter()"
+    [busy]="authoringBusy() || snapshotBusy() || rolloutPolicyBusy() || rolloutBusy()"
+    [authoringBusy]="authoringBusy()"
+    [isRemoteMode]="runtime.mode() === 'remote'"
+    [viewDepth]="viewDepth()"
+    [widthPx]="shell.explorerWidthPx()"
+    (queryChanged)="updateQuery($event)"
+    (clearQueryRequested)="clearQuery()"
+    (clearContextScopeRequested)="clearContextScopeFilter()"
+    (clearRuleTypeRequested)="clearRuleTypeFilter()"
+    (scopeSelected)="applyScopeFilter($event)"
+    (globalLensChanged)="setExplorerGlobalLens($event)"
+    (collapseRequested)="shell.toggleExplorer()"
+    (widthChanged)="shell.setExplorerWidth($event)"
+    (resetWidthRequested)="shell.resetExplorerWidth()"
+    (decisionSelected)="select($event)"
+    (loginRequested)="login($event.username, $event.password, $event.form)"
+    (retryCatalogRequested)="loadCatalog()"
+    (reauthenticateRequested)="requestAuthentication()"
+    (createRequested)="createGovernedDecision($event)"
+    (validationFailed)="reportDecisionCreateValidation($event)" />
 
-    @if (!selected() && !(portfolioOverviewOpen() && allDecisions().length > 0)) {
-      <h1 class="visually-hidden">{{ i18n.text(authenticationRequired() ? 'authOnboardingTitle' : 'catalog') }}</h1>
-    }
-
-    <pax-decision-explorer-rail
-      class="explorer-slot"
-      [decisions]="decisions()"
-      [totalCatalogCount]="allDecisions().length"
-      [selected]="selected()"
-      [query]="query()"
-      [contextScopeFilter]="contextScopeFilter()"
-      [activeRuleTypeFilter]="activeRuleTypeFilter()"
-      [globalLens]="explorerGlobalLens()"
-      [portfolioOverviewOpen]="portfolioOverviewOpen()"
-      [loading]="loading()"
-      [loadError]="loadError()"
-      [authenticationRequired]="authenticationRequired()"
-      [permissionLimited]="permissionLimited()"
-      [authenticating]="authenticating()"
-      [authenticationFailed]="authenticationFailed()"
-      [sessionActive]="sessionActive()"
-      [logoutFailed]="logoutFailed()"
-      [selectionOutsideFilter]="selectionOutsideFilter()"
-      [busy]="authoringBusy() || snapshotBusy() || rolloutPolicyBusy() || rolloutBusy()"
-      [authoringBusy]="authoringBusy()"
-      [isRemoteMode]="runtime.mode() === 'remote'"
-      [viewDepth]="viewDepth()"
-      (queryChanged)="updateQuery($event)"
-      (clearQueryRequested)="clearQuery()"
-      (clearContextScopeRequested)="clearContextScopeFilter()"
-      (clearRuleTypeRequested)="clearRuleTypeFilter()"
-      (scopeSelected)="applyScopeFilter($event)"
-      (globalLensChanged)="setExplorerGlobalLens($event)"
-      (portfolioOverviewToggled)="togglePortfolioOverview()"
-      (decisionSelected)="select($event)"
-      (loginRequested)="login($event.username, $event.password, $event.form)"
-      (retryCatalogRequested)="loadCatalog()"
-      (reauthenticateRequested)="requestAuthentication()"
-      (createRequested)="createGovernedDecision($event)"
-      (validationFailed)="reportDecisionCreateValidation($event)" />
-
-    @if (portfolioOverviewOpen() && allDecisions().length > 0) {
-      <article class="decision-pane" aria-labelledby="portfolio-title">
-        <button type="button" class="narrow-back quiet-button" (click)="returnToCatalog()">
-          <pax-icon name="arrow-left" [size]="16" />
-          <span>{{ i18n.text('backToCatalog') }}</span>
-        </button>
-        <pax-catalog-portfolio-overview
-          [decisions]="allDecisions()"
-          [selected]="selected()"
-          [viewDepth]="viewDepth()"
-          (scopeSelected)="applyScopeFilter($event)"
-          (ruleTypeSelected)="applyRuleTypeFilter($event)"
-          (decisionSelected)="select($event)"
-          (closeRequested)="closePortfolioOverview()"
-          (workflowQueueFilterRequested)="openWorkflowQueueInExplorer()" />
-      </article>
-    } @else if (selected(); as current) {
+  @if (selected(); as current) {
       <article class="decision-pane" aria-labelledby="decision-title" [attr.aria-busy]="authoringBusy() || snapshotBusy() || rolloutPolicyBusy() || rolloutBusy()">
         <button type="button" class="narrow-back quiet-button" (click)="returnToCatalog()">
           <pax-icon name="arrow-left" [size]="16" />
@@ -141,7 +118,7 @@
               }
             </div>
           </div>
-          <div class="decision-actions" [attr.aria-label]="i18n.text('decisionActions')">
+          <div class="decision-actions" role="group" [attr.aria-label]="i18n.text('decisionActions')">
             @if (isCreateDraftPrimary(current)) {
               <button type="button" class="primary-action" data-testid="create-draft-workspace-btn" [disabled]="!(current.promotedDefinitionId ?? current.configDefinitionId) || authoringBusy()" (click)="createWorkspace()">
                 {{ i18n.text('createDraft') }}
@@ -198,9 +175,13 @@
               <span class="nav-count studio-mono">{{ scenarios().length }}</span>
             </button>
           } @else {
-            <span class="navigation-unavailable" [attr.aria-label]="i18n.text('testsRequireWorkspace')" [title]="i18n.text('testsRequireWorkspace')">
+            <button
+              type="button"
+              disabled
+              class="navigation-unavailable"
+              [attr.title]="i18n.text('testsRequireWorkspace')">
               <span>{{ i18n.text('test') }}</span>
-            </span>
+            </button>
           }
           <button
             type="button"
@@ -396,50 +377,10 @@
             </section>
           </section>
 
-          <section class="evaluated-facts-strip" data-testid="evaluated-facts-strip" [attr.aria-label]="i18n.text('evaluatedFactsHeading')">
-            <p class="section-label">{{ i18n.text('evaluatedFactsHeading') }}</p>
-            @if (current.facts.length > 0) {
-              <ul class="fact-chip-list">
-                @for (fact of current.facts; track fact.path) {
-                  <li>
-                    <pax-term-popover
-                      variant="chip"
-                      icon="database"
-                      tone="info"
-                      [term]="displayFactLabel(fact)"
-                      [badge]="fact.nullable ? null : '*'"
-                      [category]="fact.valueType"
-                      [title]="displayFactLabel(fact)"
-                      [summary]="factSummaryForPopover(fact)"
-                      [detail]="factDetailForPopover(fact)" />
-                  </li>
-                }
-              </ul>
-            } @else {
-              <p class="didactic-empty-value">{{ i18n.text('evaluatedFactsEmpty') }}</p>
-            }
-
-            @let paramEntries = evaluatedParameterEntries(current);
-            @if (paramEntries.length > 0) {
-              <p class="section-label evaluated-params-label">{{ i18n.text('evaluatedParametersSubheading') }}</p>
-              <ul class="fact-chip-list">
-                @for (param of paramEntries; track param.key) {
-                  <li>
-                    <pax-term-popover
-                      variant="chip"
-                      icon="sliders"
-                      [tone]="param.isCustomized ? 'warning' : 'success'"
-                      [term]="param.label"
-                      [badge]="param.valueText"
-                      [category]="i18n.text('evaluatedParametersSubheading')"
-                      [title]="param.label"
-                      [summary]="param.description"
-                      [detail]="param.detailText" />
-                  </li>
-                }
-              </ul>
-            }
-          </section>
+          <pax-evaluated-facts-panel
+            [decision]="current"
+            [parameters]="evaluatedParameterEntries(current)"
+            [viewDepth]="viewDepth()" />
 
           <pax-rule-decision-plan-dag
             [selected]="current"
@@ -1066,24 +1007,12 @@
         (decisionSelected)="select($event)"
         (candidateSelected)="selectDiscoveredCandidate($event)"
         (enableTechnicalModeRequested)="enableTechnicalView()"
-        (openAccessPrivacyRequested)="openAccessPrivacyForCurrentDecision()" />
+        (openAccessPrivacyRequested)="openAccessPrivacyForCurrentDecision()"
+        (collapseRequested)="shell.toggleInspector()" />
     }
-  </div>
-}
+</div>
 
 <pax-governed-confirmation-dialog
   [confirmation]="governedConfirmation()"
   (confirmed)="confirmGovernedOperation()"
   (cancelled)="cancelGovernedOperation()" />
-
-<pax-studio-command-palette
-  [open]="shell.commandPaletteOpen()"
-  [decisions]="allDecisions()"
-  [selected]="selected()"
-  [viewDepth]="viewDepth()"
-  [isDarkTheme]="shell.isDarkTheme()"
-  [isRemoteMode]="runtime.mode() === 'remote'"
-  (closed)="shell.closeCommandPalette()"
-  (decisionSelected)="selectDecisionFromPalette($event)"
-  (scopeSelected)="selectScopeFromPalette($event)"
-  (actionTriggered)="handleCommandPaletteAction($event)" />

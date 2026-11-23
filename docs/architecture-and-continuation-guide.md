@@ -116,8 +116,18 @@ inferidas no browser.
 
 O login de desenvolvimento usa `/auth/login` e cookie `HttpOnly`. O Studio não
 armazena senha ou token. `401` significa sessão necessária; `403` é distinguido
-entre sessão ausente e sessão válida sem permissão. O logout consome
-`/auth/logout`, limpa toda projeção governada em memória e não oferece troca de
+entre sessão ausente e sessão válida sem permissão (`permissionLimited` exibido de forma consistente em `/catalog`, `/overview` e `/reviews`). O logout consome
+`/auth/logout`, invalida toda projeção governada, caches de lifecycle/timeline/capabilities, filtros, pontes de acesso e breadcrumbs mantidos em memória antes de voltar ao login, sem oferecer troca de operador local.
+
+### 3.5 Shell multi-módulo, roteamento lazy e extensibilidade
+
+Para preservar o orçamento de bundle inicial (`Initial total ~510 kB`, abaixo do teto de `750 kB / 1.00 MB`) sem duplicar providers por rota, `AppComponent` e `app.config.ts` permanecem isentos de imports eager de `@praxisui/*` e carregam o shell persistente pela rota pai lazy `STUDIO_SHELL_ROUTES` (`src/app/shell/studio-shell.routes.ts`):
+
+- **Módulos e navegação declarativa:** `STUDIO_NAV_ITEMS` (`src/app/core/studio-navigation.ts`) declara os grupos e rotas operacionais ativos (`/overview`, `/catalog`, `/reviews`, `/access`), seus flags declarativos de superfície (`supportsExplorer`, `supportsInspector`) e eventuais `requiredCapability` avaliados de forma fail-closed por `StudioCapabilitiesService`.
+- **Coordenação em memória vs. escopo de edição:** `CatalogSelectionStore` e `StudioCatalogBootstrapService` vivem no ambiente do shell persistente para compartilhar o catálogo já autenticado e badges em tempo real entre rotas sem requisições HTTP duplicadas, enquanto `WorkspaceAuthoringFacade`, `ScenarioSandboxFacade` e `SnapshotExecutionFacade` permanecem isolados em `CATALOG_ROUTES` com guarda `canDeactivate` (`confirmRouteLeave`) contra descarte acidental de trabalho não salvo.
+- **Ponte ao vivo de comando e higiene de URL:** dentro de `/catalog`, `StudioCatalogRouteBridge` garante que seleção via `Ctrl+K` ou troca de modo execute o mesmo ciclo `select()` e limpeza de estado de uma interação direta na lista. Transições via barra lateral, `/overview`, `/reviews` ou `Ctrl+K` preservam apenas `PRESERVED_ENVIRONMENT_QUERY_PARAMS` (`tenantId`, `organizationId`, `environment`, `apiBaseUrl`), evitando que deep-links consumidos (`resourceKey`, `ruleSetKey`, `decisionKey`, etc.) voltem a sobrescrever escolhas explícitas do operador.
+- **Títulos e i18n modular:** `StudioTitleStrategy` resolve `Route.data.titleKey` em `pt-BR`/`en-US`, e chaves específicas de módulo ficam segmentadas em `src/app/core/i18n/*.i18n.ts` (`shell.i18n.ts`, `facts-pipeline.i18n.ts`) com verificação automática de paridade e placeholders (`i18n.spec.ts`).
+- **Apresentação semântica de fatos e pipeline de avaliação (Fase B):** `fact-presentation.ts` particiona fatos realmente consultados pela regra (`evaluatedFactPaths` + paths ativos da condição) dos demais fatos disponíveis na operação para autoria, separa orientações operacionais embutidas de descrições, agrupa por raiz de origem, consome metadados opcionais (`hints`, `groupLabels`, `unit`, `valuePresentation`) quando publicados e alimenta `<pax-evaluated-facts-panel>`, `<pax-term-popover>` e os cards de `DecisionRuleInspectionComponent`. A sequência em 5 estágios (`RuleDecisionPlanDagComponent`) apresenta um stepper horizontal interativo com painel focado por estágio (limite de 6 cartões com expansão sob demanda e alternância explícita entre `Foco por etapa` e `Todas as etapas`).
 persona: IAM e identidade continuam pertencendo ao host.
 
 ## 4. Fluxos implementados

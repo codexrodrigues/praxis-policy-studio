@@ -135,4 +135,42 @@ describe('DecisionRuleInspectionComponent', () => {
     expect(disclosure?.hasAttribute('open')).toBe(true);
     expect(el.textContent).toContain('draft:retroactiveDays');
   });
+
+  it('filters rule fact cards from catalog-only facts and hides technical path details in business mode', () => {
+    const decision = makeDecision();
+    const extended: DecisionSummary = {
+      ...decision,
+      evaluatedFactPaths: ['draft:retroactiveDays'],
+      facts: [
+        {
+          ...decision.facts[0]!,
+          description: 'Dias retroativos informados. Orientação operacional: Informe inteiro positivo.'
+        },
+        {
+          path: 'neighborhood.otherRecords',
+          valueType: 'string-array',
+          nullable: true,
+          label: 'neighborhood: otherRecords',
+          description: 'Outros registros da operação.',
+          providerRef: 'attendance',
+          evidenceRefs: [],
+          sensitivity: 'NON_SENSITIVE',
+          redaction: 'NONE'
+        }
+      ]
+    };
+
+    fixture = TestBed.createComponent(DecisionRuleInspectionComponent);
+    fixture.componentRef.setInput('decision', extended);
+    fixture.componentRef.setInput('viewDepth', 'business');
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelectorAll('.rule-facts-col > section > .fact-cards > .fact-card').length).toBe(1);
+    expect(el.querySelector('.fact-hint-note')?.textContent).toContain('Informe inteiro positivo.');
+    const otherDisclosure = el.querySelector('[data-testid="rule-other-catalog-facts"]');
+    expect(otherDisclosure).toBeTruthy();
+    expect(otherDisclosure?.hasAttribute('open')).toBe(false);
+    expect(otherDisclosure?.textContent).toContain('Outros dados disponíveis na operação (1)');
+  });
 });

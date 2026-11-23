@@ -24,7 +24,17 @@ export type StudioIconName =
   | 'layers'
   | 'activity'
   | 'shield-alert'
-  | 'corner-down-left';
+  | 'corner-down-left'
+  | 'panel-left'
+  | 'panel-right'
+  | 'filter'
+  | 'inbox'
+  | 'log-out'
+  | 'chevron-right'
+  | 'building'
+  | 'check'
+  | 'refresh-cw'
+  | 'info';
 
 export type StudioIconSize = 12 | 14 | 16 | 18 | 20;
 
@@ -160,6 +170,56 @@ export type StudioIconSize = 12 | 14 | 16 | 18 | 20;
         @case ('corner-down-left') {
           <polyline points="9 10 4 15 9 20" />
           <path d="M20 4v7a4 4 0 0 1-4 4H4" />
+        }
+        @case ('panel-left') {
+          <rect width="18" height="18" x="3" y="3" rx="2" />
+          <path d="M9 3v18" />
+        }
+        @case ('panel-right') {
+          <rect width="18" height="18" x="3" y="3" rx="2" />
+          <path d="M15 3v18" />
+        }
+        @case ('filter') {
+          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+        }
+        @case ('inbox') {
+          <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+          <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+        }
+        @case ('log-out') {
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" x2="9" y1="12" y2="12" />
+        }
+        @case ('chevron-right') {
+          <path d="M9 18l6-6-6-6" />
+        }
+        @case ('building') {
+          <rect width="16" height="20" x="4" y="2" rx="2" ry="2" />
+          <path d="M9 22v-4h6v4" />
+          <path d="M8 6h.01" />
+          <path d="M16 6h.01" />
+          <path d="M12 6h.01" />
+          <path d="M12 10h.01" />
+          <path d="M12 14h.01" />
+          <path d="M16 10h.01" />
+          <path d="M16 14h.01" />
+          <path d="M8 10h.01" />
+          <path d="M8 14h.01" />
+        }
+        @case ('check') {
+          <path d="M20 6 9 17l-5-5" />
+        }
+        @case ('refresh-cw') {
+          <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+          <path d="M21 3v5h-5" />
+          <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+          <path d="M8 16H3v5" />
+        }
+        @case ('info') {
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 16v-4" />
+          <path d="M12 8h.01" />
         }
       }
     </svg>

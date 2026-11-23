@@ -8,6 +8,8 @@ import {
 const LABELS: CommandPaletteLabels = {
   openPortfolioTitle: 'Abrir Visão geral do catálogo',
   openPortfolioSubtitle: 'Mapa executivo com domínios, KPIs e tipos',
+  openReviewsTitle: 'Abrir Fila de Revisão 4-Olhos',
+  openReviewsSubtitle: 'Rascunhos, revisões independentes e promoções',
   toggleDepthTitle: 'Alternar para Modo Técnico',
   toggleDepthSubtitle: 'Atalho: Shift+D',
   openAccessTitle: 'Ir para Acesso & Privacidade (OPA)',

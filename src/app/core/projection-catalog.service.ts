@@ -24,6 +24,7 @@ import {
   SlotOverridePolicyId
 } from '../features/catalog/catalog.fixture';
 import { collectFactPaths, formatDecisionExpression } from './decision-inspection';
+import { isParameterFactPath } from './fact-presentation';
 import {
   DOMAIN_RULE_DOCUMENTATION_KEY,
   extractRuleDocumentation,
@@ -301,6 +302,11 @@ export class ProjectionCatalogService {
           expression: formatDecisionExpression(definition?.condition),
           condition: definition?.condition ?? null,
           factPaths: conditionFactPaths.length ? conditionFactPaths : decision.factPaths,
+          evaluatedFactPaths: (() => {
+            const activePaths = collectFactPaths(workspace?.condition ?? definition?.condition)
+              .filter(path => !isParameterFactPath(path));
+            return activePaths.length ? activePaths : decision.factPaths;
+          })(),
           facts,
           nullSemantics: this.stringValue(definition?.parameters, 'nullSemantics'),
           operationKeys: this.stringArrayValue(definition?.parameters, 'operationKeys') ?? projection.ruleSetRef.operationKeys,
@@ -492,6 +498,14 @@ export class ProjectionCatalogService {
       : currentAuthority;
     const evidence = this.catalogEvidence(definitionBody, facts);
     const requiredFactPaths = this.stringArrayValue(definitionBody, 'requiredFactPaths');
+    const usedFactPaths = this.stringArrayValue(definitionBody, 'usedFactPaths');
+    const activeConditionFactPaths = collectFactPaths(workspace?.condition ?? definition?.condition)
+      .filter(path => !isParameterFactPath(path));
+    const evaluatedFactPaths = usedFactPaths?.length
+      ? usedFactPaths
+      : activeConditionFactPaths.length
+        ? activeConditionFactPaths
+        : (requiredFactPaths ?? []);
     return {
       order: index + 1,
       totalDecisions: total,
@@ -529,6 +543,7 @@ export class ProjectionCatalogService {
         : requiredFactPaths?.length
           ? requiredFactPaths
           : conditionFactPaths,
+      evaluatedFactPaths,
       facts,
       nullSemantics: this.stringValue(definition?.parameters, 'nullSemantics'),
       operationKeys: this.stringArrayValue(definition?.parameters, 'operationKeys') ?? [],
@@ -584,19 +599,30 @@ export class ProjectionCatalogService {
     const allPaths = rawFacts.map(fact => fact.path);
     return rawFacts
       .filter(fact => fact.path.includes('.') || !allPaths.some(other => other.startsWith(`${fact.path}.`)))
-      .map(fact => ({
-        path: fact.path,
-        valueType: fact.valueType === 'string' && this.conditionImpliesNumericFact(condition, fact.path)
-          ? 'number'
-          : fact.valueType,
-        nullable: fact.nullable,
-        label: fact.labels[locale] ?? fact.labels['en-US'] ?? fact.path,
-        description: fact.descriptions[locale] ?? fact.descriptions['en-US'] ?? '',
-        providerRef: fact.providerRef,
-        evidenceRefs: fact.evidenceRefs,
-        sensitivity: fact.sensitivity,
-        redaction: fact.redaction
-      }));
+      .map(fact => {
+        const extra = fact as unknown as Record<string, unknown>;
+        const hint = this.localizedText(extra['hints'], locale) ?? this.stringValue(extra, 'hint');
+        const groupLabel = this.localizedText(extra['groupLabels'], locale) ?? this.stringValue(extra, 'groupLabel');
+        const unit = this.stringValue(extra, 'unit');
+        const valuePresentation = this.stringValue(extra, 'valuePresentation');
+        return {
+          path: fact.path,
+          valueType: fact.valueType === 'string' && this.conditionImpliesNumericFact(condition, fact.path)
+            ? 'number'
+            : fact.valueType,
+          nullable: fact.nullable,
+          label: fact.labels[locale] ?? fact.labels['en-US'] ?? fact.path,
+          description: fact.descriptions[locale] ?? fact.descriptions['en-US'] ?? '',
+          providerRef: fact.providerRef,
+          evidenceRefs: fact.evidenceRefs,
+          sensitivity: fact.sensitivity,
+          redaction: fact.redaction,
+          ...(hint ? { hint } : {}),
+          ...(groupLabel ? { groupLabel } : {}),
+          ...(unit ? { unit } : {}),
+          ...(valuePresentation ? { valuePresentation } : {})
+        };
+      });
   }
 
   private conditionImpliesNumericFact(node: unknown, factPath: string): boolean {
@@ -703,6 +729,7 @@ export class ProjectionCatalogService {
         expression: null,
         condition: null,
         factPaths: decision.factPaths,
+        evaluatedFactPaths: decision.factPaths,
         facts: this.projectionFacts(decision.factPaths, projection.factSchemas),
         nullSemantics: null,
         operationKeys: projection.ruleSetRef.operationKeys,

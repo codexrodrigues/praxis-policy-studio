@@ -25,6 +25,11 @@ export type TermPopoverTone =
 
 export type TermPopoverVariant = 'inline' | 'chip';
 
+export interface TermPopoverMetaTag {
+  readonly label: string;
+  readonly tone?: 'neutral' | 'info' | 'warning' | 'danger' | 'success';
+}
+
 let nextTermPopoverId = 0;
 
 @Component({
@@ -64,6 +69,26 @@ let nextTermPopoverId = 0;
           }
           <strong class="pax-term-card-title">{{ resolvedTitle() }}</strong>
           <p class="pax-term-card-summary">{{ summarySignal() }}</p>
+          @if (hintSignal(); as hintText) {
+            <div class="pax-term-card-hint">
+              <pax-icon name="info" [size]="14" />
+              <div class="pax-term-card-hint-body">
+                @if (hintLabelSignal(); as hLabel) {
+                  <strong>{{ hLabel }}</strong>
+                }
+                <span>{{ hintText }}</span>
+              </div>
+            </div>
+          }
+          @if (metaTagsSignal().length > 0) {
+            <div class="pax-term-card-meta">
+              @for (tag of metaTagsSignal(); track tag.label + ':' + $index) {
+                <span class="pax-term-card-meta-pill" [attr.data-tone]="tag.tone ?? 'neutral'">
+                  {{ tag.label }}
+                </span>
+              }
+            </div>
+          }
           @if (detailSignal()) {
             <p class="pax-term-card-detail">{{ detailSignal() }}</p>
           }
@@ -261,6 +286,74 @@ let nextTermPopoverId = 0;
       padding-top: var(--pax-space-2, 0.5rem);
       border-top: 1px solid var(--pax-color-outline-variant, #e2e8f0);
       color: var(--pax-color-on-surface-variant, #475569);
+      font-size: var(--pax-text-xs, 0.75rem);
+    }
+
+    .pax-term-card-hint {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--pax-space-2, 0.5rem);
+      padding: var(--pax-space-2, 0.5rem) var(--pax-space-3, 0.75rem);
+      border-radius: var(--pax-radius-sm, 0.375rem);
+      border-left: 3px solid var(--pax-color-primary, #076487);
+      background: var(--pax-color-surface-container-low, #f1f5f9);
+      color: var(--pax-color-on-surface, #0f172a);
+      font-size: var(--pax-text-xs, 0.75rem);
+      line-height: var(--pax-lh-xs, 1.4);
+    }
+
+    .pax-term-card-hint pax-icon {
+      margin-top: 0.1rem;
+      color: var(--pax-color-primary, #076487);
+    }
+
+    .pax-term-card-hint-body {
+      display: grid;
+      gap: 0.125rem;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .pax-term-card-hint-body strong {
+      font-size: var(--pax-text-xs, 0.75rem);
+      color: var(--pax-color-primary, #076487);
+    }
+
+    .pax-term-card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.375rem;
+    }
+
+    .pax-term-card-meta-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.125rem 0.5rem;
+      border-radius: var(--pax-radius-pill, 999px);
+      background: var(--pax-color-surface-container, #e2e8f0);
+      color: var(--pax-color-on-surface-variant, #334155);
+      font-size: var(--pax-text-xs, 0.75rem);
+      font-weight: 600;
+    }
+
+    .pax-term-card-meta-pill[data-tone='info'] {
+      background: var(--pax-policy-param-bg, #eef7fa);
+      color: var(--pax-policy-param-fg, #0a3b52);
+    }
+
+    .pax-term-card-meta-pill[data-tone='warning'] {
+      background: var(--pax-color-warning-container, #fef3c7);
+      color: var(--pax-color-on-warning-container, #451a03);
+    }
+
+    .pax-term-card-meta-pill[data-tone='danger'] {
+      background: var(--pax-color-error-container, #fee2e2);
+      color: var(--pax-color-on-error-container, #7f1d1d);
+    }
+
+    .pax-term-card-meta-pill[data-tone='success'] {
+      background: var(--pax-policy-custom-bg, #ecfdf5);
+      color: var(--pax-policy-custom-fg, #065f46);
     }
 
     .pax-term-card-footer {
@@ -294,6 +387,9 @@ export class TermPopoverComponent implements OnDestroy {
   readonly categorySignal = signal<string | null>(null);
   readonly titleSignal = signal<string | null>(null);
   readonly summarySignal = signal('');
+  readonly hintSignal = signal<string | null>(null);
+  readonly hintLabelSignal = signal<string | null>(null);
+  readonly metaTagsSignal = signal<readonly TermPopoverMetaTag[]>([]);
   readonly detailSignal = signal<string | null>(null);
   readonly badgeSignal = signal<string | null>(null);
   readonly toneSignal = signal<TermPopoverTone>('default');
@@ -320,6 +416,21 @@ export class TermPopoverComponent implements OnDestroy {
   @Input({ required: true })
   set summary(value: string) {
     this.summarySignal.set(value);
+  }
+
+  @Input()
+  set hint(value: string | null | undefined) {
+    this.hintSignal.set(value?.trim() ? value.trim() : null);
+  }
+
+  @Input()
+  set hintLabel(value: string | null | undefined) {
+    this.hintLabelSignal.set(value?.trim() ? value.trim() : null);
+  }
+
+  @Input()
+  set metaTags(value: readonly TermPopoverMetaTag[] | null | undefined) {
+    this.metaTagsSignal.set(value ?? []);
   }
 
   @Input()

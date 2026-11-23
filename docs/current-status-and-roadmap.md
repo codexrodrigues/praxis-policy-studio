@@ -289,3 +289,16 @@ no nome acessível da linha. Esta é uma correção `ja-suportado-so-ux`; nenhum
 endpoint ou contrato público foi criado. A ausência de catálogo de facts segue
 classificada como `suportado-parcialmente` e falha fechada até a fonte governada
 publicar os dados necessários.
+
+## Corte de Shell Escalável Multi-Módulo (Fase A + Hardening A.1)
+
+A arquitetura do shell foi refatorada para crescer de forma modular e manter o bundle inicial leve (`Initial total ~510 kB`, abaixo do teto de `750 kB / 1.00 MB`):
+
+- **Shell pai lazy (`STUDIO_SHELL_ROUTES`) e 4 módulos dedicados:** `/overview`, `/catalog`, `/reviews` (fila 4-olhos com tabs de bucket, busca completa e ação explícita de atualização) e `/access` (trilha ortogonal de autorização/OPA), com remoção de embeddings duplicados em `CatalogWorkspaceComponent`.
+- **Controles de espaço e navegação declarativa:** `StudioSidebarNavComponent` expansível (`224px` ↔ `60px`, faixa compacta móvel, `Ctrl/Cmd+B`, dot indicador e label acessível com contagem quando recolhida), `StudioShellLayoutComponent` em flexbox sem colisão na barra superior, `StudioEnvironmentMenuComponent` unificado, explorador redimensionável com cleanup em `DestroyRef`, seletor de escopo em overlay e inspetor recolhível (`[`, `]`), além de persistência segura de preferências de shell em `localStorage`.
+- **Integridade de estado e hardening A.1:** `StudioCatalogRouteBridge` para seleção ao vivo via `Ctrl+K` dentro de `/catalog`, guarda `canDeactivate` (`confirmRouteLeave`) contra perda de rascunho/cenário não salvo ao trocar de módulo, higiene estrita entre parâmetros de ambiente e deep-links já consumidos, limpeza completa no `/auth/logout` (store, caches, bridge e `StudioCapabilitiesService`), estados explícitos `permissionLimited` e atualização manual em `/overview` e `/reviews`, e `StudioTitleStrategy` bilíngue (`pt-BR` / `en-US`).
+
+## Corte de Inteligência da Regra — Dados Avaliados & Sequência em 5 Estágios (Fase B)
+
+- **Escopo e metadados humanos de fatos (`fact-presentation.ts`, `<pax-evaluated-facts-panel>`, `<pax-term-popover>` e `DecisionRuleInspectionComponent`):** `ProjectionCatalogService` preserva o catálogo completo em `decision.facts` (editor/cenários intactos) e publica `evaluatedFactPaths` dos dados efetivamente lidos pela regra, além de extrair campos opcionais retrocompatíveis (`hints`, `groupLabels`, `unit`, `valuePresentation`). A interface exibe por padrão apenas os fatos da regra agrupados por origem, com abertura sob demanda dos demais fatos da operação, popover enriquecido com dica operacional/pílulas de tipo e obrigatoriedade (`Opcional` / `Obrigatório` no lugar de `nullable` cru em Modo Negócio) e supressão de strings técnicas de path/sensibilidade na lente de negócio.
+- **Pipeline horizontal interativo de 5 estágios (`RuleDecisionPlanDagComponent`):** o antigo grid Kanban de 5 colunas iguais foi substituído por um stepper horizontal interativo de 5 estágios com legenda causal e alternância explícita (`Foco por etapa` no Modo Negócio com até 6 cartões por página + retorno rápido à etapa da regra, e `Todas as etapas` em faixas horizontais responsivas no Modo Técnico ou sob demanda).

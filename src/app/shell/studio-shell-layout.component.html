@@ -1,0 +1,168 @@
+<a class="skip-link" href="#main-content">{{ i18n.text('skip') }}</a>
+<header class="product-bar" [class.technical-lens]="shell.viewDepth() === 'technical'">
+  <div class="bar-left">
+    @if (supportsExplorer()) {
+      <button
+        type="button"
+        class="bar-tool-btn icon-btn explorer-toggle-btn"
+        data-testid="studio-toggle-explorer"
+        [class.active]="shell.explorerOpen()"
+        [attr.aria-pressed]="shell.explorerOpen()"
+        [attr.aria-label]="i18n.text(shell.explorerOpen() ? 'explorerCollapse' : 'explorerExpand')"
+        [attr.title]="i18n.text(shell.explorerOpen() ? 'explorerCollapse' : 'explorerExpand')"
+        (click)="shell.toggleExplorer()">
+        <pax-icon name="panel-left" [size]="16" />
+      </button>
+    }
+
+    <a class="brand" routerLink="/catalog" queryParamsHandling="preserve" [attr.aria-label]="i18n.text('productCatalogLink')">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <strong>{{ i18n.text('product') }}</strong>
+    </a>
+
+    @if (activeBreadcrumbLabel(); as crumb) {
+      <span class="crumb-sep" aria-hidden="true">/</span>
+      <span class="crumb-current" [attr.title]="crumb">{{ crumb }}</span>
+    }
+  </div>
+
+  <div class="bar-center">
+    <button
+      type="button"
+      class="bar-tool-btn command-trigger"
+      data-testid="studio-command-palette-trigger"
+      [attr.aria-label]="i18n.text('commandPaletteTriggerHint')"
+      [title]="i18n.text('commandPaletteTriggerHint')"
+      (click)="shell.openCommandPalette()">
+      <pax-icon name="search" [size]="14" />
+      <span>{{ i18n.text('commandPaletteTrigger') }}</span>
+      <kbd class="kbd-hint studio-mono" aria-hidden="true">Ctrl K</kbd>
+    </button>
+  </div>
+
+  <div class="bar-right">
+    <div class="depth-lens" role="group" [attr.aria-label]="i18n.text('viewDepthGroup')" data-testid="studio-view-depth-toggle">
+      <button
+        type="button"
+        data-testid="view-depth-business"
+        [class.active]="shell.viewDepth() === 'business'"
+        [attr.aria-pressed]="shell.viewDepth() === 'business'"
+        (click)="shell.setViewDepth('business')">
+        {{ i18n.text('viewDepthBusiness') }}
+      </button>
+      <button
+        type="button"
+        class="depth-tech-btn"
+        data-testid="view-depth-technical"
+        [class.active]="shell.viewDepth() === 'technical'"
+        [attr.aria-pressed]="shell.viewDepth() === 'technical'"
+        [title]="i18n.text('viewDepthShortcutHint')"
+        (click)="shell.setViewDepth('technical')">
+        <span class="studio-mono" aria-hidden="true">&lt;/&gt;</span>
+        <span>{{ i18n.text('viewDepthTechnical') }}</span>
+      </button>
+    </div>
+
+    <pax-studio-environment-menu
+      [isRemoteMode]="runtime.mode() === 'remote'"
+      [hostProfiles]="runtime.hostProfiles()"
+      [activeHostProfileId]="runtime.activeHostProfileId()"
+      [activeHostLabel]="activeHostProfileLabel()"
+      [tenantId]="hostScope.scope().tenantId ?? null"
+      [organizationId]="hostScope.scope().organizationId ?? null"
+      [environment]="hostScope.scope().environment ?? null"
+      (hostProfileSelected)="runtime.selectHostProfile($event)" />
+
+    <div class="bar-icon-cluster">
+      <button
+        type="button"
+        class="bar-tool-btn icon-btn ai-trigger"
+        data-testid="studio-open-ai-inspector"
+        [class.active]="supportsInspector() && shell.inspectorOpen() && shell.inspectorTab() === 'ai'"
+        [attr.aria-pressed]="supportsInspector() && shell.inspectorOpen() && shell.inspectorTab() === 'ai'"
+        [attr.aria-label]="i18n.text('inspectorTabAi')"
+        [title]="i18n.text('inspectorTabAi')"
+        (click)="openAiAssistant()">
+        <pax-icon name="sparkles" [size]="16" />
+      </button>
+
+      @if (supportsInspector()) {
+        <button
+          type="button"
+          class="bar-tool-btn icon-btn"
+          data-testid="studio-toggle-inspector"
+          [class.active]="shell.inspectorOpen()"
+          [attr.aria-pressed]="shell.inspectorOpen()"
+          [attr.aria-label]="i18n.text(shell.inspectorOpen() ? 'inspectorCollapse' : 'inspectorExpand')"
+          [attr.title]="i18n.text(shell.inspectorOpen() ? 'inspectorCollapse' : 'inspectorExpand')"
+          (click)="shell.toggleInspector()">
+          <pax-icon name="panel-right" [size]="16" />
+        </button>
+      }
+
+      <button
+        type="button"
+        class="bar-tool-btn icon-btn"
+        data-testid="studio-theme-toggle"
+        [attr.aria-pressed]="shell.isDarkTheme()"
+        [attr.aria-label]="i18n.text(shell.isDarkTheme() ? 'themeToggleToLight' : 'themeToggleToDark')"
+        [title]="i18n.text(shell.isDarkTheme() ? 'themeToggleToLight' : 'themeToggleToDark')"
+        (click)="shell.toggleTheme()">
+        <pax-icon [name]="shell.isDarkTheme() ? 'sun' : 'moon'" [size]="16" />
+      </button>
+
+      @if (shell.sessionActive()) {
+        <button
+          type="button"
+          class="bar-tool-btn icon-btn session-logout"
+          data-testid="studio-logout"
+          [disabled]="shell.signingOut()"
+          [attr.aria-label]="i18n.text(shell.signingOut() ? 'signingOut' : 'logout')"
+          [attr.title]="i18n.text(shell.signingOut() ? 'signingOut' : 'logout')"
+          (click)="shell.triggerLogout()">
+          <pax-icon name="log-out" [size]="16" />
+        </button>
+      }
+    </div>
+  </div>
+</header>
+
+<div class="studio-shell" [class.sidebar-collapsed]="shell.sidebarCollapsed()">
+  <pax-studio-sidebar-nav
+    class="sidebar-slot"
+    [groups]="visibleNavGroups()"
+    [activeItemId]="shell.activeNavItem()"
+    [collapsed]="shell.sidebarCollapsed()"
+    [isRemoteMode]="runtime.mode() === 'remote'"
+    (itemSelected)="onSidebarItemSelected($event)"
+    (toggleCollapseRequested)="shell.toggleSidebar()" />
+
+  <main id="main-content" class="studio-main" tabindex="-1">
+    @switch (runtime.state().kind) {
+      @case ('loading') {
+        <section class="setup-state" aria-live="polite"><span class="loader"></span><p>{{ i18n.text('loading') }}</p></section>
+      }
+      @case ('error') {
+        <section class="setup-state error" role="alert">
+          <span class="error-glyph" aria-hidden="true">!</span>
+          <h1>{{ i18n.text('setupError') }}</h1>
+          <code>{{ $any(runtime.state()).code }}</code>
+          <button type="button" (click)="runtime.load()">{{ i18n.text('retry') }}</button>
+        </section>
+      }
+      @default { <router-outlet /> }
+    }
+  </main>
+</div>
+
+<pax-studio-command-palette
+  [open]="shell.commandPaletteOpen()"
+  [decisions]="store.allDecisions()"
+  [selected]="store.selected()"
+  [viewDepth]="shell.viewDepth()"
+  [isDarkTheme]="shell.isDarkTheme()"
+  [isRemoteMode]="runtime.mode() === 'remote'"
+  (closed)="shell.closeCommandPalette()"
+  (decisionSelected)="selectDecisionFromPalette($event)"
+  (scopeSelected)="selectScopeFromPalette($event)"
+  (actionTriggered)="handleCommandPaletteAction($event)" />

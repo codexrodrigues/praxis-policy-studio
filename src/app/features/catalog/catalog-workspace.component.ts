@@ -1,13 +1,9 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, HostListener, OnInit, computed, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import {
-  API_URL,
-  DomainRuleService,
   PraxisThemeService,
-  ResourceDiscoveryService,
-  type ApiUrlConfig,
   type DomainRuleDefinitionAction,
   type DomainRuleDefinitionRequest,
   type DomainRuleRolloutCatalogItem,
@@ -41,22 +37,23 @@ import {
   type StudioGlossaryEntry,
   type StudioGovernanceTermKey
 } from '../../core/studio-glossary';
-import type { CommandPaletteActionId } from '../../core/studio-command-palette';
+import { StudioCapabilitiesService } from '../../core/studio-capabilities.service';
 import type { PolicyStudioRuntimeConfig } from '../../core/runtime-config';
 import { RuntimeConfigService } from '../../core/runtime-config.service';
+import { StudioCatalogBootstrapService } from '../../core/studio-catalog-bootstrap.service';
+import { extractPreservedEnvironmentQueryParams } from '../../core/studio-navigation';
 import { StudioShellStateService, type StudioInspectorTab } from '../../core/studio-shell-state.service';
+import { StudioTitleStrategy } from '../../core/studio-title.strategy';
 import { StudioIconComponent, type StudioIconName } from '../../shared/studio-icon.component';
 import { TermPopoverComponent } from '../../shared/term-popover.component';
 import { DecisionDocumentationEditorComponent } from '../authoring/decision-documentation-editor.component';
 import { DecisionParametersEditorComponent } from '../authoring/decision-parameters-editor.component';
 import { LocalDraftWorkspaceComponent } from '../authoring/local-draft-workspace.component';
-import { AccessAuthorizationWorkspaceComponent } from './access-authorization-workspace.component';
-import { CatalogPortfolioOverviewComponent } from './catalog-portfolio-overview.component';
 import { DecisionExplorerRailComponent } from './decision-explorer-rail.component';
 import { DecisionInspectorRailComponent } from './decision-inspector-rail.component';
 import { DecisionRuleInspectionComponent } from './decision-rule-inspection.component';
+import { EvaluatedFactsPanelComponent } from './evaluated-facts-panel.component';
 import { RuleDecisionPlanDagComponent } from './rule-decision-plan-dag.component';
-import { StudioCommandPaletteComponent } from './studio-command-palette.component';
 import {
   buildDecisionMaturityPosture,
   buildExecutionCorrelationSummary,
@@ -97,24 +94,12 @@ import { WorkspaceBlockersComponent } from './workspace-blockers.component';
     DecisionDocumentationEditorComponent,
     DecisionParametersEditorComponent,
     RuleDecisionPlanDagComponent,
-    CatalogPortfolioOverviewComponent,
     DecisionExplorerRailComponent,
     DecisionInspectorRailComponent,
     DecisionRuleInspectionComponent,
-    AccessAuthorizationWorkspaceComponent,
-    StudioCommandPaletteComponent,
+    EvaluatedFactsPanelComponent,
     StudioIconComponent,
     TermPopoverComponent
-  ],
-  providers: [
-    ProjectionCatalogService,
-    DomainRuleService,
-    ResourceDiscoveryService,
-    CatalogSelectionStore,
-    SnapshotExecutionFacade,
-    ScenarioSandboxFacade,
-    WorkspaceAuthoringFacade,
-    { provide: API_URL, useValue: { default: { baseUrl: '' } } satisfies ApiUrlConfig }
   ],
   templateUrl: './catalog-workspace.component.html',
   styleUrl: './catalog-workspace.component.scss',
@@ -125,9 +110,13 @@ export class CatalogWorkspaceComponent implements OnInit {
   private readonly auth = inject(AuthSessionService);
   private readonly hostScope = inject(GovernedHostScopeService);
   private readonly route = inject(ActivatedRoute, { optional: true });
+  private readonly router = inject(Router, { optional: true });
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
-  private readonly theme = inject(PraxisThemeService);
+  private readonly theme = inject(PraxisThemeService, { optional: true });
+  private readonly bootstrap = inject(StudioCatalogBootstrapService, { optional: true });
+  private readonly capabilities = inject(StudioCapabilitiesService, { optional: true });
+  private readonly titleStrategy = inject(StudioTitleStrategy, { optional: true });
   readonly shell = inject(StudioShellStateService);
   readonly runtime = inject(RuntimeConfigService);
   readonly store = inject(CatalogSelectionStore);
@@ -136,6 +125,8 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly snapshots = inject(SnapshotExecutionFacade);
 
   private readonly loadedModesForSelection = new Set<DecisionWorkMode>(['understand']);
+  private pendingLeaveResolver: ((allowLeave: boolean) => void) | null = null;
+  private pendingPostLoginRedirect = false;
 
   readonly activeWorkspaceTrack = this.store.activeWorkspaceTrack;
   readonly viewDepth = this.store.viewDepth;
@@ -146,7 +137,6 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly contextScopeFilter = this.store.contextScopeFilter;
   readonly activeRuleTypeFilter = this.store.activeRuleTypeFilter;
   readonly explorerGlobalLens = this.store.explorerGlobalLens;
-  readonly portfolioOverviewOpen = this.store.portfolioOverviewOpen;
   readonly allDecisions = this.store.allDecisions;
   readonly selected = this.store.selected;
   readonly narrowDetailOpen = this.store.narrowDetailOpen;
@@ -285,14 +275,47 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   constructor(readonly i18n: PolicyStudioI18n) {
     this.shell.registerLogoutHandler(() => this.logout());
-    this.shell.registerThemeToggleHandler(() => this.theme.toggleDark());
+    if (this.theme) {
+      this.shell.registerThemeToggleHandler(() => this.theme!.toggleDark());
+      this.shell.registerDarkThemeReader(() => this.theme!.isDark());
+    }
     this.shell.registerSessionReaders(() => this.sessionActive(), () => this.signingOut());
-    this.shell.registerDarkThemeReader(() => this.theme.isDark());
+    const sectionByMode: Readonly<Record<DecisionWorkMode, string>> = {
+      understand: 'decision-overview',
+      rule: 'decision-rule',
+      test: 'decision-tests',
+      operate: 'decision-execution',
+      history: 'decision-history'
+    };
+    this.shell.registerCatalogBridge({
+      selectDecision: (decision, mode = 'understand') => {
+        this.activeRuleTypeFilter.set(null);
+        if (!this.decisions().some(item => item.key === decision.key)) {
+          this.contextScopeFilter.set(null);
+        }
+        const selectionChanged = this.selected()?.key !== decision.key;
+        this.select(decision, false, true);
+        if (selectionChanged && this.hasUnsavedWork()) {
+          return;
+        }
+        if (mode !== 'understand') {
+          this.navigateToSection(sectionByMode[mode]);
+        }
+      },
+      applyScope: scopeKey => this.applyScopeFilter(scopeKey),
+      openMode: mode => {
+        this.narrowDetailOpen.set(true);
+        this.navigateToSection(sectionByMode[mode]);
+      },
+      hasUnsavedWork: () => this.hasUnsavedWork()
+    });
     this.destroyRef.onDestroy(() => {
+      this.resolvePendingLeave(false);
       this.shell.registerLogoutHandler(null);
       this.shell.registerThemeToggleHandler(null);
       this.shell.registerSessionReaders(null, null);
       this.shell.registerDarkThemeReader(null);
+      this.shell.registerCatalogBridge(null);
     });
   }
 
@@ -330,71 +353,8 @@ export class CatalogWorkspaceComponent implements OnInit {
     });
   }
 
-  selectDecisionFromPalette(decision: DecisionSummary): void {
-    this.shell.setWorkspaceTrack('business');
-    this.shell.closeCommandPalette();
-    this.activeRuleTypeFilter.set(null);
-    if (!this.decisions().some(item => item.key === decision.key)) {
-      this.contextScopeFilter.set(null);
-    }
-    this.select(decision, false, true);
-  }
-
-  selectScopeFromPalette(scopeKey: string): void {
-    this.shell.setWorkspaceTrack('business');
-    this.shell.closeCommandPalette();
-    this.applyScopeFilter(scopeKey);
-  }
-
-  handleCommandPaletteAction(actionId: CommandPaletteActionId): void {
-    this.shell.closeCommandPalette();
-    switch (actionId) {
-      case 'open-portfolio':
-        this.shell.setWorkspaceTrack('business');
-        if (this.allDecisions().length > 1) {
-          this.portfolioOverviewOpen.set(true);
-          this.narrowDetailOpen.set(true);
-        }
-        return;
-      case 'toggle-depth':
-        this.shell.toggleViewDepth();
-        return;
-      case 'open-access-privacy':
-        this.openAccessPrivacyForCurrentDecision();
-        return;
-      case 'open-ai':
-        this.shell.setWorkspaceTrack('business');
-        this.setInspectorTab('ai');
-        return;
-      case 'toggle-theme':
-        this.shell.toggleTheme();
-        return;
-      case 'nav-understand':
-        this.jumpToRuleSection('decision-overview');
-        return;
-      case 'nav-rule':
-        this.jumpToRuleSection('decision-rule');
-        return;
-      case 'nav-test':
-        this.jumpToRuleSection('decision-tests');
-        return;
-      case 'nav-operate':
-        this.jumpToRuleSection('decision-execution');
-        return;
-      case 'nav-history':
-        this.jumpToRuleSection('decision-history');
-        return;
-    }
-  }
-
-  private jumpToRuleSection(sectionId: string): void {
-    this.shell.setWorkspaceTrack('business');
-    this.portfolioOverviewOpen.set(false);
-    this.narrowDetailOpen.set(true);
-    this.navigateToSection(sectionId);
-  }
-
   ngOnInit(): void {
+    this.shell.setActiveNavItem('catalog');
     this.route?.queryParamMap
       .pipe(skip(1), takeUntilDestroyed(this.destroyRef))
       .subscribe(params => {
@@ -418,7 +378,53 @@ export class CatalogWorkspaceComponent implements OnInit {
         });
         this.loadCatalog();
       });
+
+    if (this.bootstrap?.hasLoadedCurrentEnvironment() && this.allDecisions().length > 0) {
+      this.hydrateExistingCatalogSelection();
+      return;
+    }
     this.loadCatalog();
+  }
+
+  private hydrateExistingCatalogSelection(): void {
+    const decisions = this.allDecisions();
+    const state = this.runtime.state();
+    const pendingKey = this.store.pendingSelectionKey();
+    const pendingMode = this.store.pendingWorkMode();
+    this.store.pendingSelectionKey.set(null);
+    this.store.pendingWorkMode.set(null);
+
+    const allowDeepLink = !this.store.deepLinkConsumed()
+      && !pendingKey
+      && !this.contextScopeFilter()
+      && !this.activeRuleTypeFilter()
+      && this.hasExplicitDeepLink();
+    if (allowDeepLink) {
+      this.contextScopeFilter.set(this.resolveDeepLinkScopeFilter(decisions));
+    }
+    const target = pendingKey
+      ? (decisions.find(item => item.key === pendingKey) ?? this.selected() ?? decisions[0] ?? null)
+      : allowDeepLink
+        ? this.resolveInitialDecision(decisions, state.kind === 'ready' ? state.config.initialDecisionKey : null)
+        : (this.selected() ?? this.resolveInitialDecision(decisions, state.kind === 'ready' ? state.config.initialDecisionKey : null));
+    const initialOperationKey = allowDeepLink ? this.resolveInitialOperationKey() : null;
+    this.store.deepLinkConsumed.set(true);
+
+    if (target && (!this.selected() || target.key !== this.selected()?.key || allowDeepLink || !this.workspaceCapabilities())) {
+      this.select(target, true, Boolean(pendingKey || allowDeepLink), false, initialOperationKey);
+    }
+    if (pendingMode) {
+      const sectionByMode: Readonly<Record<DecisionWorkMode, string>> = {
+        understand: 'decision-overview',
+        rule: 'decision-rule',
+        test: 'decision-tests',
+        operate: 'decision-execution',
+        history: 'decision-history'
+      };
+      this.navigateToSection(sectionByMode[pendingMode]);
+    }
+    this.shell.syncSessionState(this.sessionActive(), this.signingOut());
+    this.bootstrap?.syncDerivedShellBadges();
   }
 
   meaningText(decision: DecisionSummary): string {
@@ -658,28 +664,6 @@ export class CatalogWorkspaceComponent implements OnInit {
       .join(' · ');
   }
 
-  displayFactLabel(fact: DecisionFact): string {
-    const raw = fact.label?.trim() ?? '';
-    if (!raw || this.viewDepth() === 'technical') {
-      return raw || fact.path;
-    }
-    const stripped = raw.replace(/^(draft|tenant|context|record|subject)\s*:\s*/i, '').trim() || raw;
-    const isCamelCaseIdentifier = !/\s/.test(stripped) && /[a-z][A-Z]/.test(stripped);
-    return looksLikeTechnicalSlug(stripped) || isCamelCaseIdentifier
-      ? humanizeTechnicalSlug(stripped, undefined, this.i18n.locale())
-      : stripped;
-  }
-
-  factSummaryForPopover(fact: DecisionFact): string {
-    const desc = fact.description?.trim() || humanizeTechnicalSlug(fact.path, undefined, this.i18n.locale());
-    const reqLabel = this.i18n.text(fact.nullable ? 'factNullable' : 'factRequired');
-    return `${desc} (${reqLabel} · ${fact.valueType})`;
-  }
-
-  factDetailForPopover(fact: DecisionFact): string {
-    return `Path: ${fact.path} · ${fact.sensitivity}`;
-  }
-
   effectiveDocumentation(decision: DecisionSummary | null | undefined): RuleDocumentationDescriptor | null {
     return this.authoring.effectiveDocumentation(decision);
   }
@@ -857,29 +841,58 @@ export class CatalogWorkspaceComponent implements OnInit {
     if (state.kind !== 'ready') return;
     this.loading.set(true);
     this.i18n.locale.set(state.config.locale);
+    this.titleStrategy?.refreshCurrentTitle();
     this.loadError.set(null);
     this.authenticationRequired.set(false);
     this.permissionLimited.set(false);
     this.catalog.load(this.i18n.locale(), state.config).subscribe({
       next: decisions => {
         if (loadRevision !== this.store.catalogLoadRevision) return;
+        this.store.loadedEnvironmentSignature.set(this.bootstrap?.currentEnvironmentSignature() ?? null);
         this.authenticationFailed.set(false);
         this.sessionActive.set(state.config.mode === 'remote');
         this.signingOut.set(false);
         this.shell.syncSessionState(state.config.mode === 'remote', false);
         this.logoutFailed.set(false);
-        this.portfolioOverviewOpen.set(false);
         this.activeRuleTypeFilter.set(null);
         this.allDecisions.set(decisions);
+        this.shell.setReviewQueueCount(this.store.reviewQueueDecisions().length);
+        const pendingKey = this.store.pendingSelectionKey();
+        const pendingMode = this.store.pendingWorkMode();
+        this.store.pendingSelectionKey.set(null);
+        this.store.pendingWorkMode.set(null);
         this.contextScopeFilter.set(this.resolveDeepLinkScopeFilter(decisions));
-        const initial = this.resolveInitialDecision(decisions, state.config.initialDecisionKey);
+        const initial = (pendingKey ? decisions.find(item => item.key === pendingKey) : null)
+          ?? this.resolveInitialDecision(decisions, state.config.initialDecisionKey);
         const initialOperationKey = this.resolveInitialOperationKey();
-        if (initial) this.select(initial, true, this.hasExplicitDeepLink(), false, initialOperationKey);
+        if (initial) this.select(initial, true, Boolean(pendingKey || this.hasExplicitDeepLink()), false, initialOperationKey);
         else this.clearSelection();
+        this.store.deepLinkConsumed.set(true);
+        if (pendingMode && initial) {
+          const sectionByMode: Readonly<Record<DecisionWorkMode, string>> = {
+            understand: 'decision-overview',
+            rule: 'decision-rule',
+            test: 'decision-tests',
+            operate: 'decision-execution',
+            history: 'decision-history'
+          };
+          this.navigateToSection(sectionByMode[pendingMode]);
+        }
         this.loading.set(false);
+        const returnRoute = this.pendingPostLoginRedirect ? this.store.postLoginReturnRoute() : null;
+        this.pendingPostLoginRedirect = false;
+        if (returnRoute && returnRoute !== '/catalog' && this.router) {
+          this.store.postLoginReturnRoute.set(null);
+          void this.router.navigate([returnRoute], {
+            queryParams: extractPreservedEnvironmentQueryParams(
+              typeof window !== 'undefined' ? window.location.search : ''
+            )
+          });
+        }
       },
       error: (error: unknown) => {
         if (loadRevision !== this.store.catalogLoadRevision) return;
+        this.store.loadedEnvironmentSignature.set(null);
         this.loading.set(false);
         this.allDecisions.set([]);
         this.clearSelection();
@@ -1010,6 +1023,7 @@ export class CatalogWorkspaceComponent implements OnInit {
       next: () => {
         form.reset();
         this.authenticating.set(false);
+        this.pendingPostLoginRedirect = Boolean(this.store.postLoginReturnRoute());
         this.loadCatalog();
       },
       error: () => {
@@ -1029,12 +1043,25 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.auth.logout(state.config).subscribe({
       next: () => {
         ++this.store.catalogLoadRevision;
+        this.store.loadedEnvironmentSignature.set(null);
         this.signingOut.set(false);
         this.sessionActive.set(false);
         this.shell.syncSessionState(false, false);
         this.catalog.invalidateCatalogMetaCache?.();
+        this.query.set('');
+        this.contextScopeFilter.set(null);
+        this.activeRuleTypeFilter.set(null);
+        this.store.pendingSelectionKey.set(null);
+        this.store.pendingWorkMode.set(null);
+        this.store.deepLinkConsumed.set(false);
+        this.store.postLoginReturnRoute.set(null);
+        this.pendingPostLoginRedirect = false;
         this.allDecisions.set([]);
         this.clearSelection();
+        this.shell.clearAccessBridgeContext();
+        this.shell.setBreadcrumbs([]);
+        this.shell.setReviewQueueCount(0);
+        this.capabilities?.reset();
         this.loading.set(false);
         this.permissionLimited.set(false);
         this.authenticationFailed.set(false);
@@ -1074,10 +1101,6 @@ export class CatalogWorkspaceComponent implements OnInit {
   clearContextScopeFilter(): void {
     this.contextScopeFilter.set(null);
     this.activeRuleTypeFilter.set(null);
-    if (this.allDecisions().length > 1) {
-      this.portfolioOverviewOpen.set(true);
-      this.narrowDetailOpen.set(true);
-    }
   }
 
   applyScopeFilter(scopeKey: string): void {
@@ -1085,7 +1108,6 @@ export class CatalogWorkspaceComponent implements OnInit {
     if (!normalized) return;
     this.contextScopeFilter.set(normalized);
     this.activeRuleTypeFilter.set(null);
-    this.portfolioOverviewOpen.set(false);
     const matching = this.decisions();
     const current = this.selected();
     if (matching.length > 0 && (!current || !matching.some(item => item.key === current.key))) {
@@ -1099,7 +1121,6 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.contextScopeFilter.set(null);
     this.activeRuleTypeFilter.set(normalized);
     this.explorerGlobalLens.set('type');
-    this.portfolioOverviewOpen.set(false);
     const matching = this.decisions();
     const current = this.selected();
     if (matching.length > 0 && (!current || !matching.some(item => item.key === current.key))) {
@@ -1113,29 +1134,6 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   setExplorerGlobalLens(lens: ExplorerGlobalLens): void {
     this.explorerGlobalLens.set(lens);
-  }
-
-  togglePortfolioOverview(): void {
-    const next = !this.portfolioOverviewOpen();
-    this.portfolioOverviewOpen.set(next);
-    if (next) {
-      this.narrowDetailOpen.set(true);
-    }
-  }
-
-  closePortfolioOverview(): void {
-    this.portfolioOverviewOpen.set(false);
-    if (!this.selected() && this.decisions().length > 0) {
-      this.select(this.decisions()[0]!, false, true);
-    }
-  }
-
-  openWorkflowQueueInExplorer(): void {
-    this.contextScopeFilter.set(null);
-    this.activeRuleTypeFilter.set(null);
-    this.explorerGlobalLens.set('workflow');
-    this.portfolioOverviewOpen.set(false);
-    this.narrowDetailOpen.set(false);
   }
 
   navigateToSection(sectionId: string): void {
@@ -1183,7 +1181,6 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   private completeReturnToCatalog(): void {
     if (this.hasUnsavedWork()) this.discardUnsavedWorkState();
-    this.portfolioOverviewOpen.set(false);
     this.narrowDetailOpen.set(false);
     if (this.inspectorTab() === 'ai') {
       this.shell.inspectorTab.set('properties');
@@ -1203,21 +1200,17 @@ export class CatalogWorkspaceComponent implements OnInit {
     initialOperationKey: string | null = null
   ): void {
     if (decision.key === this.selected()?.key && !forceReload) {
-      this.portfolioOverviewOpen.set(false);
       if (revealOnNarrow) this.narrowDetailOpen.set(true);
       this.revealSelectedDecision();
       return;
     }
     if (!discardConfirmed && (forceReload || decision.key !== this.selected()?.key) && this.hasUnsavedWork()) {
-      const target = this.editingScenarioDirty()
-        ? (this.scenarios().find(item => item.id === this.editingScenarioId())?.name ?? this.i18n.text('scenarioLocalChanges'))
-        : (this.selected()?.name ?? this.i18n.text('localChanges'));
+      const target = this.unsavedWorkTargetLabel();
       this.store.openUnsavedWorkConfirmation(
         target,
         () => this.select(decision, forceReload, revealOnNarrow, true, initialOperationKey));
       return;
     }
-    this.portfolioOverviewOpen.set(false);
     const selectionRevision = ++this.store.selectionRevision;
     this.loadedModesForSelection.clear();
     this.loadedModesForSelection.add('understand');
@@ -1746,8 +1739,38 @@ export class CatalogWorkspaceComponent implements OnInit {
     event.returnValue = '';
   }
 
-  private hasUnsavedWork(): boolean {
+  hasUnsavedWork(): boolean {
     return (this.authoringOpen() && this.draftChanged()) || this.editingScenarioDirty();
+  }
+
+  confirmRouteLeave(): Promise<boolean> | boolean {
+    if (!this.hasUnsavedWork()) {
+      return true;
+    }
+    this.resolvePendingLeave(false);
+    return new Promise<boolean>(resolve => {
+      this.pendingLeaveResolver = resolve;
+      this.store.openUnsavedWorkConfirmation(
+        this.unsavedWorkTargetLabel(),
+        () => {
+          this.discardUnsavedWorkState();
+          this.resolvePendingLeave(true);
+        },
+        () => this.resolvePendingLeave(false)
+      );
+    });
+  }
+
+  private resolvePendingLeave(allowLeave: boolean): void {
+    const resolver = this.pendingLeaveResolver;
+    this.pendingLeaveResolver = null;
+    resolver?.(allowLeave);
+  }
+
+  private unsavedWorkTargetLabel(): string {
+    return this.editingScenarioDirty()
+      ? (this.scenarios().find(item => item.id === this.editingScenarioId())?.name ?? this.i18n.text('scenarioLocalChanges'))
+      : (this.selected()?.name ?? this.i18n.text('localChanges'));
   }
 
   private discardUnsavedWorkState(): void {

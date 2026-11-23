@@ -78,7 +78,17 @@ describe('StudioIconComponent', () => {
       'layers',
       'activity',
       'shield-alert',
-      'corner-down-left'
+      'corner-down-left',
+      'panel-left',
+      'panel-right',
+      'filter',
+      'inbox',
+      'log-out',
+      'chevron-right',
+      'building',
+      'check',
+      'refresh-cw',
+      'info'
     ];
 
     for (const variant of variants) {
