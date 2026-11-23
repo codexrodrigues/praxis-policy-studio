@@ -231,7 +231,7 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
               <summary>
                 <span>{{ i18n.format('ruleOtherCatalogFactsHeading', { count: partitioned.catalogOnlyFacts.length }) }}</span>
               </summary>
-              <ul class="fact-list fact-cards catalog-only-cards">
+              <ul class="catalog-only-cards">
                 @for (fact of partitioned.catalogOnlyFacts; track fact.path) {
                   @let model = factCardModel(fact);
                   <li class="fact-card is-catalog-only">
@@ -604,7 +604,8 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
       outline-offset: 2px;
     }
 
-    .fact-cards {
+    .fact-cards,
+    .catalog-only-cards {
       list-style: none;
       margin: 0;
       padding: 0;
