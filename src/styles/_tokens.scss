@@ -1,0 +1,215 @@
+@use '@praxisui/core/theming/workspace-themes.scss';
+@use '@praxisui/core/theming' as praxis;
+
+$studio-surfaces: (
+  'primary': var(--primary),
+  'on-primary': var(--primary-foreground),
+  'primary-container': var(--accent),
+  'on-primary-container': var(--foreground),
+  'secondary': var(--secondary),
+  'on-secondary': var(--secondary-foreground),
+  'secondary-container': var(--secondary),
+  'on-secondary-container': var(--foreground),
+  'tertiary': var(--state-success),
+  'on-tertiary': var(--primary-foreground),
+  'tertiary-container': color-mix(in oklab, var(--state-success) 16%, var(--card)),
+  'on-tertiary-container': var(--foreground),
+  'error': var(--destructive),
+  'on-error': var(--destructive-foreground),
+  'error-container': var(--workspace-error-surface, color-mix(in oklab, var(--destructive) 16%, var(--card))),
+  'on-error-container': var(--foreground),
+  'surface': var(--card),
+  'background': var(--canvas, var(--background)),
+  'foreground': var(--foreground),
+  'muted': var(--muted),
+  'muted-foreground': var(--muted-foreground),
+  'border': var(--border),
+  'surface-container-lowest': var(--card),
+  'surface-container-low': var(--workspace-surface),
+  'surface-container': var(--muted),
+  'surface-container-high': var(--secondary),
+  'surface-container-highest': var(--accent),
+  'outline': var(--input),
+  'outline-variant': var(--border),
+  'inverse-surface': var(--foreground),
+  'inverse-on-surface': var(--background)
+);
+
+@include praxis.praxis-theme-bundle(
+  $studio-surfaces,
+  $studio-surfaces,
+  ':root[data-theme="dark-tech"], .dark'
+);
+
+:root {
+  --pax-topbar-height: 3.25rem;
+  --pax-explorer-width: 17.5rem;
+  --pax-inspector-width: 22.5rem;
+
+  --pax-color-primary: var(--md-sys-color-primary, #076487);
+  --pax-color-on-primary: var(--md-sys-color-on-primary, #ffffff);
+  --pax-color-primary-container: var(--md-sys-color-primary-container, #dbeaf2);
+  --pax-color-on-primary-container: var(--md-sys-color-on-primary-container, #15242a);
+  --pax-color-secondary-container: var(--md-sys-color-secondary-container, #e4eaed);
+  --pax-color-on-secondary-container: var(--md-sys-color-on-secondary-container, #15242a);
+  --pax-color-tertiary: var(--state-success, var(--md-sys-color-tertiary, #187457));
+  --pax-color-tertiary-container: var(--md-sys-color-tertiary-container, #d8efe4);
+  --pax-color-on-tertiary-container: var(--md-sys-color-on-tertiary-container, #123f31);
+  --pax-color-surface: var(--md-sys-color-surface, #ffffff);
+  --pax-color-surface-canvas: var(--canvas, var(--md-sys-color-surface-container-low, #f4f7fa));
+  --pax-color-surface-container-lowest: var(--md-sys-color-surface-container-lowest, #ffffff);
+  --pax-color-surface-container-low: var(--md-sys-color-surface-container-low, #f4f7fa);
+  --pax-color-surface-container: var(--md-sys-color-surface-container, #e4eaed);
+  --pax-color-surface-container-high: var(--md-sys-color-surface-container-high, #dde5e9);
+  --pax-color-on-surface: var(--md-sys-color-on-surface, #15242a);
+  --pax-color-on-surface-variant: var(--md-sys-color-on-surface-variant, #51626f);
+  --pax-color-outline: var(--md-sys-color-outline, #697a82);
+  --pax-color-outline-variant: var(--md-sys-color-outline-variant, #c5d0d5);
+  --pax-color-error: var(--md-sys-color-error, #ba1a1a);
+  --pax-color-on-error: var(--md-sys-color-on-error, #ffffff);
+  --pax-color-error-container: var(--md-sys-color-error-container, #ffdad6);
+  --pax-color-on-error-container: var(--md-sys-color-on-error-container, #410002);
+
+  /* Semantic decision, warning & Dev Mode lens tokens */
+  --pax-color-success: var(--state-success, #187457);
+  --pax-color-success-container: color-mix(in oklab, var(--pax-color-success) 15%, var(--pax-color-surface));
+  --pax-color-on-success-container: var(--pax-color-on-surface);
+  --pax-color-warning: var(--state-warning, #8c5308);
+  --pax-color-warning-container: color-mix(in oklab, var(--pax-color-warning) 18%, var(--pax-color-surface));
+  --pax-color-on-warning-container: var(--pax-color-on-surface);
+
+  --pax-color-dev-accent: var(--category-indigo, #4338ca);
+  --pax-color-dev-container: color-mix(in oklab, var(--pax-color-dev-accent) 14%, var(--pax-color-surface));
+  --pax-color-on-dev-container: var(--pax-color-on-surface);
+
+  /* Tier 1 — Primitive Color Palette */
+  --pax-p-slate-50: #f8fafc;
+  --pax-p-slate-100: #f1f5f9;
+  --pax-p-slate-200: #e2e8f0;
+  --pax-p-slate-300: #cbd5e1;
+  --pax-p-slate-400: #94a3b8;
+  --pax-p-slate-500: #64748b;
+  --pax-p-slate-600: #475569;
+  --pax-p-slate-700: #334155;
+  --pax-p-slate-800: #1e293b;
+  --pax-p-slate-900: #0f172a;
+
+  --pax-p-teal-50: #eef7fa;
+  --pax-p-teal-100: #d9edf5;
+  --pax-p-teal-600: #076487;
+  --pax-p-teal-700: #054f6b;
+  --pax-p-teal-800: #0a3b52;
+  --pax-p-sky-300: #7dd3fc;
+  --pax-p-sky-400: #38bdf8;
+
+  --pax-p-emerald-50: #ecfdf5;
+  --pax-p-emerald-400: #34d399;
+  --pax-p-emerald-700: #047857;
+  --pax-p-emerald-800: #065f46;
+
+  --pax-p-amber-50: #fffbeb;
+  --pax-p-amber-400: #fbbf24;
+  --pax-p-amber-700: #b45309;
+  --pax-p-amber-800: #92400e;
+
+  --pax-p-indigo-50: #eef2ff;
+  --pax-p-indigo-300: #a5b4fc;
+  --pax-p-indigo-700: #4338ca;
+
+  /* Tier 2 — Semantic Autonomy & Popover Surface Roles (WCAG AA) */
+  --pax-policy-param-bg: #dff2f8;
+  --pax-policy-param-fg: #083d54;
+  --pax-policy-param-border: #8ec5da;
+
+  --pax-policy-custom-bg: #daf5e8;
+  --pax-policy-custom-fg: #064e3b;
+  --pax-policy-custom-border: #6ee7b7;
+
+  --pax-policy-locked-bg: #eef2f6;
+  --pax-policy-locked-fg: var(--pax-p-slate-700);
+  --pax-policy-locked-border: var(--pax-p-slate-300);
+
+  --pax-color-info-bg: #edf7fb;
+  --pax-color-info-fg: #083d54;
+  --pax-color-info-border: #9bd0e4;
+
+  --pax-color-popover-bg: var(--pax-color-surface-container-lowest);
+  --pax-color-popover-border: var(--pax-p-slate-300);
+  --pax-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.05), 0 4px 12px rgba(15, 23, 42, 0.04);
+  --pax-shadow-popover: 0 12px 32px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.08);
+
+  /* Compatibility aliases for internal components */
+  --line: var(--pax-color-outline-variant);
+  --surface: var(--pax-color-surface);
+  --surface-subtle: var(--pax-color-surface-container-low);
+  --danger: var(--pax-color-error);
+
+  /* Typography — Display, UI & Technical Monospace */
+  --pax-font-display: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+  --pax-font-sans: 'Inter', var(--font-sans, system-ui, -apple-system, sans-serif);
+  --pax-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Consolas, monospace;
+
+  /* 7-Step Type Scale (12px minimum floor) */
+  --pax-text-xs: 0.75rem;
+  --pax-text-sm: 0.8125rem;
+  --pax-text-base: 0.875rem;
+  --pax-text-md: 1rem;
+  --pax-text-lg: 1.25rem;
+  --pax-text-xl: 1.5rem;
+  --pax-text-2xl: 1.875rem;
+
+  --pax-lh-xs: 1.4;
+  --pax-lh-sm: 1.45;
+  --pax-lh-base: 1.55;
+  --pax-lh-md: 1.5;
+  --pax-lh-lg: 1.35;
+  --pax-lh-xl: 1.25;
+  --pax-lh-2xl: 1.2;
+
+  /* Strict 4pt / 8pt Spacing Grid */
+  --pax-space-1: 0.25rem;
+  --pax-space-2: 0.5rem;
+  --pax-space-3: 0.75rem;
+  --pax-space-4: 1rem;
+  --pax-space-5: 1.25rem;
+  --pax-space-6: 1.5rem;
+  --pax-space-8: 2rem;
+  --pax-space-10: 2.5rem;
+
+  --pax-radius-sm: 0.375rem;
+  --pax-radius-md: 0.5rem;
+  --pax-radius-lg: 0.75rem;
+  --pax-radius-xl: 1rem;
+  --pax-radius-pill: 999px;
+
+  font-family: var(--pax-font-sans);
+  font-size: 16px;
+  color-scheme: light;
+  background: var(--pax-color-surface-canvas);
+  color: var(--pax-color-on-surface);
+}
+
+:root[data-theme='dark-tech'],
+.dark {
+  color-scheme: dark;
+  --pax-policy-param-bg: color-mix(in oklab, var(--pax-p-sky-400) 16%, var(--pax-color-surface));
+  --pax-policy-param-fg: #bae6fd;
+  --pax-policy-param-border: color-mix(in oklab, var(--pax-p-sky-400) 38%, transparent);
+
+  --pax-policy-custom-bg: color-mix(in oklab, var(--pax-p-emerald-400) 16%, var(--pax-color-surface));
+  --pax-policy-custom-fg: #a7f3d0;
+  --pax-policy-custom-border: color-mix(in oklab, var(--pax-p-emerald-400) 38%, transparent);
+
+  --pax-policy-locked-bg: color-mix(in oklab, var(--pax-p-slate-400) 14%, var(--pax-color-surface));
+  --pax-policy-locked-fg: var(--pax-p-slate-300);
+  --pax-policy-locked-border: color-mix(in oklab, var(--pax-p-slate-400) 30%, transparent);
+
+  --pax-color-info-bg: color-mix(in oklab, var(--pax-p-sky-400) 12%, var(--pax-color-surface));
+  --pax-color-info-fg: #bae6fd;
+  --pax-color-info-border: color-mix(in oklab, var(--pax-p-sky-400) 30%, transparent);
+
+  --pax-color-popover-bg: var(--pax-color-surface-container-low);
+  --pax-color-popover-border: var(--pax-color-outline);
+  --pax-shadow-card: 0 2px 6px rgba(2, 6, 23, 0.35);
+  --pax-shadow-popover: 0 16px 36px rgba(2, 6, 23, 0.65), 0 2px 10px rgba(2, 6, 23, 0.45);
+}

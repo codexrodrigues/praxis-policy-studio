@@ -59,13 +59,28 @@ export class RuntimeConfigService {
     }
   }
 
+  private static readonly DEEP_LINK_PARAM_ALLOWLIST = [
+    'ruleSetKey',
+    'slotKey',
+    'decisionKey',
+    'bindingKey',
+    'resourceKey',
+    'operationKey'
+  ] as const;
+
   selectHostProfile(profileId: string): void {
     const current = this.stateSignal();
     if (current.kind !== 'ready' || current.config.mode !== 'remote') return;
     const target = this.hostProfiles().find(profile => profile.id === profileId);
     if (!target || target.apiBaseUrl === (current.config.configApiBaseUrl ?? '')) return;
-    // A new document clears the previous host's session token, scope, draft and pending callbacks.
+    // A new document clears the previous host's session token, tenant scope, draft and pending callbacks,
+    // while preserving semantic deep-link navigation coordinates.
     const url = new URL(window.location.pathname, window.location.origin);
+    const currentParams = new URLSearchParams(window.location.search);
+    for (const param of RuntimeConfigService.DEEP_LINK_PARAM_ALLOWLIST) {
+      const value = currentParams.get(param)?.trim();
+      if (value) url.searchParams.set(param, value);
+    }
     url.searchParams.set('apiBaseUrl', target.apiBaseUrl);
     window.location.assign(url.href);
   }

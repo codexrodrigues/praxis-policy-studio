@@ -1,0 +1,44 @@
+<section class="access-workspace" data-testid="access-authorization-workspace" aria-labelledby="access-workspace-title">
+  <header class="access-workspace-header">
+    <div>
+      <p class="studio-eyebrow">{{ i18n.text('trackAccessPrivacy') }}</p>
+      <h1 id="access-workspace-title">{{ i18n.text('accessWorkspaceTitle') }}</h1>
+      <p class="access-boundary">{{ i18n.text('accessWorkspaceBoundary') }}</p>
+    </div>
+    <button
+      type="button"
+      class="quiet-button"
+      data-testid="back-to-business-track"
+      (click)="backToBusinessRequested.emit()">
+      <pax-icon name="arrow-left" [size]="14" />
+      <span>{{ i18n.text('trackBusinessRules') }}</span>
+    </button>
+  </header>
+
+  @if (!isRemoteMode()) {
+    <div class="access-empty-state" role="status">
+      <p>{{ i18n.text('accessWorkspaceRemoteOnly') }}</p>
+    </div>
+  } @else if (loading()) {
+    <div class="access-empty-state" aria-live="polite">
+      <p>{{ i18n.text('loading') }}</p>
+    </div>
+  } @else if (!sessionActive()) {
+    <div class="access-empty-state" role="status">
+      <p>{{ i18n.text('accessWorkspaceLoginRequired') }}</p>
+      <button type="button" class="primary-action" (click)="backToBusinessRequested.emit()">
+        {{ i18n.text('trackBusinessRules') }}
+      </button>
+    </div>
+  } @else if (config(); as runtimeConfig) {
+    @if ((!loadError() || permissionLimited()) && !signingOut()) {
+      <div class="access-workspace-content">
+        <pax-access-draft-review [config]="runtimeConfig" />
+      </div>
+    } @else {
+      <div class="access-empty-state" role="alert">
+        <p>{{ i18n.text('remoteError') }}</p>
+      </div>
+    }
+  }
+</section>

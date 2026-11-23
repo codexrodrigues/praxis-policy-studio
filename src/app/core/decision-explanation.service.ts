@@ -47,7 +47,7 @@ export type DecisionExplanationEvent =
     }
   | {
       readonly kind: 'failed';
-      readonly reason: 'authentication' | 'forbidden' | 'cancelled' | 'evidence-mismatch' | 'unsafe-terminal' | 'failed';
+      readonly reason: 'authentication' | 'forbidden' | 'unavailable' | 'cancelled' | 'evidence-mismatch' | 'unsafe-terminal' | 'failed';
     };
 
 @Injectable({ providedIn: 'root' })
@@ -160,7 +160,7 @@ export class DecisionExplanationService {
       : 'Explique a decisão governada selecionada em linguagem de negócio. Descreva a condição e somente os facts, comportamento de nulo, precedência e autoridade atestados pela evidência da tool. Informe claramente quando a evidência estiver ausente; não infira semântica faltante. Responda em texto simples, sem Markdown ou HTML.';
   }
 
-  private failureReason(error: unknown): 'authentication' | 'forbidden' | 'failed' {
+  private failureReason(error: unknown): 'authentication' | 'forbidden' | 'unavailable' | 'failed' {
     const status = error instanceof HttpErrorResponse
       ? error.status
       : typeof error === 'object' && error !== null && 'status' in error
@@ -168,6 +168,7 @@ export class DecisionExplanationService {
         : 0;
     if (status === 401) return 'authentication';
     if (status === 403) return 'forbidden';
+    if (status === 404 || status === 501) return 'unavailable';
     return 'failed';
   }
 

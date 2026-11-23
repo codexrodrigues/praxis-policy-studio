@@ -4,9 +4,8 @@ export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'catalog' },
   {
     path: 'catalog',
-    loadComponent: () => import('./features/catalog/catalog-workspace.component')
-      .then(module => module.CatalogWorkspaceComponent),
-    title: 'Catálogo — Praxis Rules Studio'
+    loadChildren: () => import('./features/catalog/catalog.routes')
+      .then(module => module.CATALOG_ROUTES)
   },
   { path: '**', redirectTo: 'catalog' }
 ];

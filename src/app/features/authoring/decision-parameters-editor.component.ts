@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output } from '@angular/core';
+import { localizeGenericUnit } from '../../core/humanize-labels';
 import { PolicyStudioI18n } from '../../core/i18n';
 import type { DecisionParameterCatalog, DecisionParameterDescriptor } from '../catalog/catalog.fixture';
 
@@ -44,8 +45,8 @@ const ALLOWED_ALLOW_PARAMETER_KEYS = new Set([
               <div class="parameter-field" [attr.data-testid]="'parameter-field-' + descriptor.name">
                 <label [for]="'param-input-' + descriptor.name">
                   <span>{{ descriptor.label || descriptor.name }}</span>
-                  @if (descriptor.unit) {
-                    <small class="parameter-unit">({{ descriptor.unit }})</small>
+                  @if (localizedUnit(descriptor.unit); as unitText) {
+                    <small class="parameter-unit">({{ unitText }})</small>
                   }
                 </label>
                 @if (descriptor.description) {
@@ -303,6 +304,10 @@ export class DecisionParametersEditorComponent {
 
   protected stringifyAllowed(value: unknown): string {
     return value === null || value === undefined ? '' : String(value);
+  }
+
+  protected localizedUnit(unit: string | null | undefined): string {
+    return localizeGenericUnit(unit, this.i18n.locale());
   }
 
   protected updateTemplateValue(descriptor: DecisionParameterDescriptor, rawValue: string): void {

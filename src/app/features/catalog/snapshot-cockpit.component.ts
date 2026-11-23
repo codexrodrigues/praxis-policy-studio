@@ -97,6 +97,7 @@ export class SnapshotCockpitComponent {
   readonly activateRolloutPolicy = output<DomainRuleRolloutPolicy>();
   readonly retryRollouts = output<void>();
   readonly createRollout = output<string>();
+  readonly probeRollout = output<DomainRuleRolloutCatalogItem>();
   readonly cancelRollout = output<DomainRuleRolloutCatalogItem>();
   readonly activateRollout = output<DomainRuleRolloutCatalogItem>();
   readonly compositionCandidate = input<RuleSetCompositionCandidate | null>(null);

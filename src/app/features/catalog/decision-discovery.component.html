@@ -71,9 +71,11 @@
       @case ('failed') {
         @if (state(); as failed) {
           @if (failed.kind === 'failed') {
-            <div class="discovery-failure" role="alert">
+            <div class="discovery-failure" role="alert" data-testid="ai-discovery-failure">
               <p>{{ failureMessage(failed.reason) }}</p>
-              <button type="button" class="quiet-button" (click)="retry()">{{ i18n.text('retryAiDiscovery') }}</button>
+              @if (failed.reason !== 'unavailable') {
+                <button type="button" class="quiet-button" (click)="retry()">{{ i18n.text('retryAiDiscovery') }}</button>
+              }
             </div>
           }
         }

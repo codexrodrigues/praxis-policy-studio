@@ -1,0 +1,162 @@
+/* Shared workstation structural primitives for the 3-region studio layout. */
+
+.studio-eyebrow,
+.section-label {
+  color: var(--pax-color-primary);
+  font-size: var(--pax-text-xs);
+  line-height: var(--pax-lh-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.studio-mono {
+  font-family: var(--pax-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.studio-pill,
+.studio-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pax-space-1);
+  border-radius: var(--pax-radius-pill);
+  border: 1px solid transparent;
+  padding: 0.25rem var(--pax-space-3);
+  font-size: var(--pax-text-xs);
+  line-height: var(--pax-lh-xs);
+  font-weight: 600;
+  background: var(--pax-color-surface-container);
+  color: var(--pax-color-on-surface-variant);
+  white-space: nowrap;
+}
+
+.studio-pill.verified,
+.studio-badge.verified {
+  background: var(--pax-policy-custom-bg);
+  color: var(--pax-policy-custom-fg);
+  border-color: var(--pax-policy-custom-border);
+}
+
+.studio-pill.dev-active,
+.studio-badge.dev-active {
+  background: var(--pax-color-dev-container);
+  color: var(--pax-color-on-dev-container);
+  border-color: color-mix(in oklab, var(--pax-color-dev-accent) 42%, transparent);
+}
+
+.studio-badge.policy-param {
+  background: var(--pax-policy-param-bg);
+  color: var(--pax-policy-param-fg);
+  border-color: var(--pax-policy-param-border);
+}
+
+.studio-badge.policy-custom {
+  background: var(--pax-policy-custom-bg);
+  color: var(--pax-policy-custom-fg);
+  border-color: var(--pax-policy-custom-border);
+}
+
+.studio-badge.policy-locked {
+  background: var(--pax-policy-locked-bg);
+  color: var(--pax-policy-locked-fg);
+  border-color: var(--pax-policy-locked-border);
+}
+
+.studio-badge.info {
+  background: var(--pax-color-info-bg);
+  color: var(--pax-color-info-fg);
+  border-color: var(--pax-color-info-border);
+}
+
+.studio-badge.warning {
+  background: var(--pax-color-warning-container);
+  color: var(--pax-color-on-warning-container);
+  border-color: color-mix(in oklab, var(--pax-color-warning) 32%, transparent);
+}
+
+.guidance-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pax-space-3);
+  padding: var(--pax-space-3) var(--pax-space-4);
+  border-radius: var(--pax-radius-lg);
+  border: 1px solid var(--pax-color-info-border);
+  background: var(--pax-color-info-bg);
+  color: var(--pax-color-on-surface);
+  font-size: var(--pax-text-sm);
+  line-height: var(--pax-lh-sm);
+}
+
+.guidance-banner strong {
+  color: var(--pax-color-info-fg);
+  font-weight: 700;
+}
+
+.quiet-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pax-space-2);
+  min-height: 2.25rem;
+  border: 1px solid var(--pax-color-outline);
+  background: transparent;
+  color: var(--pax-color-on-surface);
+  border-radius: var(--pax-radius-md);
+  padding: var(--pax-space-2) var(--pax-space-4);
+  font: inherit;
+  font-size: var(--pax-text-sm);
+  line-height: var(--pax-lh-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.quiet-button:hover:not(:disabled) {
+  background: var(--pax-color-surface-container-low);
+}
+
+.quiet-button:focus-visible,
+.primary-action:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--pax-color-primary) 38%, transparent);
+  outline-offset: 2px;
+}
+
+.quiet-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.primary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pax-space-2);
+  min-height: 2.25rem;
+  border: 1px solid var(--pax-color-primary);
+  border-radius: var(--pax-radius-md);
+  background: var(--pax-color-primary);
+  color: var(--pax-color-on-primary);
+  padding: var(--pax-space-2) var(--pax-space-4);
+  font: inherit;
+  font-size: var(--pax-text-sm);
+  line-height: var(--pax-lh-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primary-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.work-mode-panel:focus {
+  outline: none;
+}
+
+.work-mode-panel:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--pax-color-primary) 45%, transparent);
+  outline-offset: 4px;
+  border-radius: var(--pax-radius-md);
+}

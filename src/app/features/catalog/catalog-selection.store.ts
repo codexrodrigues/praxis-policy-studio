@@ -6,8 +6,10 @@ import type {
   DomainRuleWorkspaceCapabilities
 } from '@praxisui/core';
 import { PolicyStudioI18n } from '../../core/i18n';
+import type { ExplorerGlobalLens } from '../../core/catalog-portfolio';
 import { ProjectionCatalogService } from '../../core/projection-catalog.service';
 import { RuntimeConfigService } from '../../core/runtime-config.service';
+import { StudioShellStateService } from '../../core/studio-shell-state.service';
 import type {
   DecisionLifecycleSummary,
   DecisionSummary,
@@ -28,9 +30,19 @@ export class CatalogSelectionStore {
   readonly catalog = inject(ProjectionCatalogService);
   readonly runtime = inject(RuntimeConfigService);
   readonly i18n = inject(PolicyStudioI18n);
+  readonly shell = inject(StudioShellStateService);
+
+  readonly activeWorkspaceTrack = this.shell.activeWorkspaceTrack;
+  readonly viewDepth = this.shell.viewDepth;
+  readonly inspectorTab = this.shell.inspectorTab;
+  readonly inspectorOpen = this.shell.inspectorOpen;
+  readonly explorerOpen = this.shell.explorerOpen;
 
   readonly query = signal('');
   readonly contextScopeFilter = signal<string | null>(null);
+  readonly activeRuleTypeFilter = signal<string | null>(null);
+  readonly explorerGlobalLens = signal<ExplorerGlobalLens>('domain');
+  readonly portfolioOverviewOpen = signal(false);
   readonly allDecisions = signal<readonly DecisionSummary[]>([]);
   readonly selected = signal<DecisionSummary | null>(null);
   readonly narrowDetailOpen = signal(false);
@@ -74,14 +86,18 @@ export class CatalogSelectionStore {
 
   readonly decisions = computed(() => {
     const scope = this.contextScopeFilter()?.trim() || null;
+    const ruleType = this.activeRuleTypeFilter()?.trim().toLowerCase() || null;
     const scoped = scope
       ? this.allDecisions().filter(item =>
           item.ruleSetKey === scope || item.resourceKey === scope || item.domain === scope
         )
       : this.allDecisions();
+    const typed = ruleType
+      ? scoped.filter(item => (item.ruleType?.trim().toLowerCase() || 'other') === ruleType)
+      : scoped;
     const query = this.query().trim().toLocaleLowerCase();
     return query
-      ? scoped.filter(item => {
+      ? typed.filter(item => {
           const doc = item.workspaceDocumentation ?? item.definitionDocumentation ?? item.documentation;
           const legalBasisTokens = (doc?.legalBasis ?? []).flatMap(entry => [
             entry.code,
@@ -110,12 +126,15 @@ export class CatalogSelectionStore {
             .toLocaleLowerCase()
             .includes(query);
         })
-      : scoped;
+      : typed;
   });
 
   readonly selectionOutsideFilter = computed(() => {
     const selected = this.selected();
-    const hasFilter = !!this.query().trim() || !!this.contextScopeFilter()?.trim();
+    const hasFilter =
+      !!this.query().trim() ||
+      !!this.contextScopeFilter()?.trim() ||
+      !!this.activeRuleTypeFilter()?.trim();
     return hasFilter && !!selected && !this.decisions().some(item => item.key === selected.key);
   });
 

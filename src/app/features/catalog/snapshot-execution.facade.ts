@@ -155,7 +155,7 @@ export class SnapshotExecutionFacade {
     this.loadSnapshots();
   }
 
-  loadSnapshots(): void {
+  loadSnapshots(includeOperationalPanels = true): void {
     const loadRevision = ++this.snapshotLoadRevision;
     const state = this.runtime.state();
     const ruleSetKey = this.store.selected()?.ruleSetKey;
@@ -170,8 +170,10 @@ export class SnapshotExecutionFacade {
     this.snapshotVersions.set([]);
     this.snapshotsError.set(false);
     this.loadSnapshotHeadSet(ruleSetKey ?? null, operations);
-    this.loadRolloutPolicies(ruleSetKey ?? null);
-    this.loadRollouts(ruleSetKey ?? null);
+    if (includeOperationalPanels) {
+      this.loadRolloutPolicies(ruleSetKey ?? null);
+      this.loadRollouts(ruleSetKey ?? null);
+    }
     if (state.kind !== 'ready' || !ruleSetKey || !operationKey || state.config.mode !== 'remote') {
       this.snapshotsLoading.set(false);
       return;
@@ -189,13 +191,15 @@ export class SnapshotExecutionFacade {
         this.snapshotHead.set(cockpit.head);
         this.snapshotVersions.set(cockpit.versions);
         this.snapshotsLoading.set(false);
-        const activeSnapshotKey =
-          cockpit.head && cockpit.head.governanceState !== 'WITHDRAWN'
-            ? (cockpit.head.activeSnapshotKey ?? null)
-            : null;
-        this.loadExecutionSummary(activeSnapshotKey);
-        if (cockpit.head && cockpit.head.governanceState !== 'WITHDRAWN') {
-          this.loadHostStatusSummary(ruleSetKey);
+        if (includeOperationalPanels) {
+          const activeSnapshotKey =
+            cockpit.head && cockpit.head.governanceState !== 'WITHDRAWN'
+              ? (cockpit.head.activeSnapshotKey ?? null)
+              : null;
+          this.loadExecutionSummary(activeSnapshotKey);
+          if (cockpit.head && cockpit.head.governanceState !== 'WITHDRAWN') {
+            this.loadHostStatusSummary(ruleSetKey);
+          }
         }
       },
       error: () => {
@@ -545,6 +549,38 @@ export class SnapshotExecutionFacade {
     } catch (error: unknown) {
       this.failRolloutOperation(error);
     }
+  }
+
+  probeRollout(item: DomainRuleRolloutCatalogItem): void {
+    const state = this.runtime.state();
+    if (state.kind !== 'ready' || this.rolloutBusy()) return;
+    this.rolloutBusy.set(true);
+    this.clearRolloutFeedback();
+    const commandRevision = this.store.selectionRevision;
+    this.catalog.probeRolloutCandidate(
+      item.rollout.ruleSetKey,
+      item.rollout.rolloutId,
+      item.rollout.operationKey,
+      state.config
+    ).subscribe({
+      next: result => {
+        if (commandRevision !== this.store.selectionRevision) {
+          return;
+        }
+        this.rolloutBusy.set(false);
+        this.rolloutFeedback.set(
+          this.i18n.text(result.updated ? 'rolloutProbedReady' : 'rolloutProbedNotReady')
+        );
+        this.loadRollouts();
+        this.loadSnapshots();
+      },
+      error: error => {
+        if (commandRevision !== this.store.selectionRevision) {
+          return;
+        }
+        this.failRolloutOperation(error);
+      }
+    });
   }
 
   cancelRollout(item: DomainRuleRolloutCatalogItem): void {

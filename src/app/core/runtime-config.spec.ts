@@ -1,5 +1,13 @@
+import '@angular/compiler';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
+import { BrowserTestingModule, platformBrowserTesting } from '@angular/platform-browser/testing';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { normalizeTrustedConfigApiBaseUrl, validateRuntimeConfig } from './runtime-config';
-import { describe, expect, it } from 'vitest';
+import { RuntimeConfigService } from './runtime-config.service';
+
+TestBed.initTestEnvironment(BrowserTestingModule, platformBrowserTesting());
 
 describe('validateRuntimeConfig', () => {
   it('accepts the hermetic fixture mode without an endpoint', () => {
@@ -52,5 +60,54 @@ describe('validateRuntimeConfig', () => {
       ].map(apiBaseUrl => [main, { ...other, apiBaseUrl }])]) {
       expect(() => validateRuntimeConfig({ ...config, hostProfiles })).toThrow('SETUP_INVALID_HOST_PROFILES');
     }
+  });
+});
+
+describe('RuntimeConfigService host switching', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    TestBed.resetTestingModule();
+  });
+
+  it('selectHostProfile preserves allowlisted semantic deep-link params and clears host scope params', async () => {
+    const primary = { id: 'primary', labelPtBr: 'Primário', labelEnUs: 'Primary', apiBaseUrl: 'https://primary.example' };
+    const secondary = { id: 'secondary', labelPtBr: 'Secundário', labelEnUs: 'Secondary', apiBaseUrl: 'https://other.example' };
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const runtime = TestBed.inject(RuntimeConfigService);
+    const http = TestBed.inject(HttpTestingController);
+
+    const loadPromise = runtime.load();
+    http.expectOne('/app-config.json').flush({
+      mode: 'remote',
+      configApiBaseUrl: 'https://primary.example',
+      locale: 'pt-BR',
+      hostProfiles: [primary, secondary]
+    });
+    await loadPromise;
+
+    const assign = vi.fn();
+    vi.stubGlobal('location', {
+      origin: 'http://127.0.0.1:4302',
+      pathname: '/catalog',
+      search: '?resourceKey=workforce.leave&ruleSetKey=workforce.leave.rules&slotKey=limit&decisionKey=d1&bindingKey=b1&operationKey=CREATE&tenantId=rio&organizationId=ALL&environment=local',
+      assign
+    });
+
+    runtime.selectHostProfile('secondary');
+
+    expect(assign).toHaveBeenCalledOnce();
+    const targetUrl = new URL(assign.mock.calls[0][0] as string);
+    expect(targetUrl.pathname).toBe('/catalog');
+    expect(targetUrl.searchParams.get('apiBaseUrl')).toBe('https://other.example');
+    expect(targetUrl.searchParams.get('resourceKey')).toBe('workforce.leave');
+    expect(targetUrl.searchParams.get('ruleSetKey')).toBe('workforce.leave.rules');
+    expect(targetUrl.searchParams.get('slotKey')).toBe('limit');
+    expect(targetUrl.searchParams.get('decisionKey')).toBe('d1');
+    expect(targetUrl.searchParams.get('bindingKey')).toBe('b1');
+    expect(targetUrl.searchParams.get('operationKey')).toBe('CREATE');
+    expect(targetUrl.searchParams.has('tenantId')).toBe(false);
+    expect(targetUrl.searchParams.has('organizationId')).toBe(false);
+    expect(targetUrl.searchParams.has('environment')).toBe(false);
   });
 });

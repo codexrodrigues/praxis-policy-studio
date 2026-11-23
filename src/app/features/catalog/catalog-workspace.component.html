@@ -1,1001 +1,1143 @@
-<div class="workspace" [class.decision-open]="narrowDetailOpen()">
-  <aside class="catalog-pane" [attr.aria-label]="i18n.text('decisionCatalogRegion')">
-    <header class="pane-heading">
-      <div>
-        <p class="eyebrow">{{ selected()?.domain ?? i18n.text('product') }}</p>
-        <h1 id="catalog-title">{{ i18n.text('catalog') }}</h1>
-      </div>
-      <div class="pane-actions">
-        <span class="count">{{ decisions().length }} {{ i18n.text(decisions().length === 1 ? 'decision' : 'decisions') }}</span>
-        @if (sessionActive()) {
-          <button type="button" class="quiet-button session-logout" [disabled]="signingOut()" (click)="logout()">
-            {{ i18n.text(signingOut() ? 'signingOut' : 'logout') }}
-          </button>
-        }
-      </div>
-    </header>
+@if (activeWorkspaceTrack() === 'authorization') {
+  <pax-access-authorization-workspace
+    [config]="policyConfig()"
+    [isRemoteMode]="runtime.mode() === 'remote'"
+    [sessionActive]="sessionActive()"
+    [loading]="loading()"
+    [loadError]="loadError()"
+    [permissionLimited]="permissionLimited()"
+    [signingOut]="signingOut()"
+    (backToBusinessRequested)="setBusinessTrack()" />
+} @else {
+  <div
+    class="workspace"
+    [class.decision-open]="narrowDetailOpen()"
+    [class.inspector-ai-active]="inspectorOpen() && inspectorTab() === 'ai'"
+    [attr.data-view-depth]="viewDepth()">
 
-    @if (logoutFailed()) {
-      <p class="session-error" role="alert">{{ i18n.text('logoutFailed') }}</p>
+    @if (!selected() && !(portfolioOverviewOpen() && allDecisions().length > 0)) {
+      <h1 class="visually-hidden">{{ i18n.text(authenticationRequired() ? 'authOnboardingTitle' : 'catalog') }}</h1>
     }
 
-    @if (policyConfig(); as discoveryConfig) {
-      <pax-decision-discovery
-        [config]="discoveryConfig"
-        [decisions]="allDecisions()"
-        (decisionSelected)="select($event)"
-        (candidateSelected)="selectDiscoveredCandidate($event)" />
-    }
+    <pax-decision-explorer-rail
+      class="explorer-slot"
+      [decisions]="decisions()"
+      [totalCatalogCount]="allDecisions().length"
+      [selected]="selected()"
+      [query]="query()"
+      [contextScopeFilter]="contextScopeFilter()"
+      [activeRuleTypeFilter]="activeRuleTypeFilter()"
+      [globalLens]="explorerGlobalLens()"
+      [portfolioOverviewOpen]="portfolioOverviewOpen()"
+      [loading]="loading()"
+      [loadError]="loadError()"
+      [authenticationRequired]="authenticationRequired()"
+      [permissionLimited]="permissionLimited()"
+      [authenticating]="authenticating()"
+      [authenticationFailed]="authenticationFailed()"
+      [sessionActive]="sessionActive()"
+      [logoutFailed]="logoutFailed()"
+      [selectionOutsideFilter]="selectionOutsideFilter()"
+      [busy]="authoringBusy() || snapshotBusy() || rolloutPolicyBusy() || rolloutBusy()"
+      [authoringBusy]="authoringBusy()"
+      [isRemoteMode]="runtime.mode() === 'remote'"
+      [viewDepth]="viewDepth()"
+      (queryChanged)="updateQuery($event)"
+      (clearQueryRequested)="clearQuery()"
+      (clearContextScopeRequested)="clearContextScopeFilter()"
+      (clearRuleTypeRequested)="clearRuleTypeFilter()"
+      (scopeSelected)="applyScopeFilter($event)"
+      (globalLensChanged)="setExplorerGlobalLens($event)"
+      (portfolioOverviewToggled)="togglePortfolioOverview()"
+      (decisionSelected)="select($event)"
+      (loginRequested)="login($event.username, $event.password, $event.form)"
+      (retryCatalogRequested)="loadCatalog()"
+      (reauthenticateRequested)="requestAuthentication()"
+      (createRequested)="createGovernedDecision($event)"
+      (validationFailed)="reportDecisionCreateValidation($event)" />
 
-    @if (runtime.mode() === 'remote' && sessionActive()) {
-      <pax-decision-create-form
-        [busy]="authoringBusy()"
-        (createRequested)="createGovernedDecision($event)"
-        (validationFailed)="reportDecisionCreateValidation($event)" />
-      @if (policyConfig(); as config) {
-        @if (!loading() && (!loadError() || permissionLimited()) && !signingOut()) {
-          <pax-access-draft-review [config]="config" />
-        }
-      }
-    }
-
-    <label class="search">
-      <span class="search-glyph" aria-hidden="true">⌕</span>
-      <span class="visually-hidden">{{ i18n.text('localCatalogFilter') }}</span>
-      <input [value]="query()" (input)="updateQuery($any($event.target).value)" [placeholder]="i18n.text('localCatalogFilterHint')">
-      @if (query()) {
-        <button type="button" (click)="clearQuery()" [attr.aria-label]="i18n.text('clearSearch')">×</button>
-      }
-    </label>
-
-    @if (contextScopeFilter(); as scopeFilter) {
-      <div class="scope-filter-chip" data-testid="context-scope-filter" role="status">
-        <span>{{ i18n.text('contextScopeActive') }}: <code>{{ scopeFilter }}</code></span>
-        <button type="button" class="quiet-button" data-testid="clear-context-scope-filter" (click)="clearContextScopeFilter()">
-          {{ i18n.text('showAllDecisions') }}
+    @if (portfolioOverviewOpen() && allDecisions().length > 0) {
+      <article class="decision-pane" aria-labelledby="portfolio-title">
+        <button type="button" class="narrow-back quiet-button" (click)="returnToCatalog()">
+          <pax-icon name="arrow-left" [size]="16" />
+          <span>{{ i18n.text('backToCatalog') }}</span>
         </button>
-      </div>
-    }
-
-    <div class="decision-list" [attr.aria-label]="i18n.text('availableDecisions')">
-      @if (loading()) {
-        <p class="empty" aria-live="polite">{{ i18n.text('loading') }}</p>
-      } @else if (authenticationRequired()) {
-        <p class="empty state-message" role="alert">{{ i18n.text('authenticationRequired') }}</p>
-        <form #loginForm class="development-login" (submit)="$event.preventDefault(); login(username.value, password.value, loginForm)">
-          <strong>{{ i18n.text('developmentLogin') }}</strong>
-          <label><span>{{ i18n.text('username') }}</span><input #username name="username" value="admin" autocomplete="username" required></label>
-          <label><span>{{ i18n.text('password') }}</span><input #password name="password" type="password" autocomplete="current-password" required></label>
-          @if (authenticationFailed()) { <p role="alert">{{ i18n.text('authenticationFailed') }}</p> }
-          <button type="submit" [disabled]="authenticating()">{{ i18n.text(authenticating() ? 'authenticating' : 'login') }}</button>
-          <small>{{ i18n.text('credentialBoundary') }}</small>
-        </form>
-      } @else if (permissionLimited()) {
-        <p class="empty state-message" role="alert">{{ i18n.text('permissionLimited') }}</p>
-        <button type="button" class="quiet-button state-retry" (click)="requestAuthentication()">
-          {{ i18n.text('reauthenticate') }}
+        <pax-catalog-portfolio-overview
+          [decisions]="allDecisions()"
+          [selected]="selected()"
+          [viewDepth]="viewDepth()"
+          (scopeSelected)="applyScopeFilter($event)"
+          (ruleTypeSelected)="applyRuleTypeFilter($event)"
+          (decisionSelected)="select($event)"
+          (closeRequested)="closePortfolioOverview()"
+          (workflowQueueFilterRequested)="openWorkflowQueueInExplorer()" />
+      </article>
+    } @else if (selected(); as current) {
+      <article class="decision-pane" aria-labelledby="decision-title" [attr.aria-busy]="authoringBusy() || snapshotBusy() || rolloutPolicyBusy() || rolloutBusy()">
+        <button type="button" class="narrow-back quiet-button" (click)="returnToCatalog()">
+          <pax-icon name="arrow-left" [size]="16" />
+          <span>{{ i18n.text('backToCatalog') }}</span>
         </button>
-      } @else if (loadError()) {
-        <p class="empty state-message" role="alert">{{ i18n.text('remoteError') }}</p>
-        <button type="button" class="quiet-button state-retry" (click)="loadCatalog()">
-          {{ i18n.text('retryCatalog') }}
-        </button>
-        <button type="button" class="quiet-button state-retry" (click)="requestAuthentication()">
-          {{ i18n.text('reauthenticate') }}
-        </button>
-      } @else {
-        @for (decision of decisions(); track decision.key) {
-          <button
-            type="button"
-            class="decision-row"
-            [disabled]="authoringBusy() || snapshotBusy() || rolloutPolicyBusy() || rolloutBusy()"
-            [class.selected]="selected()?.key === decision.key"
-            [attr.aria-current]="selected()?.key === decision.key ? 'true' : null"
-            (click)="select(decision)">
-            <span class="decision-copy">
-              <strong>{{ decision.name }}</strong>
-              <small>{{ decision.ruleSet }}</small>
-              <span class="visually-hidden">{{ i18n.text('technicalDecisionCode') }}: {{ decision.code }}</span>
-              <span class="visually-hidden">{{ i18n.text(decision.state === 'verified' ? 'verifiedState' : 'draftState') }}</span>
-            </span>
-            <span class="state-dot" [class.verified]="decision.state === 'verified'" aria-hidden="true"></span>
-          </button>
-        } @empty {
-          <p class="empty">{{ i18n.text('noResults') }}</p>
-        }
-      }
-    </div>
-    @if (selectionOutsideFilter()) {
-      <div class="selection-outside-filter" role="status">
-        <p>{{ i18n.text('selectionOutsideFilter') }}</p>
-        <button type="button" class="quiet-button" (click)="clearQuery()">{{ i18n.text('showSelectedDecision') }}</button>
-      </div>
-    }
-  </aside>
 
-  @if (selected(); as current) {
-  <article class="decision-pane" aria-labelledby="decision-title" [attr.aria-busy]="authoringBusy() || snapshotBusy() || rolloutPolicyBusy() || rolloutBusy()">
-    <button type="button" class="narrow-back quiet-button" (click)="returnToCatalog()">
-      <span aria-hidden="true">←</span> {{ i18n.text('backToCatalog') }}
-    </button>
-    <header class="decision-header">
-      <div>
-        <p class="eyebrow">{{ i18n.text('selected') }}</p>
-        <h1 class="decision-title" id="decision-title">{{ current.name }}</h1>
-      </div>
-      <span class="status" [class.verified]="current.state === 'verified'">
-        {{ i18n.text(current.state === 'verified' ? 'verifiedState' : 'draftState') }}
-      </span>
-      <div class="decision-actions" [attr.aria-label]="i18n.text('decisionActions')">
-        @if (current.workspaceId && current.authoringSupported && hasWorkspaceAction('VIEW')) {
-          <button type="button" class="primary-action" [disabled]="!canOpenAuthoring(current) || authoringBusy()" (click)="openAuthoringAndFocus()">
-            {{ i18n.text('editRule') }}
-          </button>
-        } @else if (!current.workspaceId && current.authoringSupported && hasDefinitionAction('CREATE_NEW_VERSION')) {
-          <button type="button" class="primary-action" [disabled]="!current.configDefinitionId || authoringBusy()" (click)="createWorkspace()">
-            {{ i18n.text('createDraft') }}
-          </button>
-        }
-        @if (current.workspaceId) {
-          <button type="button" class="quiet-button" (click)="navigateToSection('decision-tests')">{{ i18n.text('testRule') }}</button>
-        }
-      </div>
-    </header>
-
-    <nav class="decision-navigation" [attr.aria-label]="i18n.text('decisionNavigation')">
-      <button type="button" [class.active]="activeMode() === 'understand'" [attr.aria-current]="activeMode() === 'understand' ? 'page' : null" (click)="navigateToSection('decision-overview')">
-        <span aria-hidden="true">01</span>
-        <strong>{{ i18n.text('understand') }}</strong>
-        <small>{{ i18n.text('understandHint') }}</small>
-      </button>
-      <button type="button" [class.active]="activeMode() === 'rule'" [attr.aria-current]="activeMode() === 'rule' ? 'page' : null" (click)="navigateToSection('decision-rule')">
-        <span aria-hidden="true">02</span>
-        <strong>{{ i18n.text('rule') }}</strong>
-        <small>{{ i18n.text('ruleHint') }}</small>
-      </button>
-      @if (current.workspaceId) {
-        <button type="button" [class.active]="activeMode() === 'test'" [attr.aria-current]="activeMode() === 'test' ? 'page' : null" (click)="navigateToSection('decision-tests')">
-          <span aria-hidden="true">03</span>
-          <strong>{{ i18n.text('test') }}</strong>
-          <small>{{ scenarios().length }} {{ i18n.text('savedScenarios') }}</small>
-        </button>
-      } @else {
-        <span class="navigation-unavailable" [attr.aria-label]="i18n.text('testsRequireWorkspace')">
-          <span aria-hidden="true">03</span>
-          <strong>{{ i18n.text('test') }}</strong>
-          <small>{{ i18n.text('testsRequireWorkspace') }}</small>
-        </span>
-      }
-      <button type="button" [class.active]="activeMode() === 'operate'" [attr.aria-current]="activeMode() === 'operate' ? 'page' : null" (click)="navigateToSection('decision-execution')">
-        <span aria-hidden="true">04</span>
-        <strong>{{ i18n.text('operate') }}</strong>
-        <small>{{ i18n.text('executionHint') }}</small>
-      </button>
-      <button type="button" [class.active]="activeMode() === 'history'" [attr.aria-current]="activeMode() === 'history' ? 'page' : null" (click)="navigateToSection('decision-history')">
-        <span aria-hidden="true">05</span>
-        <strong>{{ i18n.text('history') }}</strong>
-        <small>{{ current.evidenceCount }} {{ i18n.text('packageReferences') }}</small>
-      </button>
-    </nav>
-
-    @if (authoringFeedback()) {
-      <p class="work-mode-feedback" [class.state-message]="authoringError()" [attr.role]="authoringError() ? 'alert' : 'status'">{{ authoringFeedback() }}</p>
-    }
-    @if (authoringConflict()) {
-      <div class="governed-actions" data-testid="conflict-recovery-bar">
-        <button
-          type="button"
-          class="quiet-button"
-          data-testid="reload-governed-evidence"
-          [disabled]="authoringBusy()"
-          (click)="reloadGovernedEvidence()">
-          {{ i18n.text('reloadGovernedEvidence') }}
-        </button>
-      </div>
-    }
-
-    <div class="detail-grid anchored-section work-mode-panel" id="decision-overview" tabindex="-1" [hidden]="activeMode() !== 'understand'">
-      <section class="meaning-block">
-        <p class="section-label">{{ i18n.text('meaning') }}</p>
-        <p class="meaning">{{ meaningText(current) }}</p>
-
-        @let didactic = effectiveDocumentation(current);
-        <section class="didactic-panel" data-testid="decision-didactic-panel" [attr.aria-label]="i18n.text('didacticDocumentationSection')">
-          <div class="didactic-panel-header">
-            <p class="section-label">{{ i18n.text('didacticDocumentationSection') }}</p>
-            @if (!hasCompleteDidacticDocumentation(didactic)) {
-              <span class="didactic-fallback-badge" data-testid="decision-didactic-fallback">
-                {{ i18n.text('didacticFallbackBadge') }}
-              </span>
+        <header class="decision-header">
+          <div class="decision-header-copy">
+            <div class="decision-header-meta">
+              <p class="eyebrow">{{ displayHeaderDomain(current) }}</p>
+              @if (viewDepth() === 'technical') {
+                <code class="technical-code-badge studio-mono" data-testid="header-technical-code">{{ current.code }}</code>
+                <code class="technical-key-badge studio-mono" data-testid="header-technical-key">{{ current.key }}</code>
+                <span class="status" [class.verified]="current.state === 'verified'">
+                  {{ i18n.text(current.state === 'verified' ? 'verifiedState' : 'draftState') }}
+                </span>
+              }
+            </div>
+            <h1 class="decision-title" id="decision-title">{{ displayCanvasTitle(current) }}</h1>
+            @if (displayCanvasSubtitle(current); as heroSubtitle) {
+              <p class="decision-subtitle" data-testid="decision-subtitle">{{ heroSubtitle }}</p>
             }
-          </div>
-          <dl class="didactic-sections">
-            @if (didactic?.title && didactic!.title !== current.name) {
-              <div data-testid="didactic-title">
-                <dt>{{ i18n.text('didacticTitleHeading') }}</dt>
-                <dd>{{ didactic!.title }}</dd>
-              </div>
-            }
-            <div data-testid="didactic-summary">
-              <dt>{{ i18n.text('didacticWhatItChecks') }}</dt>
-              <dd>{{ didactic?.summary || meaningText(current) }}</dd>
-            </div>
-            <div data-testid="didactic-when-applies">
-              <dt>{{ i18n.text('didacticWhenApplies') }}</dt>
-              <dd>{{ didactic?.whenApplies || i18n.text('didacticNotInformed') }}</dd>
-            </div>
-            <div data-testid="didactic-rationale">
-              <dt>{{ i18n.text('didacticRationale') }}</dt>
-              <dd>{{ didactic?.rationale || i18n.text('didacticNotInformed') }}</dd>
-            </div>
-            <div data-testid="didactic-legal-basis">
-              <dt>{{ i18n.text('didacticLegalBasis') }}</dt>
-              <dd>
-                @if (didactic?.legalBasis?.length) {
-                  <ul class="legal-basis-list">
-                    @for (basis of didactic!.legalBasis!; track basis.code + ':' + (basis.article ?? '') + ':' + $index) {
-                      <li class="legal-basis-chip" data-testid="didactic-legal-basis-chip">
-                        <div class="legal-basis-chip-head">
-                          <strong>{{ basis.code }}</strong>
-                          @if (basis.article) {
-                            <span>· {{ basis.article }}</span>
-                          }
-                          @if (basis.jurisdiction) {
-                            <span class="legal-basis-jurisdiction">{{ basis.jurisdiction }}</span>
-                          }
-                        </div>
-                        @if (basis.title) {
-                          <small class="legal-basis-title">{{ basis.title }}</small>
-                        }
-                        @if (basis.summary) {
-                          <p class="legal-basis-summary">{{ basis.summary }}</p>
-                        }
-                        @if (safeLegalBasisUrl(basis.url); as safeHref) {
-                          <a
-                            class="legal-basis-link"
-                            [href]="safeHref"
-                            target="_blank"
-                            rel="noopener noreferrer">
-                            {{ i18n.text('legalBasisOpenLink') }}
-                          </a>
-                        }
-                      </li>
-                    }
-                  </ul>
-                } @else {
-                  <span class="didactic-empty-value">{{ i18n.text('didacticNoLegalBasis') }}</span>
-                }
-              </dd>
-            </div>
-            <div data-testid="didactic-customization-guidance">
-              <dt>{{ i18n.text('didacticCustomizationGuidance') }}</dt>
-              <dd>{{ didactic?.customizationGuidance || customizationGuidanceFallback(current) }}</dd>
-            </div>
-          </dl>
-        </section>
-      </section>
-      <div class="decision-context">
-        <dl class="facts">
-          <div><dt>{{ i18n.text('domain') }}</dt><dd>{{ current.domain }}</dd></div>
-          <div>
-            <dt>{{ i18n.text('decisionSet') }}</dt>
-            <dd>
-              {{ current.ruleSet }}
-              <small>{{ i18n.text('ruleSetHint') }}</small>
-            </dd>
-          </div>
-          <div><dt>{{ i18n.text('whoDecidesToday') }}</dt><dd>{{ authorityLabel(current.authority) }}</dd></div>
-          <div><dt>{{ i18n.text('migrationStrategy') }}</dt><dd>{{ persistenceLabel(current.authority) }}</dd></div>
-          <div><dt>{{ i18n.text('source') }}</dt><dd>{{ i18n.text('projectionSource') }}</dd></div>
-          @if (current.configStatus) {
-            <div><dt>{{ i18n.text('configVersion') }}</dt><dd>{{ configStatusLabel(current.configStatus) }}</dd></div>
-          }
-        </dl>
-        @if (maturityPosture(); as posture) {
-          <div class="decision-maturity-posture" data-testid="decision-maturity-posture">
-            <p class="section-label">{{ i18n.text('maturityPostureTitle') }}</p>
-            <dl class="facts">
-              <div data-testid="posture-technical-maturity">
-                <dt>{{ i18n.text('postureTechnicalMaturity') }}</dt>
-                <dd>{{ technicalMaturityLabel(posture.technicalMaturity) }}</dd>
-              </div>
-              <div data-testid="posture-approval-stage">
-                <dt>{{ i18n.text('postureApprovalStage') }}</dt>
-                <dd>{{ approvalStageLabel(posture.approvalStage) }}</dd>
-              </div>
-              <div data-testid="posture-operational-authority">
-                <dt>{{ i18n.text('postureOperationalAuthority') }}</dt>
-                <dd>
-                  {{ operationalAuthorityPostureLabel(posture.operationalAuthority) }}
-                  @if (posture.activeSnapshotKey) {
-                    · <code>{{ posture.activeSnapshotKey }}</code>
-                  }
-                </dd>
-              </div>
-            </dl>
-          </div>
-        }
-        <details class="technical-details">
-          <summary>{{ i18n.text('technicalDetails') }}</summary>
-          <dl>
-            <div><dt>{{ i18n.text('technicalDecisionCode') }}</dt><dd><code>{{ current.code }}</code></dd></div>
-            <div><dt>{{ i18n.text('canonicalDecisionKey') }}</dt><dd><code>{{ current.key }}</code></dd></div>
-            <div><dt>{{ i18n.text('authority') }}</dt><dd><code>{{ current.authority }}</code></dd></div>
-            <div><dt>{{ i18n.text('source') }}</dt><dd><code>{{ current.source }}</code></dd></div>
-            @if (current.configStatus) {
-              <div><dt>Config</dt><dd><code>{{ current.configStatus }}</code></dd></div>
-            }
-          </dl>
-        </details>
-      </div>
-    </div>
-
-    <div class="work-mode-panel" [hidden]="activeMode() !== 'understand'">
-      <pax-rule-decision-plan-dag
-        [selected]="current"
-        [decisions]="allDecisions()"
-        [sandboxRun]="sandboxRun()"
-        [latestTestRun]="lifecycle()?.latestTestRun ?? null"
-        (decisionSelected)="select($event)"
-        (conceptRootSelected)="filterByOntologyRoot($event)" />
-      @if (policyConfig(); as studioConfig) {
-        <pax-decision-explanation [decision]="current" [config]="studioConfig" />
-      }
-    </div>
-
-    <section class="inspection anchored-section work-mode-panel" id="decision-rule" tabindex="-1" aria-labelledby="inspection-title" [hidden]="activeMode() !== 'rule'">
-      <header class="inspection-heading">
-        <div>
-          <p class="section-label" id="inspection-title">{{ i18n.text('inspection') }}</p>
-          <p class="inspection-summary">{{ i18n.text('inspectionHint') }}</p>
-        </div>
-      </header>
-
-      <div class="inspection-grid">
-        <section class="condition-panel">
-          <p class="inspection-label">{{ i18n.text('condition') }}</p>
-          @if (current.expression) {
-            <code class="expression">{{ current.expression }}</code>
-          } @else {
-            <p class="inspection-empty">{{ i18n.text('noCondition') }}</p>
-          }
-          <dl class="contract-facts">
-            <div><dt>{{ i18n.text('missingDataBehavior') }}</dt><dd>{{ nullSemanticsLabel(current.nullSemantics) }}</dd></div>
-          </dl>
-          <details class="technical-details condition-technical-details">
-            <summary>{{ i18n.text('conditionTechnicalDetails') }}</summary>
-            <dl>
-              <div><dt>{{ i18n.text('nullBehavior') }}</dt><dd><code>{{ current.nullSemantics ?? '—' }}</code></dd></div>
-              <div><dt>{{ i18n.text('operations') }}</dt><dd><code>{{ current.operationKeys.join(' · ') || '—' }}</code></dd></div>
-              <div><dt>{{ i18n.text('hostContract') }}</dt><dd><code>{{ current.hostContractVersion ?? '—' }}</code></dd></div>
-            </dl>
-          </details>
-        </section>
-
-        <section class="facts-panel">
-          <p class="inspection-label">{{ i18n.text('facts') }}</p>
-          @if (maturityPosture(); as posture) {
-            @if (posture.totalFacts > 0) {
-              <small class="authority-note" data-testid="fact-redaction-summary">
-                {{ i18n.text('factRedactionSummaryTitle') }}:
-                {{ posture.sensitiveFactsCount }}/{{ posture.totalFacts }} {{ i18n.text('factSensitiveCount') }} ·
-                {{ posture.redactedFactsCount }}/{{ posture.totalFacts }} {{ i18n.text('factRedactedCount') }}
-              </small>
-            }
-          }
-          <ul class="fact-list">
-            @for (fact of current.facts; track fact.path) {
-              <li>
-                <strong>{{ fact.label }}</strong>
-                <code>{{ fact.path }}</code>
-                <small>{{ fact.description }} · {{ fact.valueType }} · {{ i18n.text(fact.nullable ? 'factNullable' : 'factRequired') }} · {{ fact.sensitivity }} / {{ fact.redaction }}</small>
-              </li>
-            }
-            @empty { <li class="inspection-empty fact-gap">{{ i18n.text('factCatalogUnavailable') }}</li> }
-          </ul>
-        </section>
-      </div>
-
-      <div class="version-compare" [attr.aria-label]="i18n.text('authorityDraftComparison')">
-        <section>
-          <span class="version-kicker">{{ i18n.text('baseline') }}</span>
-          <strong>{{ i18n.text('referenceBaseline') }}</strong>
-          <small>{{ current.baselineAuthority }}</small>
-        </section>
-        <span class="compare-arrow" aria-hidden="true">→</span>
-        <section [class.unavailable]="!current.configStatus">
-          <span class="version-kicker">{{ i18n.text('draft') }}</span>
-          <strong>{{ current.configStatus ? configStatusLabel(current.configStatus) : i18n.text('noDraft') }}</strong>
-          <small>{{ i18n.text('governedDraftReviewHint') }}</small>
-        </section>
-      </div>
-
-      @if (current.workspaceId) {
-        <section class="semantic-diff" aria-labelledby="semantic-diff-title">
-          <header>
-            <div>
-              <p class="section-label" id="semantic-diff-title">{{ i18n.text('semanticDiff') }}</p>
-              <p>{{ i18n.text('semanticDiffBoundary') }}</p>
-            </div>
-            <strong>{{ semanticDiff().length }}</strong>
-          </header>
-          @for (change of semanticDiff(); track change.path + change.kind) {
-            <article>
-              <span>{{ change.kind }}</span>
-              <code>{{ change.path }}</code>
-              <small>{{ displayDiffValue(change.baseline) }} → {{ displayDiffValue(change.candidate) }}</small>
-            </article>
-          } @empty {
-            <p class="empty">{{ i18n.text('noSemanticChanges') }}</p>
-          }
-        </section>
-      }
-
-    </section>
-
-
-    @if (authoringOpen() && editorConfig(); as authoringConfig) {
-      <section class="draft-workspace work-mode-panel" tabindex="-1" aria-labelledby="draft-workspace-title" [hidden]="activeMode() !== 'rule'">
-        <header>
-          <div>
-            <p class="section-label">{{ i18n.text('localDraft') }}</p>
-            <h2 id="draft-workspace-title">{{ current.name }}</h2>
-            <p>{{ i18n.text('localDraftBoundary') }}</p>
-          </div>
-          <button type="button" class="quiet-button" (click)="closeAuthoring()">{{ i18n.text('close') }}</button>
-        </header>
-        @if (draftCondition() !== null) {
-          @defer (when authoringOpen()) {
-          <pax-local-draft-workspace
-            [config]="authoringConfig"
-            [condition]="editorCondition()"
-            (conditionChanged)="updateDraft($event)"
-            (stateChanged)="updateEditorState($event)" />
-          } @placeholder {
-            <p>{{ i18n.text('loading') }}</p>
-          }
-        }
-        @if (hasEditableParameters(current)) {
-          <pax-decision-parameters-editor
-            [parameterCatalog]="current.parameterCatalog ?? null"
-            [parameters]="draftParameters()"
-            (parametersChanged)="updateDraftParameters($event)"
-            (validationErrorsChanged)="parameterValidationErrors.set($event)" />
-        }
-        <pax-decision-documentation-editor
-          idPrefix="workspace-doc"
-          [documentation]="draftDocumentation()"
-          [disabled]="authoringBusy()"
-          (documentationChanged)="updateDraftDocumentation($event)"
-          (validationErrorsChanged)="documentationValidationErrors.set($event)" />
-        @if (suggestedDiffProposals().length) {
-          <div class="assisted-diff-proposals" data-testid="assisted-diff-proposals">
-            <p class="section-label">{{ i18n.text('assistedDiffProposalsTitle') }}</p>
-            <small class="authority-note">{{ i18n.text('assistedDiffProposalsHint') }}</small>
-            <div class="governed-actions">
-              @for (proposal of suggestedDiffProposals(); track proposal.id) {
-                <button
-                  type="button"
-                  class="quiet-button"
-                  [attr.data-testid]="'apply-diff-proposal-' + proposal.id"
-                  [disabled]="authoringBusy()"
-                  (click)="applyDiffProposal(proposal)">
-                  {{ proposal.label }}
-                </button>
+            <div class="decision-header-pills" data-testid="decision-header-pills">
+              @let polEntry = policyGlossary(current);
+              <pax-term-popover
+                variant="chip"
+                [icon]="policyIconName(current)"
+                [tone]="policyBadgeTone(current)"
+                [term]="polEntry.title"
+                [category]="polEntry.category"
+                [summary]="polEntry.summary"
+                [detail]="polEntry.detail ?? null" />
+              @let statusEntry = statusGlossary(current);
+              <pax-term-popover
+                variant="chip"
+                [icon]="statusIconName(current)"
+                [tone]="statusBadgeTone(current)"
+                [term]="statusEntry.title"
+                [category]="statusEntry.category"
+                [summary]="statusEntry.summary"
+                [detail]="statusEntry.detail ?? null" />
+              @if (effectiveDocumentation(current)?.legalBasis?.length; as basisCount) {
+                @let legalTerm = governanceTerm('legalBasis');
+                <pax-term-popover
+                  variant="chip"
+                  icon="book-open"
+                  tone="info"
+                  [term]="i18n.text('didacticLegalBasis')"
+                  [badge]="'' + basisCount"
+                  [category]="legalTerm.category"
+                  [title]="legalTerm.title"
+                  [summary]="legalTerm.summary" />
+              }
+              @if (customizedParameterEntries(current).length > 0) {
+                <pax-term-popover
+                  variant="chip"
+                  icon="sliders"
+                  tone="warning"
+                  data-testid="customized-org-badge"
+                  [term]="i18n.text('customizedOrgBadge')"
+                  [category]="i18n.text('customizedOrgCategory')"
+                  [summary]="i18n.text('customizedOrgSummary')"
+                  [detail]="customizedParametersDetail(current)" />
               }
             </div>
           </div>
+          <div class="decision-actions" [attr.aria-label]="i18n.text('decisionActions')">
+            @if (isCreateDraftPrimary(current)) {
+              <button type="button" class="primary-action" data-testid="create-draft-workspace-btn" [disabled]="!(current.promotedDefinitionId ?? current.configDefinitionId) || authoringBusy()" (click)="createWorkspace()">
+                {{ i18n.text('createDraft') }}
+              </button>
+              @if (current.workspaceId && current.authoringSupported && hasWorkspaceAction('VIEW')) {
+                <button type="button" class="quiet-button" [disabled]="!canOpenAuthoring(current) || authoringBusy()" (click)="openAuthoringAndFocus()">
+                  {{ i18n.text('editRule') }}
+                </button>
+              }
+            } @else if (current.workspaceId && current.authoringSupported && hasWorkspaceAction('VIEW')) {
+              <button type="button" class="primary-action" [disabled]="!canOpenAuthoring(current) || authoringBusy()" (click)="openAuthoringAndFocus()">
+                {{ i18n.text('editRule') }}
+              </button>
+            }
+            @if (current.workspaceId) {
+              <button type="button" class="quiet-button" (click)="navigateToSection('decision-tests')">{{ i18n.text('testRule') }}</button>
+            }
+          </div>
+        </header>
+
+        @if (viewDepth() === 'technical') {
+          <div class="technical-lens-banner" data-testid="technical-lens-banner" role="status">
+            <span class="studio-mono">&lt;/&gt;</span>
+            <span>{{ i18n.text('technicalLensActiveBanner') }}</span>
+            <code class="studio-mono">{{ current.ruleSetKey }}</code>
+          </div>
         }
-        <div class="draft-compare" [attr.aria-label]="i18n.text('loadedDraftConditionComparison')">
-          <section>
-            <span>{{ i18n.text('loadedCondition') }}</span>
-            <code>{{ originalExpression() ?? '—' }}</code>
-          </section>
-          <section [class.changed]="draftChanged()">
-            <span>{{ i18n.text('localCondition') }}</span>
-            <code>{{ draftExpression() ?? '—' }}</code>
-          </section>
-        </div>
-        @if (ontologicalWarning(); as ontologyAlert) {
-          <div class="ontology-warning-banner" role="alert" data-testid="authoring-ontology-warning">
-            <p class="state-message">{{ ontologyAlert }}</p>
+
+        <nav class="decision-navigation" [attr.aria-label]="i18n.text('decisionNavigation')">
+          <button
+            type="button"
+            [class.active]="activeMode() === 'understand'"
+            [attr.aria-current]="activeMode() === 'understand' ? 'page' : null"
+            [title]="i18n.text('understandHint')"
+            (click)="navigateToSection('decision-overview')">
+            <span>{{ i18n.text('understand') }}</span>
+          </button>
+          <button
+            type="button"
+            [class.active]="activeMode() === 'rule'"
+            [attr.aria-current]="activeMode() === 'rule' ? 'page' : null"
+            [title]="i18n.text('ruleHint')"
+            (click)="navigateToSection('decision-rule')">
+            <span>{{ i18n.text('rule') }}</span>
+          </button>
+          @if (current.workspaceId) {
+            <button
+              type="button"
+              [class.active]="activeMode() === 'test'"
+              [attr.aria-current]="activeMode() === 'test' ? 'page' : null"
+              [title]="scenarioCountHint(scenarios().length)"
+              (click)="navigateToSection('decision-tests')">
+              <span>{{ i18n.text('test') }}</span>
+              <span class="nav-count studio-mono">{{ scenarios().length }}</span>
+            </button>
+          } @else {
+            <span class="navigation-unavailable" [attr.aria-label]="i18n.text('testsRequireWorkspace')" [title]="i18n.text('testsRequireWorkspace')">
+              <span>{{ i18n.text('test') }}</span>
+            </span>
+          }
+          <button
+            type="button"
+            [class.active]="activeMode() === 'operate'"
+            [attr.aria-current]="activeMode() === 'operate' ? 'page' : null"
+            [title]="i18n.text('executionHint')"
+            (click)="navigateToSection('decision-execution')">
+            <span>{{ i18n.text('operate') }}</span>
+          </button>
+          <button
+            type="button"
+            [class.active]="activeMode() === 'history'"
+            [attr.aria-current]="activeMode() === 'history' ? 'page' : null"
+            [title]="evidenceCountHint(current.evidenceCount)"
+            (click)="navigateToSection('decision-history')">
+            <span>{{ i18n.text('history') }}</span>
+            <span class="nav-count studio-mono">{{ current.evidenceCount }}</span>
+          </button>
+        </nav>
+
+        @if (authoringFeedback()) {
+          <p class="work-mode-feedback" [class.state-message]="authoringError()" [attr.role]="authoringError() ? 'alert' : 'status'">{{ authoringFeedback() }}</p>
+        }
+        @if (authoringConflict()) {
+          <div class="governed-actions" data-testid="conflict-recovery-bar">
             <button
               type="button"
               class="quiet-button"
-              data-testid="authoring-ontology-autofix"
+              data-testid="reload-governed-evidence"
               [disabled]="authoringBusy()"
-              (click)="autoFixDraftOntology()">
-              {{ i18n.locale() === 'pt-BR' ? 'Normalizar raízes ontológicas' : 'Normalize ontological roots' }}
+              (click)="reloadGovernedEvidence()">
+              {{ i18n.text('reloadGovernedEvidence') }}
             </button>
           </div>
         }
-        <footer>
-          <div>
-            <strong>{{ totalAuthoringValidationErrors() }} {{ i18n.text('validationIssues') }}</strong>
-            <small>{{ draftChanged() ? i18n.text('unsavedLocalChanges') : i18n.text('unchangedDraft') }}</small>
-          </div>
-          <div class="authoring-actions">
-            <button type="button" class="quiet-button" (click)="resetDraft()">{{ i18n.text('resetDraft') }}</button>
-            <button type="button" [disabled]="authoringBusy() || !hasWorkspaceAction('UPDATE_DRAFT') || !draftChanged() || totalAuthoringValidationErrors() > 0" (click)="saveGovernedDraft()">
-              {{ i18n.text('saveDraft') }}
-            </button>
-          </div>
-        </footer>
-      </section>
-    }
 
-    @if (current.workspaceId) {
-      <section class="scenario-workspace anchored-section work-mode-panel" id="decision-tests" tabindex="-1" aria-labelledby="scenario-title" [hidden]="activeMode() !== 'test'">
-        <header>
-          <div>
-            <p class="section-label" id="scenario-title">{{ i18n.text('testScenarios') }}</p>
-            <p>{{ i18n.text('scenarioBoundary') }}</p>
-          </div>
-          <strong>{{ scenarios().length }}</strong>
-        </header>
-        <pax-scenario-create-form [facts]="current.facts" [factValues]="scenarioFactDraft()"
-          [factsJson]="scenarioFactsJson()" [fallbackJson]="scenarioFactsFallback()"
-          [busy]="authoringBusy()" [canManage]="hasWorkspaceAction('MANAGE_SCENARIOS')"
-          [suggestions]="suggestedScenarios()"
-          [canScaffoldOntology]="canScaffoldScenarioOntology()"
-          [ontologyWarning]="scenarioOntologyWarning()"
-          (factValueChanged)="setScenarioFactValue($event.fact, $event.value)"
-          (factNullChanged)="setScenarioFactNull($event.fact, $event.useNull)"
-          (fallbackJsonChanged)="scenarioFactsFallback.set($event)"
-          (suggestionApplied)="applyScenarioSuggestion($event)"
-          (scaffoldOntologyRequested)="scaffoldScenarioOntology()"
-          (createRequested)="createScenarioFromView($event)" />
-        @if (scenarioFeedback()) {
-          <p class="task-feedback" [class.state-message]="scenarioError()"
-            [attr.role]="scenarioError() ? 'alert' : 'status'">{{ scenarioFeedback() }}</p>
-        }
-        <pax-scenario-catalog [scenarios]="scenarios()" [facts]="current.facts"
-          [editingScenarioId]="editingScenarioId()" [editingFactValues]="editingScenarioFactDraft()"
-          [editingFactsJson]="editingScenarioFactsJson()" [busy]="authoringBusy()"
-          [canManage]="hasWorkspaceAction('MANAGE_SCENARIOS')" [operationalModeEnabled]="!!operationalAction()"
-          [operationalModes]="operationalScenarioModes()" (editRequested)="editScenario($event)"
-          (cancelRequested)="cancelScenarioEdit()" (editDirty)="markScenarioEditDirty()"
-          (factValueChanged)="setEditingScenarioFactValue($event.fact, $event.value)"
-          (factNullChanged)="setEditingScenarioFactNull($event.fact, $event.useNull)"
-          (updateRequested)="updateScenarioFromView($event)"
-          (operationModeChanged)="setOperationalScenarioMode($event.scenarioId, $event.mode)" />
-        <div class="governed-actions">
-          <button type="button" [disabled]="authoringBusy() || !hasWorkspaceAction('RECORD_TEST_RUN') || !activeScenarios().length || draftChanged()" (click)="runGovernedSandbox()">
-            {{ i18n.text('runSandbox') }}
-          </button>
-          <button type="button" [disabled]="authoringBusy() || !hasWorkspaceAction('SUBMIT') || draftChanged()" (click)="submitGovernedWorkspace()">
-            {{ i18n.text('submitReview') }}
-          </button>
-        </div>
-        @if (sandboxFeedback()) {
-          <p class="task-feedback" [class.state-message]="sandboxError()"
-            [attr.role]="sandboxError() ? 'alert' : 'status'">{{ sandboxFeedback() }}</p>
-        }
-        @if (operationalActionLoading()) {
-          <p class="empty" role="status">{{ i18n.text('loadingOperationalAction') }}</p>
-        } @else if (operationalActionError()) {
-          <p class="state-message" role="alert">{{ i18n.text('operationalActionLoadError') }}</p>
-          <button type="button" class="quiet-button" (click)="loadOperationalTestAction()">{{ i18n.text('retryOperationalAction') }}</button>
-        } @else if (operationalAction(); as action) {
-          <section class="operational-command" aria-labelledby="operational-command-title">
-            <div>
-              <strong id="operational-command-title">{{ action.title }}</strong>
-              <p>{{ action.description }}</p>
-              <small>{{ i18n.text('operationalSelectionCount') }}: {{ operationalSelections().length }}</small>
-              @if (operationalPartialCoverage()) {
-                <small class="authority-note" data-testid="operational-partial-coverage-hint">
-                  {{ i18n.text('operationalPartialCoverageHint') }}
-                </small>
+        <div class="overview-canvas work-mode-panel" id="decision-overview" tabindex="-1" [hidden]="activeMode() !== 'understand'">
+          <section class="guidance-banner" data-testid="decision-next-step-banner" [attr.data-policy-tone]="policyBadgeTone(current)">
+            <div class="guidance-banner-copy">
+              <strong>{{ i18n.text('nextStepHeading') }}:</strong>
+              @if (isNextStepEditable(current) || isNextStepParameterizable(current)) {
+                @let parts = nextStepBodyParts(current);
+                @let draftGlossary = governanceTerm('safeDraft');
+                @let fourEyesGlossary = governanceTerm('fourEyes');
+                <span>
+                  {{ parts.beforeDraft }}<pax-term-popover
+                    variant="inline"
+                    [term]="i18n.locale() === 'pt-BR' ? 'rascunho seguro' : 'safe draft'"
+                    [category]="draftGlossary.category"
+                    [title]="draftGlossary.title"
+                    [summary]="draftGlossary.summary" />{{ parts.betweenDraftAndFourEyes }}<pax-term-popover
+                    variant="inline"
+                    [term]="i18n.locale() === 'pt-BR' ? 'revisão 4-olhos' : '4-eyes review'"
+                    [category]="fourEyesGlossary.category"
+                    [title]="fourEyesGlossary.title"
+                    [summary]="fourEyesGlossary.summary"
+                    [detail]="fourEyesGlossary.detail ?? null" />{{ parts.afterFourEyes }}
+                </span>
+              } @else {
+                <span>{{ i18n.text('nextStepLockedBody') }}</span>
               }
             </div>
-            <div class="authoring-actions">
-              <button
-                type="button"
-                class="quiet-button"
-                data-testid="select-all-operational-create"
-                [disabled]="authoringBusy() || !activeScenarios().length"
-                (click)="selectAllActiveOperationalScenarios('CREATE')">
-                {{ i18n.text('selectAllOperationalCreate') }}
-              </button>
-              <button type="button" [disabled]="authoringBusy() || !action.availability.allowed || !current.workspaceEtag || !operationalSelections().length" (click)="reviewOperationalTest()">
-                {{ i18n.text('reviewOperationalTest') }}
-              </button>
+            <div class="guidance-actions">
+              @if (canShowNextStepEdit(current)) {
+                <button
+                  type="button"
+                  class="quiet-button"
+                  data-testid="next-step-edit-draft-cta"
+                  [disabled]="authoringBusy()"
+                  (click)="openAuthoringAndFocus()">
+                  <span>{{ i18n.text('nextStepEditDraftCta') }}</span>
+                </button>
+              } @else if (canShowNextStepCreateDraft(current)) {
+                <button
+                  type="button"
+                  class="quiet-button"
+                  data-testid="next-step-create-draft-cta"
+                  [disabled]="authoringBusy()"
+                  (click)="createWorkspace()">
+                  <span>{{ i18n.text('nextStepCreateDraftCta') }}</span>
+                </button>
+              }
+              @if (runtime.mode() === 'remote') {
+                <button
+                  type="button"
+                  class="quiet-button"
+                  data-testid="next-step-ask-ai-cta"
+                  (click)="setInspectorTab('ai')">
+                  <pax-icon name="sparkles" [size]="14" />
+                  <span>{{ i18n.text('nextStepAskAiCta') }}</span>
+                </button>
+              }
             </div>
           </section>
-          @if (!action.availability.allowed) {
-            <p class="empty">{{ i18n.text('operationalActionUnavailable') }}</p>
-          }
-          @if (operationalConfirmationOpen()) {
-            <section class="operational-confirmation" role="group" [attr.aria-label]="i18n.text('confirmOperationalTest')">
-              <strong>{{ i18n.text('confirmOperationalTest') }}</strong>
-              <p>{{ i18n.text('operationalTestBoundary') }}</p>
-              <div class="authoring-actions">
-                <button type="button" class="quiet-button" (click)="cancelOperationalTest()">{{ i18n.text('cancel') }}</button>
-                <button type="button" [disabled]="authoringBusy()" (click)="runOperationalTest()">{{ i18n.text('executeOperationalTest') }}</button>
+
+          <section class="meaning-block">
+            @if (showStandaloneMeaning(current)) {
+              <p class="section-label">{{ i18n.text('meaning') }}</p>
+              <p class="meaning">{{ meaningText(current) }}</p>
+            }
+
+            @let didactic = effectiveDocumentation(current);
+            <section class="didactic-panel" data-testid="decision-didactic-panel" [attr.aria-label]="i18n.text('didacticDocumentationSection')">
+              <div class="didactic-panel-header">
+                <p class="section-label">{{ i18n.text('didacticSectionTitle') }}</p>
+                @if (!hasCompleteDidacticDocumentation(didactic)) {
+                  <span class="didactic-fallback-badge" data-testid="decision-didactic-fallback">
+                    {{ i18n.text('didacticFallbackBadge') }}
+                  </span>
+                }
               </div>
-            </section>
-          }
-        }
-        <pax-policy-sandbox-results [run]="sandboxRun()" />
-      </section>
-
-
-      <section class="review-workspace work-mode-panel" aria-labelledby="review-title" [hidden]="activeMode() !== 'operate'">
-        <header>
-          <div>
-            <p class="section-label" id="review-title">{{ i18n.text('independentReview') }}</p>
-            <p>{{ i18n.text('reviewBoundary') }}</p>
-          </div>
-          <strong>{{ reviews().length }}</strong>
-        </header>
-        <div class="review-list">
-          @for (review of reviews(); track review.id) {
-            <article>
-              <strong>{{ review.decision }}</strong>
-              <span>{{ review.reviewerRef }} · rev {{ review.workspaceRevision }}</span>
-              <p>{{ review.rationale }}</p>
-              <time [attr.datetime]="review.reviewedAt">{{ review.reviewedAt }}</time>
-            </article>
-          } @empty {
-            <p class="empty">{{ i18n.text('noReviews') }}</p>
-          }
-        </div>
-        @if (hasWorkspaceAction('REVIEW')) {
-          <form #reviewForm class="review-form" (submit)="$event.preventDefault()">
-            <label>
-              <span>{{ i18n.text('reviewRationale') }}</span>
-              <textarea #reviewRationale rows="3" required [value]="reviewRationaleValue()" (input)="reviewRationaleValue.set(reviewRationale.value)"></textarea>
-            </label>
-            <div class="governed-actions">
-              <button type="button" class="quiet-button" [disabled]="authoringBusy() || !reviewRationaleValue().trim()" (click)="reviewGovernedWorkspace('REJECT', reviewRationaleValue(), reviewForm)">
-                {{ i18n.text('rejectWorkspace') }}
-              </button>
-              <button type="button" [disabled]="authoringBusy() || !reviewRationaleValue().trim()" (click)="reviewGovernedWorkspace('APPROVE', reviewRationaleValue(), reviewForm)">
-                {{ i18n.text('approveWorkspace') }}
-              </button>
-            </div>
-          </form>
-        }
-        @if (hasWorkspaceAction('PROMOTE')) {
-          <div class="governed-actions">
-            <button type="button" [disabled]="authoringBusy()" (click)="promoteGovernedWorkspace()">
-              {{ i18n.text('promoteWorkspace') }}
-            </button>
-          </div>
-        }
-        @if (workspaceCapabilitiesLoading()) {
-          <p class="empty" role="status">{{ i18n.text('loading') }}</p>
-        } @else if (workspaceCapabilitiesError()) {
-          <p class="state-message" role="alert">{{ i18n.text('governedCommandFailed') }}</p>
-        } @else if (workspaceCapabilities(); as capabilities) {
-          <pax-workspace-blockers [capabilities]="capabilities" />
-        }
-        @if (governanceGateSummary(); as gateMatrix) {
-          <div class="governance-gate-summary" data-testid="governance-gate-summary">
-            <p class="section-label">{{ i18n.text('governanceGateMatrixTitle') }}</p>
-            <small class="authority-note">{{ i18n.text('governanceGateMatrixHint') }}</small>
-            @if (gateMatrix.submittedTestRunId) {
-              <small class="authority-note" data-testid="governance-bound-receipt">
-                {{ i18n.text('boundEvidenceReceipt') }}: <code>{{ gateMatrix.submittedTestRunId }}</code>
-                @if (gateMatrix.evidenceEligibility) {
-                  · <code>{{ gateMatrix.evidenceEligibility }}</code>
+              <dl class="didactic-sections">
+                @if (didactic?.title && didactic!.title !== current.name && didactic!.title !== displayCanvasTitle(current)) {
+                  <div class="didactic-span-full" data-testid="didactic-title">
+                    <dt>{{ i18n.text('didacticTitleHeading') }}</dt>
+                    <dd>{{ didactic!.title }}</dd>
+                  </div>
                 }
-              </small>
-            }
-            <dl class="facts lifecycle-grid">
-              @for (gate of gateMatrix.gates; track gate.id) {
-                <div [attr.data-testid]="'governance-gate-' + gate.id">
-                  <dt><code>{{ gate.id }}</code></dt>
+                <div class="didactic-span-full" data-testid="didactic-summary">
+                  <dt>{{ i18n.text('didacticWhatItChecks') }}</dt>
+                  <dd>{{ didactic?.summary || meaningText(current) }}</dd>
+                </div>
+                <div data-testid="didactic-when-applies">
+                  <dt>{{ i18n.text('didacticWhenApplies') }}</dt>
                   <dd>
-                    <strong>{{ i18n.text(gate.allowed ? 'gateStatusAuthorized' : 'gateStatusSegregatedOrBlocked') }}</strong>
-                    ·
-                    <small>{{ i18n.text(gate.etagBound ? 'gateEtagReady' : 'gateEtagMissing') }}@if (gate.etagValue) { (<code>{{ gate.etagValue }}</code>) }</small>
-                    @if (gate.reviewerRefs.length) {
-                      · <small>4-eyes: <code>{{ gate.reviewerRefs.join(', ') }}</code></small>
-                    }
-                    @if (gate.blockerCodes.length) {
-                      · <small><code>{{ gate.blockerCodes.join(', ') }}</code></small>
-                    }
-                    @if (gate.allowed && isActionableDelegatedGate(gate.id)) {
-                      ·
-                      <button
-                        type="button"
-                        class="quiet-button"
-                        [attr.data-testid]="'delegated-command-' + gate.id"
-                        [disabled]="authoringBusy() || (gate.id === 'SUBMIT' && draftChanged())"
-                        (click)="requestDelegatedGateCommand(gate.id)">
-                        {{ i18n.text('executeDelegatedGateCommand') }}
-                      </button>
+                    @if (didactic?.whenApplies) {
+                      {{ didactic!.whenApplies }}
+                    } @else if (viewDepth() === 'technical') {
+                      <span class="didactic-empty-value">{{ i18n.text('didacticNotInformed') }}</span>
+                    } @else {
+                      <span class="didactic-empty-value">—</span>
                     }
                   </dd>
                 </div>
-              }
-            </dl>
-          </div>
-        }
-        <small class="authority-note">{{ i18n.text('serverAuthorizesActions') }}</small>
-      </section>
-
-      @if (current.promotedDefinitionId) {
-        <section class="publication-workspace work-mode-panel" aria-labelledby="publication-title" [hidden]="activeMode() !== 'operate'">
-          <header>
-            <div>
-              <p class="section-label" id="publication-title">{{ i18n.text('publicationReadiness') }}</p>
-              <p>{{ i18n.text('publicationBoundary') }}</p>
-            </div>
-            <code>{{ current.promotedDefinitionId }}</code>
-          </header>
-          <button type="button" [disabled]="authoringBusy()" (click)="inspectPublicationReadiness()">
-            {{ i18n.text('inspectReadiness') }}
-          </button>
-          @if (publicationReadiness(); as readiness) {
-            <dl class="facts lifecycle-grid">
-              <div><dt>{{ i18n.text('readiness') }}</dt><dd>{{ readiness.readiness ?? '—' }}</dd></div>
-              <div><dt>{{ i18n.text('structuralResult') }}</dt><dd>{{ readiness.result ?? '—' }}</dd></div>
-              <div><dt>{{ i18n.text('existingCoverage') }}</dt><dd>{{ readiness.existingCoverage.length }}</dd></div>
-              <div><dt>{{ i18n.text('requiredApprovals') }}</dt><dd>{{ readiness.requiredApprovals.length }}</dd></div>
-              <div><dt>{{ i18n.text('predictedTargets') }}</dt><dd>{{ readiness.predictedMaterializations.length }}</dd></div>
-              <div><dt>{{ i18n.text('warnings') }}</dt><dd>{{ readiness.warnings.length }}</dd></div>
-            </dl>
-            @if (readiness.recommendedAction) { <p>{{ readiness.recommendedAction }}</p> }
-            <div class="readiness-details">
-              @for (target of readiness.predictedMaterializations; track $index) { <code>{{ displayDiffValue(target) }}</code> }
-              @for (warning of readiness.warnings; track $index) { <code class="warning">{{ displayDiffValue(warning) }}</code> }
-            </div>
-            <button type="button" [disabled]="authoringBusy() || readiness.readiness !== 'ready_to_publish' || !hasDefinitionAction('PUBLISH')" (click)="publishGovernedDefinition()">
-              {{ i18n.text('publishDefinition') }}
-            </button>
-          }
-          @if (publicationResult(); as publication) {
-            <p role="status">{{ publication.status }} · {{ publication.readiness }} · {{ publication.materializationCount }} {{ i18n.text('materializations') }}</p>
-          }
-          <small class="authority-note">{{ i18n.text('publicationSeparation') }}</small>
-        </section>
-      }
-    }
-
-    <section class="anchored-section execution-section work-mode-panel" id="decision-execution" tabindex="-1" [attr.aria-labelledby]="'decision-execution-title'" [hidden]="activeMode() !== 'operate'">
-      <header class="section-introduction">
-        <p class="section-label" id="decision-execution-title">{{ i18n.text('execution') }}</p>
-        <p>{{ i18n.text('executionBoundary') }}</p>
-      </header>
-      @if (executionCorrelation(); as correlation) {
-        <div class="execution-correlation-summary" data-testid="execution-correlation-summary">
-          <p class="section-label">{{ i18n.text('executionCorrelationTitle') }}</p>
-          <small class="authority-note">{{ i18n.text('executionCorrelationHint') }}</small>
-          <dl class="facts lifecycle-grid">
-            <div data-testid="correlation-slo-posture">
-              <dt>{{ i18n.text('sloPostureLabel') }}</dt>
-              <dd><strong>{{ sloPostureLabel(correlation.sloPosture) }}</strong></dd>
-            </div>
-            <div data-testid="correlation-success-ratio">
-              <dt>{{ i18n.text('runtimeSuccessRatio') }}</dt>
-              <dd>{{ correlation.successRatioPercent !== null ? (correlation.successRatioPercent + '%') : '—' }} ({{ correlation.totalObservations }})</dd>
-            </div>
-            <div data-testid="correlation-host-alignment">
-              <dt>{{ i18n.text('hostAlignmentRatio') }}</dt>
-              <dd>{{ hostStatusSummary() ? (correlation.alignedHosts + '/' + correlation.totalHosts) : i18n.text('hostAlignmentUnavailable') }}</dd>
-            </div>
-            <div data-testid="correlation-bound-receipt">
-              <dt>{{ i18n.text('boundEvidenceReceipt') }}</dt>
-              <dd>
-                @if (correlation.boundTestRunId) {
-                  <code>{{ correlation.boundTestRunId }}</code>
-                  @if (correlation.evidenceEligibility) {
-                    · <code>{{ correlation.evidenceEligibility }}</code>
-                  }
-                } @else {
-                  —
-                }
-              </dd>
-            </div>
-            <div data-testid="correlation-causal-diagnosis">
-              <dt>{{ i18n.text('causalDiagnosisLabel') }}</dt>
-              <dd>{{ causalDiagnosisLabel(correlation.causalState) }}</dd>
-            </div>
-          </dl>
-        </div>
-      }
-    @if (runtime.mode() === 'remote') {
-      <pax-snapshot-cockpit
-        [ruleSetKey]="current.ruleSetKey"
-          [operationKeys]="current.operationKeys"
-          [operationKey]="snapshots.snapshotOperationKey()"
-          (operationSelected)="snapshots.selectSnapshotOperation($event)"
-        [head]="snapshotHead()"
-        [headSet]="snapshotHeadSet()"
-        [headSetLoading]="snapshotHeadSetLoading()"
-        [headSetError]="snapshotHeadSetError()"
-        [versions]="snapshotVersions()"
-        [loading]="snapshotsLoading()"
-        [loadError]="snapshotsError()"
-        [busy]="snapshotBusy()"
-        [feedback]="snapshotFeedback()"
-        [feedbackError]="snapshotFeedbackError()"
-        [blockers]="snapshotBlockers()"
-        [executionSummary]="executionSummary()"
-        [executionSummaryLoading]="executionSummaryLoading()"
-        [executionSummaryError]="executionSummaryError()"
-        [hostStatusSummary]="hostStatusSummary()"
-        [hostStatusLoading]="hostStatusLoading()"
-        [hostStatusError]="hostStatusError()"
-        [rolloutPolicyCatalog]="rolloutPolicyCatalog()"
-        [rolloutPolicyTimeline]="rolloutPolicyTimeline()"
-        [rolloutPoliciesLoading]="rolloutPoliciesLoading()"
-        [rolloutPoliciesError]="rolloutPoliciesError()"
-        [rolloutPolicyBusy]="rolloutPolicyBusy()"
-        [rolloutPolicyFeedback]="rolloutPolicyFeedback()"
-        [rolloutPolicyFeedbackError]="rolloutPolicyFeedbackError()"
-        [rolloutCatalog]="rolloutCatalog()"
-        [rolloutLoading]="rolloutLoading()"
-        [rolloutError]="rolloutError()"
-        [rolloutBusy]="rolloutBusy()"
-        [rolloutFeedback]="rolloutFeedback()"
-        [rolloutFeedbackError]="rolloutFeedbackError()"
-        [compositionCandidate]="compositionCandidate()"
-        [compositionApproval]="compositionApproval()"
-        [compositionPublication]="compositionPublication()"
-        [defaultSourceDefinitionId]="defaultSnapshotSourceDefinitionId()"
-        [eligibleSources]="eligibleSnapshotSources()"
-        [catalogDecisions]="allDecisions()"
-        (retry)="loadSnapshots()"
-        (retryExecutionSummary)="loadExecutionSummary()"
-        (retryHostStatus)="loadHostStatusSummary()"
-        (retryRolloutPolicies)="loadRolloutPolicies()"
-        (createRolloutPolicy)="createRolloutPolicy($event)"
-        (approveRolloutPolicy)="approveRolloutPolicy($event)"
-        (activateRolloutPolicy)="activateRolloutPolicy($event)"
-        (retryRollouts)="loadRollouts()"
-        (createRollout)="createRollout($event)"
-        (cancelRollout)="cancelRollout($event)"
-        (activateRollout)="activateRollout($event)"
-        (operate)="operateSnapshot($event)"
-        (withdrawHead)="snapshots.withdrawSnapshotHead($event)"
-        (prepareComposition)="prepareSnapshotComposition($event)"
-        (approveComposition)="approveSnapshotComposition($event)"
-        (publishComposition)="publishSnapshotComposition($event)"
-        (compositionDraftChanged)="invalidateSnapshotCompositionDraft()" />
-    } @else {
-      <p class="empty">{{ i18n.text('executionUnavailableFixture') }}</p>
-    }
-    </section>
-
-    <section class="evidence-ledger anchored-section work-mode-panel" id="decision-history" tabindex="-1" aria-labelledby="evidence-title" [hidden]="activeMode() !== 'history'">
-      <div>
-        <p class="section-label" id="evidence-title">{{ i18n.text('evidence') }}</p>
-        <p>{{ i18n.text('packageEvidenceScope') }}</p>
-      </div>
-      <details class="evidence-details">
-        <summary>{{ current.evidenceCount }} {{ i18n.text('packageReferences') }}</summary>
-        <ol>
-          @for (item of current.evidence; track item.path + ':' + item.kind) {
-            <li>
-              <span>{{ item.kind }}</span>
-              <code>{{ item.path }}</code>
-              @if (item.sha256) {
-                <small>SHA-256 {{ item.sha256.slice(0, 12) }}…</small>
-              }
-            </li>
-          }
-        </ol>
-      </details>
-    </section>
-
-    @if (current.workspaceId) {
-      <section class="timeline work-mode-panel" aria-labelledby="lifecycle-title" [hidden]="activeMode() !== 'history'">
-        <p class="section-label" id="lifecycle-title">{{ i18n.text('governedLifecycle') }}</p>
-        @if (lifecycleLoading()) {
-          <p class="empty" aria-live="polite">{{ i18n.text('loading') }}</p>
-        } @else if (lifecycleError()) {
-          <p class="empty state-message" role="alert">{{ i18n.text('lifecycleError') }}</p>
-          <button type="button" class="quiet-button" (click)="loadLifecycle()">{{ i18n.text('retryLifecycle') }}</button>
-        } @else if (lifecycle(); as governed) {
-          <dl class="facts lifecycle-grid">
-            <div><dt>{{ i18n.text('workspaceStatus') }}</dt><dd>{{ workspaceStatusLabel(governed.workspaceStatus) }}</dd></div>
-            <div><dt>{{ i18n.text('revision') }}</dt><dd>{{ governed.workspaceRevision }}</dd></div>
-            <div><dt>{{ i18n.text('testRuns') }}</dt><dd>{{ governed.testRunCount }}</dd></div>
-            <div><dt>{{ i18n.text('reviews') }}</dt><dd>{{ governed.reviewCount }}</dd></div>
-            <div><dt>{{ i18n.text('materializations') }}</dt><dd>{{ governed.materializationCount }}</dd></div>
-            @if (governed.submittedTestRunId) {
-              <div><dt>{{ i18n.text('submittedTestRun') }}</dt><dd><code>{{ governed.submittedTestRunId }}</code></dd></div>
-            }
-          </dl>
-          @if (governed.latestTestRun?.baselineEvidence; as baseline) {
-            <section aria-labelledby="test-evidence-title">
-              <p class="section-label" id="test-evidence-title">{{ i18n.text('testEvidenceAuthority') }}</p>
-              <dl class="facts lifecycle-grid">
-                <div>
-                  <dt>{{ i18n.text('baselineType') }}</dt>
+                <div data-testid="didactic-rationale">
+                  <dt>{{ i18n.text('didacticRationale') }}</dt>
                   <dd>
-                    @switch (baseline.authorityType) {
-                      @case ('LEGACY_ORACLE') { {{ i18n.text('legacyOracle') }} }
-                      @case ('ACTIVE_SNAPSHOT') { {{ i18n.text('activeSnapshotBaseline') }} }
-                      @default { {{ i18n.text('syntheticExpected') }} }
+                    @if (didactic?.rationale) {
+                      {{ didactic!.rationale }}
+                    } @else if (viewDepth() === 'technical') {
+                      <span class="didactic-empty-value">{{ i18n.text('didacticNotInformed') }}</span>
+                    } @else {
+                      <span class="didactic-empty-value">—</span>
                     }
                   </dd>
                 </div>
-                <div>
-                  <dt>{{ i18n.text('evidenceEligibility') }}</dt>
+                <div data-testid="didactic-legal-basis">
+                  <dt>{{ i18n.text('didacticLegalBasis') }}</dt>
                   <dd>
-                    @switch (baseline.eligibility) {
-                      @case ('ELIGIBLE') { {{ i18n.text('eligibleEvidence') }} }
-                      @case ('INELIGIBLE') { {{ i18n.text('ineligibleEvidence') }} }
-                      @default { {{ i18n.text('pendingEvidence') }} }
+                    @if (didactic?.legalBasis?.length) {
+                      <ul class="legal-basis-list">
+                        @for (basis of didactic!.legalBasis!; track basis.code + ':' + (basis.article ?? '') + ':' + $index) {
+                          <li class="legal-basis-chip" data-testid="didactic-legal-basis-chip">
+                            <div class="legal-basis-chip-head">
+                              <strong>{{ basis.code }}</strong>
+                              @if (basis.article) {
+                                <span>· {{ basis.article }}</span>
+                              }
+                              @if (basis.jurisdiction) {
+                                <span class="legal-basis-jurisdiction">{{ basis.jurisdiction }}</span>
+                              }
+                            </div>
+                            @if (basis.title) {
+                              <small class="legal-basis-title">{{ basis.title }}</small>
+                            }
+                            @if (basis.summary) {
+                              <p class="legal-basis-summary">{{ basis.summary }}</p>
+                            }
+                            @if (safeLegalBasisUrl(basis.url); as safeHref) {
+                              <a
+                                class="legal-basis-link"
+                                [href]="safeHref"
+                                target="_blank"
+                                rel="noopener noreferrer">
+                                {{ i18n.text('legalBasisOpenLink') }}
+                              </a>
+                            }
+                          </li>
+                        }
+                      </ul>
+                    } @else if (viewDepth() === 'technical') {
+                      <span class="didactic-empty-value">{{ i18n.text('didacticNoLegalBasis') }}</span>
+                    } @else {
+                      <span class="didactic-empty-value">—</span>
                     }
                   </dd>
                 </div>
-                <div><dt>{{ i18n.text('evidenceObservedAt') }}</dt><dd><time [attr.datetime]="baseline.observedAtUtc">{{ baseline.observedAtUtc }}</time></dd></div>
-                <div><dt>{{ i18n.text('provenScenarios') }}</dt><dd>{{ governed.latestTestRun?.results?.length ?? 0 }}</dd></div>
-                <div><dt>{{ i18n.text('evidenceArtifact') }}</dt><dd><code>{{ baseline.artifactRef }}</code></dd></div>
-                <div><dt>{{ i18n.text('evidenceFingerprint') }}</dt><dd><code>{{ baseline.artifactDigest.slice(0, 12) }}…</code></dd></div>
+                <div data-testid="didactic-customization-guidance">
+                  <dt>{{ i18n.text('didacticCustomizationGuidance') }}</dt>
+                  <dd>{{ didactic?.customizationGuidance || customizationGuidanceFallback(current) }}</dd>
+                </div>
               </dl>
             </section>
-          }
-          @if (operationalTestEvidence().length) {
-            <section aria-labelledby="operational-evidence-title">
-              <p class="section-label" id="operational-evidence-title">{{ i18n.text('operationalEvidence') }}</p>
-              <div>
-                @for (item of operationalTestEvidence(); track item.scenarioKey) {
-                  <article class="timeline-event">
-                    <strong>{{ item.scenarioKey }}</strong>
-                    <dl class="facts lifecycle-grid">
-                      <div><dt>{{ i18n.text('operation') }}</dt><dd>{{ item.evidence.operationMode }}</dd></div>
-                      <div>
-                        <dt>{{ i18n.text('mutation') }}</dt>
-                        <dd>{{ i18n.text(item.evidence.mutationObserved ? 'mutationObserved' : 'noMutationVerified') }}</dd>
-                      </div>
-                      <div><dt>{{ i18n.text('cleanup') }}</dt><dd>{{ i18n.text(item.evidence.cleanupVerified ? 'verified' : 'notVerified') }}</dd></div>
-                      <div><dt>{{ i18n.text('baselineCalls') }}</dt><dd>{{ item.evidence.baselineCallCount }}</dd></div>
-                    </dl>
-                  </article>
+          </section>
+
+          <section class="evaluated-facts-strip" data-testid="evaluated-facts-strip" [attr.aria-label]="i18n.text('evaluatedFactsHeading')">
+            <p class="section-label">{{ i18n.text('evaluatedFactsHeading') }}</p>
+            @if (current.facts.length > 0) {
+              <ul class="fact-chip-list">
+                @for (fact of current.facts; track fact.path) {
+                  <li>
+                    <pax-term-popover
+                      variant="chip"
+                      icon="database"
+                      tone="info"
+                      [term]="displayFactLabel(fact)"
+                      [badge]="fact.nullable ? null : '*'"
+                      [category]="fact.valueType"
+                      [title]="displayFactLabel(fact)"
+                      [summary]="factSummaryForPopover(fact)"
+                      [detail]="factDetailForPopover(fact)" />
+                  </li>
                 }
+              </ul>
+            } @else {
+              <p class="didactic-empty-value">{{ i18n.text('evaluatedFactsEmpty') }}</p>
+            }
+
+            @let paramEntries = evaluatedParameterEntries(current);
+            @if (paramEntries.length > 0) {
+              <p class="section-label evaluated-params-label">{{ i18n.text('evaluatedParametersSubheading') }}</p>
+              <ul class="fact-chip-list">
+                @for (param of paramEntries; track param.key) {
+                  <li>
+                    <pax-term-popover
+                      variant="chip"
+                      icon="sliders"
+                      [tone]="param.isCustomized ? 'warning' : 'success'"
+                      [term]="param.label"
+                      [badge]="param.valueText"
+                      [category]="i18n.text('evaluatedParametersSubheading')"
+                      [title]="param.label"
+                      [summary]="param.description"
+                      [detail]="param.detailText" />
+                  </li>
+                }
+              </ul>
+            }
+          </section>
+
+          <pax-rule-decision-plan-dag
+            [selected]="current"
+            [decisions]="allDecisions()"
+            [sandboxRun]="sandboxRun()"
+            [latestTestRun]="lifecycle()?.latestTestRun ?? null"
+            [viewDepth]="viewDepth()"
+            (technicalModeRequested)="enableTechnicalView()"
+            (decisionSelected)="select($event)"
+            (conceptRootSelected)="filterByOntologyRoot($event)" />
+        </div>
+
+        <section class="inspection anchored-section work-mode-panel" id="decision-rule" tabindex="-1" aria-labelledby="inspection-title" [hidden]="activeMode() !== 'rule'">
+          <header class="inspection-heading">
+            <div>
+              <p class="section-label" id="inspection-title">{{ i18n.text('inspection') }}</p>
+              <p class="inspection-summary">{{ i18n.text('inspectionHint') }}</p>
+            </div>
+          </header>
+
+          <div class="inspection-grid">
+            <section class="condition-panel">
+              <p class="inspection-label">{{ i18n.text('condition') }}</p>
+              @if (current.expression) {
+                <code class="expression">{{ current.expression }}</code>
+              } @else {
+                <p class="inspection-empty">{{ i18n.text('noCondition') }}</p>
+              }
+              <dl class="contract-facts">
+                <div><dt>{{ i18n.text('missingDataBehavior') }}</dt><dd>{{ nullSemanticsLabel(current.nullSemantics) }}</dd></div>
+              </dl>
+              <details class="technical-details condition-technical-details" [attr.open]="viewDepth() === 'technical' ? '' : null">
+                <summary>{{ i18n.text('conditionTechnicalDetails') }}</summary>
+                <dl>
+                  <div><dt>{{ i18n.text('nullBehavior') }}</dt><dd><code>{{ current.nullSemantics ?? '—' }}</code></dd></div>
+                  <div><dt>{{ i18n.text('operations') }}</dt><dd><code>{{ current.operationKeys.join(' · ') || '—' }}</code></dd></div>
+                  <div><dt>{{ i18n.text('hostContract') }}</dt><dd><code>{{ current.hostContractVersion ?? '—' }}</code></dd></div>
+                </dl>
+              </details>
+            </section>
+
+            <section class="facts-panel">
+              <p class="inspection-label">{{ i18n.text('facts') }}</p>
+              @if (maturityPosture(); as posture) {
+                @if (posture.totalFacts > 0) {
+                  <small class="authority-note" data-testid="fact-redaction-summary">
+                    {{ i18n.text('factRedactionSummaryTitle') }}:
+                    {{ posture.sensitiveFactsCount }}/{{ posture.totalFacts }} {{ i18n.text('factSensitiveCount') }} ·
+                    {{ posture.redactedFactsCount }}/{{ posture.totalFacts }} {{ i18n.text('factRedactedCount') }}
+                  </small>
+                }
+              }
+              <ul class="fact-list">
+                @for (fact of current.facts; track fact.path) {
+                  <li>
+                    <strong>{{ fact.label }}</strong>
+                    <code>{{ fact.path }}</code>
+                    <small>{{ fact.description }} · {{ fact.valueType }} · {{ i18n.text(fact.nullable ? 'factNullable' : 'factRequired') }} · {{ fact.sensitivity }} / {{ fact.redaction }}</small>
+                  </li>
+                }
+                @empty { <li class="inspection-empty fact-gap">{{ i18n.text('factCatalogUnavailable') }}</li> }
+              </ul>
+            </section>
+          </div>
+
+          <div class="version-compare" [attr.aria-label]="i18n.text('authorityDraftComparison')">
+            <section>
+              <span class="version-kicker">{{ i18n.text('baseline') }}</span>
+              <strong>{{ i18n.text('referenceBaseline') }}</strong>
+              <small>{{ current.baselineAuthority }}</small>
+            </section>
+            <pax-icon class="compare-arrow" name="arrow-right" [size]="18" />
+            <section [class.unavailable]="!current.configStatus">
+              <span class="version-kicker">{{ i18n.text('draft') }}</span>
+              <strong>{{ current.configStatus ? configStatusLabel(current.configStatus) : i18n.text('noDraft') }}</strong>
+              <small>{{ i18n.text('governedDraftReviewHint') }}</small>
+            </section>
+          </div>
+
+          @if (current.workspaceId) {
+            <section class="semantic-diff" aria-labelledby="semantic-diff-title">
+              <header>
+                <div>
+                  <p class="section-label" id="semantic-diff-title">{{ i18n.text('semanticDiff') }}</p>
+                  <p>{{ i18n.text('semanticDiffBoundary') }}</p>
+                </div>
+                <strong>{{ semanticDiff().length }}</strong>
+              </header>
+              @for (change of semanticDiff(); track change.path + change.kind) {
+                <article>
+                  <span>{{ change.kind }}</span>
+                  <code>{{ change.path }}</code>
+                  <small>{{ displayDiffValue(change.baseline) }} → {{ displayDiffValue(change.candidate) }}</small>
+                </article>
+              } @empty {
+                <p class="empty">{{ i18n.text('noSemanticChanges') }}</p>
+              }
+            </section>
+          }
+        </section>
+
+        @if (authoringOpen() && editorConfig(); as authoringConfig) {
+          <section class="draft-workspace work-mode-panel" tabindex="-1" aria-labelledby="draft-workspace-title" [hidden]="activeMode() !== 'rule'">
+            <header>
+              <div>
+                <p class="section-label">{{ i18n.text('localDraft') }}</p>
+                <h2 id="draft-workspace-title">{{ current.name }}</h2>
+                <p>{{ i18n.text('localDraftBoundary') }}</p>
               </div>
+              <button type="button" class="quiet-button" (click)="closeAuthoring()">{{ i18n.text('close') }}</button>
+            </header>
+            @if (draftCondition() !== null) {
+              @defer (when authoringOpen()) {
+                <pax-local-draft-workspace
+                  [config]="authoringConfig"
+                  [condition]="editorCondition()"
+                  (conditionChanged)="updateDraft($event)"
+                  (stateChanged)="updateEditorState($event)" />
+              } @placeholder {
+                <p>{{ i18n.text('loading') }}</p>
+              }
+            }
+            @if (hasEditableParameters(current)) {
+              <pax-decision-parameters-editor
+                [parameterCatalog]="current.parameterCatalog ?? null"
+                [parameters]="draftParameters()"
+                (parametersChanged)="updateDraftParameters($event)"
+                (validationErrorsChanged)="parameterValidationErrors.set($event)" />
+            }
+            <pax-decision-documentation-editor
+              idPrefix="workspace-doc"
+              [documentation]="draftDocumentation()"
+              [disabled]="authoringBusy()"
+              (documentationChanged)="updateDraftDocumentation($event)"
+              (validationErrorsChanged)="documentationValidationErrors.set($event)" />
+            @if (suggestedDiffProposals().length) {
+              <div class="assisted-diff-proposals" data-testid="assisted-diff-proposals">
+                <p class="section-label">{{ i18n.text('assistedDiffProposalsTitle') }}</p>
+                <small class="authority-note">{{ i18n.text('assistedDiffProposalsHint') }}</small>
+                <div class="governed-actions">
+                  @for (proposal of suggestedDiffProposals(); track proposal.id) {
+                    <button
+                      type="button"
+                      class="quiet-button"
+                      [attr.data-testid]="'apply-diff-proposal-' + proposal.id"
+                      [disabled]="authoringBusy()"
+                      (click)="applyDiffProposal(proposal)">
+                      {{ proposal.label }}
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+            <div class="draft-compare" [attr.aria-label]="i18n.text('loadedDraftConditionComparison')">
+              <section>
+                <span>{{ i18n.text('loadedCondition') }}</span>
+                <code>{{ originalExpression() ?? '—' }}</code>
+              </section>
+              <section [class.changed]="draftChanged()">
+                <span>{{ i18n.text('localCondition') }}</span>
+                <code>{{ draftExpression() ?? '—' }}</code>
+              </section>
+            </div>
+            @if (ontologicalWarning(); as ontologyAlert) {
+              <div class="ontology-warning-banner" role="alert" data-testid="authoring-ontology-warning">
+                <p class="state-message">{{ ontologyAlert }}</p>
+                <button
+                  type="button"
+                  class="quiet-button"
+                  data-testid="authoring-ontology-autofix"
+                  [disabled]="authoringBusy()"
+                  (click)="autoFixDraftOntology()">
+                  {{ i18n.locale() === 'pt-BR' ? 'Normalizar raízes ontológicas' : 'Normalize ontological roots' }}
+                </button>
+              </div>
+            }
+            <footer>
+              <div>
+                <strong>{{ totalAuthoringValidationErrors() }} {{ i18n.text('validationIssues') }}</strong>
+                <small>{{ draftChanged() ? i18n.text('unsavedLocalChanges') : i18n.text('unchangedDraft') }}</small>
+              </div>
+              <div class="authoring-actions">
+                <button type="button" class="quiet-button" (click)="resetDraft()">{{ i18n.text('resetDraft') }}</button>
+                <button type="button" class="primary-action" [disabled]="authoringBusy() || !hasWorkspaceAction('UPDATE_DRAFT') || !draftChanged() || totalAuthoringValidationErrors() > 0" (click)="saveGovernedDraft()">
+                  {{ i18n.text('saveDraft') }}
+                </button>
+              </div>
+            </footer>
+          </section>
+        }
+
+        @if (current.workspaceId) {
+          <section class="scenario-workspace anchored-section work-mode-panel" id="decision-tests" tabindex="-1" aria-labelledby="scenario-title" [hidden]="activeMode() !== 'test'">
+            <header>
+              <div>
+                <p class="section-label" id="scenario-title">{{ i18n.text('testScenarios') }}</p>
+                <p>{{ i18n.text('scenarioBoundary') }}</p>
+              </div>
+              <strong>{{ scenarios().length }}</strong>
+            </header>
+            <pax-scenario-create-form [facts]="current.facts" [factValues]="scenarioFactDraft()"
+              [factsJson]="scenarioFactsJson()" [fallbackJson]="scenarioFactsFallback()"
+              [busy]="authoringBusy()" [canManage]="hasWorkspaceAction('MANAGE_SCENARIOS')"
+              [suggestions]="suggestedScenarios()"
+              [canScaffoldOntology]="canScaffoldScenarioOntology()"
+              [ontologyWarning]="scenarioOntologyWarning()"
+              (factValueChanged)="setScenarioFactValue($event.fact, $event.value)"
+              (factNullChanged)="setScenarioFactNull($event.fact, $event.useNull)"
+              (fallbackJsonChanged)="scenarioFactsFallback.set($event)"
+              (suggestionApplied)="applyScenarioSuggestion($event)"
+              (scaffoldOntologyRequested)="scaffoldScenarioOntology()"
+              (createRequested)="createScenarioFromView($event)" />
+            @if (scenarioFeedback()) {
+              <p class="task-feedback" [class.state-message]="scenarioError()"
+                [attr.role]="scenarioError() ? 'alert' : 'status'">{{ scenarioFeedback() }}</p>
+            }
+            <pax-scenario-catalog [scenarios]="scenarios()" [facts]="current.facts"
+              [editingScenarioId]="editingScenarioId()" [editingFactValues]="editingScenarioFactDraft()"
+              [editingFactsJson]="editingScenarioFactsJson()" [busy]="authoringBusy()"
+              [canManage]="hasWorkspaceAction('MANAGE_SCENARIOS')" [operationalModeEnabled]="!!operationalAction()"
+              [operationalModes]="operationalScenarioModes()" (editRequested)="editScenario($event)"
+              (cancelRequested)="cancelScenarioEdit()" (editDirty)="markScenarioEditDirty()"
+              (factValueChanged)="setEditingScenarioFactValue($event.fact, $event.value)"
+              (factNullChanged)="setEditingScenarioFactNull($event.fact, $event.useNull)"
+              (updateRequested)="updateScenarioFromView($event)"
+              (operationModeChanged)="setOperationalScenarioMode($event.scenarioId, $event.mode)" />
+            <div class="governed-actions">
+              <button type="button" class="quiet-button" [disabled]="authoringBusy() || !hasWorkspaceAction('RECORD_TEST_RUN') || !activeScenarios().length || draftChanged()" (click)="runGovernedSandbox()">
+                {{ i18n.text('runSandbox') }}
+              </button>
+              <button type="button" class="primary-action" [disabled]="authoringBusy() || !hasWorkspaceAction('SUBMIT') || draftChanged()" (click)="submitGovernedWorkspace()">
+                {{ i18n.text('submitReview') }}
+              </button>
+            </div>
+            @if (sandboxFeedback()) {
+              <p class="task-feedback" [class.state-message]="sandboxError()"
+                [attr.role]="sandboxError() ? 'alert' : 'status'">{{ sandboxFeedback() }}</p>
+            }
+            @if (operationalActionLoading()) {
+              <p class="empty" role="status">{{ i18n.text('loadingOperationalAction') }}</p>
+            } @else if (operationalActionError()) {
+              <p class="state-message" role="alert">{{ i18n.text('operationalActionLoadError') }}</p>
+              <button type="button" class="quiet-button" (click)="loadOperationalTestAction()">{{ i18n.text('retryOperationalAction') }}</button>
+            } @else if (operationalAction(); as action) {
+              <section class="operational-command" aria-labelledby="operational-command-title">
+                <div>
+                  <strong id="operational-command-title">{{ action.title }}</strong>
+                  <p>{{ action.description }}</p>
+                  <small>{{ i18n.text('operationalSelectionCount') }}: {{ operationalSelections().length }}</small>
+                  @if (operationalPartialCoverage()) {
+                    <small class="authority-note" data-testid="operational-partial-coverage-hint">
+                      {{ i18n.text('operationalPartialCoverageHint') }}
+                    </small>
+                  }
+                </div>
+                <div class="authoring-actions">
+                  <button
+                    type="button"
+                    class="quiet-button"
+                    data-testid="select-all-operational-create"
+                    [disabled]="authoringBusy() || !activeScenarios().length"
+                    (click)="selectAllActiveOperationalScenarios('CREATE')">
+                    {{ i18n.text('selectAllOperationalCreate') }}
+                  </button>
+                  <button type="button" class="quiet-button" [disabled]="authoringBusy() || !action.availability.allowed || !current.workspaceEtag || !operationalSelections().length" (click)="reviewOperationalTest()">
+                    {{ i18n.text('reviewOperationalTest') }}
+                  </button>
+                </div>
+              </section>
+              @if (!action.availability.allowed) {
+                <p class="empty">{{ i18n.text('operationalActionUnavailable') }}</p>
+              }
+              @if (operationalConfirmationOpen()) {
+                <section class="operational-confirmation" role="group" [attr.aria-label]="i18n.text('confirmOperationalTest')">
+                  <strong>{{ i18n.text('confirmOperationalTest') }}</strong>
+                  <p>{{ i18n.text('operationalTestBoundary') }}</p>
+                  <div class="authoring-actions">
+                    <button type="button" class="quiet-button" (click)="cancelOperationalTest()">{{ i18n.text('cancel') }}</button>
+                    <button type="button" class="primary-action" [disabled]="authoringBusy()" (click)="runOperationalTest()">{{ i18n.text('executeOperationalTest') }}</button>
+                  </div>
+                </section>
+              }
+            }
+            <pax-policy-sandbox-results [run]="sandboxRun()" />
+          </section>
+
+          <section class="review-workspace work-mode-panel" aria-labelledby="review-title" [hidden]="activeMode() !== 'operate'">
+            <header>
+              <div>
+                <p class="section-label" id="review-title">{{ i18n.text('independentReview') }}</p>
+                <p>{{ i18n.text('reviewBoundary') }}</p>
+              </div>
+              <strong>{{ reviews().length }}</strong>
+            </header>
+            <div class="review-list">
+              @for (review of reviews(); track review.id) {
+                <article>
+                  <strong>{{ review.decision }}</strong>
+                  <span>{{ review.reviewerRef }} · rev {{ review.workspaceRevision }}</span>
+                  <p>{{ review.rationale }}</p>
+                  <time [attr.datetime]="review.reviewedAt">{{ review.reviewedAt }}</time>
+                </article>
+              } @empty {
+                <p class="empty">{{ i18n.text('noReviews') }}</p>
+              }
+            </div>
+            @if (hasWorkspaceAction('REVIEW')) {
+              <form #reviewForm class="review-form" (submit)="$event.preventDefault()">
+                <label>
+                  <span>{{ i18n.text('reviewRationale') }}</span>
+                  <textarea #reviewRationale rows="3" required [value]="reviewRationaleValue()" (input)="reviewRationaleValue.set(reviewRationale.value)"></textarea>
+                </label>
+                <div class="governed-actions">
+                  <button type="button" class="quiet-button" [disabled]="authoringBusy() || !reviewRationaleValue().trim()" (click)="reviewGovernedWorkspace('REJECT', reviewRationaleValue(), reviewForm)">
+                    {{ i18n.text('rejectWorkspace') }}
+                  </button>
+                  <button type="button" class="primary-action" [disabled]="authoringBusy() || !reviewRationaleValue().trim()" (click)="reviewGovernedWorkspace('APPROVE', reviewRationaleValue(), reviewForm)">
+                    {{ i18n.text('approveWorkspace') }}
+                  </button>
+                </div>
+              </form>
+            }
+            @if (hasWorkspaceAction('PROMOTE')) {
+              <div class="governed-actions">
+                <button type="button" class="primary-action" [disabled]="authoringBusy()" (click)="promoteGovernedWorkspace()">
+                  {{ i18n.text('promoteWorkspace') }}
+                </button>
+              </div>
+            }
+            @if (workspaceCapabilitiesLoading()) {
+              <p class="empty" role="status">{{ i18n.text('loading') }}</p>
+            } @else if (workspaceCapabilitiesError()) {
+              <p class="state-message" role="alert">{{ i18n.text('governedCommandFailed') }}</p>
+            } @else if (workspaceCapabilities(); as capabilities) {
+              <pax-workspace-blockers [capabilities]="capabilities" />
+            }
+            @if (governanceGateSummary(); as gateMatrix) {
+              <div class="governance-gate-summary" data-testid="governance-gate-summary">
+                <p class="section-label">{{ i18n.text('governanceGateMatrixTitle') }}</p>
+                <small class="authority-note">{{ i18n.text('governanceGateMatrixHint') }}</small>
+                @if (gateMatrix.submittedTestRunId) {
+                  <small class="authority-note" data-testid="governance-bound-receipt">
+                    {{ i18n.text('boundEvidenceReceipt') }}: <code>{{ gateMatrix.submittedTestRunId }}</code>
+                    @if (gateMatrix.evidenceEligibility) {
+                      · <code>{{ gateMatrix.evidenceEligibility }}</code>
+                    }
+                  </small>
+                }
+                <dl class="facts lifecycle-grid">
+                  @for (gate of gateMatrix.gates; track gate.id) {
+                    <div [attr.data-testid]="'governance-gate-' + gate.id">
+                      <dt><code>{{ gate.id }}</code></dt>
+                      <dd>
+                        <strong>{{ i18n.text(gate.allowed ? 'gateStatusAuthorized' : 'gateStatusSegregatedOrBlocked') }}</strong>
+                        ·
+                        <small>{{ i18n.text(gate.etagBound ? 'gateEtagReady' : 'gateEtagMissing') }}@if (gate.etagValue) { (<code>{{ gate.etagValue }}</code>) }</small>
+                        @if (gate.reviewerRefs.length) {
+                          · <small>4-eyes: <code>{{ gate.reviewerRefs.join(', ') }}</code></small>
+                        }
+                        @if (gate.blockerCodes.length) {
+                          · <small><code>{{ gate.blockerCodes.join(', ') }}</code></small>
+                        }
+                        @if (gate.allowed && isActionableDelegatedGate(gate.id)) {
+                          ·
+                          <button
+                            type="button"
+                            class="quiet-button"
+                            [attr.data-testid]="'delegated-command-' + gate.id"
+                            [disabled]="authoringBusy() || (gate.id === 'SUBMIT' && draftChanged())"
+                            (click)="requestDelegatedGateCommand(gate.id)">
+                            {{ i18n.text('executeDelegatedGateCommand') }}
+                          </button>
+                        }
+                      </dd>
+                    </div>
+                  }
+                </dl>
+              </div>
+            }
+            <small class="authority-note">{{ i18n.text('serverAuthorizesActions') }}</small>
+          </section>
+
+          @if (current.promotedDefinitionId) {
+            <section class="publication-workspace work-mode-panel" aria-labelledby="publication-title" [hidden]="activeMode() !== 'operate'">
+              <header>
+                <div>
+                  <p class="section-label" id="publication-title">{{ i18n.text('publicationReadiness') }}</p>
+                  <p>{{ i18n.text('publicationBoundary') }}</p>
+                </div>
+                <code>{{ current.promotedDefinitionId }}</code>
+              </header>
+              <button type="button" class="quiet-button" [disabled]="authoringBusy()" (click)="inspectPublicationReadiness()">
+                {{ i18n.text('inspectReadiness') }}
+              </button>
+              @if (publicationReadiness(); as readiness) {
+                <dl class="facts lifecycle-grid">
+                  <div><dt>{{ i18n.text('readiness') }}</dt><dd>{{ readiness.readiness ?? '—' }}</dd></div>
+                  <div><dt>{{ i18n.text('structuralResult') }}</dt><dd>{{ readiness.result ?? '—' }}</dd></div>
+                  <div><dt>{{ i18n.text('existingCoverage') }}</dt><dd>{{ readiness.existingCoverage.length }}</dd></div>
+                  <div><dt>{{ i18n.text('requiredApprovals') }}</dt><dd>{{ readiness.requiredApprovals.length }}</dd></div>
+                  <div><dt>{{ i18n.text('predictedTargets') }}</dt><dd>{{ readiness.predictedMaterializations.length }}</dd></div>
+                  <div><dt>{{ i18n.text('warnings') }}</dt><dd>{{ readiness.warnings.length }}</dd></div>
+                </dl>
+                @if (readiness.recommendedAction) { <p>{{ readiness.recommendedAction }}</p> }
+                <div class="readiness-details">
+                  @for (target of readiness.predictedMaterializations; track $index) { <code>{{ displayDiffValue(target) }}</code> }
+                  @for (warning of readiness.warnings; track $index) { <code class="warning">{{ displayDiffValue(warning) }}</code> }
+                </div>
+                <button type="button" class="primary-action" [disabled]="authoringBusy() || readiness.readiness !== 'ready_to_publish' || !hasDefinitionAction('PUBLISH')" (click)="publishGovernedDefinition()">
+                  {{ i18n.text('publishDefinition') }}
+                </button>
+              }
+              @if (publicationResult(); as publication) {
+                <p role="status">{{ publication.status }} · {{ publication.readiness }} · {{ publication.materializationCount }} {{ i18n.text('materializations') }}</p>
+              }
+              <small class="authority-note">{{ i18n.text('publicationSeparation') }}</small>
             </section>
           }
         }
-      </section>
-    }
 
-    @if (current.configDefinitionId) {
-      <section class="timeline work-mode-panel" aria-labelledby="timeline-title" [hidden]="activeMode() !== 'history'">
-        <p class="section-label" id="timeline-title">{{ i18n.text('timeline') }}</p>
-        @if (timelineLoading()) {
-          <p class="empty timeline-empty" aria-live="polite">{{ i18n.text('loading') }}</p>
-        } @else if (timelineError()) {
-          <p class="empty timeline-empty state-message" role="alert">{{ i18n.text('timelineError') }}</p>
-          <button type="button" class="quiet-button" (click)="loadTimeline()">{{ i18n.text('retryTimeline') }}</button>
-        } @else {
-          @for (event of timeline(); track event.occurredAt + event.eventType) {
-            <article class="timeline-event">
-              <time [attr.datetime]="event.occurredAt">{{ event.occurredAt }}</time>
-              <strong>{{ event.summary }}</strong>
-              <small>{{ event.eventType }} @if (event.status) { · {{ event.status }} } @if (event.actor) { · {{ event.actor }} }</small>
-            </article>
-          } @empty {
-            <p class="empty timeline-empty">{{ i18n.text('noTimeline') }}</p>
+        <section class="anchored-section execution-section work-mode-panel" id="decision-execution" tabindex="-1" [attr.aria-labelledby]="'decision-execution-title'" [hidden]="activeMode() !== 'operate'">
+          <header class="section-introduction">
+            <p class="section-label" id="decision-execution-title">{{ i18n.text('execution') }}</p>
+            <p>{{ i18n.text('executionBoundary') }}</p>
+          </header>
+          @if (executionCorrelation(); as correlation) {
+            <div class="execution-correlation-summary" data-testid="execution-correlation-summary">
+              <p class="section-label">{{ i18n.text('executionCorrelationTitle') }}</p>
+              <small class="authority-note">{{ i18n.text('executionCorrelationHint') }}</small>
+              <dl class="facts lifecycle-grid">
+                <div data-testid="correlation-slo-posture">
+                  <dt>{{ i18n.text('sloPostureLabel') }}</dt>
+                  <dd><strong>{{ sloPostureLabel(correlation.sloPosture) }}</strong></dd>
+                </div>
+                <div data-testid="correlation-success-ratio">
+                  <dt>{{ i18n.text('runtimeSuccessRatio') }}</dt>
+                  <dd>{{ correlation.successRatioPercent !== null ? (correlation.successRatioPercent + '%') : '—' }} ({{ correlation.totalObservations }})</dd>
+                </div>
+                <div data-testid="correlation-host-alignment">
+                  <dt>{{ i18n.text('hostAlignmentRatio') }}</dt>
+                  <dd>{{ hostStatusSummary() ? (correlation.alignedHosts + '/' + correlation.totalHosts) : i18n.text('hostAlignmentUnavailable') }}</dd>
+                </div>
+                <div data-testid="correlation-bound-receipt">
+                  <dt>{{ i18n.text('boundEvidenceReceipt') }}</dt>
+                  <dd>
+                    @if (correlation.boundTestRunId) {
+                      <code>{{ correlation.boundTestRunId }}</code>
+                      @if (correlation.evidenceEligibility) {
+                        · <code>{{ correlation.evidenceEligibility }}</code>
+                      }
+                    } @else {
+                      —
+                    }
+                  </dd>
+                </div>
+                <div data-testid="correlation-causal-diagnosis">
+                  <dt>{{ i18n.text('causalDiagnosisLabel') }}</dt>
+                  <dd>{{ causalDiagnosisLabel(correlation.causalState) }}</dd>
+                </div>
+              </dl>
+            </div>
           }
+          @if (runtime.mode() === 'remote') {
+            <pax-snapshot-cockpit
+              [ruleSetKey]="current.ruleSetKey"
+              [operationKeys]="current.operationKeys"
+              [operationKey]="snapshots.snapshotOperationKey()"
+              (operationSelected)="snapshots.selectSnapshotOperation($event)"
+              [head]="snapshotHead()"
+              [headSet]="snapshotHeadSet()"
+              [headSetLoading]="snapshotHeadSetLoading()"
+              [headSetError]="snapshotHeadSetError()"
+              [versions]="snapshotVersions()"
+              [loading]="snapshotsLoading()"
+              [loadError]="snapshotsError()"
+              [busy]="snapshotBusy()"
+              [feedback]="snapshotFeedback()"
+              [feedbackError]="snapshotFeedbackError()"
+              [blockers]="snapshotBlockers()"
+              [executionSummary]="executionSummary()"
+              [executionSummaryLoading]="executionSummaryLoading()"
+              [executionSummaryError]="executionSummaryError()"
+              [hostStatusSummary]="hostStatusSummary()"
+              [hostStatusLoading]="hostStatusLoading()"
+              [hostStatusError]="hostStatusError()"
+              [rolloutPolicyCatalog]="rolloutPolicyCatalog()"
+              [rolloutPolicyTimeline]="rolloutPolicyTimeline()"
+              [rolloutPoliciesLoading]="rolloutPoliciesLoading()"
+              [rolloutPoliciesError]="rolloutPoliciesError()"
+              [rolloutPolicyBusy]="rolloutPolicyBusy()"
+              [rolloutPolicyFeedback]="rolloutPolicyFeedback()"
+              [rolloutPolicyFeedbackError]="rolloutPolicyFeedbackError()"
+              [rolloutCatalog]="rolloutCatalog()"
+              [rolloutLoading]="rolloutLoading()"
+              [rolloutError]="rolloutError()"
+              [rolloutBusy]="rolloutBusy()"
+              [rolloutFeedback]="rolloutFeedback()"
+              [rolloutFeedbackError]="rolloutFeedbackError()"
+              [compositionCandidate]="compositionCandidate()"
+              [compositionApproval]="compositionApproval()"
+              [compositionPublication]="compositionPublication()"
+              [defaultSourceDefinitionId]="defaultSnapshotSourceDefinitionId()"
+              [eligibleSources]="eligibleSnapshotSources()"
+              [catalogDecisions]="allDecisions()"
+              (retry)="loadSnapshots()"
+              (retryExecutionSummary)="loadExecutionSummary()"
+              (retryHostStatus)="loadHostStatusSummary()"
+              (retryRolloutPolicies)="loadRolloutPolicies()"
+              (createRolloutPolicy)="createRolloutPolicy($event)"
+              (approveRolloutPolicy)="approveRolloutPolicy($event)"
+              (activateRolloutPolicy)="activateRolloutPolicy($event)"
+              (retryRollouts)="loadRollouts()"
+              (createRollout)="createRollout($event)"
+              (probeRollout)="probeRollout($event)"
+              (cancelRollout)="cancelRollout($event)"
+              (activateRollout)="activateRollout($event)"
+              (operate)="operateSnapshot($event)"
+              (withdrawHead)="snapshots.withdrawSnapshotHead($event)"
+              (prepareComposition)="prepareSnapshotComposition($event)"
+              (approveComposition)="approveSnapshotComposition($event)"
+              (publishComposition)="publishSnapshotComposition($event)"
+              (compositionDraftChanged)="invalidateSnapshotCompositionDraft()" />
+          } @else {
+            <p class="empty">{{ i18n.text('executionUnavailableFixture') }}</p>
+          }
+        </section>
+
+        <section class="evidence-ledger anchored-section work-mode-panel" id="decision-history" tabindex="-1" aria-labelledby="evidence-title" [hidden]="activeMode() !== 'history'">
+          <div>
+            <p class="section-label" id="evidence-title">{{ i18n.text('evidence') }}</p>
+            <p>{{ i18n.text('packageEvidenceScope') }}</p>
+          </div>
+          <details class="evidence-details">
+            <summary>{{ current.evidenceCount }} {{ i18n.text('packageReferences') }}</summary>
+            <ol>
+              @for (item of current.evidence; track item.path + ':' + item.kind) {
+                <li>
+                  <span>{{ item.kind }}</span>
+                  <code>{{ item.path }}</code>
+                  @if (item.sha256) {
+                    <small>SHA-256 {{ item.sha256.slice(0, 12) }}…</small>
+                  }
+                </li>
+              }
+            </ol>
+          </details>
+        </section>
+
+        @if (current.workspaceId) {
+          <section class="timeline work-mode-panel" aria-labelledby="lifecycle-title" [hidden]="activeMode() !== 'history'">
+            <p class="section-label" id="lifecycle-title">{{ i18n.text('governedLifecycle') }}</p>
+            @if (lifecycleLoading()) {
+              <p class="empty" aria-live="polite">{{ i18n.text('loading') }}</p>
+            } @else if (lifecycleError()) {
+              <p class="empty state-message" role="alert">{{ i18n.text('lifecycleError') }}</p>
+              <button type="button" class="quiet-button" (click)="loadLifecycle()">{{ i18n.text('retryLifecycle') }}</button>
+            } @else if (lifecycle(); as governed) {
+              <dl class="facts lifecycle-grid">
+                <div><dt>{{ i18n.text('workspaceStatus') }}</dt><dd>{{ workspaceStatusLabel(governed.workspaceStatus) }}</dd></div>
+                <div><dt>{{ i18n.text('revision') }}</dt><dd>{{ governed.workspaceRevision }}</dd></div>
+                <div><dt>{{ i18n.text('testRuns') }}</dt><dd>{{ governed.testRunCount }}</dd></div>
+                <div><dt>{{ i18n.text('reviews') }}</dt><dd>{{ governed.reviewCount }}</dd></div>
+                <div><dt>{{ i18n.text('materializations') }}</dt><dd>{{ governed.materializationCount }}</dd></div>
+                @if (governed.submittedTestRunId) {
+                  <div><dt>{{ i18n.text('submittedTestRun') }}</dt><dd><code>{{ governed.submittedTestRunId }}</code></dd></div>
+                }
+              </dl>
+              @if (governed.latestTestRun?.baselineEvidence; as baseline) {
+                <section aria-labelledby="test-evidence-title">
+                  <p class="section-label" id="test-evidence-title">{{ i18n.text('testEvidenceAuthority') }}</p>
+                  <dl class="facts lifecycle-grid">
+                    <div>
+                      <dt>{{ i18n.text('baselineType') }}</dt>
+                      <dd>
+                        @switch (baseline.authorityType) {
+                          @case ('LEGACY_ORACLE') { {{ i18n.text('legacyOracle') }} }
+                          @case ('ACTIVE_SNAPSHOT') { {{ i18n.text('activeSnapshotBaseline') }} }
+                          @default { {{ i18n.text('syntheticExpected') }} }
+                        }
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{{ i18n.text('evidenceEligibility') }}</dt>
+                      <dd>
+                        @switch (baseline.eligibility) {
+                          @case ('ELIGIBLE') { {{ i18n.text('eligibleEvidence') }} }
+                          @case ('INELIGIBLE') { {{ i18n.text('ineligibleEvidence') }} }
+                          @default { {{ i18n.text('pendingEvidence') }} }
+                        }
+                      </dd>
+                    </div>
+                    <div><dt>{{ i18n.text('evidenceObservedAt') }}</dt><dd><time [attr.datetime]="baseline.observedAtUtc">{{ baseline.observedAtUtc }}</time></dd></div>
+                    <div><dt>{{ i18n.text('provenScenarios') }}</dt><dd>{{ governed.latestTestRun?.results?.length ?? 0 }}</dd></div>
+                    <div><dt>{{ i18n.text('evidenceArtifact') }}</dt><dd><code>{{ baseline.artifactRef }}</code></dd></div>
+                    <div><dt>{{ i18n.text('evidenceFingerprint') }}</dt><dd><code>{{ baseline.artifactDigest.slice(0, 12) }}…</code></dd></div>
+                  </dl>
+                </section>
+              }
+              @if (operationalTestEvidence().length) {
+                <section aria-labelledby="operational-evidence-title">
+                  <p class="section-label" id="operational-evidence-title">{{ i18n.text('operationalEvidence') }}</p>
+                  <div>
+                    @for (item of operationalTestEvidence(); track item.scenarioKey) {
+                      <article class="timeline-event">
+                        <strong>{{ item.scenarioKey }}</strong>
+                        <dl class="facts lifecycle-grid">
+                          <div><dt>{{ i18n.text('operation') }}</dt><dd>{{ item.evidence.operationMode }}</dd></div>
+                          <div>
+                            <dt>{{ i18n.text('mutation') }}</dt>
+                            <dd>{{ i18n.text(item.evidence.mutationObserved ? 'mutationObserved' : 'noMutationVerified') }}</dd>
+                          </div>
+                          <div><dt>{{ i18n.text('cleanup') }}</dt><dd>{{ i18n.text(item.evidence.cleanupVerified ? 'verified' : 'notVerified') }}</dd></div>
+                          <div><dt>{{ i18n.text('baselineCalls') }}</dt><dd>{{ item.evidence.baselineCallCount }}</dd></div>
+                        </dl>
+                      </article>
+                    }
+                  </div>
+                </section>
+              }
+            }
+          </section>
+        }
+
+        @if (current.configDefinitionId) {
+          <section class="timeline work-mode-panel" aria-labelledby="timeline-title" [hidden]="activeMode() !== 'history'">
+            <p class="section-label" id="timeline-title">{{ i18n.text('timeline') }}</p>
+            @if (timelineLoading()) {
+              <p class="empty timeline-empty" aria-live="polite">{{ i18n.text('loading') }}</p>
+            } @else if (timelineError()) {
+              <p class="empty timeline-empty state-message" role="alert">{{ i18n.text('timelineError') }}</p>
+              <button type="button" class="quiet-button" (click)="loadTimeline()">{{ i18n.text('retryTimeline') }}</button>
+            } @else {
+              @for (event of timeline(); track event.occurredAt + event.eventType) {
+                <article class="timeline-event">
+                  <time [attr.datetime]="event.occurredAt">{{ event.occurredAt }}</time>
+                  <strong>{{ event.summary }}</strong>
+                  <small>{{ event.eventType }} @if (event.status) { · {{ event.status }} } @if (event.actor) { · {{ event.actor }} }</small>
+                </article>
+              } @empty {
+                <p class="empty timeline-empty">{{ i18n.text('noTimeline') }}</p>
+              }
+            }
+          </section>
+        }
+
+        <footer class="fixture-boundary">
+          <pax-icon class="boundary-glyph" name="shield-check" [size]="14" />
+          <span>{{ i18n.text(runtime.mode() === 'remote' ? 'governedNotice' : 'fixtureNotice') }}</span>
+        </footer>
+      </article>
+    } @else {
+      <section class="decision-pane empty-detail" aria-live="polite">
+        @if (authenticationRequired()) {
+          <div class="auth-onboarding-card" data-testid="auth-onboarding-card">
+            <p class="section-label">{{ i18n.text('product') }}</p>
+            <h2>{{ i18n.text('authOnboardingTitle') }}</h2>
+            <p>{{ i18n.text('authOnboardingBody') }}</p>
+          </div>
+        } @else if (loadError()) {
+          <div class="auth-onboarding-card" data-testid="catalog-load-error-card">
+            <h2>{{ i18n.text('projectionUnavailable') }}</h2>
+            <p>{{ i18n.text('remoteError') }}</p>
+            @if (viewDepth() === 'technical') {
+              <code class="studio-mono">{{ loadError() }}</code>
+            }
+          </div>
+        } @else if (loading()) {
+          <p>{{ i18n.text('loading') }}</p>
+        } @else {
+          <p>{{ i18n.text('noResults') }}</p>
         }
       </section>
     }
 
-    <footer class="fixture-boundary">
-      <span class="boundary-glyph" aria-hidden="true">◇</span>
-      <span>{{ i18n.text(runtime.mode() === 'remote' ? 'governedNotice' : 'fixtureNotice') }}</span>
-    </footer>
-  </article>
-  } @else {
-    <section class="decision-pane empty-detail" aria-live="polite">
-      @if (loadError()) {
-        <h2>{{ i18n.text('projectionUnavailable') }}</h2>
-        <code>{{ loadError() }}</code>
-      } @else if (loading()) {
-        <p>{{ i18n.text('loading') }}</p>
-      } @else {
-        <p>{{ i18n.text('noResults') }}</p>
-      }
-    </section>
-  }
-</div>
+    @if (inspectorOpen()) {
+      @let current = selected();
+      <pax-decision-inspector-rail
+        class="inspector-slot"
+        [activeTab]="inspectorTab()"
+        [viewDepth]="viewDepth()"
+        [decision]="current"
+        [allDecisions]="allDecisions()"
+        [policyConfig]="policyConfig()"
+        [maturityPosture]="maturityPosture()"
+        [documentation]="effectiveDocumentation(current)"
+        [autonomyGuidance]="current ? customizationGuidanceFallback(current) : ''"
+        [authorityText]="current ? authorityLabel(current.authority) : ''"
+        [migrationStrategyText]="current ? persistenceLabel(current.authority) : ''"
+        [configStatusText]="current?.configStatus ? configStatusLabel(current!.configStatus!) : ''"
+        [nullSemanticsText]="current ? nullSemanticsLabel(current.nullSemantics) : ''"
+        [technicalMaturityText]="maturityPosture() ? technicalMaturityLabel(maturityPosture()!.technicalMaturity) : ''"
+        [approvalStageText]="maturityPosture() ? approvalStageLabel(maturityPosture()!.approvalStage) : ''"
+        [operationalAuthorityText]="maturityPosture() ? operationalAuthorityPostureLabel(maturityPosture()!.operationalAuthority) : ''"
+        (tabChanged)="setInspectorTab($event)"
+        (decisionSelected)="select($event)"
+        (candidateSelected)="selectDiscoveredCandidate($event)"
+        (enableTechnicalModeRequested)="enableTechnicalView()" />
+    }
+  </div>
+}
 
 <pax-governed-confirmation-dialog
   [confirmation]="governedConfirmation()"

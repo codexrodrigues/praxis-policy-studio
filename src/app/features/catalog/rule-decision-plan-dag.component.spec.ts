@@ -74,6 +74,7 @@ describe('RuleDecisionPlanDagComponent', () => {
 
     fixture.componentInstance.selected = domainDecision;
     fixture.componentInstance.decisions = [guardDecision, domainDecision];
+    fixture.componentInstance.viewDepth = 'technical';
     fixture.detectChanges();
 
     const host = fixture.nativeElement as HTMLElement;
@@ -137,6 +138,7 @@ describe('RuleDecisionPlanDagComponent', () => {
         activeReasonCodes: []
       }]
     };
+    fixture.componentInstance.viewDepth = 'technical';
     fixture.detectChanges();
 
     const host = fixture.nativeElement as HTMLElement;
@@ -182,6 +184,8 @@ describe('RuleDecisionPlanDagComponent', () => {
     fixture.detectChanges();
 
     const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('[data-testid="dag-business-footer"]')).toBeTruthy();
+    expect(host.querySelector('[data-testid="dag-legacy-lineage"]')).toBeNull();
     expect(host.querySelector('[data-testid="dag-stage-PROTECTED_GUARD"]')?.textContent)
       .toContain('Pré-requisitos obrigatórios');
     expect(host.querySelector('[data-testid="dag-stage-DOMAIN_DECISION"]')?.textContent)
@@ -193,13 +197,22 @@ describe('RuleDecisionPlanDagComponent', () => {
     expect(host.querySelector('[data-testid="dag-stage-EFFECT_INTENT"]')?.textContent)
       .toContain('Consequências e registros');
     expect(host.querySelector('[data-testid="dag-node-workforce.guard.locked_rule"]')?.textContent)
-      .toContain('GUARD · BLOQUEADO');
+      .toContain('Fixa');
 
     i18n.locale.set('en-US');
     fixture.detectChanges();
     expect(host.querySelector('[data-testid="dag-stage-PROTECTED_GUARD"]')?.textContent)
       .toContain('Required prerequisites');
     expect(host.querySelector('[data-testid="dag-node-workforce.guard.locked_rule"]')?.textContent)
+      .toContain('Locked');
+
+    fixture.componentInstance.viewDepth = 'technical';
+    fixture.detectChanges();
+    expect(host.querySelector('[data-testid="dag-node-workforce.guard.locked_rule"]')?.textContent)
       .toContain('GUARD · LOCKED');
+    i18n.locale.set('pt-BR');
+    fixture.detectChanges();
+    expect(host.querySelector('[data-testid="dag-node-workforce.guard.locked_rule"]')?.textContent)
+      .toContain('GUARD · BLOQUEADO');
   });
 });

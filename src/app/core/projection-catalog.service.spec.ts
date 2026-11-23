@@ -1415,4 +1415,113 @@ describe('ProjectionCatalogService', () => {
     expect(clearReq.request.body.documentation).toEqual({});
     clearReq.flush({ id: 'ws-custom', etag: 'etag-custom-4', parameters: {}, documentation: null });
   });
+
+  it('reuses cached workspaces and capabilities on loadDiscoveredCandidate and prefers active OPEN workspaces over newer REJECTED ones', () => {
+    const config = {
+      mode: 'remote' as const,
+      configApiBaseUrl: '',
+      locale: 'pt-BR' as const,
+      projectionPath: null,
+      initialDecisionKey: null
+    };
+    let initialDecisions: readonly import('../features/catalog/catalog.fixture').DecisionSummary[] = [];
+    service.load('pt-BR', config).subscribe(value => initialDecisions = value);
+
+    http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([
+      {
+        id: 'ws-rejected-newer',
+        ruleKey: 'workforce.leave.late-candidate',
+        status: 'REJECTED',
+        revision: 4,
+        etag: 'etag-rejected-4',
+        updatedAt: '2026-08-20T12:00:00Z'
+      },
+      {
+        id: 'ws-open-older',
+        ruleKey: 'workforce.leave.late-candidate',
+        status: 'OPEN',
+        revision: 3,
+        etag: 'etag-open-3',
+        updatedAt: '2026-08-19T12:00:00Z'
+      }
+    ]);
+    http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities').flush({
+      tenantId: 't1',
+      environment: 'dev',
+      definitions: [{
+        definitionId: 'def-late',
+        ruleKey: 'workforce.leave.late-candidate',
+        version: 1,
+        availableActions: ['CREATE_NEW_VERSION']
+      }]
+    });
+    http.expectOne(request => request.url.endsWith('/definitions/catalog')).flush({
+      schemaVersion: 'praxis-domain-rule-catalog.v1',
+      page: 0,
+      limit: 12,
+      hasMore: false,
+      candidates: [{
+        definitionId: 'def-initial',
+        ruleKey: 'workforce.leave.base',
+        version: 1,
+        ruleType: 'validation',
+        status: 'active',
+        contextKey: 'workforce',
+        resourceKey: 'workforce.leave-requests'
+      }]
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-initial').flush({
+      id: 'def-initial',
+      ruleKey: 'workforce.leave.base',
+      version: 1,
+      status: 'active',
+      ruleType: 'validation',
+      definition: { ruleSetKey: 'workforce.leave.rules' },
+      condition: { '==': [1, 1] },
+      parameters: {}
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-initial/facts')
+      .flush(factCatalog('def-initial', 'workforce.leave.base'));
+
+    expect(initialDecisions).toHaveLength(1);
+
+    const hydratedList: import('../features/catalog/catalog.fixture').DecisionSummary[] = [];
+    service.loadDiscoveredCandidate(
+      {
+        definitionId: 'def-late',
+        ruleKey: 'workforce.leave.late-candidate',
+        version: 1,
+        ruleType: 'validation',
+        status: 'draft',
+        contextKey: 'workforce',
+        resourceKey: 'workforce.leave-requests',
+        serviceKey: 'praxis-api-quickstart',
+        semanticOwner: 'workforce-policy',
+        updatedAt: '2026-08-19T12:00:00Z'
+      },
+      1,
+      2,
+      'pt-BR',
+      config
+    ).subscribe(value => hydratedList.push(value));
+
+    http.expectNone('/api/praxis/config/domain-rules/workspaces');
+    http.expectNone('/api/praxis/config/domain-rules/definitions/capabilities');
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-late').flush({
+      id: 'def-late',
+      ruleKey: 'workforce.leave.late-candidate',
+      version: 1,
+      status: 'draft',
+      ruleType: 'validation',
+      definition: { ruleSetKey: 'workforce.leave.rules' },
+      condition: { '==': [1, 1] },
+      parameters: {}
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-late/facts')
+      .flush(factCatalog('def-late', 'workforce.leave.late-candidate'));
+
+    expect(hydratedList[0]?.workspaceId).toBe('ws-open-older');
+    expect(hydratedList[0]?.workspaceStatus).toBe('OPEN');
+    expect(hydratedList[0]?.availableDefinitionActions).toContain('CREATE_NEW_VERSION');
+  });
 });

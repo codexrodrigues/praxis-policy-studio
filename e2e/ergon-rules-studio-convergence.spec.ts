@@ -844,8 +844,12 @@ test('resolves Workforce deep-link, renders 6-stage DAG with FORBIDDEN guards & 
     `/catalog?ruleSetKey=${encodeURIComponent(RN013_RULESET_KEY)}&slotKey=rn013.qtd_max_non_negative&decisionKey=product.ergon.rn013.erg08380`
   );
 
-  // 1. Verify deep-link selection of WF-08380 and 6-stage DAG rendering
+  // 1. Verify deep-link selection of WF-08380 and calm Business defaults before Technical lens reveal
   await expect(page.getByTestId('rule-decision-plan-dag')).toBeVisible();
+  await expect(page.getByTestId('dag-business-footer')).toBeVisible();
+  await expect(page.getByTestId('dag-legacy-lineage')).toHaveCount(0);
+
+  await page.getByTestId('dag-open-technical-details').click();
   await expect(page.getByTestId('dag-ruleset-key')).toContainText(RN013_RULESET_KEY);
 
   // Verify PROTECTED_GUARD (WF-00019), DOMAIN_DECISION (WF-08380, WF-08381, WF-08382, WF-08385), and POST_DECISION (WF-08393)
@@ -909,6 +913,7 @@ test('navigates 1-hop ontology neighborhood to RN-017 (WF-00446) and executes ca
   );
 
   await expect(page.getByTestId('rule-decision-plan-dag')).toBeVisible();
+  await page.getByTestId('dag-open-technical-details').click();
 
   // 1. Click 1-hop ontology chip tipoFrequencia and jump directly to neighbor RN-017 (WF-00446) via DAG
   await page.getByTestId('dag-concept-chip-tipoFrequencia').click();
@@ -920,7 +925,7 @@ test('navigates 1-hop ontology neighborhood to RN-017 (WF-00446) and executes ca
   // Verify RN-017 (WF-00446) lineage and extracted expression fact draft.retroactiveDays (Finding L6)
   await expect(page.getByTestId('dag-ruleset-key')).toContainText(RN017_RULESET_KEY);
   await expect(page.getByTestId('dag-legacy-lineage')).toContainText('pkg_legacy_rules.frequencias.MAIN_PRE');
-  await page.getByRole('button', { name: /^Regra/ }).click();
+  await page.locator('.decision-navigation').getByRole('button', { name: /^Regra/ }).click();
   await expect(page.locator('.fact-list')).toContainText('draft.retroactiveDays');
 
   // 2. Return to Entender, jump back to WF-08380 via 1-hop neighbor link, and execute candidate composition & snapshot publication in 04 · Operar

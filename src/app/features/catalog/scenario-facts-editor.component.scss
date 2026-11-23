@@ -18,7 +18,7 @@ select {
 
 .scenario-fact-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .scenario-fact-field { align-content: start; gap: .4rem; min-width: 0; }
-.scenario-fact-field > small { color: var(--pax-color-on-surface-variant, #455a64); font-size: .72rem; line-height: 1.4; }
+.scenario-fact-field > small { color: var(--pax-color-on-surface-variant, #455a64); font-size: var(--pax-text-xs, 0.75rem); line-height: var(--pax-lh-xs, 1.4); }
 .scenario-fact-null { display: flex; align-items: center; justify-content: start; font-weight: 500; }
 .scenario-fact-null input { min-width: auto; }
 .scenario-facts-preview { margin-top: 1rem; }

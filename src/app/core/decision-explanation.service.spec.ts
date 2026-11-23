@@ -130,7 +130,7 @@ describe('DecisionExplanationService', () => {
   });
 
   it('separates authentication and authorization failures', () => {
-    for (const [status, reason] of [[401, 'authentication'], [403, 'forbidden']] as const) {
+    for (const [status, reason] of [[401, 'authentication'], [403, 'forbidden'], [404, 'unavailable'], [501, 'unavailable']] as const) {
       const streamEvents = vi.fn().mockReturnValue(throwError(() => new HttpErrorResponse({ status })));
       const service = new DecisionExplanationService({ streamEvents } as unknown as AgenticAuthoringTurnClientService);
       const events: unknown[] = [];

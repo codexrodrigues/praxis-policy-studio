@@ -1,6 +1,6 @@
 import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { catchError, EMPTY, expand, forkJoin, map, Observable, of, reduce, switchMap, throwError } from 'rxjs';
+import { catchError, EMPTY, expand, forkJoin, map, Observable, of, reduce, switchMap, tap, throwError } from 'rxjs';
 import { PolicyStudioRuntimeConfig, SupportedLocale } from './runtime-config';
 import { AUTHORIZATION_RULE_TYPE } from './prepared-access-draft';
 import { createClientRequestId } from './client-request-id';
@@ -76,8 +76,18 @@ export class ProjectionCatalogService {
   private readonly http = inject(HttpClient);
   private readonly domainRules = inject(DomainRuleService);
   private readonly discovery = inject(ResourceDiscoveryService);
+  private cachedCatalogMeta: {
+    readonly baseUrl: string;
+    readonly workspaces: readonly DomainRuleChangeWorkspace[];
+    readonly definitionCapabilities: DomainRuleDefinitionCapabilities;
+  } | null = null;
+
+  invalidateCatalogMetaCache(): void {
+    this.cachedCatalogMeta = null;
+  }
 
   load(locale: SupportedLocale, config: PolicyStudioRuntimeConfig): Observable<readonly DecisionSummary[]> {
+    this.invalidateCatalogMetaCache();
     const catalog = config.mode === 'remote'
       ? this.loadCatalogPages(config)
       : of([] as readonly DomainRuleCatalogCandidate[]);
@@ -101,6 +111,11 @@ export class ProjectionCatalogService {
         if (config.mode === 'fixture') {
           return of(this.fixtureSummaries(projection!, locale));
         }
+        this.cachedCatalogMeta = {
+          baseUrl: (config.configApiBaseUrl ?? '').replace(/\/$/, ''),
+          workspaces,
+          definitionCapabilities
+        };
         const searchParams = typeof window !== 'undefined' && window.location?.search
           ? new URLSearchParams(window.location.search)
           : null;
@@ -109,6 +124,9 @@ export class ProjectionCatalogService {
         const requestedSlotKey = searchParams?.get('slotKey')?.trim() || null;
         const requestedRuleSetKey = searchParams?.get('ruleSetKey')?.trim() || null;
         const requestedResourceKey = searchParams?.get('resourceKey')?.trim() || null;
+        const hasRequestedDeepLink = Boolean(
+          requestedDecisionKey || requestedBindingKey || requestedSlotKey || requestedRuleSetKey || requestedResourceKey
+        );
         const eagerRuleKeys = new Set<string>([
           ...(projection?.decisionRefs.map(item => item.decisionKey) ?? []),
           ...(config.initialDecisionKey ? [config.initialDecisionKey] : []),
@@ -132,14 +150,18 @@ export class ProjectionCatalogService {
           seenRepresentativeResourceKeys.add(rk);
           return true;
         };
+        const deepLinkHasMatches = hasRequestedDeepLink && catalog.some(matchesRequestedDeepLink);
         const eagerCandidates = catalog.length <= 12
           ? catalog
           : projectionMatchesCatalog
             ? catalog.filter(matchesRequestedDeepLink)
-            : catalog.filter((candidate, idx) =>
-                matchesRequestedDeepLink(candidate)
-                || isFirstRepresentativeOfResourceKey(candidate)
-                || (candidate.status !== 'retired' && idx < 36));
+            : deepLinkHasMatches
+              ? catalog.filter(candidate =>
+                  matchesRequestedDeepLink(candidate) || isFirstRepresentativeOfResourceKey(candidate))
+              : catalog.filter((candidate, idx) =>
+                  matchesRequestedDeepLink(candidate)
+                  || isFirstRepresentativeOfResourceKey(candidate)
+                  || (candidate.status !== 'retired' && idx < 36));
         const detailReads = eagerCandidates.map(candidate => forkJoin({
           definitionWithParameters: this.domainRules.getDefinition(candidate.definitionId, this.requestOptions(config)).pipe(
             switchMap(definition => (this.hasParameterTemplate(definition)
@@ -317,6 +339,8 @@ export class ProjectionCatalogService {
     config: PolicyStudioRuntimeConfig
   ): Observable<DecisionSummary> {
     const options = this.requestOptions(config);
+    const baseUrl = (config.configApiBaseUrl ?? '').replace(/\/$/, '');
+    const cached = this.cachedCatalogMeta?.baseUrl === baseUrl ? this.cachedCatalogMeta : null;
     return forkJoin({
       definitionWithParameters: this.domainRules.getDefinition(candidate.definitionId, options).pipe(
         switchMap(definition => (this.hasParameterTemplate(definition)
@@ -325,9 +349,14 @@ export class ProjectionCatalogService {
         ).pipe(map(serverParameterCatalog => ({ definition, serverParameterCatalog }))))
       ),
       factCatalog: this.domainRules.getDefinitionFacts(candidate.definitionId, options),
-      workspaces: this.domainRules.listChangeWorkspaces(options),
-      definitionCapabilities: this.domainRules.getDefinitionCapabilities(options)
+      workspaces: cached ? of(cached.workspaces) : this.domainRules.listChangeWorkspaces(options),
+      definitionCapabilities: cached ? of(cached.definitionCapabilities) : this.domainRules.getDefinitionCapabilities(options)
     }).pipe(
+      tap(({ workspaces, definitionCapabilities }) => {
+        if (!cached) {
+          this.cachedCatalogMeta = { baseUrl, workspaces, definitionCapabilities };
+        }
+      }),
       map(({ definitionWithParameters, factCatalog, workspaces, definitionCapabilities }) => {
         const { definition, serverParameterCatalog } = definitionWithParameters;
         if (definition.ruleType === AUTHORIZATION_RULE_TYPE) throw new Error('BUSINESS_DEFINITION_REQUIRED');
@@ -794,7 +823,9 @@ export class ProjectionCatalogService {
     request: DomainRuleDefinitionRequest,
     config: PolicyStudioRuntimeConfig
   ): Observable<DomainRuleDefinition> {
-    return this.domainRules.createDefinition(request, this.requestOptions(config));
+    return this.domainRules.createDefinition(request, this.requestOptions(config)).pipe(
+      tap(() => this.invalidateCatalogMetaCache())
+    );
   }
 
   readDefinition(id: string, config: PolicyStudioRuntimeConfig): Observable<DomainRuleDefinition> {
@@ -806,7 +837,7 @@ export class ProjectionCatalogService {
       id,
       { status: 'approved', validationResult: { review: 'approved', source: 'praxis-policy-studio' } },
       this.requestOptions(config)
-    );
+    ).pipe(tap(() => this.invalidateCatalogMetaCache()));
   }
 
   createWorkspace(
@@ -814,7 +845,9 @@ export class ProjectionCatalogService {
     title: string,
     config: PolicyStudioRuntimeConfig
   ): Observable<DomainRuleChangeWorkspace> {
-    return this.domainRules.createChangeWorkspace({ baseDefinitionId, title }, this.requestOptions(config));
+    return this.domainRules.createChangeWorkspace({ baseDefinitionId, title }, this.requestOptions(config)).pipe(
+      tap(() => this.invalidateCatalogMetaCache())
+    );
   }
 
   saveWorkspaceDraft(
@@ -837,7 +870,7 @@ export class ProjectionCatalogService {
       payload as unknown as DomainRuleChangeWorkspaceUpdateRequest,
       workspace.etag,
       this.requestOptions(config)
-    );
+    ).pipe(tap(() => this.invalidateCatalogMetaCache()));
   }
 
   scenarios(workspaceId: string, config: PolicyStudioRuntimeConfig): Observable<DomainRuleTestScenario[]> {
@@ -959,7 +992,9 @@ export class ProjectionCatalogService {
     etag: string,
     config: PolicyStudioRuntimeConfig
   ): Observable<DomainRuleChangeWorkspace> {
-    return this.domainRules.submitChangeWorkspace(workspaceId, etag, this.requestOptions(config));
+    return this.domainRules.submitChangeWorkspace(workspaceId, etag, this.requestOptions(config)).pipe(
+      tap(() => this.invalidateCatalogMetaCache())
+    );
   }
 
   reviews(workspaceId: string, config: PolicyStudioRuntimeConfig) {
@@ -975,6 +1010,7 @@ export class ProjectionCatalogService {
   ): Observable<DomainRuleChangeWorkspace> {
     const options = this.requestOptions(config);
     return this.domainRules.reviewChangeWorkspace(workspaceId, { decision, rationale }, etag, options).pipe(
+      tap(() => this.invalidateCatalogMetaCache()),
       switchMap(() => this.domainRules.getChangeWorkspace(workspaceId, options))
     );
   }
@@ -984,7 +1020,9 @@ export class ProjectionCatalogService {
     etag: string,
     config: PolicyStudioRuntimeConfig
   ): Observable<DomainRuleChangeWorkspace> {
-    return this.domainRules.promoteChangeWorkspace(workspaceId, etag, this.requestOptions(config));
+    return this.domainRules.promoteChangeWorkspace(workspaceId, etag, this.requestOptions(config)).pipe(
+      tap(() => this.invalidateCatalogMetaCache())
+    );
   }
 
   definitionActions(
@@ -1031,12 +1069,15 @@ export class ProjectionCatalogService {
       ruleDefinitionId: definitionId,
       applyEligibleMaterializations: true,
       publicationNotes: { source: 'praxis-policy-studio', intent: 'publish-governed-definition' }
-    }, this.requestOptions(config)).pipe(map(publication => ({
-      status: publication.publicationStatus ?? null,
-      readiness: publication.publicationReadiness ?? null,
-      materializationCount: publication.materializations?.length ?? 0,
-      outcomes: publication.explainability?.publicationDiagnostics?.materializationOutcomes ?? []
-    })));
+    }, this.requestOptions(config)).pipe(
+      tap(() => this.invalidateCatalogMetaCache()),
+      map(publication => ({
+        status: publication.publicationStatus ?? null,
+        readiness: publication.publicationReadiness ?? null,
+        materializationCount: publication.materializations?.length ?? 0,
+        outcomes: publication.explainability?.publicationDiagnostics?.materializationOutcomes ?? []
+      }))
+    );
   }
 
   lifecycle(
@@ -1146,6 +1187,19 @@ export class ProjectionCatalogService {
   ): Observable<DomainRuleRollout> {
     return this.domainRules.createRollout(
       { candidateSnapshotKey }, headEtag, this.requestOptions(config));
+  }
+
+  probeRolloutCandidate(
+    ruleSetKey: string,
+    rolloutId: string,
+    operationKey: string,
+    config: PolicyStudioRuntimeConfig
+  ): Observable<{ readonly updated: boolean; readonly observedAtUtc: string }> {
+    const baseUrl = (config.configApiBaseUrl ?? '').replace(/\/$/, '');
+    return this.http.post<{ readonly updated: boolean; readonly observedAtUtc: string }>(
+      `${baseUrl}/api/praxis/rules-studio/rule-sets/${encodeURIComponent(ruleSetKey)}/rollouts/${encodeURIComponent(rolloutId)}/probe?operationKey=${encodeURIComponent(operationKey)}`,
+      {}
+    );
   }
 
   cancelRollout(
@@ -1379,9 +1433,36 @@ export class ProjectionCatalogService {
     workspaces: readonly DomainRuleChangeWorkspace[],
     ruleKey: string
   ): DomainRuleChangeWorkspace | undefined {
+    const statusPriority = (status: string | null | undefined): number => {
+      switch ((status ?? '').trim().toUpperCase()) {
+        case 'OPEN':
+          return 4;
+        case 'SUBMITTED':
+          return 3;
+        case 'APPROVED':
+          return 2;
+        case 'PROMOTED':
+          return 1;
+        default:
+          return 0;
+      }
+    };
+    const timestamp = (iso: string | null | undefined): number => {
+      if (!iso) return 0;
+      const parsed = Date.parse(iso);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
     return workspaces
       .filter(item => item.ruleKey === ruleKey)
-      .sort((left, right) => (right.updatedAt ?? '').localeCompare(left.updatedAt ?? ''))[0];
+      .sort((left, right) => {
+        const statusDiff = statusPriority(right.status) - statusPriority(left.status);
+        if (statusDiff !== 0) return statusDiff;
+        const timeDiff = timestamp(right.updatedAt) - timestamp(left.updatedAt);
+        if (timeDiff !== 0) return timeDiff;
+        const isoDiff = (right.updatedAt ?? '').localeCompare(left.updatedAt ?? '');
+        if (isoDiff !== 0) return isoDiff;
+        return (right.revision ?? 0) - (left.revision ?? 0);
+      })[0];
   }
 
   private mergeDefinitionActions(

@@ -102,11 +102,13 @@ export class DecisionExplanationComponent implements OnChanges, OnDestroy {
       ? 'aiExplanationAuthenticationRequired'
       : reason === 'forbidden'
         ? 'aiExplanationPermissionLimited'
-        : reason === 'cancelled'
-          ? 'aiExplanationCancelled'
-          : reason === 'evidence-mismatch' || reason === 'unsafe-terminal'
-          ? 'aiExplanationEvidenceRejected'
-          : 'aiExplanationFailed';
+        : reason === 'unavailable'
+          ? 'aiServiceUnavailable'
+          : reason === 'cancelled'
+            ? 'aiExplanationCancelled'
+            : reason === 'evidence-mismatch' || reason === 'unsafe-terminal'
+              ? 'aiExplanationEvidenceRejected'
+              : 'aiExplanationFailed';
     return this.i18n.text(key);
   }
 

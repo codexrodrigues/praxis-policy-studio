@@ -100,9 +100,11 @@ export class DecisionDiscoveryComponent implements OnDestroy {
       ? 'aiDiscoveryAuthenticationRequired'
       : reason === 'forbidden'
         ? 'aiDiscoveryPermissionLimited'
-        : reason === 'evidence-mismatch' || reason === 'unsafe-terminal'
-          ? 'aiDiscoveryEvidenceRejected'
-          : 'aiDiscoveryFailed';
+        : reason === 'unavailable'
+          ? 'aiServiceUnavailable'
+          : reason === 'evidence-mismatch' || reason === 'unsafe-terminal'
+            ? 'aiDiscoveryEvidenceRejected'
+            : 'aiDiscoveryFailed';
     return this.i18n.text(key);
   }
 }

@@ -9,7 +9,10 @@ import {
   signal
 } from '@angular/core';
 import type { DomainRuleTestRun } from '@praxisui/core';
+import { humanizeDecisionTitle } from '../../core/humanize-labels';
 import { PolicyStudioI18n } from '../../core/i18n';
+import type { StudioViewDepth } from '../../core/studio-shell-state.service';
+import { StudioIconComponent, type StudioIconName } from '../../shared/studio-icon.component';
 import {
   buildConceptRootNeighborhood,
   type ConceptRootNeighborGroup
@@ -28,6 +31,8 @@ export interface DagStageLane {
   readonly codeLabel: string;
   readonly titlePtBr: string;
   readonly titleEnUs: string;
+  readonly shortTitlePtBr: string;
+  readonly shortTitleEnUs: string;
   readonly decisions: readonly DecisionSummary[];
 }
 
@@ -45,47 +50,60 @@ const CANONICAL_STAGES: readonly {
   readonly codeLabel: string;
   readonly titlePtBr: string;
   readonly titleEnUs: string;
+  readonly shortTitlePtBr: string;
+  readonly shortTitleEnUs: string;
 }[] = [
   {
     id: 'PROTECTED_GUARD',
     index: 1,
     codeLabel: '01 · GUARD',
     titlePtBr: 'Pré-requisitos obrigatórios',
-    titleEnUs: 'Required prerequisites'
+    titleEnUs: 'Required prerequisites',
+    shortTitlePtBr: 'Pré-req.',
+    shortTitleEnUs: 'Guards'
   },
   {
     id: 'DOMAIN_DECISION',
     index: 2,
     codeLabel: '02 · DOMAIN',
     titlePtBr: 'Regras de negócio',
-    titleEnUs: 'Business rules'
+    titleEnUs: 'Business rules',
+    shortTitlePtBr: 'Negócio',
+    shortTitleEnUs: 'Business'
   },
   {
     id: 'POST_DECISION',
     index: 3,
     codeLabel: '03 · POST',
     titlePtBr: 'Validações cruzadas',
-    titleEnUs: 'Cross-validations'
+    titleEnUs: 'Cross-validations',
+    shortTitlePtBr: 'Cruzadas',
+    shortTitleEnUs: 'Cross'
   },
   {
     id: 'TRANSFORMATION_INTENT',
     index: 4,
     codeLabel: '04 · TRANSFORM',
     titlePtBr: 'Ajustes automáticos',
-    titleEnUs: 'Automatic adjustments'
+    titleEnUs: 'Automatic adjustments',
+    shortTitlePtBr: 'Ajustes',
+    shortTitleEnUs: 'Adjust'
   },
   {
     id: 'EFFECT_INTENT',
     index: 5,
     codeLabel: '05 · EFFECT',
     titlePtBr: 'Consequências e registros',
-    titleEnUs: 'Consequences and records'
+    titleEnUs: 'Consequences and records',
+    shortTitlePtBr: 'Efeitos',
+    shortTitleEnUs: 'Effects'
   }
 ];
 
 @Component({
   selector: 'pax-rule-decision-plan-dag',
   standalone: true,
+  imports: [StudioIconComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section
@@ -95,17 +113,29 @@ const CANONICAL_STAGES: readonly {
       <header class="dag-header">
         <div>
           <p class="section-label">
-            {{ isPtBr() ? 'Topologia do RuleDecisionPlan (5 Estágios)' : 'RuleDecisionPlan Topology (5 Stages)' }}
+            @if (viewDepthSignal() === 'technical') {
+              {{ isPtBr() ? 'Topologia do RuleDecisionPlan (5 Estágios)' : 'RuleDecisionPlan Topology (5 Stages)' }}
+            } @else {
+              {{ isPtBr() ? 'Sequência de avaliação desta operação' : 'Operation evaluation sequence' }}
+            }
           </p>
           <p class="dag-subtitle">
-            {{ isPtBr()
-              ? 'Sequência determinística de avaliação do conjunto de regras, políticas de override por slot e raízes ontológicas.'
-              : 'Deterministic evaluation sequence of the RuleSet, per-slot override policies, and ontological roots.' }}
+            @if (viewDepthSignal() === 'technical') {
+              {{ isPtBr()
+                ? 'Sequência determinística de avaliação do conjunto de regras, políticas de override por slot e raízes ontológicas.'
+                : 'Deterministic evaluation sequence of the RuleSet, per-slot override policies, and ontological roots.' }}
+            } @else {
+              {{ isPtBr()
+                ? 'Veja em que etapa esta regra atua e clique em qualquer cartão para comparar.'
+                : 'See the exact step where each criterion runs and click any card to inspect.' }}
+            }
           </p>
         </div>
-        <span class="dag-ruleset-badge" data-testid="dag-ruleset-key">
-          <code>{{ selectedDecision()?.ruleSetKey }}</code>
-        </span>
+        @if (viewDepthSignal() === 'technical') {
+          <span class="dag-ruleset-badge" data-testid="dag-ruleset-key">
+            <code>{{ selectedDecision()?.ruleSetKey }}</code>
+          </span>
+        }
       </header>
 
       <div class="dag-svg-strip" aria-hidden="true">
@@ -120,7 +150,7 @@ const CANONICAL_STAGES: readonly {
                 rx="6"
                 [attr.class]="'svg-stage-box ' + (lane.decisions.length > 0 ? 'populated' : 'empty') + (isSelectedStage(lane.id) ? ' active' : '')" />
               <text x="48" y="20" text-anchor="middle" class="svg-stage-text">
-                {{ lane.codeLabel }} ({{ lane.decisions.length }})
+                {{ viewDepthSignal() === 'technical' ? lane.codeLabel : (isPtBr() ? lane.shortTitlePtBr : lane.shortTitleEnUs) }} ({{ lane.decisions.length }})
               </text>
               @if (!last) {
                 <line x1="96" y1="16" x2="120" y2="16" class="svg-stage-edge" />
@@ -139,7 +169,7 @@ const CANONICAL_STAGES: readonly {
             [class.selected-lane]="isSelectedStage(lane.id)"
             [attr.data-testid]="'dag-stage-' + lane.id">
             <header class="lane-header">
-              <span class="lane-code">{{ lane.codeLabel }}</span>
+              <span class="lane-code">{{ viewDepthSignal() === 'technical' ? lane.codeLabel : '0' + lane.index }}</span>
               <strong>{{ isPtBr() ? lane.titlePtBr : lane.titleEnUs }}</strong>
               <span class="lane-count">{{ lane.decisions.length }}</span>
             </header>
@@ -155,13 +185,18 @@ const CANONICAL_STAGES: readonly {
                   [attr.data-testid]="'dag-node-' + item.key"
                   (click)="decisionSelected.emit(item)">
                   <div class="node-top">
-                    <code class="node-code">{{ item.code }}</code>
+                    @if (viewDepthSignal() === 'technical') {
+                      <code class="node-code">{{ item.code }}</code>
+                    }
                     <span class="policy-pill" [attr.data-policy]="resolveOverridePolicy(item)">
-                      {{ overridePolicyLabel(resolveOverridePolicy(item)) }}
+                      <pax-icon [name]="overridePolicyIcon(resolveOverridePolicy(item))" [size]="12" />
+                      <span>{{ overridePolicyLabel(resolveOverridePolicy(item)) }}</span>
                     </span>
                   </div>
-                  <strong class="node-name">{{ item.name }}</strong>
-                  <small class="node-key">{{ item.key }}</small>
+                  <strong class="node-name">{{ displayNodeTitle(item) }}</strong>
+                  @if (viewDepthSignal() === 'technical') {
+                    <small class="node-key" [title]="item.key">{{ item.key }}</small>
+                  }
                   @if (trace) {
                     <div class="node-trace-row" [attr.data-testid]="'dag-node-trace-' + item.key">
                       <span class="trace-outcome-pill" [attr.data-outcome]="trace.candidateOutcome">
@@ -178,7 +213,7 @@ const CANONICAL_STAGES: readonly {
                   }
                 </button>
               } @empty {
-                <p class="lane-empty">{{ isPtBr() ? 'Sem slots neste estágio' : 'No slots in this stage' }}</p>
+                <p class="lane-empty">{{ isPtBr() ? 'Sem regras neste estágio' : 'No rules in this stage' }}</p>
               }
             </div>
           </div>
@@ -210,97 +245,116 @@ const CANONICAL_STAGES: readonly {
         </div>
       }
 
-      @if (ontologyRoots().available.length > 0 || ontologyRoots().concepts.length > 0) {
-        <div class="ontology-roots-bar" data-testid="dag-ontology-roots">
-          <div class="roots-group">
-            <span class="roots-label">
-              {{ isPtBr() ? 'Raízes ontológicas (availableRoots):' : 'Ontological roots (availableRoots):' }}
-            </span>
-            @for (root of ontologyRoots().available; track root) {
-              @if (hasConceptGroup(root)) {
-                <button
-                  type="button"
-                  class="root-chip interactive"
-                  [class.active-root]="activeConceptRoot() === root"
-                  [attr.data-testid]="'dag-root-chip-' + root"
-                  (click)="selectConceptRoot(root)">
-                  <code>{{ root }}</code>
-                </button>
-              } @else {
-                <code class="root-chip">{{ root }}</code>
-              }
-            }
-          </div>
-          @if (ontologyRoots().concepts.length > 0) {
+      @if (viewDepthSignal() === 'technical') {
+        @if (ontologyRoots().available.length > 0 || ontologyRoots().concepts.length > 0) {
+          <div class="ontology-roots-bar" data-testid="dag-ontology-roots">
             <div class="roots-group">
               <span class="roots-label">
-                {{ isPtBr() ? 'Vizinhança 1-Hop (conceptRoots):' : '1-Hop Neighborhood (conceptRoots):' }}
+                {{ isPtBr() ? 'Raízes ontológicas (availableRoots):' : 'Ontological roots (availableRoots):' }}
               </span>
-              @for (concept of ontologyRoots().concepts; track concept) {
-                <button
-                  type="button"
-                  class="root-chip concept interactive"
-                  [class.active-root]="activeConceptRoot() === concept"
-                  [attr.data-testid]="'dag-concept-chip-' + concept"
-                  (click)="selectConceptRoot(concept)">
-                  <code>{{ concept }}</code>
-                  @if (neighborCountForRoot(concept) > 0) {
-                    <small class="neighbor-badge">{{ neighborCountForRoot(concept) }}</small>
-                  }
-                </button>
+              @for (root of ontologyRoots().available; track root) {
+                @if (hasConceptGroup(root)) {
+                  <button
+                    type="button"
+                    class="root-chip interactive"
+                    [class.active-root]="activeConceptRoot() === root"
+                    [attr.data-testid]="'dag-root-chip-' + root"
+                    (click)="selectConceptRoot(root)">
+                    <code>{{ root }}</code>
+                  </button>
+                } @else {
+                  <code class="root-chip">{{ root }}</code>
+                }
               }
             </div>
-          }
-        </div>
-      }
+            @if (ontologyRoots().concepts.length > 0) {
+              <div class="roots-group">
+                <span class="roots-label">
+                  {{ isPtBr() ? 'Vizinhança 1-Hop (conceptRoots):' : '1-Hop Neighborhood (conceptRoots):' }}
+                </span>
+                @for (concept of ontologyRoots().concepts; track concept) {
+                  <button
+                    type="button"
+                    class="root-chip concept interactive"
+                    [class.active-root]="activeConceptRoot() === concept"
+                    [attr.data-testid]="'dag-concept-chip-' + concept"
+                    (click)="selectConceptRoot(concept)">
+                    <code>{{ concept }}</code>
+                    @if (neighborCountForRoot(concept) > 0) {
+                      <small class="neighbor-badge">{{ neighborCountForRoot(concept) }}</small>
+                    }
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        }
 
-      @if (conceptNeighborGroups().length > 0) {
-        <div class="concept-neighborhood-bar" data-testid="dag-concept-neighborhood">
-          <span class="roots-label">
-            {{ isPtBr() ? 'Navegação 1-Hop entre RuleSets:' : '1-Hop Cross-RuleSet Navigation:' }}
-          </span>
-          @for (group of visibleNeighborGroups(); track group.root) {
-            <div class="neighbor-group" [attr.data-testid]="'dag-neighbor-group-' + group.root">
-              <code class="root-chip concept">{{ group.root }}</code>
-              @for (neighbor of group.neighborDecisions.slice(0, 6); track neighbor.key) {
-                <button
-                  type="button"
-                  class="neighbor-link"
-                  [attr.data-testid]="'dag-neighbor-' + neighbor.key"
-                  (click)="decisionSelected.emit(neighbor)">
-                  <strong>{{ neighbor.code }}</strong>
-                  <small>{{ neighbor.ruleSetKey }}</small>
-                </button>
-              } @empty {
-                <small class="lane-empty">
-                  {{ isPtBr() ? 'Sem outros slots carregados nesta raiz' : 'No other slots loaded on this root' }}
-                </small>
-              }
-            </div>
-          }
-        </div>
-      }
+        @if (conceptNeighborGroups().length > 0) {
+          <div class="concept-neighborhood-bar" data-testid="dag-concept-neighborhood">
+            <span class="roots-label">
+              {{ isPtBr() ? 'Navegação 1-Hop entre RuleSets:' : '1-Hop Cross-RuleSet Navigation:' }}
+            </span>
+            @for (group of visibleNeighborGroups(); track group.root) {
+              <div class="neighbor-group" [attr.data-testid]="'dag-neighbor-group-' + group.root">
+                <code class="root-chip concept">{{ group.root }}</code>
+                @for (neighbor of group.neighborDecisions.slice(0, 6); track neighbor.key) {
+                  <button
+                    type="button"
+                    class="neighbor-link"
+                    [attr.data-testid]="'dag-neighbor-' + neighbor.key"
+                    (click)="decisionSelected.emit(neighbor)">
+                    <strong>{{ neighbor.code }}</strong>
+                    <small>{{ neighbor.ruleSetKey }}</small>
+                  </button>
+                } @empty {
+                  <small class="lane-empty">
+                    {{ isPtBr() ? 'Sem outros slots carregados nesta raiz' : 'No other slots loaded on this root' }}
+                  </small>
+                }
+              </div>
+            }
+          </div>
+        }
 
-      @if (selectedDecision()?.legacyOccurrence; as legacy) {
-        <div class="legacy-lineage-card" data-testid="dag-legacy-lineage">
-          <span class="roots-label">
-            {{ isPtBr() ? 'Linhagem Reconciliada (PL/SQL / Origem):' : 'Reconciled Lineage (PL/SQL / Origin):' }}
-          </span>
-          <code>{{ legacy.code }}</code>
-          @if (legacy.plsqlOrigin) {
-            · <code>{{ legacy.plsqlOrigin }}</code>
-          }
-          @if (legacy.targetField) {
-            · <small>{{ isPtBr() ? 'Campo:' : 'Field:' }} <code>{{ legacy.targetField }}</code></small>
-          }
-          @if (legacy.plsqlLineage) {
-            <small class="lineage-detail">{{ legacy.plsqlLineage }}</small>
-          }
-        </div>
+        @if (selectedDecision()?.legacyOccurrence; as legacy) {
+          <div class="legacy-lineage-card" data-testid="dag-legacy-lineage">
+            <span class="roots-label">
+              {{ isPtBr() ? 'Linhagem Reconciliada (PL/SQL / Origem):' : 'Reconciled Lineage (PL/SQL / Origin):' }}
+            </span>
+            <code>{{ legacy.code }}</code>
+            @if (legacy.plsqlOrigin) {
+              · <code>{{ legacy.plsqlOrigin }}</code>
+            }
+            @if (legacy.targetField) {
+              · <small>{{ isPtBr() ? 'Campo:' : 'Field:' }} <code>{{ legacy.targetField }}</code></small>
+            }
+            @if (legacy.plsqlLineage) {
+              <small class="lineage-detail">{{ legacy.plsqlLineage }}</small>
+            }
+          </div>
+        }
+      } @else {
+        <footer class="dag-business-footer" data-testid="dag-business-footer">
+          <span>{{ i18n.text('dagTechnicalHiddenNotice') }}</span>
+          <button
+            type="button"
+            class="quiet-button dag-technical-cta"
+            data-testid="dag-open-technical-details"
+            (click)="technicalModeRequested.emit()">
+            <span class="studio-mono" aria-hidden="true">&lt;/&gt;</span>
+            <span>{{ i18n.text('openTechnicalCanvasHint') }}</span>
+          </button>
+        </footer>
       }
     </section>
   `,
   styles: [`
+    :host {
+      display: block;
+      min-width: 0;
+      max-width: 100%;
+    }
     .plan-dag-surface {
       margin-top: 1rem;
       padding: 1rem;
@@ -308,6 +362,8 @@ const CANONICAL_STAGES: readonly {
       border-radius: 8px;
       background: var(--surface-subtle, rgba(128, 128, 128, 0.04));
       display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      container-type: inline-size;
       gap: 0.75rem;
       min-width: 0;
       max-width: 100%;
@@ -351,7 +407,8 @@ const CANONICAL_STAGES: readonly {
     }
     .svg-stage-text {
       font-size: 9px;
-      font-family: monospace;
+      font-family: var(--pax-font-sans, sans-serif);
+      font-weight: 700;
       fill: currentColor;
     }
     .svg-stage-edge {
@@ -364,13 +421,19 @@ const CANONICAL_STAGES: readonly {
       grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 0.6rem;
     }
+    @container (max-width: 820px) {
+      .dag-lanes {
+        grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr));
+      }
+    }
     @media (max-width: 1100px) {
       .dag-lanes {
         grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
       }
     }
     .dag-lane {
-      border: 1px solid var(--line, rgba(128, 128, 128, 0.22));
+      min-width: 0;
+      border: 1px solid var(--pax-color-outline-variant, rgba(128, 128, 128, 0.22));
       border-radius: 6px;
       padding: 0.6rem;
       display: grid;
@@ -385,44 +448,56 @@ const CANONICAL_STAGES: readonly {
       border-color: currentColor;
     }
     .lane-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.35rem;
-      font-size: 0.76rem;
+      min-width: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: start;
+      gap: 0.2rem 0.45rem;
+      font-size: var(--pax-text-xs, 0.75rem);
     }
     .lane-code {
-      font-family: monospace;
-      font-size: 0.68rem;
+      grid-column: 1 / -1;
+      font-family: var(--pax-font-mono, monospace);
+      font-size: var(--pax-text-xs, 0.75rem);
       color: var(--pax-color-on-surface-variant, #42545c);
     }
+    .lane-header strong {
+      grid-column: 1;
+      line-height: 1.3;
+    }
     .lane-count {
-      font-family: monospace;
-      font-size: 0.72rem;
-      padding: 0.05rem 0.35rem;
+      grid-column: 2;
+      justify-self: end;
+      flex-shrink: 0;
+      font-family: var(--pax-font-mono, monospace);
+      font-size: var(--pax-text-xs, 0.75rem);
+      padding: 0.0625rem 0.45rem;
       border-radius: 999px;
-      background: rgba(128, 128, 128, 0.14);
+      background: var(--pax-color-surface-container, rgba(128, 128, 128, 0.14));
+      color: var(--pax-color-on-surface, inherit);
     }
     .lane-nodes {
       display: grid;
-      gap: 0.4rem;
+      grid-template-columns: minmax(0, 1fr);
+      min-width: 0;
+      gap: 0.5rem;
     }
     .dag-node {
       text-align: left;
-      padding: 0.45rem 0.55rem;
-      border-radius: 5px;
+      padding: 0.55rem 0.65rem;
+      border-radius: var(--pax-radius-md, 6px);
       border: 1px solid var(--line, rgba(128, 128, 128, 0.25));
       background: var(--surface, transparent);
       cursor: pointer;
       display: grid;
-      gap: 0.15rem;
+      gap: 0.25rem;
       color: inherit;
       min-width: 0;
       max-width: 100%;
     }
     .dag-node.selected {
       border-width: 2px;
-      border-color: currentColor;
+      border-color: var(--pax-color-primary, currentColor);
       font-weight: 600;
     }
     .dag-node[data-trace-outcome="ALLOW"] {
@@ -445,26 +520,49 @@ const CANONICAL_STAGES: readonly {
       min-width: 0;
     }
     .node-code {
-      font-size: 0.7rem;
+      font-family: var(--pax-font-mono, monospace);
+      font-size: var(--pax-text-xs, 0.75rem);
       overflow-wrap: anywhere;
       min-width: 0;
     }
     .policy-pill {
-      font-size: 0.64rem;
-      font-family: monospace;
-      padding: 0.05rem 0.3rem;
-      border-radius: 4px;
-      background: rgba(128, 128, 128, 0.14);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: var(--pax-text-xs, 0.75rem);
+      font-weight: 600;
+      padding: 0.1rem 0.45rem;
+      border-radius: var(--pax-radius-pill, 999px);
+      border: 1px solid var(--pax-policy-locked-border, rgba(128, 128, 128, 0.24));
+      background: var(--pax-policy-locked-bg, rgba(128, 128, 128, 0.14));
+      color: var(--pax-policy-locked-fg, inherit);
+    }
+    .policy-pill[data-policy="PARAMETERIZABLE"] {
+      background: var(--pax-policy-param-bg, #eef7fa);
+      color: var(--pax-policy-param-fg, #0a3b52);
+      border-color: var(--pax-policy-param-border, #b4daea);
+    }
+    .policy-pill[data-policy="REPLACEABLE"],
+    .policy-pill[data-policy="RESTRICT_ONLY"],
+    .policy-pill[data-policy="EXTEND_ONLY"] {
+      background: var(--pax-policy-custom-bg, #ecfdf5);
+      color: var(--pax-policy-custom-fg, #065f46);
+      border-color: var(--pax-policy-custom-border, #a7f3d0);
     }
     .node-name {
-      font-size: 0.78rem;
-      line-height: 1.25;
+      font-size: var(--pax-text-sm, 0.8125rem);
+      line-height: 1.35;
+      overflow-wrap: anywhere;
     }
     .node-key {
-      font-size: 0.68rem;
-      opacity: 0.7;
-      font-family: monospace;
-      word-break: break-all;
+      display: block;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: var(--pax-text-xs, 0.75rem);
+      opacity: 0.72;
+      font-family: var(--pax-font-mono, monospace);
     }
     .node-trace-row {
       display: flex;
@@ -475,28 +573,44 @@ const CANONICAL_STAGES: readonly {
     }
     .trace-outcome-pill,
     .trace-divergence-pill {
-      font-size: 0.64rem;
-      font-family: monospace;
-      padding: 0.05rem 0.35rem;
+      font-size: var(--pax-text-xs, 0.75rem);
+      font-family: var(--pax-font-mono, monospace);
+      padding: 0.08rem 0.4rem;
       border-radius: 4px;
       background: rgba(128, 128, 128, 0.14);
     }
+    .dag-business-footer {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem 0.75rem;
+      padding-top: 0.65rem;
+      border-top: 1px solid var(--line, rgba(128, 128, 128, 0.18));
+      font-size: var(--pax-text-xs, 0.75rem);
+      color: var(--pax-color-on-surface-variant, #42545c);
+    }
+    .dag-technical-cta {
+      min-height: 1.875rem;
+      padding: 0.25rem 0.6rem;
+      font-size: var(--pax-text-xs, 0.75rem);
+    }
     .trace-outcome-pill[data-outcome="ALLOW"] {
-      background: rgba(22, 163, 74, 0.16);
-      color: #15803d;
+      background: var(--pax-color-success-container, rgba(22, 163, 74, 0.16));
+      color: var(--pax-color-on-success-container, #15803d);
     }
     .trace-outcome-pill[data-outcome="DENY"] {
-      background: rgba(220, 38, 38, 0.16);
-      color: #b91c1c;
+      background: var(--pax-color-error-container, rgba(220, 38, 38, 0.16));
+      color: var(--pax-color-on-error-container, #b91c1c);
     }
     .trace-divergence-pill {
-      background: rgba(217, 119, 6, 0.18);
-      color: #b45309;
+      background: var(--pax-color-warning-container, rgba(217, 119, 6, 0.18));
+      color: var(--pax-color-on-warning-container, #b45309);
       font-weight: 700;
     }
     .lane-empty {
       margin: 0;
-      font-size: 0.72rem;
+      font-size: var(--pax-text-xs, 0.75rem);
       color: var(--pax-color-on-surface-variant, #42545c);
     }
     .trace-summary-bar,
@@ -509,7 +623,7 @@ const CANONICAL_STAGES: readonly {
       gap: 0.45rem 0.75rem;
       padding-top: 0.5rem;
       border-top: 1px solid var(--line, rgba(128, 128, 128, 0.18));
-      font-size: 0.76rem;
+      font-size: var(--pax-text-xs, 0.75rem);
     }
     .roots-group,
     .neighbor-group {
@@ -523,12 +637,12 @@ const CANONICAL_STAGES: readonly {
       color: var(--pax-color-on-surface-variant, #42545c);
     }
     .root-chip {
-      padding: 0.1rem 0.4rem;
+      padding: 0.125rem 0.45rem;
       border-radius: 4px;
       background: rgba(128, 128, 128, 0.12);
       border: 1px solid transparent;
       color: inherit;
-      font-size: 0.74rem;
+      font-size: var(--pax-text-xs, 0.75rem);
     }
     .root-chip.concept {
       border: 1px dashed rgba(128, 128, 128, 0.4);
@@ -544,8 +658,8 @@ const CANONICAL_STAGES: readonly {
       font-weight: 700;
     }
     .neighbor-badge {
-      font-size: 0.65rem;
-      padding: 0 0.28rem;
+      font-size: var(--pax-text-xs, 0.75rem);
+      padding: 0 0.35rem;
       border-radius: 999px;
       background: rgba(37, 99, 235, 0.16);
     }
@@ -553,13 +667,13 @@ const CANONICAL_STAGES: readonly {
       display: inline-flex;
       align-items: center;
       gap: 0.3rem;
-      padding: 0.15rem 0.45rem;
+      padding: 0.2rem 0.5rem;
       border-radius: 4px;
       border: 1px solid var(--line, rgba(128, 128, 128, 0.28));
       background: var(--surface, transparent);
       color: inherit;
       cursor: pointer;
-      font-size: 0.72rem;
+      font-size: var(--pax-text-xs, 0.75rem);
     }
     .lineage-detail {
       display: block;
@@ -569,11 +683,12 @@ const CANONICAL_STAGES: readonly {
   `]
 })
 export class RuleDecisionPlanDagComponent {
-  private readonly i18n = inject(PolicyStudioI18n);
+  readonly i18n = inject(PolicyStudioI18n);
   readonly selectedDecision = signal<DecisionSummary | null>(null);
   readonly allDecisions = signal<readonly DecisionSummary[]>([]);
   readonly sandboxRunSignal = signal<PolicySandboxRun | null>(null);
   readonly latestTestRunSignal = signal<DomainRuleTestRun | null>(null);
+  readonly viewDepthSignal = signal<StudioViewDepth>('business');
   readonly activeConceptRoot = signal<string | null>(null);
 
   @Input({ required: true })
@@ -597,8 +712,22 @@ export class RuleDecisionPlanDagComponent {
     this.latestTestRunSignal.set(value ?? null);
   }
 
+  @Input()
+  set viewDepth(value: StudioViewDepth | null | undefined) {
+    this.viewDepthSignal.set(value === 'technical' ? 'technical' : 'business');
+  }
+
   @Output() readonly decisionSelected = new EventEmitter<DecisionSummary>();
   @Output() readonly conceptRootSelected = new EventEmitter<string>();
+  @Output() readonly technicalModeRequested = new EventEmitter<void>();
+
+  displayNodeTitle(item: DecisionSummary): string {
+    const docTitle =
+      item.workspaceDocumentation?.title ??
+      item.documentation?.title ??
+      item.definitionDocumentation?.title;
+    return humanizeDecisionTitle(item.name, item.code, docTitle, this.viewDepthSignal());
+  }
 
   readonly isPtBr = computed(() => this.i18n.locale() === 'pt-BR');
 
@@ -774,7 +903,34 @@ export class RuleDecisionPlanDagComponent {
     return 'REPLACEABLE';
   }
 
+  overridePolicyIcon(policy: SlotOverridePolicyId): StudioIconName {
+    switch (policy) {
+      case 'PARAMETERIZABLE':
+        return 'sliders';
+      case 'REPLACEABLE':
+      case 'RESTRICT_ONLY':
+      case 'EXTEND_ONLY':
+        return 'pencil';
+      case 'FORBIDDEN':
+      case 'LOCKED':
+        return 'lock';
+    }
+  }
+
   overridePolicyLabel(policy: SlotOverridePolicyId): string {
+    if (this.viewDepthSignal() !== 'technical') {
+      switch (policy) {
+        case 'FORBIDDEN':
+        case 'LOCKED':
+          return this.i18n.text('overrideForbiddenShort');
+        case 'PARAMETERIZABLE':
+          return this.i18n.text('overrideParameterizableShort');
+        case 'REPLACEABLE':
+        case 'RESTRICT_ONLY':
+        case 'EXTEND_ONLY':
+          return this.i18n.text('overrideEditableShort');
+      }
+    }
     if (this.isPtBr()) {
       switch (policy) {
         case 'FORBIDDEN': return 'GUARD · FIXO';

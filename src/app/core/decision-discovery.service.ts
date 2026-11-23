@@ -41,7 +41,7 @@ export type DecisionDiscoveryEvent =
     }
   | {
       readonly kind: 'failed';
-      readonly reason: 'authentication' | 'forbidden' | 'cancelled' | 'evidence-mismatch' | 'unsafe-terminal' | 'failed';
+      readonly reason: 'authentication' | 'forbidden' | 'unavailable' | 'cancelled' | 'evidence-mismatch' | 'unsafe-terminal' | 'failed';
     };
 
 @Injectable({ providedIn: 'root' })
@@ -144,7 +144,7 @@ export class DecisionDiscoveryService {
     };
   }
 
-  private failureReason(error: unknown): 'authentication' | 'forbidden' | 'failed' {
+  private failureReason(error: unknown): 'authentication' | 'forbidden' | 'unavailable' | 'failed' {
     const status = error instanceof HttpErrorResponse
       ? error.status
       : typeof error === 'object' && error !== null && 'status' in error
@@ -152,6 +152,7 @@ export class DecisionDiscoveryService {
         : 0;
     if (status === 401) return 'authentication';
     if (status === 403) return 'forbidden';
+    if (status === 404 || status === 501) return 'unavailable';
     return 'failed';
   }
 

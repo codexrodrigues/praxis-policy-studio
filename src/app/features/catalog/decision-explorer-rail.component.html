@@ -1,0 +1,322 @@
+<aside class="catalog-pane" [attr.aria-label]="i18n.text('decisionCatalogRegion')">
+  <header class="pane-heading">
+    <div class="heading-copy">
+      <p class="studio-eyebrow">{{ displayDomainEyebrow() }}</p>
+      <div class="heading-title-row">
+        <div class="heading-title-meta">
+          <h2 id="catalog-title">{{ i18n.text('catalog') }}</h2>
+          <span class="count studio-mono" data-testid="explorer-decision-count" [attr.aria-label]="filteredDecisions().length + ' ' + i18n.text(filteredDecisions().length === 1 ? 'decision' : 'decisions')">
+            {{ filteredDecisions().length }}
+          </span>
+        </div>
+        @if (totalCatalogCount() > 1) {
+          <button
+            type="button"
+            class="portfolio-toggle-btn"
+            data-testid="explorer-portfolio-toggle"
+            [class.active]="portfolioOverviewOpen()"
+            [attr.aria-pressed]="portfolioOverviewOpen()"
+            (click)="portfolioOverviewToggled.emit()">
+            <pax-icon name="layout-grid" [size]="14" />
+            <span>{{ i18n.text('explorerPortfolioToggle') }}</span>
+          </button>
+        }
+      </div>
+    </div>
+  </header>
+
+  @if (logoutFailed()) {
+    <p class="session-error" role="alert">{{ i18n.text('logoutFailed') }}</p>
+  }
+
+  <div class="explorer-controls">
+    <label class="search">
+      <pax-icon class="search-glyph" name="search" [size]="16" />
+      <span class="visually-hidden">{{ i18n.text('localCatalogFilter') }}</span>
+      <input
+        [value]="query()"
+        (input)="queryChanged.emit($any($event.target).value)"
+        [placeholder]="i18n.text('localCatalogFilterHint')">
+      @if (query()) {
+        <button type="button" (click)="clearQueryRequested.emit()" [attr.aria-label]="i18n.text('clearSearch')">
+          <pax-icon name="x" [size]="14" />
+        </button>
+      }
+    </label>
+
+    @if (contextScopeFilter(); as scopeFilter) {
+      <div class="scope-filter-chip" data-testid="context-scope-filter" role="status">
+        <div class="scope-filter-copy">
+          <span class="scope-filter-kicker">{{ i18n.text('contextScopeActive') }}</span>
+          @if (viewDepth() === 'technical') {
+            <code class="scope-filter-value" [title]="scopeFilter">{{ scopeFilter }}</code>
+          } @else {
+            <strong class="scope-filter-value" [title]="displayScopeFilter(scopeFilter)">{{ displayScopeFilter(scopeFilter) }}</strong>
+          }
+        </div>
+        <button type="button" class="quiet-button scope-clear-btn" data-testid="clear-context-scope-filter" (click)="clearContextScopeRequested.emit()">
+          {{ i18n.text('showAllDecisions') }}
+        </button>
+      </div>
+    }
+
+    @if (activeRuleTypeFilter(); as ruleTypeFilter) {
+      <div class="scope-filter-chip rule-type-chip" data-testid="rule-type-scope-filter" role="status">
+        <div class="scope-filter-copy">
+          <span class="scope-filter-kicker">{{ i18n.text('ruleTypeScopeActive') }}</span>
+          <strong class="scope-filter-value">{{ displayRuleTypeFilter(ruleTypeFilter) }}</strong>
+        </div>
+        <button type="button" class="quiet-button scope-clear-btn" data-testid="clear-rule-type-filter" (click)="clearRuleTypeRequested.emit()">
+          {{ i18n.text('clearRuleTypeFilter') }}
+        </button>
+      </div>
+    }
+
+    @if (autonomyFilterAvailable() && decisions().length > 1) {
+      @let counts = autonomyCounts();
+      @if (counts.param > 0 || counts.editable > 0 || counts.locked > 0 || counts.legal > 0) {
+        <div class="autonomy-filter-strip" role="group" [attr.aria-label]="i18n.text('explorerAutonomyFilterLabel')" data-testid="explorer-autonomy-filter">
+          <button
+            type="button"
+            class="autonomy-pill-btn"
+            data-testid="autonomy-filter-all"
+            [class.active]="effectiveAutonomyFilter() === 'all'"
+            [attr.aria-pressed]="effectiveAutonomyFilter() === 'all'"
+            (click)="selectAutonomyFilter('all')">
+            <span>{{ i18n.text('explorerFilterAll') }}</span>
+            <span class="pill-count studio-mono">{{ counts.all }}</span>
+          </button>
+          @if (counts.param > 0) {
+            <button
+              type="button"
+              class="autonomy-pill-btn"
+              data-tone="param"
+              data-testid="autonomy-filter-param"
+              [class.active]="effectiveAutonomyFilter() === 'param'"
+              [attr.aria-pressed]="effectiveAutonomyFilter() === 'param'"
+              (click)="selectAutonomyFilter('param')">
+              <pax-icon name="sliders" [size]="12" />
+              <span>{{ i18n.text('overrideParameterizableShort') }}</span>
+              <span class="pill-count studio-mono">{{ counts.param }}</span>
+            </button>
+          }
+          @if (counts.editable > 0) {
+            <button
+              type="button"
+              class="autonomy-pill-btn"
+              data-tone="editable"
+              data-testid="autonomy-filter-editable"
+              [class.active]="effectiveAutonomyFilter() === 'editable'"
+              [attr.aria-pressed]="effectiveAutonomyFilter() === 'editable'"
+              (click)="selectAutonomyFilter('editable')">
+              <pax-icon name="pencil" [size]="12" />
+              <span>{{ i18n.text('overrideEditableShort') }}</span>
+              <span class="pill-count studio-mono">{{ counts.editable }}</span>
+            </button>
+          }
+          @if (counts.locked > 0) {
+            <button
+              type="button"
+              class="autonomy-pill-btn"
+              data-tone="locked"
+              data-testid="autonomy-filter-locked"
+              [class.active]="effectiveAutonomyFilter() === 'locked'"
+              [attr.aria-pressed]="effectiveAutonomyFilter() === 'locked'"
+              (click)="selectAutonomyFilter('locked')">
+              <pax-icon name="lock" [size]="12" />
+              <span>{{ i18n.text('overrideForbiddenShort') }}</span>
+              <span class="pill-count studio-mono">{{ counts.locked }}</span>
+            </button>
+          }
+          @if (counts.legal > 0) {
+            <button
+              type="button"
+              class="autonomy-pill-btn"
+              data-tone="legal"
+              data-testid="autonomy-filter-legal"
+              [class.active]="effectiveAutonomyFilter() === 'legal'"
+              [attr.aria-pressed]="effectiveAutonomyFilter() === 'legal'"
+              (click)="selectAutonomyFilter('legal')">
+              <pax-icon name="book-open" [size]="12" />
+              <span>{{ i18n.text('explorerFilterLegal') }}</span>
+              <span class="pill-count studio-mono">{{ counts.legal }}</span>
+            </button>
+          }
+        </div>
+      }
+    } @else if (!hasStageMetadata() && decisions().length > 1) {
+      <div class="global-lens-bar" role="group" [attr.aria-label]="i18n.text('explorerLensGroupLabel')" data-testid="explorer-global-lens">
+        <button
+          type="button"
+          data-testid="global-lens-domain"
+          [class.active]="globalLens() === 'domain'"
+          [attr.aria-pressed]="globalLens() === 'domain'"
+          (click)="globalLensChanged.emit('domain')">
+          {{ i18n.text('explorerLensDomain') }}
+        </button>
+        <button
+          type="button"
+          data-testid="global-lens-type"
+          [class.active]="globalLens() === 'type'"
+          [attr.aria-pressed]="globalLens() === 'type'"
+          (click)="globalLensChanged.emit('type')">
+          {{ i18n.text('explorerLensType') }}
+        </button>
+        <button
+          type="button"
+          data-testid="global-lens-workflow"
+          [class.active]="globalLens() === 'workflow'"
+          [attr.aria-pressed]="globalLens() === 'workflow'"
+          (click)="globalLensChanged.emit('workflow')">
+          {{ i18n.text('explorerLensWorkflow') }}
+        </button>
+      </div>
+    }
+  </div>
+
+  <div class="decision-list" [attr.aria-label]="i18n.text('availableDecisions')">
+    @if (loading()) {
+      <p class="empty" aria-live="polite">{{ i18n.text('loading') }}</p>
+    } @else if (authenticationRequired()) {
+      <p class="empty state-message" role="alert">{{ i18n.text('authenticationRequired') }}</p>
+      <form #loginForm class="development-login" (submit)="$event.preventDefault(); loginRequested.emit({ username: username.value, password: password.value, form: loginForm })">
+        <strong>{{ i18n.text('developmentLogin') }}</strong>
+        <label><span>{{ i18n.text('username') }}</span><input #username name="username" value="admin" autocomplete="username" required></label>
+        <label><span>{{ i18n.text('password') }}</span><input #password name="password" type="password" autocomplete="current-password" required></label>
+        @if (authenticationFailed()) { <p role="alert">{{ i18n.text('authenticationFailed') }}</p> }
+        <button type="submit" [disabled]="authenticating()">{{ i18n.text(authenticating() ? 'authenticating' : 'login') }}</button>
+        <small>{{ i18n.text('credentialBoundary') }}</small>
+      </form>
+    } @else if (permissionLimited()) {
+      <p class="empty state-message" role="alert">{{ i18n.text('permissionLimited') }}</p>
+      <button type="button" class="quiet-button state-retry" (click)="reauthenticateRequested.emit()">
+        {{ i18n.text('reauthenticate') }}
+      </button>
+    } @else if (loadError()) {
+      <p class="empty state-message" role="alert">{{ i18n.text('remoteError') }}</p>
+      <button type="button" class="quiet-button state-retry" (click)="retryCatalogRequested.emit()">
+        {{ i18n.text('retryCatalog') }}
+      </button>
+      <button type="button" class="quiet-button state-retry" (click)="reauthenticateRequested.emit()">
+        {{ i18n.text('reauthenticate') }}
+      </button>
+    } @else if (filteredDecisions().length === 0) {
+      <p class="empty">{{ i18n.text('noResults') }}</p>
+    } @else if (useVirtualScroll()) {
+      <cdk-virtual-scroll-viewport itemSize="78" class="decision-virtual-viewport">
+        <div *cdkVirtualFor="let row of virtualRows(); trackBy: trackVirtualRow" class="virtual-row-slot">
+          @if (row.kind === 'stage') {
+            <div class="stage-heading virtual-heading">
+              <span>{{ i18n.text(row.labelKey) }}</span>
+              <span class="studio-mono">{{ row.count }}</span>
+            </div>
+          } @else if (row.kind === 'group') {
+            <div class="stage-heading virtual-heading">
+              <span class="group-heading-label" [title]="row.label">{{ row.label }}</span>
+              <div class="group-heading-actions">
+                @if (row.scopeKey) {
+                  <button type="button" class="group-focus-btn" (click)="scopeSelected.emit(row.scopeKey)">
+                    {{ i18n.text('explorerFocusGroup') }}
+                  </button>
+                }
+                <span class="studio-mono">{{ row.count }}</span>
+              </div>
+            </div>
+          } @else {
+            <ng-container *ngTemplateOutlet="decisionRow; context: { $implicit: row.decision }" />
+          }
+        </div>
+      </cdk-virtual-scroll-viewport>
+    } @else if (hasStageMetadata()) {
+      @for (group of stageGroups(); track group.stageKey) {
+        <section class="stage-group" [attr.aria-label]="i18n.text(group.labelKey)">
+          <div class="stage-heading">
+            <span>{{ i18n.text(group.labelKey) }}</span>
+            <span class="studio-mono">{{ group.items.length }}</span>
+          </div>
+          @for (decision of group.items; track decision.key) {
+            <ng-container *ngTemplateOutlet="decisionRow; context: { $implicit: decision }" />
+          }
+        </section>
+      }
+    } @else if (globalGroups().length > 0) {
+      @for (group of globalGroups(); track group.groupKey) {
+        <section class="stage-group" [attr.aria-label]="group.label">
+          <div class="stage-heading">
+            <span class="group-heading-label" [title]="group.label">{{ group.label }}</span>
+            <div class="group-heading-actions">
+              @if (group.scopeKey) {
+                <button type="button" class="group-focus-btn" (click)="scopeSelected.emit(group.scopeKey)">
+                  {{ i18n.text('explorerFocusGroup') }}
+                </button>
+              }
+              <span class="studio-mono">{{ group.items.length }}</span>
+            </div>
+          </div>
+          @for (decision of group.items; track decision.key) {
+            <ng-container *ngTemplateOutlet="decisionRow; context: { $implicit: decision }" />
+          }
+        </section>
+      }
+    } @else {
+      @for (decision of filteredDecisions(); track decision.key) {
+        <ng-container *ngTemplateOutlet="decisionRow; context: { $implicit: decision }" />
+      }
+    }
+  </div>
+
+  <ng-template #decisionRow let-decision>
+    <button
+      type="button"
+      class="decision-row"
+      [disabled]="busy()"
+      [class.selected]="selected()?.key === decision.key"
+      [attr.aria-current]="selected()?.key === decision.key ? 'true' : null"
+      (click)="decisionSelected.emit(decision)">
+      <span
+        class="autonomy-icon-badge"
+        [attr.data-tone]="autonomyTone(decision) ?? 'unknown'"
+        [title]="autonomyTooltip(decision)"
+        aria-hidden="true">
+        <pax-icon [name]="autonomyIcon(decision)" [size]="14" />
+      </span>
+      <span class="decision-copy">
+        @if (viewDepth() === 'technical') {
+          <code class="decision-code">{{ decision.code }}</code>
+        }
+        <strong>{{ displayDecisionTitle(decision) }}</strong>
+        @if (displayRuleSetSubtitle(decision); as subtitle) {
+          <small class="decision-subtitle-line">{{ subtitle }}</small>
+        }
+        <span class="visually-hidden">{{ i18n.text('technicalDecisionCode') }}: {{ decision.code }}</span>
+        @if (autonomyLabel(decision); as autonomyText) {
+          <span class="visually-hidden">{{ i18n.text('policyLabelPrefix') }}: {{ autonomyText }}</span>
+        }
+        <span class="visually-hidden">{{ i18n.text(decision.state === 'verified' ? 'verifiedState' : 'draftState') }}</span>
+      </span>
+      @if (hasActiveWorkflowIndicator(decision)) {
+        <span
+          class="workflow-dot"
+          [attr.data-tone]="workflowIndicatorTone(decision)"
+          [title]="workflowIndicatorTitle(decision) ?? ''"
+          aria-hidden="true"></span>
+      }
+    </button>
+  </ng-template>
+
+  @if (selectionOutsideFilter()) {
+    <div class="selection-outside-filter" role="status">
+      <p>{{ i18n.text('selectionOutsideFilter') }}</p>
+      <button type="button" class="quiet-button" (click)="clearQueryRequested.emit()">{{ i18n.text('showSelectedDecision') }}</button>
+    </div>
+  }
+
+  @if (isRemoteMode() && sessionActive()) {
+    <footer class="explorer-footer">
+      <pax-decision-create-form
+        [busy]="authoringBusy()"
+        (createRequested)="createRequested.emit($event)"
+        (validationFailed)="validationFailed.emit($event)" />
+    </footer>
+  }
+</aside>

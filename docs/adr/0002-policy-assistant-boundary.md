@@ -145,3 +145,55 @@ Ordem incremental:
 - ações humanas e de IA permanecem semanticamente idênticas e auditáveis;
 - mudanças futuras em tools/manifests exigem documentação pública, corpus HTTP,
   recipes e testes de segurança como artefatos derivados.
+
+## Adendo — Convergência no Runtime Operacional de Agente (`/api/praxis/config/ai/agent`)
+
+- Estado do adendo: aprovado para implementação incremental (2026-11-22)
+
+A inspeção arquitetural do `praxis-config-starter` e de `@praxisui/ai` após a
+introdução do `OperationalAgentController` (`/api/praxis/config/ai/agent/**`)
+evidenciou que o pipeline `/api/praxis/config/ai/authoring/**` permanece
+especializado em autoria de componentes UI e Page Builder (`ui_user_config`),
+operando em turno único sem propagação assíncrona de `SecurityContext`/`TenantContext`
+e ignorando `conversationMessages` na explicação de decisões. Em contraste, o
+runtime operacional de agente já provê loop ReAct multi-ferramenta, histórico
+multi-turno com `TurnScopedPiiVault`, propagação de contexto/autoridades em
+worker threads, composição determinística de blocos ricos em `@praxisui/ai` e
+ledger persistido de propostas (`OperationalAgentProposalService` com `If-Match` e
+`Idempotency-Key`).
+
+Fica consolidada a convergência em dois planos com responsabilidade canônica
+distinta sobre um kernel compartilhado:
+
+1. **Plano 1 (`/api/praxis/config/ai/authoring/**`):** exclusivo para autoria de
+   UI e Page Builder (`ui_user_config`), mantendo a fronteira original desta ADR.
+2. **Plano 2 (`/api/praxis/config/ai/agent/**`):** runtime conversacional único
+   do Policy/Rules Assistant por meio de `AgentProfile('rules-studio')` no
+   `PraxisOperationalAgentLoop` e em `OperationalAssistantBlockComposer`,
+   consumido via `WorkspaceAssistantOrchestratorService` e
+   `PraxisWorkspaceAssistantComponent`.
+3. **Kernel neutro compartilhado (`DomainRuleExplanationProjectionService`):**
+   permanece independente do Plano 1 e passa a ser consumido por `OperationalAgentTool`s
+   dedicadas (`search_domain_rules`, `inspect_domain_decision`,
+   `simulate_domain_rule_what_if`), enriquecido com documentação didática, amparo
+   legal e parâmetros resolvidos sob política `aiUsage`.
+
+Requisitos obrigatórios de hardening no `praxis-config-starter` (Trilha 2) antes
+da ativação produtiva completa no Plano 2:
+
+- **Fail-closed corporativo por padrão:** alterar `corporateMode` padrão de
+  `OperationalAgentTurnStreamService` de `false` para `true` (alinhado a
+  `AiPrincipalContextResolver`).
+- **RBAC e `aiUsage` na descoberta de regras:** exigir `RULE_DEFINITION_READER` e
+  filtrar `aiUsage.visibility = DENY` em `ConfigDomainRuleKnowledgeContributor`.
+- **Fidelidade de tool-calling e resiliência de providers:** repassar
+  `disableToolCalling` em `RoutingAiToolCallingProvider` e portar fallback entre
+  providers, rate-limit cooldown, lease de capacidade de stream e métricas.
+- **SPI de perfil e executor de propostas:** isolar instruções de sistema e
+  catálogo de tools via `AgentProfile('rules-studio')` e extrair
+  `AgentProposalExecutor` em `OperationalAgentProposalService` para comandos do
+  Control Plane de regras (`DomainRuleChangeWorkspaceService`, `DomainRuleService`,
+  `DomainRuleSnapshotService`, `DomainRuleRolloutService`) preservando SoD/ETag.
+- **Chaves seguras contra redaction no bloco `domain-decision`:** usar campos não
+  interceptados por `AiSensitiveDataRedactor` (`narrative`, `eventNote`,
+  `rationaleNote`, `impedimentNote`) nos eventos SSE do bloco estruturado de decisão.

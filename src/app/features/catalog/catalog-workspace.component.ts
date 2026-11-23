@@ -5,6 +5,7 @@ import { ActivatedRoute } from '@angular/router';
 import {
   API_URL,
   DomainRuleService,
+  PraxisThemeService,
   ResourceDiscoveryService,
   type ApiUrlConfig,
   type DomainRuleDefinitionAction,
@@ -19,19 +20,39 @@ import {
 import type { RuleBuilderState } from '@praxisui/visual-builder';
 import { skip } from 'rxjs';
 import { AuthSessionService } from '../../core/auth-session.service';
+import type { ExplorerGlobalLens } from '../../core/catalog-portfolio';
 import type { DecisionDiscoveryCandidate } from '../../core/decision-discovery.service';
 import { GovernedHostScopeService } from '../../core/governed-host-scope.service';
+import { humanizeDecisionTitle, humanizeTechnicalSlug, looksLikeTechnicalSlug } from '../../core/humanize-labels';
 import { PolicyStudioI18n } from '../../core/i18n';
 import { ProjectionCatalogService } from '../../core/projection-catalog.service';
+import {
+  buildRuleParameterDisplayEntries,
+  type RuleParameterDisplayEntry
+} from '../../core/rule-parameters-display';
 import {
   isSafeLegalBasisUrl,
   type RuleDocumentationDescriptor
 } from '../../core/rule-documentation';
+import {
+  resolveGovernanceGlossaryEntry,
+  resolvePolicyGlossaryEntry,
+  resolveStatusGlossaryEntry,
+  type StudioGlossaryEntry,
+  type StudioGovernanceTermKey
+} from '../../core/studio-glossary';
 import type { PolicyStudioRuntimeConfig } from '../../core/runtime-config';
 import { RuntimeConfigService } from '../../core/runtime-config.service';
+import { StudioShellStateService, type StudioInspectorTab } from '../../core/studio-shell-state.service';
+import { StudioIconComponent, type StudioIconName } from '../../shared/studio-icon.component';
+import { TermPopoverComponent } from '../../shared/term-popover.component';
 import { DecisionDocumentationEditorComponent } from '../authoring/decision-documentation-editor.component';
 import { DecisionParametersEditorComponent } from '../authoring/decision-parameters-editor.component';
 import { LocalDraftWorkspaceComponent } from '../authoring/local-draft-workspace.component';
+import { AccessAuthorizationWorkspaceComponent } from './access-authorization-workspace.component';
+import { CatalogPortfolioOverviewComponent } from './catalog-portfolio-overview.component';
+import { DecisionExplorerRailComponent } from './decision-explorer-rail.component';
+import { DecisionInspectorRailComponent } from './decision-inspector-rail.component';
 import { RuleDecisionPlanDagComponent } from './rule-decision-plan-dag.component';
 import {
   buildDecisionMaturityPosture,
@@ -50,10 +71,6 @@ import type {
   RuleSetCompositionCandidateCommand,
   RuleSetCompositionCandidateRequest
 } from './catalog.fixture';
-import { AccessDraftReviewComponent } from '../authoring/access-draft-review.component';
-import { DecisionCreateFormComponent } from './decision-create-form.component';
-import { DecisionDiscoveryComponent } from './decision-discovery.component';
-import { DecisionExplanationComponent } from './decision-explanation.component';
 import { GovernedConfirmationDialogComponent } from './governed-confirmation-dialog.component';
 import { PolicySandboxResultsComponent } from './policy-sandbox-results.component';
 import { ScenarioCatalogComponent, type ScenarioUpdateView } from './scenario-catalog.component';
@@ -69,8 +86,6 @@ import { WorkspaceBlockersComponent } from './workspace-blockers.component';
   imports: [
     LocalDraftWorkspaceComponent,
     SnapshotCockpitComponent,
-    DecisionExplanationComponent,
-    DecisionDiscoveryComponent,
     GovernedConfirmationDialogComponent,
     PolicySandboxResultsComponent,
     WorkspaceBlockersComponent,
@@ -78,9 +93,13 @@ import { WorkspaceBlockersComponent } from './workspace-blockers.component';
     ScenarioCreateFormComponent,
     DecisionDocumentationEditorComponent,
     DecisionParametersEditorComponent,
-    DecisionCreateFormComponent,
-    AccessDraftReviewComponent,
-    RuleDecisionPlanDagComponent
+    RuleDecisionPlanDagComponent,
+    CatalogPortfolioOverviewComponent,
+    DecisionExplorerRailComponent,
+    DecisionInspectorRailComponent,
+    AccessAuthorizationWorkspaceComponent,
+    StudioIconComponent,
+    TermPopoverComponent
   ],
   providers: [
     ProjectionCatalogService,
@@ -103,14 +122,26 @@ export class CatalogWorkspaceComponent implements OnInit {
   private readonly route = inject(ActivatedRoute, { optional: true });
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly theme = inject(PraxisThemeService);
+  readonly shell = inject(StudioShellStateService);
   readonly runtime = inject(RuntimeConfigService);
   readonly store = inject(CatalogSelectionStore);
   readonly authoring = inject(WorkspaceAuthoringFacade);
   readonly testing = inject(ScenarioSandboxFacade);
   readonly snapshots = inject(SnapshotExecutionFacade);
 
+  private readonly loadedModesForSelection = new Set<DecisionWorkMode>(['understand']);
+
+  readonly activeWorkspaceTrack = this.store.activeWorkspaceTrack;
+  readonly viewDepth = this.store.viewDepth;
+  readonly inspectorTab = this.store.inspectorTab;
+  readonly inspectorOpen = this.store.inspectorOpen;
+  readonly explorerOpen = this.store.explorerOpen;
   readonly query = this.store.query;
   readonly contextScopeFilter = this.store.contextScopeFilter;
+  readonly activeRuleTypeFilter = this.store.activeRuleTypeFilter;
+  readonly explorerGlobalLens = this.store.explorerGlobalLens;
+  readonly portfolioOverviewOpen = this.store.portfolioOverviewOpen;
   readonly allDecisions = this.store.allDecisions;
   readonly selected = this.store.selected;
   readonly narrowDetailOpen = this.store.narrowDetailOpen;
@@ -247,7 +278,30 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.snapshotHeadSet()
   ));
 
-  constructor(readonly i18n: PolicyStudioI18n) {}
+  constructor(readonly i18n: PolicyStudioI18n) {
+    this.shell.registerLogoutHandler(() => this.logout());
+    this.shell.registerThemeToggleHandler(() => this.theme.toggleDark());
+    this.shell.registerSessionReaders(() => this.sessionActive(), () => this.signingOut());
+    this.shell.registerDarkThemeReader(() => this.theme.isDark());
+    this.destroyRef.onDestroy(() => {
+      this.shell.registerLogoutHandler(null);
+      this.shell.registerThemeToggleHandler(null);
+      this.shell.registerSessionReaders(null, null);
+      this.shell.registerDarkThemeReader(null);
+    });
+  }
+
+  setInspectorTab(tab: StudioInspectorTab): void {
+    this.shell.openInspectorTab(tab);
+  }
+
+  enableTechnicalView(): void {
+    this.shell.setViewDepth('technical');
+  }
+
+  setBusinessTrack(): void {
+    this.shell.setWorkspaceTrack('business');
+  }
 
   ngOnInit(): void {
     this.route?.queryParamMap
@@ -279,6 +333,260 @@ export class CatalogWorkspaceComponent implements OnInit {
   meaningText(decision: DecisionSummary): string {
     if (decision.meaning.trim() && decision.meaning.trim() !== decision.name.trim()) return decision.meaning;
     return `${this.i18n.text('decisionInDecisionSet')} ${decision.ruleSet}.`;
+  }
+
+  displayHeaderDomain(decision: DecisionSummary): string {
+    const raw = decision.domain?.trim() || this.i18n.text('selected');
+    if (this.viewDepth() === 'technical' || !looksLikeTechnicalSlug(raw)) return raw;
+    return humanizeTechnicalSlug(raw, 2, this.i18n.locale()) || raw;
+  }
+
+  displayDecisionTitle(decision: DecisionSummary): string {
+    return humanizeDecisionTitle(
+      decision.name,
+      decision.code,
+      this.effectiveDocumentation(decision)?.title,
+      this.viewDepth(),
+      this.i18n.locale()
+    );
+  }
+
+  displayCanvasTitle(decision: DecisionSummary): string {
+    if (this.viewDepth() === 'business') {
+      const docTitle = this.effectiveDocumentation(decision)?.title?.trim();
+      if (docTitle && !looksLikeTechnicalSlug(docTitle)) {
+        return docTitle;
+      }
+    }
+    return this.displayDecisionTitle(decision);
+  }
+
+  displayCanvasSubtitle(decision: DecisionSummary): string | null {
+    if (this.viewDepth() !== 'business') return null;
+    const heroTitle = this.displayCanvasTitle(decision);
+    const ruleName = this.displayDecisionTitle(decision);
+    const normalize = (value: string): string =>
+      value.trim().replace(/\.+$/, '').replace(/\s+/g, ' ').toLowerCase();
+    return normalize(heroTitle) !== normalize(ruleName) ? ruleName : null;
+  }
+
+  showStandaloneMeaning(decision: DecisionSummary): boolean {
+    const normalize = (value: string | null | undefined): string =>
+      (value ?? '').trim().replace(/\.+$/, '').replace(/\s+/g, ' ').toLowerCase();
+    const lead = normalize(this.meaningText(decision));
+    if (!lead) return false;
+    const title = normalize(this.displayCanvasTitle(decision));
+    const subtitle = normalize(this.displayCanvasSubtitle(decision));
+    const didacticSummary = normalize(this.effectiveDocumentation(decision)?.summary ?? this.meaningText(decision));
+    return lead !== title && lead !== subtitle && lead !== didacticSummary;
+  }
+
+  policyGlossary(decision: DecisionSummary): StudioGlossaryEntry {
+    return resolvePolicyGlossaryEntry(decision.slotOverridePolicy, this.i18n.locale());
+  }
+
+  policyBadgeTone(decision: DecisionSummary): 'info' | 'success' | 'locked' {
+    switch (decision.slotOverridePolicy) {
+      case 'PARAMETERIZABLE':
+        return 'info';
+      case 'RESTRICT_ONLY':
+      case 'EXTEND_ONLY':
+      case 'REPLACEABLE':
+        return 'success';
+      default:
+        return 'locked';
+    }
+  }
+
+  private resolvedGovernanceStatusCode(
+    decision: DecisionSummary
+  ): 'PROMOTED' | 'APPROVED' | 'SUBMITTED' | 'REJECTED' | 'OPEN' {
+    const posture = this.maturityPosture();
+    if (posture?.operationalAuthority === 'CONFIG_ACTIVE_SNAPSHOT') {
+      return 'PROMOTED';
+    }
+    switch (posture?.approvalStage) {
+      case 'PROMOTED_READY':
+        return 'PROMOTED';
+      case 'APPROVED':
+        return 'APPROVED';
+      case 'IN_REVIEW':
+        return 'SUBMITTED';
+      case 'REJECTED':
+        return 'REJECTED';
+      default:
+        return decision.state === 'verified' ? 'PROMOTED' : 'OPEN';
+    }
+  }
+
+  statusGlossary(decision: DecisionSummary): StudioGlossaryEntry {
+    const locale = this.i18n.locale();
+    const code = this.resolvedGovernanceStatusCode(decision);
+    const base = resolveStatusGlossaryEntry(code, locale);
+    if (code === 'PROMOTED' && decision.workspaceStatus?.toUpperCase() === 'OPEN') {
+      return { ...base, detail: this.i18n.text('parallelDraftNote') };
+    }
+    return base;
+  }
+
+  statusBadgeTone(decision: DecisionSummary): 'success' | 'info' | 'warning' | 'default' {
+    switch (this.resolvedGovernanceStatusCode(decision)) {
+      case 'PROMOTED':
+        return 'success';
+      case 'APPROVED':
+        return 'info';
+      case 'SUBMITTED':
+      case 'REJECTED':
+        return 'warning';
+      default:
+        return 'default';
+    }
+  }
+
+  isCreateDraftPrimary(decision: DecisionSummary): boolean {
+    return Boolean(
+      (!decision.workspaceId ||
+        decision.workspaceStatus === 'PROMOTED' ||
+        decision.workspaceStatus === 'REJECTED') &&
+        decision.authoringSupported &&
+        this.hasDefinitionAction('CREATE_NEW_VERSION')
+    );
+  }
+
+  policyIconName(decision: DecisionSummary): StudioIconName {
+    switch (decision.slotOverridePolicy) {
+      case 'PARAMETERIZABLE':
+        return 'sliders';
+      case 'RESTRICT_ONLY':
+      case 'EXTEND_ONLY':
+      case 'REPLACEABLE':
+        return 'pencil';
+      case 'FORBIDDEN':
+      case 'LOCKED':
+        return 'lock';
+      default:
+        return 'shield-check';
+    }
+  }
+
+  statusIconName(decision: DecisionSummary): StudioIconName {
+    switch (this.resolvedGovernanceStatusCode(decision)) {
+      case 'PROMOTED':
+        return 'check-circle';
+      case 'APPROVED':
+        return 'shield-check';
+      case 'SUBMITTED':
+        return 'clock';
+      case 'REJECTED':
+        return 'x';
+      default:
+        return 'file-edit';
+    }
+  }
+
+  canShowNextStepEdit(decision: DecisionSummary): boolean {
+    return Boolean(
+      !this.isCreateDraftPrimary(decision) &&
+        decision.workspaceId &&
+        decision.authoringSupported &&
+        this.hasWorkspaceAction('VIEW') &&
+        this.canOpenAuthoring(decision)
+    );
+  }
+
+  canShowNextStepCreateDraft(decision: DecisionSummary): boolean {
+    return Boolean(
+      (!decision.workspaceId ||
+        decision.workspaceStatus === 'PROMOTED' ||
+        decision.workspaceStatus === 'REJECTED') &&
+        decision.authoringSupported &&
+        this.hasDefinitionAction('CREATE_NEW_VERSION') &&
+        (decision.promotedDefinitionId ?? decision.configDefinitionId)
+    );
+  }
+
+  scenarioCountHint(count: number): string {
+    const unit =
+      count === 1 ? this.i18n.text('navScenarioSingular') : this.i18n.text('savedScenarios');
+    return `${count} ${unit}`;
+  }
+
+  evidenceCountHint(count: number): string {
+    const unit =
+      count === 1 ? this.i18n.text('navEvidenceSingular') : this.i18n.text('packageReferences');
+    return `${count} ${unit}`;
+  }
+
+  governanceTerm(key: StudioGovernanceTermKey): StudioGlossaryEntry {
+    return resolveGovernanceGlossaryEntry(key, this.i18n.locale());
+  }
+
+  isNextStepEditable(decision: DecisionSummary): boolean {
+    return (
+      decision.slotOverridePolicy === 'RESTRICT_ONLY' ||
+      decision.slotOverridePolicy === 'EXTEND_ONLY' ||
+      decision.slotOverridePolicy === 'REPLACEABLE'
+    );
+  }
+
+  isNextStepParameterizable(decision: DecisionSummary): boolean {
+    return decision.slotOverridePolicy === 'PARAMETERIZABLE';
+  }
+
+  nextStepBodyParts(decision: DecisionSummary): { readonly beforeDraft: string; readonly betweenDraftAndFourEyes: string; readonly afterFourEyes: string } {
+    const template = this.isNextStepEditable(decision)
+      ? this.i18n.text('nextStepEditableBody')
+      : this.i18n.text('nextStepParameterizableBody');
+    const [beforeDraft = '', rest = ''] = template.split('{draft}');
+    const [betweenDraftAndFourEyes = '', afterFourEyes = ''] = rest.split('{fourEyes}');
+    return { beforeDraft, betweenDraftAndFourEyes, afterFourEyes };
+  }
+
+  evaluatedParameterEntries(decision: DecisionSummary): readonly RuleParameterDisplayEntry[] {
+    return buildRuleParameterDisplayEntries(
+      decision,
+      this.effectiveParameters(decision),
+      this.i18n.locale(),
+      this.i18n.text('paramDefaultPrefix')
+    );
+  }
+
+  customizedParameterEntries(decision: DecisionSummary): readonly RuleParameterDisplayEntry[] {
+    return this.evaluatedParameterEntries(decision).filter(entry => entry.isCustomized);
+  }
+
+  customizedParametersDetail(decision: DecisionSummary): string | null {
+    const items = this.customizedParameterEntries(decision);
+    if (items.length === 0) {
+      return null;
+    }
+    return items
+      .map(entry =>
+        entry.defaultHint ? `${entry.label}: ${entry.valueText} (${entry.defaultHint})` : `${entry.label}: ${entry.valueText}`
+      )
+      .join(' · ');
+  }
+
+  displayFactLabel(fact: DecisionFact): string {
+    const raw = fact.label?.trim() ?? '';
+    if (!raw || this.viewDepth() === 'technical') {
+      return raw || fact.path;
+    }
+    const stripped = raw.replace(/^(draft|tenant|context|record|subject)\s*:\s*/i, '').trim() || raw;
+    const isCamelCaseIdentifier = !/\s/.test(stripped) && /[a-z][A-Z]/.test(stripped);
+    return looksLikeTechnicalSlug(stripped) || isCamelCaseIdentifier
+      ? humanizeTechnicalSlug(stripped, undefined, this.i18n.locale())
+      : stripped;
+  }
+
+  factSummaryForPopover(fact: DecisionFact): string {
+    const desc = fact.description?.trim() || humanizeTechnicalSlug(fact.path, undefined, this.i18n.locale());
+    const reqLabel = this.i18n.text(fact.nullable ? 'factNullable' : 'factRequired');
+    return `${desc} (${reqLabel} · ${fact.valueType})`;
+  }
+
+  factDetailForPopover(fact: DecisionFact): string {
+    return `Path: ${fact.path} · ${fact.sensitivity}`;
   }
 
   effectiveDocumentation(decision: DecisionSummary | null | undefined): RuleDocumentationDescriptor | null {
@@ -344,7 +652,11 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   approvalStageLabel(value: DecisionMaturityPosture['approvalStage']): string {
-    if (value === 'PROMOTED_READY') return this.i18n.text('approvalStagePromoted');
+    if (value === 'PROMOTED_READY') {
+      return this.i18n.text(
+        this.viewDepth() === 'business' ? 'approvalStagePromotedBusiness' : 'approvalStagePromoted'
+      );
+    }
     if (value === 'APPROVED') return this.i18n.text('approvalStageApproved');
     if (value === 'IN_REVIEW') return this.i18n.text('approvalStageInReview');
     if (value === 'REJECTED') return this.i18n.text('approvalStageRejected');
@@ -352,7 +664,13 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   operationalAuthorityPostureLabel(value: DecisionMaturityPosture['operationalAuthority']): string {
-    if (value === 'CONFIG_ACTIVE_SNAPSHOT') return this.i18n.text('authorityActiveSnapshot');
+    if (value === 'CONFIG_ACTIVE_SNAPSHOT') {
+      return this.i18n.text(
+        this.viewDepth() === 'business'
+          ? 'authorityActiveSnapshotBusiness'
+          : 'authorityActiveSnapshot'
+      );
+    }
     if (value === 'CONFIG_AUTHORITATIVE') return this.i18n.text('authorityConfigDeclared');
     if (value === 'LEGACY_AUTHORITATIVE') return this.i18n.text('authorityLegacyDeclared');
     return this.i18n.text('authorityNotDescribed');
@@ -456,11 +774,16 @@ export class CatalogWorkspaceComponent implements OnInit {
         if (loadRevision !== this.store.catalogLoadRevision) return;
         this.authenticationFailed.set(false);
         this.sessionActive.set(state.config.mode === 'remote');
+        this.signingOut.set(false);
+        this.shell.syncSessionState(state.config.mode === 'remote', false);
         this.logoutFailed.set(false);
+        this.portfolioOverviewOpen.set(false);
+        this.activeRuleTypeFilter.set(null);
         this.allDecisions.set(decisions);
         this.contextScopeFilter.set(this.resolveDeepLinkScopeFilter(decisions));
         const initial = this.resolveInitialDecision(decisions, state.config.initialDecisionKey);
-        if (initial) this.select(initial, true, this.hasExplicitDeepLink());
+        const initialOperationKey = this.resolveInitialOperationKey();
+        if (initial) this.select(initial, true, this.hasExplicitDeepLink(), false, initialOperationKey);
         else this.clearSelection();
         this.loading.set(false);
       },
@@ -472,6 +795,7 @@ export class CatalogWorkspaceComponent implements OnInit {
         this.loadError.set(error instanceof Error ? error.message : 'PROJECTION_LOAD_FAILED');
         if (error instanceof HttpErrorResponse && error.status === 401) {
           this.sessionActive.set(false);
+          this.shell.syncSessionState(false, false);
           this.authenticationRequired.set(true);
         } else if (error instanceof HttpErrorResponse && error.status === 403) {
           this.resolveForbiddenResponse(state.config, loadRevision);
@@ -554,6 +878,12 @@ export class CatalogWorkspaceComponent implements OnInit {
     );
   }
 
+  private resolveInitialOperationKey(): string | null {
+    if (typeof window === 'undefined' || !window.location?.search) return null;
+    const params = new URLSearchParams(window.location.search);
+    return params.get('operationKey')?.trim() || null;
+  }
+
   private resolveDeepLinkScopeFilter(decisions: readonly DecisionSummary[]): string | null {
     if (typeof window === 'undefined' || !window.location?.search || !decisions.length) return null;
     const params = new URLSearchParams(window.location.search);
@@ -570,6 +900,7 @@ export class CatalogWorkspaceComponent implements OnInit {
       next: active => {
         if (catalogRevision !== this.store.catalogLoadRevision) return;
         this.sessionActive.set(active);
+        this.shell.syncSessionState(active, this.signingOut());
         active ? this.permissionLimited.set(true) : this.authenticationRequired.set(true);
       },
       error: () => {
@@ -602,12 +933,15 @@ export class CatalogWorkspaceComponent implements OnInit {
     const state = this.runtime.state();
     if (state.kind !== 'ready' || !this.sessionActive() || this.signingOut()) return;
     this.signingOut.set(true);
+    this.shell.syncSessionState(true, true);
     this.logoutFailed.set(false);
     this.auth.logout(state.config).subscribe({
       next: () => {
         ++this.store.catalogLoadRevision;
         this.signingOut.set(false);
         this.sessionActive.set(false);
+        this.shell.syncSessionState(false, false);
+        this.catalog.invalidateCatalogMetaCache?.();
         this.allDecisions.set([]);
         this.clearSelection();
         this.loading.set(false);
@@ -618,6 +952,7 @@ export class CatalogWorkspaceComponent implements OnInit {
       },
       error: () => {
         this.signingOut.set(false);
+        this.shell.syncSessionState(this.sessionActive(), false);
         this.logoutFailed.set(true);
       }
     });
@@ -630,6 +965,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.permissionLimited.set(false);
     this.authenticationFailed.set(false);
     this.sessionActive.set(false);
+    this.shell.syncSessionState(false, false);
     this.authenticationRequired.set(true);
   }
 
@@ -646,6 +982,69 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   clearContextScopeFilter(): void {
     this.contextScopeFilter.set(null);
+    this.activeRuleTypeFilter.set(null);
+    if (this.allDecisions().length > 1) {
+      this.portfolioOverviewOpen.set(true);
+      this.narrowDetailOpen.set(true);
+    }
+  }
+
+  applyScopeFilter(scopeKey: string): void {
+    const normalized = scopeKey.trim();
+    if (!normalized) return;
+    this.contextScopeFilter.set(normalized);
+    this.activeRuleTypeFilter.set(null);
+    this.portfolioOverviewOpen.set(false);
+    const matching = this.decisions();
+    const current = this.selected();
+    if (matching.length > 0 && (!current || !matching.some(item => item.key === current.key))) {
+      this.select(matching[0]!, false, true);
+    }
+  }
+
+  applyRuleTypeFilter(ruleType: string): void {
+    const normalized = ruleType.trim();
+    if (!normalized) return;
+    this.contextScopeFilter.set(null);
+    this.activeRuleTypeFilter.set(normalized);
+    this.explorerGlobalLens.set('type');
+    this.portfolioOverviewOpen.set(false);
+    const matching = this.decisions();
+    const current = this.selected();
+    if (matching.length > 0 && (!current || !matching.some(item => item.key === current.key))) {
+      this.select(matching[0]!, false, true);
+    }
+  }
+
+  clearRuleTypeFilter(): void {
+    this.activeRuleTypeFilter.set(null);
+  }
+
+  setExplorerGlobalLens(lens: ExplorerGlobalLens): void {
+    this.explorerGlobalLens.set(lens);
+  }
+
+  togglePortfolioOverview(): void {
+    const next = !this.portfolioOverviewOpen();
+    this.portfolioOverviewOpen.set(next);
+    if (next) {
+      this.narrowDetailOpen.set(true);
+    }
+  }
+
+  closePortfolioOverview(): void {
+    this.portfolioOverviewOpen.set(false);
+    if (!this.selected() && this.decisions().length > 0) {
+      this.select(this.decisions()[0]!, false, true);
+    }
+  }
+
+  openWorkflowQueueInExplorer(): void {
+    this.contextScopeFilter.set(null);
+    this.activeRuleTypeFilter.set(null);
+    this.explorerGlobalLens.set('workflow');
+    this.portfolioOverviewOpen.set(false);
+    this.narrowDetailOpen.set(false);
   }
 
   navigateToSection(sectionId: string): void {
@@ -659,12 +1058,26 @@ export class CatalogWorkspaceComponent implements OnInit {
     const mode = modeBySection[sectionId];
     if (!mode) return;
     this.activeMode.set(mode);
+    this.ensureModeDataLoaded(mode);
     requestAnimationFrame(() => {
       const target = this.host.nativeElement.querySelector<HTMLElement>(`#${sectionId}`);
       if (!target) return;
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
       target.focus({ preventScroll: true });
     });
+  }
+
+  private ensureModeDataLoaded(mode: DecisionWorkMode): void {
+    if (this.loadedModesForSelection.has(mode)) return;
+    this.loadedModesForSelection.add(mode);
+    const selectionRevision = this.store.selectionRevision;
+    if (mode === 'test') {
+      this.loadOperationalTestAction(selectionRevision);
+    } else if (mode === 'operate') {
+      this.loadReviews(selectionRevision);
+      this.snapshots.loadSnapshots(true);
+    } else if (mode === 'history') {
+      this.loadTimeline(selectionRevision);
+    }
   }
 
   returnToCatalog(): void {
@@ -679,7 +1092,11 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   private completeReturnToCatalog(): void {
     if (this.hasUnsavedWork()) this.discardUnsavedWorkState();
+    this.portfolioOverviewOpen.set(false);
     this.narrowDetailOpen.set(false);
+    if (this.inspectorTab() === 'ai') {
+      this.shell.inspectorTab.set('properties');
+    }
     requestAnimationFrame(() => {
       const search = this.host.nativeElement.querySelector<HTMLInputElement>('.search input');
       search?.scrollIntoView({ block: 'start' });
@@ -687,8 +1104,15 @@ export class CatalogWorkspaceComponent implements OnInit {
     });
   }
 
-  select(decision: DecisionSummary, forceReload = false, revealOnNarrow = true, discardConfirmed = false): void {
+  select(
+    decision: DecisionSummary,
+    forceReload = false,
+    revealOnNarrow = true,
+    discardConfirmed = false,
+    initialOperationKey: string | null = null
+  ): void {
     if (decision.key === this.selected()?.key && !forceReload) {
+      this.portfolioOverviewOpen.set(false);
       if (revealOnNarrow) this.narrowDetailOpen.set(true);
       this.revealSelectedDecision();
       return;
@@ -699,10 +1123,13 @@ export class CatalogWorkspaceComponent implements OnInit {
         : (this.selected()?.name ?? this.i18n.text('localChanges'));
       this.store.openUnsavedWorkConfirmation(
         target,
-        () => this.select(decision, forceReload, revealOnNarrow, true));
+        () => this.select(decision, forceReload, revealOnNarrow, true, initialOperationKey));
       return;
     }
+    this.portfolioOverviewOpen.set(false);
     const selectionRevision = ++this.store.selectionRevision;
+    this.loadedModesForSelection.clear();
+    this.loadedModesForSelection.add('understand');
     this.selected.set(decision);
     this.narrowDetailOpen.set(revealOnNarrow);
     this.activeMode.set('understand');
@@ -710,13 +1137,13 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.authoring.resetForSelection(decision);
     this.testing.resetForSelection();
     this.snapshots.resetForSelection();
-    this.loadTimeline(selectionRevision);
+    if (initialOperationKey && decision.operationKeys.includes(initialOperationKey)) {
+      this.snapshots.snapshotOperationKey.set(initialOperationKey);
+    }
     this.loadLifecycle(selectionRevision);
     this.loadScenarios(selectionRevision);
-    this.loadReviews(selectionRevision);
     this.loadWorkspaceCapabilities(selectionRevision);
-    this.loadOperationalTestAction(selectionRevision);
-    this.loadSnapshots();
+    this.snapshots.loadSnapshots(false);
     this.hydrateSelectedDecision(decision, selectionRevision);
     this.revealSelectedDecision();
   }
@@ -757,17 +1184,17 @@ export class CatalogWorkspaceComponent implements OnInit {
           this.selected.set(hydrated);
           this.authoring.resetForSelection(hydrated);
           if (hydrated.workspaceId !== decision.workspaceId) {
-            this.loadTimeline(selectionRevision);
             this.loadLifecycle(selectionRevision);
             this.loadScenarios(selectionRevision);
-            this.loadReviews(selectionRevision);
             this.loadWorkspaceCapabilities(selectionRevision);
+            if (this.loadedModesForSelection.has('history')) this.loadTimeline(selectionRevision);
+            if (this.loadedModesForSelection.has('operate')) this.loadReviews(selectionRevision);
           }
-          if (hydrated.resourceKey !== decision.resourceKey) {
+          if (hydrated.resourceKey !== decision.resourceKey && this.loadedModesForSelection.has('test')) {
             this.loadOperationalTestAction(selectionRevision);
           }
           if (hydrated.ruleSetKey !== decision.ruleSetKey) {
-            this.loadSnapshots();
+            this.snapshots.loadSnapshots(this.loadedModesForSelection.has('operate'));
           }
         },
         error: error => this.store.failAuthoringCommand(error, selectionRevision, decision.key)
@@ -878,19 +1305,22 @@ export class CatalogWorkspaceComponent implements OnInit {
           return;
         }
         const selectionRevision = ++this.store.selectionRevision;
+        this.loadedModesForSelection.clear();
+        this.loadedModesForSelection.add('understand');
+        this.loadedModesForSelection.add(previousMode);
         this.selected.set(refreshed);
         this.timeline.set([]);
         this.authoring.resetForSelection(refreshed);
         this.testing.resetForSelection();
         this.snapshots.resetForSelection();
         this.activeMode.set(previousMode);
-        this.loadTimeline(selectionRevision);
         this.loadLifecycle(selectionRevision);
         this.loadScenarios(selectionRevision);
-        this.loadReviews(selectionRevision);
         this.loadWorkspaceCapabilities(selectionRevision);
-        this.loadOperationalTestAction(selectionRevision);
-        this.loadSnapshots();
+        this.snapshots.loadSnapshots(previousMode === 'operate');
+        if (previousMode === 'history') this.loadTimeline(selectionRevision);
+        if (previousMode === 'operate') this.loadReviews(selectionRevision);
+        if (previousMode === 'test') this.loadOperationalTestAction(selectionRevision);
         if (wasAuthoringOpen && refreshed.authoringSupported) {
           this.authoringOpen.set(true);
         }
@@ -951,7 +1381,8 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.openAuthoring();
     if (!this.authoringOpen()) return;
     this.activeMode.set('rule');
-    requestAnimationFrame(() => this.host.nativeElement.querySelector<HTMLElement>('.draft-workspace')?.focus());
+    this.ensureModeDataLoaded('rule');
+    requestAnimationFrame(() => this.host.nativeElement.querySelector<HTMLElement>('.draft-workspace')?.focus({ preventScroll: true }));
   }
 
   closeAuthoring(): void {
@@ -1171,6 +1602,10 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   createRollout(candidateSnapshotKey: string): void {
     this.snapshots.createRollout(candidateSnapshotKey);
+  }
+
+  probeRollout(item: DomainRuleRolloutCatalogItem): void {
+    this.snapshots.probeRollout(item);
   }
 
   cancelRollout(item: DomainRuleRolloutCatalogItem): void {

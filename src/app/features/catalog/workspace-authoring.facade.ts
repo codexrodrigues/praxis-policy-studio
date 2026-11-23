@@ -393,13 +393,14 @@ export class WorkspaceAuthoringFacade {
   createWorkspace(): void {
     const state = this.runtime.state();
     const decision = this.store.selected();
-    if (state.kind !== 'ready' || !decision?.configDefinitionId
+    const baseDefinitionId = decision?.promotedDefinitionId ?? decision?.configDefinitionId;
+    if (state.kind !== 'ready' || !decision || !baseDefinitionId
       || !this.store.hasDefinitionAction('CREATE_NEW_VERSION') || this.store.authoringBusy()) return;
     this.store.authoringBusy.set(true);
     this.store.clearAuthoringMessage();
     const commandRevision = this.store.selectionRevision;
     const commandRuleKey = decision.key;
-    this.catalog.createWorkspace(decision.configDefinitionId, decision.name, state.config).subscribe({
+    this.catalog.createWorkspace(baseDefinitionId, decision.name, state.config).subscribe({
       next: workspace => {
         if (!this.store.isCurrentCommand(commandRevision, commandRuleKey)) {
           this.store.authoringBusy.set(false);
@@ -708,11 +709,15 @@ export class WorkspaceAuthoringFacade {
         : decision.definitionDocumentation;
       return {
         ...decision,
+        configDefinitionId: workspace.baseDefinitionId ?? decision.configDefinitionId,
+        configVersion: workspace.baseDefinitionVersion ?? decision.configVersion,
         workspaceId: workspace.id,
         workspaceStatus: workspace.status,
         workspaceEtag: workspace.etag,
         workspaceRevision: workspace.revision,
-        promotedDefinitionId: workspace.promotedDefinitionId ?? decision.promotedDefinitionId ?? null,
+        promotedDefinitionId: workspace.status === 'PROMOTED'
+          ? (workspace.promotedDefinitionId ?? decision.promotedDefinitionId ?? null)
+          : (workspace.promotedDefinitionId ?? null),
         configStatus: workspace.promotedDefinitionId ? 'approved' : decision.configStatus,
         workspaceCondition: workspace.condition ?? null,
         workspaceParameters: workspace.parameters,

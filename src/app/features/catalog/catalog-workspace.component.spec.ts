@@ -10,6 +10,7 @@ import { AuthSessionService } from '../../core/auth-session.service';
 import { PolicyStudioI18n } from '../../core/i18n';
 import { ProjectionCatalogService } from '../../core/projection-catalog.service';
 import { RuntimeConfigService } from '../../core/runtime-config.service';
+import { StudioShellStateService } from '../../core/studio-shell-state.service';
 import type { DecisionLifecycleSummary, DecisionSummary } from './catalog.fixture';
 import { buildRuleSetImpactSummary } from './catalog-presentation';
 import { CatalogSelectionStore } from './catalog-selection.store';
@@ -71,6 +72,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
   const updateScenario = vi.fn();
   const reviewWorkspace = vi.fn();
   const cancelRollout = vi.fn();
+  const probeRolloutCandidate = vi.fn();
   const activateRolloutCandidate = vi.fn();
   const createRollout = vi.fn();
   const operateSnapshot = vi.fn();
@@ -115,6 +117,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     updateScenario.mockReset();
     reviewWorkspace.mockReset();
     cancelRollout.mockReset();
+    probeRolloutCandidate.mockReset();
     activateRolloutCandidate.mockReset();
     createRollout.mockReset();
     operateSnapshot.mockReset();
@@ -174,6 +177,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
         updateScenario,
         reviewWorkspace,
         cancelRollout,
+        probeRolloutCandidate,
         activateRolloutCandidate,
         createRollout,
         operateSnapshot,
@@ -229,10 +233,14 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
 
   it('ignores timeline, lifecycle, scenario, review and error responses from a previous selection', () => {
     component.select(decision('A'));
+    component.navigateToSection('decision-execution');
+    component.navigateToSection('decision-history');
     component.sandboxRun.set({ runId: 'run-A' } as any);
     component.publicationReadiness.set({ readiness: 'ready_to_publish' } as any);
     component.publicationResult.set({ status: 'published' } as any);
     component.select(decision('B'));
+    component.navigateToSection('decision-execution');
+    component.navigateToSection('decision-history');
 
     timelines.B[0].next([{ eventType: 'B', occurredAt: '2026-08-13T12:00:00Z', summary: 'B', status: null, actor: null }]);
     lifecycles.B[0].next({ workspaceStatus: 'B', workspaceRevision: 2, testRunCount: 1, reviewCount: 1, materializationCount: 0, promotedDefinitionId: null, submittedTestRunId: 'run-B', latestTestRun: null });
@@ -308,6 +316,38 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     component.createWorkspace();
     expect(createWorkspace).toHaveBeenCalledOnce();
     expect(createWorkspace).toHaveBeenCalledWith('definition-A', 'A', config);
+  });
+
+  it('creates a fresh OPEN workspace from promotedDefinitionId when the latest workspace is PROMOTED', () => {
+    createWorkspace.mockReturnValue(of({
+      id: 'workspace-v3',
+      ruleKey: 'A',
+      baseDefinitionId: 'def-v2',
+      baseDefinitionVersion: 2,
+      status: 'OPEN',
+      etag: 'etag-v3',
+      revision: 1,
+      parameters: {},
+      promotedDefinitionId: null
+    }));
+    component.select({
+      ...decision('A'),
+      configDefinitionId: 'definition-A',
+      configVersion: 1,
+      workspaceId: 'workspace-v1',
+      workspaceStatus: 'PROMOTED',
+      promotedDefinitionId: 'def-v2',
+      availableDefinitionActions: ['CREATE_NEW_VERSION']
+    }, true);
+
+    component.createWorkspace();
+
+    expect(createWorkspace).toHaveBeenCalledWith('def-v2', 'A', config);
+    expect(component.selected()?.workspaceId).toBe('workspace-v3');
+    expect(component.selected()?.workspaceStatus).toBe('OPEN');
+    expect(component.selected()?.configDefinitionId).toBe('def-v2');
+    expect(component.selected()?.configVersion).toBe(2);
+    expect(component.selected()?.promotedDefinitionId).toBeNull();
   });
 
   it('persists complete scenario corrections and refreshes the rotated workspace ETag', () => {
@@ -449,7 +489,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     vi.runAllTimers();
 
     expect(component.activeMode()).toBe('rule');
-    expect(target.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+    expect(target.scrollIntoView).not.toHaveBeenCalled();
     expect(target.focus).toHaveBeenCalledWith({ preventScroll: true });
     vi.useRealTimers();
     vi.unstubAllGlobals();
@@ -772,6 +812,27 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(component.rolloutBusy()).toBe(true);
   });
 
+  it('probes the host for rollout readiness and reloads rollouts when recorded', () => {
+    const remoteConfig = { ...config, mode: 'remote' as const, configApiBaseUrl: '' };
+    vi.spyOn(component.runtime, 'state').mockReturnValue({ kind: 'ready', config: remoteConfig });
+    const item = readyBootstrapRollout();
+    component.selected.set({ ...decision('A'), operationKeys: ['evaluate'] });
+    component.snapshots.selectSnapshotOperation('evaluate');
+    component.rolloutCatalog.set({ operationKey: 'evaluate', ruleSetKey: 'test-rules', availableActions: [], rollouts: [item] });
+    probeRolloutCandidate.mockReturnValue(of({ updated: true, observedAtUtc: '2026-10-21T12:01:00Z' }));
+    const rolloutCatalogSpy = vi.spyOn(TestBed.inject(ProjectionCatalogService), 'rolloutCatalog');
+    snapshotCockpit.mockClear();
+
+    component.probeRollout(item);
+
+    expect(probeRolloutCandidate).toHaveBeenCalledWith('test-rules', 'bootstrap-1', 'evaluate', remoteConfig);
+    expect(component.rolloutBusy()).toBe(false);
+    expect(component.rolloutFeedbackError()).toBe(false);
+    expect(component.rolloutFeedback()).toBe('Prontidão do candidato confirmada pelo host.');
+    expect(rolloutCatalogSpy).toHaveBeenCalledWith('test-rules', 'evaluate', remoteConfig);
+    expect(snapshotCockpit).toHaveBeenCalledWith('test-rules', 'evaluate', remoteConfig);
+  });
+
   it('requires the contextual governed dialog before cancelling a rollout', () => {
     const item = {
       rollout: { candidateSnapshotKey: 'snapshot-candidate', rolloutId: 'rollout-A' },
@@ -865,6 +926,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     }));
 
     component.select(decision('A'));
+    component.navigateToSection('decision-tests');
     component.scenarios.set([{ id: 'scenario-A', scenarioKey: 'allow-create' }] as any);
     component.reviewOperationalTest();
     expect(component.operationalConfirmationOpen()).toBe(false);
@@ -900,6 +962,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
       });
 
       component.select(decision('A'));
+      component.navigateToSection('decision-tests');
       component.scenarios.set([{ id: 'scenario-A', scenarioKey: 'allow-create' }] as any);
       component.setOperationalScenarioMode('scenario-A', 'CREATE');
       component.reviewOperationalTest();
@@ -967,6 +1030,8 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
 
   it('ignores older success and error responses when the same resource is reloaded', () => {
     component.select(decision('A'));
+    component.navigateToSection('decision-execution');
+    component.navigateToSection('decision-history');
     component.loadTimeline();
     component.loadLifecycle();
     component.loadScenarios();
@@ -1386,7 +1451,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(component.authoringConflict()).toBe(true);
     expect(component.authoringFeedback()).toContain('Recarregue as evidências');
 
-    component.activeMode.set('operate');
+    component.navigateToSection('decision-execution');
     loadCatalog.mockReturnValueOnce(of([refreshedDecision]));
     snapshotCockpit.mockReturnValueOnce(of({
       head: {
@@ -2047,5 +2112,82 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     component.clearContextScopeFilter();
     expect(component.contextScopeFilter()).toBeNull();
     expect(component.decisions().map(item => item.key)).toEqual(['rule.alpha', 'rule.beta']);
+  });
+
+  it('selects an initial operationKey from deep-link URL query parameters when matching the decision operationKeys', () => {
+    const first = {
+      ...decision('workforce.attendance.validate'),
+      operationKeys: ['CREATE', 'UPDATE']
+    };
+    const originalUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    try {
+      window.history.replaceState(
+        {},
+        '',
+        '/catalog?decisionKey=workforce.attendance.validate&operationKey=UPDATE'
+      );
+      loadCatalog.mockReturnValueOnce(of([first]));
+      component.loadCatalog();
+      expect(component.selected()?.key).toBe('workforce.attendance.validate');
+      expect(component.snapshots.snapshotOperationKey()).toBe('UPDATE');
+    } finally {
+      window.history.replaceState({}, '', originalUrl);
+    }
+  });
+
+  it('bridges session state, theme toggle, track switcher, and depth lens through StudioShellStateService', () => {
+    const shell = TestBed.inject(StudioShellStateService);
+    const current = decision('A');
+    component.allDecisions.set([current]);
+    component.select(current);
+    component.sessionActive.set(true);
+
+    expect(shell.sessionActive()).toBe(true);
+    expect(shell.signingOut()).toBe(false);
+    expect(shell.isDarkTheme()).toBe(false);
+
+    shell.toggleTheme();
+    expect(shell.isDarkTheme()).toBe(true);
+    shell.toggleTheme();
+    expect(shell.isDarkTheme()).toBe(false);
+
+    shell.setWorkspaceTrack('authorization');
+    expect(component.activeWorkspaceTrack()).toBe('authorization');
+    shell.setViewDepth('technical');
+    expect(component.viewDepth()).toBe('technical');
+
+    shell.triggerLogout();
+    expect(loginSession).not.toHaveBeenCalled();
+    expect(logoutSession).toHaveBeenCalledOnce();
+    expect(shell.signingOut()).toBe(true);
+  });
+
+  it('keeps header primary CTA and safe-next-step banner coherent across PROMOTED and OPEN workspaces', () => {
+    const base = {
+      ...decision('A'),
+      promotedDefinitionId: 'def-active-1',
+      availableDefinitionActions: ['CREATE_NEW_VERSION' as const]
+    };
+    component.workspaceCapabilities.set({
+      workspaceId: base.workspaceId!,
+      ruleKey: base.key,
+      status: 'OPEN',
+      etag: 'etag-1',
+      revision: 1,
+      availableActions: ['VIEW', 'UPDATE_DRAFT'],
+      blockers: []
+    });
+
+    const openDecision = { ...base, workspaceStatus: 'OPEN' };
+    component.selected.set(openDecision);
+    expect(component.isCreateDraftPrimary(openDecision)).toBe(false);
+    expect(component.canShowNextStepEdit(openDecision)).toBe(true);
+    expect(component.canShowNextStepCreateDraft(openDecision)).toBe(false);
+
+    const promotedDecision = { ...base, workspaceStatus: 'PROMOTED' };
+    component.selected.set(promotedDecision);
+    expect(component.isCreateDraftPrimary(promotedDecision)).toBe(true);
+    expect(component.canShowNextStepEdit(promotedDecision)).toBe(false);
+    expect(component.canShowNextStepCreateDraft(promotedDecision)).toBe(true);
   });
 });

@@ -1,0 +1,262 @@
+<aside class="inspector-rail" [attr.aria-label]="i18n.text('inspectorRegion')">
+  <header class="inspector-header">
+    <div class="inspector-tabs" role="tablist" [attr.aria-label]="i18n.text('inspectorRegion')">
+      <button
+        type="button"
+        role="tab"
+        data-testid="inspector-tab-properties"
+        [class.active]="activeTab() === 'properties'"
+        [attr.aria-selected]="activeTab() === 'properties'"
+        (click)="tabChanged.emit('properties')">
+        {{ i18n.text('inspectorTabProperties') }}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        data-testid="inspector-tab-ai"
+        [class.active]="activeTab() === 'ai'"
+        [attr.aria-selected]="activeTab() === 'ai'"
+        (click)="tabChanged.emit('ai')">
+        <pax-icon name="sparkles" [size]="14" />
+        <span>{{ i18n.text('inspectorTabAi') }}</span>
+      </button>
+      <button
+        type="button"
+        role="tab"
+        data-testid="inspector-tab-technical"
+        [class.active]="activeTab() === 'technical'"
+        [attr.aria-selected]="activeTab() === 'technical'"
+        (click)="tabChanged.emit('technical')">
+        <span class="studio-mono" aria-hidden="true">&lt;/&gt;</span>
+        <span>{{ i18n.text('inspectorTabTechnical') }}</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="inspector-body">
+    @switch (activeTab()) {
+      @case ('properties') {
+        @if (decision(); as current) {
+          @if (maturityPosture(); as posture) {
+            <section class="inspector-section decision-maturity-posture" data-testid="decision-maturity-posture">
+              <div class="inspector-section-head">
+                <p class="section-label">
+                  {{ viewDepth() === 'technical' ? i18n.text('maturityPostureTitle') : i18n.text('inspectorGovernanceHeading') }}
+                </p>
+              </div>
+              <dl class="inspector-facts">
+                <div data-testid="posture-technical-maturity">
+                  <dt>{{ i18n.text('postureTechnicalMaturity') }}</dt>
+                  <dd>{{ technicalMaturityText() }}</dd>
+                </div>
+                <div data-testid="posture-approval-stage">
+                  @let fourEyesTerm = governanceTerm('fourEyes');
+                  <dt>
+                    <pax-term-popover
+                      variant="inline"
+                      [term]="i18n.text('postureApprovalStage')"
+                      [category]="fourEyesTerm.category"
+                      [title]="fourEyesTerm.title"
+                      [summary]="fourEyesTerm.summary"
+                      [detail]="fourEyesTerm.detail ?? null" />
+                  </dt>
+                  <dd>{{ approvalStageText() }}</dd>
+                </div>
+                <div data-testid="posture-operational-authority">
+                  @let authorityTerm = governanceTerm('runtimeAuthority');
+                  <dt>
+                    <pax-term-popover
+                      variant="inline"
+                      [term]="i18n.text('postureOperationalAuthority')"
+                      [category]="authorityTerm.category"
+                      [title]="authorityTerm.title"
+                      [summary]="authorityTerm.summary" />
+                  </dt>
+                  <dd>
+                    {{ operationalAuthorityText() }}
+                    @if (posture.activeSnapshotKey && viewDepth() === 'technical') {
+                      · <code class="studio-mono">{{ posture.activeSnapshotKey }}</code>
+                    }
+                  </dd>
+                </div>
+              </dl>
+            </section>
+          }
+
+          <section class="inspector-section">
+            <p class="section-label">{{ i18n.text('inspectorScopeRulesetLabel') }}</p>
+            <dl class="inspector-facts">
+              <div><dt>{{ i18n.text('inspectorScopeDomainLabel') }}</dt><dd>{{ displayDomain(current) }}</dd></div>
+              <div>
+                <dt>{{ i18n.text('decisionSet') }}</dt>
+                <dd>{{ displayRuleSet(current) }}</dd>
+              </div>
+              @if (hasExplicitAuthority()) {
+                <div><dt>{{ i18n.text('whoDecidesToday') }}</dt><dd>{{ authorityText() }}</dd></div>
+              }
+              @if (hasExplicitPersistenceStrategy()) {
+                <div><dt>{{ i18n.text('migrationStrategy') }}</dt><dd>{{ migrationStrategyText() }}</dd></div>
+              }
+              @if (viewDepth() === 'technical') {
+                <div><dt>{{ i18n.text('source') }}</dt><dd>{{ i18n.text('projectionSource') }}</dd></div>
+              }
+              @if (current.configStatus) {
+                <div><dt>{{ i18n.text('configVersion') }}</dt><dd>{{ configStatusText() }}</dd></div>
+              }
+            </dl>
+          </section>
+
+          @let paramItems = activeParameters(current);
+          @if (paramItems.length > 0) {
+            <section class="inspector-section" data-testid="inspector-active-parameters">
+              <p class="section-label">{{ i18n.text('inspectorActiveParamsHeading') }}</p>
+              <dl class="inspector-param-list">
+                @for (param of paramItems; track param.key) {
+                  <div class="inspector-param-row" [class.is-customized]="param.isCustomized">
+                    <dt>{{ param.label }}</dt>
+                    <dd>
+                      <code class="studio-mono">{{ param.valueText }}</code>
+                      @if (param.defaultHint) {
+                        <small class="param-default-hint">{{ param.defaultHint }}</small>
+                      }
+                    </dd>
+                  </div>
+                }
+              </dl>
+            </section>
+          }
+        } @else {
+          <p class="inspector-empty">{{ i18n.text('inspectorEmptySelection') }}</p>
+        }
+      }
+
+      @case ('ai') {
+        <div class="ai-context-chip" data-testid="ai-inspector-context-chip">
+          @if (decision(); as current) {
+            <strong class="studio-mono">{{ current.code }}</strong>
+            @if (current.configVersion) {
+              <span class="studio-mono">v{{ current.configVersion }}</span>
+            }
+          }
+          <span>{{ i18n.text('aiContextChipScope') }}</span>
+        </div>
+
+        @if (policyConfig(); as studioConfig) {
+          @if (decision(); as current) {
+            <pax-decision-explanation [decision]="current" [config]="studioConfig" />
+          }
+          <pax-decision-discovery
+            [config]="studioConfig"
+            [decisions]="allDecisions()"
+            (decisionSelected)="decisionSelected.emit($event)"
+            (candidateSelected)="candidateSelected.emit($event)" />
+        } @else {
+          <p class="inspector-empty">{{ i18n.text('inspectorEmptySelection') }}</p>
+        }
+      }
+
+      @case ('technical') {
+        @if (decision(); as current) {
+          <section class="inspector-section">
+            <p class="section-label">{{ i18n.text('technicalContractsSection') }}</p>
+            <dl class="technical-kv">
+              <div>
+                <dt>{{ i18n.text('technicalDecisionCode') }}</dt>
+                <dd>
+                  <code class="studio-mono">{{ current.code }}</code>
+                  <button type="button" class="copy-btn" (click)="copyText('code', current.code)">
+                    {{ i18n.text(copiedField() === 'code' ? 'copiedValue' : 'copyValue') }}
+                  </button>
+                </dd>
+              </div>
+              <div>
+                <dt>{{ i18n.text('canonicalDecisionKey') }}</dt>
+                <dd>
+                  <code class="studio-mono">{{ current.key }}</code>
+                  <button type="button" class="copy-btn" (click)="copyText('key', current.key)">
+                    {{ i18n.text(copiedField() === 'key' ? 'copiedValue' : 'copyValue') }}
+                  </button>
+                </dd>
+              </div>
+              <div>
+                <dt>ruleSetKey</dt>
+                <dd>
+                  <code class="studio-mono">{{ current.ruleSetKey }}</code>
+                  <button type="button" class="copy-btn" (click)="copyText('ruleSetKey', current.ruleSetKey)">
+                    {{ i18n.text(copiedField() === 'ruleSetKey' ? 'copiedValue' : 'copyValue') }}
+                  </button>
+                </dd>
+              </div>
+              @if (current.configDefinitionId) {
+                <div>
+                  <dt>definitionId</dt>
+                  <dd>
+                    <code class="studio-mono">{{ current.configDefinitionId }}</code>
+                    <button type="button" class="copy-btn" (click)="copyText('definitionId', current.configDefinitionId)">
+                      {{ i18n.text(copiedField() === 'definitionId' ? 'copiedValue' : 'copyValue') }}
+                    </button>
+                  </dd>
+                </div>
+              }
+              <div>
+                <dt>{{ i18n.text('authority') }}</dt>
+                <dd><code class="studio-mono">{{ current.authority }}</code></dd>
+              </div>
+              <div>
+                <dt>{{ i18n.text('source') }}</dt>
+                <dd><code class="studio-mono">{{ current.source }}</code></dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="inspector-section">
+            <p class="section-label">{{ i18n.text('technicalNullAndHostSection') }}</p>
+            <dl class="technical-kv">
+              <div>
+                <dt>{{ i18n.text('nullBehavior') }}</dt>
+                <dd>{{ nullSemanticsText() }}</dd>
+              </div>
+              <div>
+                <dt>{{ i18n.text('operations') }}</dt>
+                <dd><code class="studio-mono">{{ current.operationKeys.join(', ') || i18n.text('notInformed') }}</code></dd>
+              </div>
+              <div>
+                <dt>{{ i18n.text('hostContract') }}</dt>
+                <dd><code class="studio-mono">{{ current.hostContractVersion ?? i18n.text('notInformed') }}</code></dd>
+              </div>
+            </dl>
+          </section>
+
+          @if (maturityPosture(); as posture) {
+            <section class="inspector-section">
+              <p class="section-label">{{ i18n.text('technicalFactsSummarySection') }}</p>
+              <p class="inspector-meta-note" data-testid="inspector-fact-redaction-summary">
+                {{ i18n.format('factRedactionSummary', {
+                  sensitive: posture.sensitiveFactsCount,
+                  total: posture.totalFacts,
+                  redacted: posture.redactedFactsCount
+                }) }}
+              </p>
+            </section>
+          }
+
+          @if (viewDepth() !== 'technical') {
+            <button
+              type="button"
+              class="quiet-button full-width-btn"
+              data-testid="inspector-enable-technical-lens"
+              (click)="enableTechnicalModeRequested.emit()">
+              <span class="studio-mono" aria-hidden="true">&lt;/&gt;</span> {{ i18n.text('openTechnicalCanvasHint') }}
+            </button>
+          }
+        } @else {
+          <p class="inspector-empty">{{ i18n.text('inspectorEmptySelection') }}</p>
+        }
+      }
+    }
+  </div>
+
+  <footer class="inspector-footer">
+    <small>{{ activeTab() === 'properties' ? i18n.text('inspectorOverviewNote') : i18n.text('inspectorScopeNote') }}</small>
+  </footer>
+</aside>

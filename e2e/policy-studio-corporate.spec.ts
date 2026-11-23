@@ -90,6 +90,7 @@ async function governedResponse(
         ...definition,
         parameters: {
           ...definition.parameters,
+          operationKeys: ['evaluate-extraordinary-grant'],
           parameterValues: { maxBenefitAmount: 3000 },
           validationPolicy: {
             effect: 'BLOCK',
@@ -129,7 +130,10 @@ async function governedResponse(
   if (path.includes('/ai/authoring/turn/stream/') && request.method() === 'GET') {
     const streamId = path.split('/').at(-1) ?? '';
     const component = authoringStreams.components.get(streamId);
-    const payload = component === 'policy-decision-explanation'
+    const payload = (
+      component === 'rules-decision-explanation'
+      || component === 'policy-decision-explanation'
+    )
       ? {
           assistantMessage: 'A decisão limita o valor solicitado ao teto governado e falha fechada quando o valor está ausente.',
           canApply: false,
@@ -519,6 +523,7 @@ async function governedResponse(
   if (path.endsWith('/rollout-policies')) return json({}, 404);
   if (path.endsWith('/rollouts')) return json({
     ruleSetKey: url.searchParams.get('ruleSetKey') ?? 'quickstart.extraordinary-benefit.eligibility',
+    operationKey: url.searchParams.get('operationKey') ?? 'evaluate-extraordinary-grant',
     rollouts: [],
     availableActions: []
   });
@@ -582,9 +587,10 @@ test('discovers, selects, and explains an exact governed decision', async ({ pag
   await mockGovernedBackend(page, false);
   await page.goto('/catalog');
 
+  await page.getByTestId('studio-open-ai-inspector').click();
   await page.getByLabel('O que você precisa encontrar?').fill('regras que limitam o valor do auxílio');
   await page.getByRole('button', { name: 'Descobrir', exact: true }).click();
-  const candidate = page.getByRole('button', { name: /grant\.amount-parameters/ });
+  const candidate = page.getByTestId('discovery-candidate-grant.amount-parameters');
   await expect(candidate).toBeVisible();
   await candidate.click();
   await page.getByRole('button', { name: 'Explicar esta decisão' }).click();
@@ -637,7 +643,7 @@ test('preserves the governed workspace while editing, adding a typed scenario, a
     await page.getByRole('button', { name: /O valor solicitado deve respeitar o limite do programa/ }).click();
   }
 
-  await page.getByRole('button', { name: /^Regra/ }).click();
+  await page.locator('.decision-navigation').getByRole('button', { name: /^Regra/ }).click();
   await expect(page.locator('#decision-rule')).toBeFocused();
   await expect(page).toHaveURL(/\/catalog$/);
   expect(configLoads).toBe(1);
@@ -645,7 +651,7 @@ test('preserves the governed workspace while editing, adding a typed scenario, a
   await page.getByRole('button', { name: 'Testar regra', exact: true }).click();
   await page.getByRole('button', { name: 'Editar regra', exact: true }).click();
   await expect(page.locator('.draft-workspace')).toBeVisible();
-  await expect(page.getByRole('button', { name: /^Regra/ })).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('.decision-navigation').getByRole('button', { name: /^Regra/ })).toHaveAttribute('aria-current', 'page');
   await page.locator('.draft-workspace').getByRole('spinbutton', { name: 'Valor' }).fill('2750');
   await page.getByRole('button', { name: 'Salvar draft governado' }).click();
   await expect(page.getByText('Draft salvo com controle de concorrência.')).toBeVisible();
@@ -904,7 +910,7 @@ test('validates new decision creation, operational effect authoring, and assiste
     path: testInfo.outputPath(`decision-create-${testInfo.project.name}.png`),
     fullPage: false
   });
-  await toggleNewDecision.click();
+  await page.getByTestId('decision-create-form').getByRole('button', { name: 'Fechar' }).click();
 
   if (testInfo.project.name === 'narrow') {
     await page.getByRole('button', { name: /O valor solicitado deve respeitar o limite do programa/ }).click();
@@ -959,6 +965,7 @@ test('completes the multi-persona 4-eyes journey, assisted scenario suggestions,
     status: 200,
     contentType: 'application/json',
     body: JSON.stringify({
+      operationKey: 'evaluate-extraordinary-grant',
       ruleSetKey: 'quickstart.extraordinary-benefit.eligibility',
       activeSnapshotKey,
       ruleSetVersion: activeSnapshotKey === 'snapshot-active-002' ? 2 : 1,
@@ -973,6 +980,7 @@ test('completes the multi-persona 4-eyes journey, assisted scenario suggestions,
     status: 200,
     contentType: 'application/json',
     body: JSON.stringify({
+      operationKey: 'evaluate-extraordinary-grant',
       ruleSetKey: 'quickstart.extraordinary-benefit.eligibility',
       expectedSnapshotKey: activeSnapshotKey,
       expectedSnapshotContentHash: 'A'.repeat(64),
@@ -1013,6 +1021,7 @@ test('completes the multi-persona 4-eyes journey, assisted scenario suggestions,
     body: JSON.stringify([
       {
         snapshotKey: 'snapshot-active-002',
+        operationKey: 'evaluate-extraordinary-grant',
         ruleSetKey: 'quickstart.extraordinary-benefit.eligibility',
         ruleSetVersion: 2,
         publicationRevision: 4,
@@ -1025,6 +1034,7 @@ test('completes the multi-persona 4-eyes journey, assisted scenario suggestions,
       },
       {
         snapshotKey: 'snapshot-prev-001',
+        operationKey: 'evaluate-extraordinary-grant',
         ruleSetKey: 'quickstart.extraordinary-benefit.eligibility',
         ruleSetVersion: 1,
         publicationRevision: 3,
@@ -1054,6 +1064,7 @@ test('completes the multi-persona 4-eyes journey, assisted scenario suggestions,
   await page.goto('/catalog');
 
   // 1. On-demand discovery resolution of an external candidate outside the initial projection
+  await page.getByTestId('studio-open-ai-inspector').click();
   await page.getByLabel('O que você precisa encontrar?').fill('aprovação urgente de pedido de compra');
   await page.getByRole('button', { name: 'Descobrir' }).click();
   const externalCandidateBtn = page.getByTestId('discovery-candidate-procurement.po_approval.urgent_override');
@@ -1068,6 +1079,9 @@ test('completes the multi-persona 4-eyes journey, assisted scenario suggestions,
 
   // Return to the governed grant decision for the 4-eyes journey
   await page.getByRole('button', { name: /O valor solicitado deve respeitar o limite do programa/ }).click();
+  if (testInfo.project.name !== 'narrow') {
+    await page.getByTestId('inspector-tab-properties').click();
+  }
   await expect(page.getByRole('heading', { name: 'O valor solicitado deve respeitar o limite do programa.' })).toBeVisible();
   await expect(page.getByTestId('decision-maturity-posture')).toBeVisible();
   await expect(page.getByTestId('posture-technical-maturity')).toContainText('Estrutura técnica e catálogo de fatos verificados');
@@ -1311,6 +1325,7 @@ test('reviews a prepared ACCESS draft and retries readback without repeating the
     await route.fulfill(reads === 1 ? { status: 503, json: {} } : { json: reads === 2 ? { ...result, serviceKey: 'unexpected-service' } : result });
   });
   await page.goto('/catalog');
+  await page.getByTestId('workspace-track-authorization').click();
   await page.getByText('Revisar rascunho de acesso (ACCESS)', { exact: true }).click();
   const source = page.getByLabel('Requisição JSON de criação da definição');
   const inspect = page.getByRole('button', { name: 'Revisar candidata', exact: true });
@@ -1363,6 +1378,7 @@ test('browses the scoped PAP catalog and uses the selected mode without changing
     });
   });
   await page.goto('/catalog');
+  await page.getByTestId('workspace-track-authorization').click();
   await page.getByText('Revisar rascunho de acesso (ACCESS)', { exact: true }).click();
   const source = page.getByLabel('Requisição JSON de criação da definição');
   await source.fill('draft in progress');
@@ -1373,10 +1389,11 @@ test('browses the scoped PAP catalog and uses the selected mode without changing
   await expect(panel.getByRole('combobox')).toHaveCount(0);
   await browse.click();
   await expect(panel.getByLabel('Ponto de decisão admitido')).toHaveValue(point.pointKey);
-  await expect(panel.getByText(subject.factPath)).toBeVisible();
-  await expect(panel.getByText(target.factPath)).toHaveCount(0);
+  await expect(panel.getByRole('list').getByText(subject.factPath)).toBeVisible();
+  await panel.getByLabel('Modo de avaliação').selectOption('SEARCH');
+  await expect(panel.getByRole('list').getByText(target.factPath)).toHaveCount(0);
   await panel.getByLabel('Modo de avaliação').selectOption('TARGET');
-  await expect(panel.getByText(target.factPath)).toBeVisible();
+  await expect(panel.getByRole('list').getByText(target.factPath)).toBeVisible();
   await panel.getByText('Referências do contrato e campos do alvo EXACT').click();
   await expect(panel.locator('pre')).toContainText(point.descriptorDigest);
   await expect(panel.locator('pre')).toContainText('TARGET');
@@ -1436,6 +1453,7 @@ test('publishes approved ACCESS and resumes activation and rollback against the 
     return route.fulfill({ json: { ...initial, state: 'reverting', current: true, expectedHead: previous, observedHead: null } });
   });
   await page.goto('/catalog');
+  await page.getByTestId('workspace-track-authorization').click();
   const panel = page.locator('pax-access-release');
   await panel.locator('summary').click();
   await panel.getByRole('button', { name: 'Carregar definições aprovadas' }).click();
@@ -1485,6 +1503,7 @@ test('recovers a currently selected pending ACCESS activation by confirming roll
       expectedHead: { ...head, activationRevision: 3, runtimeRevision: 'restoring-r3' } } });
   });
   await page.goto('/catalog');
+  await page.getByTestId('workspace-track-authorization').click();
   const panel = page.locator('pax-access-release');
   await panel.locator('summary').click();
   await panel.getByLabel('ID do release OPA').fill(releaseId);
@@ -1541,6 +1560,7 @@ test('selects a trusted deployment host, clears previous host scope and restores
   expect(await next.headerValue('x-tenant-id')).toBeNull();
   expect(new URL(page.url()).searchParams.has('tenantId')).toBe(false);
   expect(projectionReads).toBe(1);
+  await page.getByTestId('workspace-track-authorization').click();
   await expect(page.getByText('Revisar rascunho de acesso (ACCESS)', { exact: true })).toBeVisible();
   const link = new URL(page.url());
   link.searchParams.set('tenantId', 'enterprise-realm');
@@ -1880,4 +1900,75 @@ test('creates, validates, persists, reloads, and clears didactic documentation i
   await expect(page.getByTestId('decision-didactic-fallback')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+});
+
+test('supports Figma-style progressive workspace shell, Shift+D depth lens, dark theme with zero Axe violations, and orthogonal track switching', async ({ page }, testInfo) => {
+  await mockGovernedBackend(page, false);
+  await page.goto('/catalog');
+
+  const firstDecision = page.locator('pax-decision-explorer-rail').getByRole('button', { name: /O valor solicitado deve respeitar o limite do programa/ });
+  await expect(firstDecision).toBeVisible();
+
+  if (testInfo.project.name !== 'narrow') {
+    const viewport = page.viewportSize()!;
+    const box = await firstDecision.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height);
+  } else {
+    await firstDecision.click();
+  }
+
+  // Progressive Wikipedia-style term popovers & next-step banner in Light Mode
+  await expect(page.getByTestId('decision-next-step-banner')).toBeVisible();
+  await expect(page.getByTestId('evaluated-facts-strip')).toBeVisible();
+  const headerPillTrigger = page.getByTestId('decision-header-pills').locator('.pax-term-trigger').first();
+  await headerPillTrigger.click();
+  const openPopoverCard = page.locator('.pax-term-card');
+  await expect(openPopoverCard).toBeVisible();
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.keyboard.press('Escape');
+  await expect(openPopoverCard).toHaveCount(0);
+
+  // Toggle Business <-> Technical depth lens via button and Shift+D shortcut
+  await expect(page.locator('.workspace')).toHaveAttribute('data-view-depth', 'business');
+  await page.getByTestId('view-depth-technical').click();
+  await expect(page.locator('.workspace')).toHaveAttribute('data-view-depth', 'technical');
+  await expect(page.getByTestId('technical-lens-banner')).toBeVisible();
+  await expect(page.getByTestId('header-technical-code')).toBeVisible();
+
+  await page.keyboard.press('Shift+D');
+  await expect(page.locator('.workspace')).toHaveAttribute('data-view-depth', 'business');
+  await expect(page.getByTestId('technical-lens-banner')).toHaveCount(0);
+
+  // Switch Inspector tabs and verify AI unavailable diagnosis when endpoint returns 404
+  await page.route('**/ai/authoring/turn/stream/start', route => route.fulfill({ status: 404, json: {} }));
+  await page.getByTestId('inspector-tab-ai').click();
+  await page.getByRole('button', { name: 'Explicar esta decisão' }).click();
+  await expect(page.getByText('O serviço de assistente IA de autoria não está habilitado neste host.')).toBeVisible();
+  await page.getByTestId('inspector-tab-technical').click();
+  await expect(page.getByTestId('inspector-enable-technical-lens')).toBeVisible();
+
+  // Toggle Light <-> Dark theme, verify popover + zero Axe accessibility violations in dark mode
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light-tech');
+  await page.getByTestId('studio-theme-toggle').click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark-tech');
+  await headerPillTrigger.click();
+  await expect(openPopoverCard).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.keyboard.press('Escape');
+  await expect(openPopoverCard).toHaveCount(0);
+
+  await page.getByTestId('studio-theme-toggle').click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light-tech');
+
+  // Switch Business Rules <-> Access & Privacy orthogonal track
+  await page.getByTestId('workspace-track-authorization').click();
+  await expect(page.getByTestId('access-authorization-workspace')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+
+  await page.getByTestId('back-to-business-track').click();
+  await expect(page.getByTestId('access-authorization-workspace')).toHaveCount(0);
+  await expect(page.locator('.workspace')).toBeVisible();
 });

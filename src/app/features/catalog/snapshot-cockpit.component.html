@@ -147,6 +147,7 @@
                   <div><dt>{{ i18n.text('expectedHeadCurrent') }}</dt><dd>{{ item.expectedHeadCurrent ? i18n.text('yes') : i18n.text('no') }}</dd></div>
                 </dl>
                 <div class="rollout-actions">
+                  <button type="button" class="quiet-button" data-testid="rollout-probe-host-btn" [disabled]="rolloutBusy()" (click)="probeRollout.emit(item)">{{ i18n.text('probeRolloutHost') }}</button>
                   @if (item.availableActions.includes('ACTIVATE_CANDIDATE')) {
                     <button type="button" class="quiet-button" [disabled]="rolloutBusy()" (click)="activateRollout.emit(item)">{{ i18n.text('promoteCandidate') }}</button>
                   }
