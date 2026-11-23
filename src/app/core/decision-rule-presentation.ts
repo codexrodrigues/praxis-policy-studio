@@ -1,6 +1,7 @@
 import type { DecisionComparisonOperator } from './decision-inspection';
 import { extractDecisionTableProjection } from './decision-inspection';
 import { humanizeTechnicalSlug, looksLikeTechnicalSlug } from './humanize-labels';
+import { POLICY_STUDIO_COPY } from './i18n';
 import type { RuleParameterDisplayEntry } from './rule-parameters-display';
 import type { SupportedLocale } from './runtime-config';
 import type { StudioViewDepth } from './studio-shell-state.service';
@@ -132,37 +133,38 @@ export function humanizeFactValueType(
   locale: SupportedLocale
 ): string {
   const normalized = valueType?.trim().toLowerCase() ?? '';
-  const isPt = locale === 'pt-BR';
+  const dict = POLICY_STUDIO_COPY[locale];
   switch (normalized) {
     case 'integer':
     case 'int':
     case 'int32':
     case 'int64':
-      return isPt ? 'Número inteiro' : 'Whole number';
+      return dict.factTypeInteger;
     case 'number':
+      return locale === 'pt-BR' ? 'Número' : 'Number';
     case 'decimal':
     case 'float':
     case 'double':
-      return isPt ? 'Número' : 'Number';
+      return dict.factTypeDecimal;
     case 'string':
     case 'text':
-      return isPt ? 'Texto' : 'Text';
+      return dict.factTypeString;
     case 'boolean':
     case 'bool':
-      return isPt ? 'Sim ou Não' : 'Yes / No';
+      return dict.factTypeBoolean;
     case 'date':
-      return isPt ? 'Data' : 'Date';
+      return dict.factTypeDate;
     case 'datetime':
     case 'timestamp':
-      return isPt ? 'Data e hora' : 'Date & time';
+      return dict.factTypeDateTime;
     case 'string-array':
     case 'date-array':
     case 'number-array':
     case 'array<number>':
     case 'array':
-      return isPt ? 'Lista' : 'List';
+      return dict.factTypeList;
     default:
-      return valueType?.trim() || (isPt ? 'Valor' : 'Value');
+      return valueType?.trim() || (locale === 'pt-BR' ? 'Valor' : 'Value');
   }
 }
 
@@ -171,22 +173,23 @@ export function humanizeFactSensitivity(
   locale: SupportedLocale
 ): { readonly label: string; readonly tone: 'neutral' | 'info' | 'warning' | 'danger' } {
   const normalized = sensitivity?.trim().toUpperCase() ?? '';
-  const isPt = locale === 'pt-BR';
+  const dict = POLICY_STUDIO_COPY[locale];
   switch (normalized) {
     case 'NON_SENSITIVE':
     case 'PUBLIC':
-      return { label: isPt ? 'Público' : 'Public', tone: 'neutral' };
+      return { label: dict.factSensitivityPublic, tone: 'neutral' };
     case 'PERSONAL':
+      return { label: locale === 'pt-BR' ? 'Dado pessoal' : 'Personal data', tone: 'info' };
     case 'INTERNAL':
-      return { label: isPt ? 'Dado pessoal' : 'Personal data', tone: 'info' };
+      return { label: dict.factSensitivityInternal, tone: 'info' };
     case 'SENSITIVE':
     case 'PII':
-      return { label: isPt ? 'Sensível / LGPD' : 'Sensitive / Privacy', tone: 'warning' };
+      return { label: dict.factSensitivitySensitive, tone: 'warning' };
     case 'SECRET':
     case 'RESTRICTED':
-      return { label: isPt ? 'Restrito' : 'Restricted', tone: 'danger' };
+      return { label: dict.factSensitivityRestricted, tone: 'danger' };
     default:
-      return { label: isPt ? 'Uso padrão' : 'Standard', tone: 'neutral' };
+      return { label: dict.factSensitivityDefault, tone: 'neutral' };
   }
 }
 
@@ -196,21 +199,21 @@ export function humanizeBaselineAuthority(
   viewDepth: StudioViewDepth
 ): string {
   const raw = authority?.trim() ?? '';
+  const dict = POLICY_STUDIO_COPY[locale];
   if (!raw) {
-    return locale === 'pt-BR' ? 'Não informado' : 'Not informed';
+    return dict.notInformed;
   }
   if (viewDepth === 'technical') {
     return raw;
   }
   const upper = raw.toUpperCase();
-  const isPt = locale === 'pt-BR';
   if (upper.includes('LEGACY')) {
-    return isPt ? 'Regra recuperada do sistema de origem' : 'Recovered from origin system';
+    return dict.ruleAuthorityLegacy;
   }
   if (upper.includes('CONFIG')) {
-    return isPt ? 'Governada centralmente no Config' : 'Governed centrally in Config';
+    return dict.ruleAuthorityConfig;
   }
-  return isPt ? 'Referência ativa do catálogo' : 'Active catalog baseline';
+  return dict.ruleAuthorityCatalog;
 }
 
 export function humanizeSemanticDiffKind(
@@ -218,15 +221,15 @@ export function humanizeSemanticDiffKind(
   locale: SupportedLocale
 ): string {
   const upper = kind.trim().toUpperCase();
-  const isPt = locale === 'pt-BR';
+  const dict = POLICY_STUDIO_COPY[locale];
   if (upper === 'ADDED' || upper === 'ADD') {
-    return isPt ? 'Adicionado' : 'Added';
+    return dict.ruleDiffAdded;
   }
   if (upper === 'REMOVED' || upper === 'REMOVE' || upper === 'DELETED') {
-    return isPt ? 'Removido' : 'Removed';
+    return dict.ruleDiffRemoved;
   }
   if (upper === 'CHANGED' || upper === 'MODIFIED' || upper === 'UPDATED') {
-    return isPt ? 'Alterado' : 'Changed';
+    return dict.ruleDiffChanged;
   }
   return kind;
 }
