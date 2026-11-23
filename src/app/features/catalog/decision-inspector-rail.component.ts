@@ -47,6 +47,7 @@ export class DecisionInspectorRailComponent {
   readonly decisionSelected = output<DecisionSummary>();
   readonly candidateSelected = output<DecisionDiscoveryCandidate>();
   readonly enableTechnicalModeRequested = output<void>();
+  readonly openAccessPrivacyRequested = output<void>();
 
   readonly copiedField = signal<string | null>(null);
 

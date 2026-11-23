@@ -4,6 +4,15 @@ export type StudioWorkspaceTrack = 'business' | 'authorization';
 export type StudioViewDepth = 'business' | 'technical';
 export type StudioInspectorTab = 'properties' | 'ai' | 'technical';
 
+export interface StudioAccessBridgeContext {
+  readonly resourceKey: string;
+  readonly serviceKey: string | null;
+  readonly domainLabel: string;
+  readonly ruleTitle: string;
+  readonly decisionKey: string;
+  readonly sensitiveFactsCount: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class StudioShellStateService {
   readonly activeWorkspaceTrack = signal<StudioWorkspaceTrack>('business');
@@ -11,6 +20,8 @@ export class StudioShellStateService {
   readonly inspectorOpen = signal(true);
   readonly inspectorTab = signal<StudioInspectorTab>('properties');
   readonly explorerOpen = signal(true);
+  readonly accessBridgeContext = signal<StudioAccessBridgeContext | null>(null);
+  readonly commandPaletteOpen = signal(false);
 
   private readonly sessionActiveFallback = signal(false);
   private readonly signingOutFallback = signal(false);
@@ -34,6 +45,27 @@ export class StudioShellStateService {
 
   setWorkspaceTrack(track: StudioWorkspaceTrack): void {
     this.activeWorkspaceTrack.set(track);
+  }
+
+  openAccessBridge(context: StudioAccessBridgeContext): void {
+    this.accessBridgeContext.set(context);
+    this.activeWorkspaceTrack.set('authorization');
+  }
+
+  clearAccessBridgeContext(): void {
+    this.accessBridgeContext.set(null);
+  }
+
+  openCommandPalette(): void {
+    this.commandPaletteOpen.set(true);
+  }
+
+  closeCommandPalette(): void {
+    this.commandPaletteOpen.set(false);
+  }
+
+  toggleCommandPalette(): void {
+    this.commandPaletteOpen.update(open => !open);
   }
 
   setViewDepth(depth: StudioViewDepth): void {

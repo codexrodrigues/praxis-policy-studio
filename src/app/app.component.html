@@ -62,6 +62,18 @@
   </div>
 
   <div class="bar-right">
+    <button
+      type="button"
+      class="bar-tool-btn command-trigger"
+      data-testid="studio-command-palette-trigger"
+      [attr.aria-label]="i18n.text('commandPaletteTriggerHint')"
+      [title]="i18n.text('commandPaletteTriggerHint')"
+      (click)="shell.openCommandPalette()">
+      <pax-icon name="search" [size]="14" />
+      <span>{{ i18n.text('commandPaletteTrigger') }}</span>
+      <kbd class="kbd-hint studio-mono" aria-hidden="true">Ctrl K</kbd>
+    </button>
+
     <div class="depth-lens" role="group" [attr.aria-label]="i18n.text('viewDepthGroup')" data-testid="studio-view-depth-toggle">
       <button
         type="button"

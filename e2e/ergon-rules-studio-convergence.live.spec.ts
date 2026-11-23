@@ -57,6 +57,7 @@ test.describe('Workforce Showcase <-> Praxis Policy Studio live convergence (C9)
       '/catalog?ruleSetKey=ergon.administracao-pessoal.regras-frequencia.rn013&slotKey=rn013.qtd_max_non_negative&decisionKey=product.ergon.rn013.erg08380'
     );
     await expect(page.getByTestId('rule-decision-plan-dag')).toBeVisible();
+    await page.getByTestId('dag-open-technical-details').click();
     await expect(page.getByTestId('dag-ruleset-key')).toContainText(
       'ergon.administracao-pessoal.regras-frequencia.rn013'
     );
@@ -64,11 +65,22 @@ test.describe('Workforce Showcase <-> Praxis Policy Studio live convergence (C9)
     await expect(page.getByTestId('dag-stage-DOMAIN_DECISION')).toContainText(/(?:WF|E[R]G)-08380/);
     await expect(page.getByTestId('dag-stage-POST_DECISION')).toContainText(/(?:WF|E[R]G)-08393/);
 
-    await expect(page.getByTestId('dag-concept-chip-tipoFrequencia')).toBeVisible();
-    await page.getByTestId('dag-concept-chip-tipoFrequencia').click();
+    await expect(page.getByTestId('dag-ontology-roots')).toContainText('draft');
+
+    await page.goto(
+      '/catalog?ruleSetKey=ergon.administracao-pessoal.frequencias.lancamento&slotKey=freq.limite_retroatividade_lancamento&decisionKey=product.ergon.freq.erg00446'
+    );
+    await expect(page.getByTestId('rule-decision-plan-dag')).toBeVisible();
+    const techBtn = page.getByTestId('dag-open-technical-details');
+    if (await techBtn.isVisible()) {
+      await techBtn.click();
+    }
     await expect(page.getByTestId('dag-ruleset-key')).toContainText(
       'ergon.administracao-pessoal.frequencias.lancamento'
     );
     await expect(page.getByTestId('dag-stage-DOMAIN_DECISION')).toContainText(/(?:WF|E[R]G)-00446/);
+    await expect(page.getByTestId('dag-concept-chip-tipoFrequencia')).toBeVisible();
+    await page.getByTestId('dag-concept-chip-tipoFrequencia').click();
+    await expect(page.getByTestId('dag-neighbor-group-tipoFrequencia')).toBeVisible();
   });
 });

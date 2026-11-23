@@ -125,6 +125,22 @@
               </dl>
             </section>
           }
+
+          <section class="inspector-section inspector-access-bridge" data-testid="inspector-access-bridge">
+            <div class="inspector-bridge-head">
+              <pax-icon name="shield-check" [size]="14" />
+              <p class="section-label">{{ i18n.text('inspectorAccessBridgeTitle') }}</p>
+            </div>
+            <p class="inspector-meta-note">{{ i18n.text('inspectorAccessBridgeHint') }}</p>
+            <button
+              type="button"
+              class="quiet-button full-width-btn"
+              data-testid="bridge-to-access-privacy"
+              (click)="openAccessPrivacyRequested.emit()">
+              <span>{{ i18n.text('inspectorAccessBridgeCta') }}</span>
+              <pax-icon name="arrow-right" [size]="14" />
+            </button>
+          </section>
         } @else {
           <p class="inspector-empty">{{ i18n.text('inspectorEmptySelection') }}</p>
         }

@@ -7,6 +7,8 @@
     [loadError]="loadError()"
     [permissionLimited]="permissionLimited()"
     [signingOut]="signingOut()"
+    [bridgeContext]="shell.accessBridgeContext()"
+    (clearBridgeContextRequested)="shell.clearAccessBridgeContext()"
     (backToBusinessRequested)="setBusinessTrack()" />
 } @else {
   <div
@@ -451,92 +453,21 @@
         </div>
 
         <section class="inspection anchored-section work-mode-panel" id="decision-rule" tabindex="-1" aria-labelledby="inspection-title" [hidden]="activeMode() !== 'rule'">
-          <header class="inspection-heading">
-            <div>
-              <p class="section-label" id="inspection-title">{{ i18n.text('inspection') }}</p>
-              <p class="inspection-summary">{{ i18n.text('inspectionHint') }}</p>
-            </div>
-          </header>
-
-          <div class="inspection-grid">
-            <section class="condition-panel">
-              <p class="inspection-label">{{ i18n.text('condition') }}</p>
-              @if (current.expression) {
-                <code class="expression">{{ current.expression }}</code>
-              } @else {
-                <p class="inspection-empty">{{ i18n.text('noCondition') }}</p>
-              }
-              <dl class="contract-facts">
-                <div><dt>{{ i18n.text('missingDataBehavior') }}</dt><dd>{{ nullSemanticsLabel(current.nullSemantics) }}</dd></div>
-              </dl>
-              <details class="technical-details condition-technical-details" [attr.open]="viewDepth() === 'technical' ? '' : null">
-                <summary>{{ i18n.text('conditionTechnicalDetails') }}</summary>
-                <dl>
-                  <div><dt>{{ i18n.text('nullBehavior') }}</dt><dd><code>{{ current.nullSemantics ?? '—' }}</code></dd></div>
-                  <div><dt>{{ i18n.text('operations') }}</dt><dd><code>{{ current.operationKeys.join(' · ') || '—' }}</code></dd></div>
-                  <div><dt>{{ i18n.text('hostContract') }}</dt><dd><code>{{ current.hostContractVersion ?? '—' }}</code></dd></div>
-                </dl>
-              </details>
-            </section>
-
-            <section class="facts-panel">
-              <p class="inspection-label">{{ i18n.text('facts') }}</p>
-              @if (maturityPosture(); as posture) {
-                @if (posture.totalFacts > 0) {
-                  <small class="authority-note" data-testid="fact-redaction-summary">
-                    {{ i18n.text('factRedactionSummaryTitle') }}:
-                    {{ posture.sensitiveFactsCount }}/{{ posture.totalFacts }} {{ i18n.text('factSensitiveCount') }} ·
-                    {{ posture.redactedFactsCount }}/{{ posture.totalFacts }} {{ i18n.text('factRedactedCount') }}
-                  </small>
-                }
-              }
-              <ul class="fact-list">
-                @for (fact of current.facts; track fact.path) {
-                  <li>
-                    <strong>{{ fact.label }}</strong>
-                    <code>{{ fact.path }}</code>
-                    <small>{{ fact.description }} · {{ fact.valueType }} · {{ i18n.text(fact.nullable ? 'factNullable' : 'factRequired') }} · {{ fact.sensitivity }} / {{ fact.redaction }}</small>
-                  </li>
-                }
-                @empty { <li class="inspection-empty fact-gap">{{ i18n.text('factCatalogUnavailable') }}</li> }
-              </ul>
-            </section>
-          </div>
-
-          <div class="version-compare" [attr.aria-label]="i18n.text('authorityDraftComparison')">
-            <section>
-              <span class="version-kicker">{{ i18n.text('baseline') }}</span>
-              <strong>{{ i18n.text('referenceBaseline') }}</strong>
-              <small>{{ current.baselineAuthority }}</small>
-            </section>
-            <pax-icon class="compare-arrow" name="arrow-right" [size]="18" />
-            <section [class.unavailable]="!current.configStatus">
-              <span class="version-kicker">{{ i18n.text('draft') }}</span>
-              <strong>{{ current.configStatus ? configStatusLabel(current.configStatus) : i18n.text('noDraft') }}</strong>
-              <small>{{ i18n.text('governedDraftReviewHint') }}</small>
-            </section>
-          </div>
-
-          @if (current.workspaceId) {
-            <section class="semantic-diff" aria-labelledby="semantic-diff-title">
-              <header>
-                <div>
-                  <p class="section-label" id="semantic-diff-title">{{ i18n.text('semanticDiff') }}</p>
-                  <p>{{ i18n.text('semanticDiffBoundary') }}</p>
-                </div>
-                <strong>{{ semanticDiff().length }}</strong>
-              </header>
-              @for (change of semanticDiff(); track change.path + change.kind) {
-                <article>
-                  <span>{{ change.kind }}</span>
-                  <code>{{ change.path }}</code>
-                  <small>{{ displayDiffValue(change.baseline) }} → {{ displayDiffValue(change.candidate) }}</small>
-                </article>
-              } @empty {
-                <p class="empty">{{ i18n.text('noSemanticChanges') }}</p>
-              }
-            </section>
-          }
+          <pax-decision-rule-inspection
+            [decision]="current"
+            [viewDepth]="viewDepth()"
+            [maturityPosture]="maturityPosture()"
+            [parameters]="evaluatedParameterEntries(current)"
+            [documentation]="effectiveDocumentation(current)"
+            [semanticDiff]="semanticDiff()"
+            [canEditRule]="canShowNextStepEdit(current)"
+            [canCreateDraft]="canShowNextStepCreateDraft(current)"
+            [authoringBusy]="authoringBusy()"
+            [nullSemanticsText]="nullSemanticsLabel(current.nullSemantics)"
+            [configStatusText]="current.configStatus ? configStatusLabel(current.configStatus) : ''"
+            (editRuleRequested)="openAuthoringAndFocus()"
+            (createDraftRequested)="createWorkspace()"
+            (openAccessPrivacyRequested)="openAccessPrivacyForCurrentDecision()" />
         </section>
 
         @if (authoringOpen() && editorConfig(); as authoringConfig) {
@@ -1134,7 +1065,8 @@
         (tabChanged)="setInspectorTab($event)"
         (decisionSelected)="select($event)"
         (candidateSelected)="selectDiscoveredCandidate($event)"
-        (enableTechnicalModeRequested)="enableTechnicalView()" />
+        (enableTechnicalModeRequested)="enableTechnicalView()"
+        (openAccessPrivacyRequested)="openAccessPrivacyForCurrentDecision()" />
     }
   </div>
 }
@@ -1143,3 +1075,15 @@
   [confirmation]="governedConfirmation()"
   (confirmed)="confirmGovernedOperation()"
   (cancelled)="cancelGovernedOperation()" />
+
+<pax-studio-command-palette
+  [open]="shell.commandPaletteOpen()"
+  [decisions]="allDecisions()"
+  [selected]="selected()"
+  [viewDepth]="viewDepth()"
+  [isDarkTheme]="shell.isDarkTheme()"
+  [isRemoteMode]="runtime.mode() === 'remote'"
+  (closed)="shell.closeCommandPalette()"
+  (decisionSelected)="selectDecisionFromPalette($event)"
+  (scopeSelected)="selectScopeFromPalette($event)"
+  (actionTriggered)="handleCommandPaletteAction($event)" />

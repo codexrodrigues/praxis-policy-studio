@@ -21,6 +21,8 @@ import { AUTHORIZATION_RULE_TYPE, accessPreview, readPreparedAccessDraft } from 
 })
 export class AccessDraftReviewComponent {
   readonly config = input.required<PolicyStudioRuntimeConfig>();
+  readonly preferredResourceKey = input<string | null>(null);
+  readonly preferredServiceKey = input<string | null>(null);
   readonly i18n = inject(PolicyStudioI18n);
   protected readonly present = Boolean;
   private readonly auth = inject(AuthSessionService);

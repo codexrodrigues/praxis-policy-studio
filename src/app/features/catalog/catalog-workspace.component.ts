@@ -41,6 +41,7 @@ import {
   type StudioGlossaryEntry,
   type StudioGovernanceTermKey
 } from '../../core/studio-glossary';
+import type { CommandPaletteActionId } from '../../core/studio-command-palette';
 import type { PolicyStudioRuntimeConfig } from '../../core/runtime-config';
 import { RuntimeConfigService } from '../../core/runtime-config.service';
 import { StudioShellStateService, type StudioInspectorTab } from '../../core/studio-shell-state.service';
@@ -53,7 +54,9 @@ import { AccessAuthorizationWorkspaceComponent } from './access-authorization-wo
 import { CatalogPortfolioOverviewComponent } from './catalog-portfolio-overview.component';
 import { DecisionExplorerRailComponent } from './decision-explorer-rail.component';
 import { DecisionInspectorRailComponent } from './decision-inspector-rail.component';
+import { DecisionRuleInspectionComponent } from './decision-rule-inspection.component';
 import { RuleDecisionPlanDagComponent } from './rule-decision-plan-dag.component';
+import { StudioCommandPaletteComponent } from './studio-command-palette.component';
 import {
   buildDecisionMaturityPosture,
   buildExecutionCorrelationSummary,
@@ -97,7 +100,9 @@ import { WorkspaceBlockersComponent } from './workspace-blockers.component';
     CatalogPortfolioOverviewComponent,
     DecisionExplorerRailComponent,
     DecisionInspectorRailComponent,
+    DecisionRuleInspectionComponent,
     AccessAuthorizationWorkspaceComponent,
+    StudioCommandPaletteComponent,
     StudioIconComponent,
     TermPopoverComponent
   ],
@@ -301,6 +306,92 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   setBusinessTrack(): void {
     this.shell.setWorkspaceTrack('business');
+  }
+
+  openAccessPrivacyForCurrentDecision(): void {
+    const current = this.selected();
+    if (!current) {
+      this.shell.setWorkspaceTrack('authorization');
+      return;
+    }
+    const resourceKey =
+      current.resourceKey?.trim() ||
+      current.ruleSetKey?.trim() ||
+      current.domain?.trim() ||
+      current.key;
+    const posture = this.maturityPosture();
+    this.shell.openAccessBridge({
+      resourceKey,
+      serviceKey: current.serviceKey?.trim() || null,
+      domainLabel: this.displayHeaderDomain(current),
+      ruleTitle: this.displayCanvasTitle(current),
+      decisionKey: current.key,
+      sensitiveFactsCount: posture?.sensitiveFactsCount ?? 0
+    });
+  }
+
+  selectDecisionFromPalette(decision: DecisionSummary): void {
+    this.shell.setWorkspaceTrack('business');
+    this.shell.closeCommandPalette();
+    this.activeRuleTypeFilter.set(null);
+    if (!this.decisions().some(item => item.key === decision.key)) {
+      this.contextScopeFilter.set(null);
+    }
+    this.select(decision, false, true);
+  }
+
+  selectScopeFromPalette(scopeKey: string): void {
+    this.shell.setWorkspaceTrack('business');
+    this.shell.closeCommandPalette();
+    this.applyScopeFilter(scopeKey);
+  }
+
+  handleCommandPaletteAction(actionId: CommandPaletteActionId): void {
+    this.shell.closeCommandPalette();
+    switch (actionId) {
+      case 'open-portfolio':
+        this.shell.setWorkspaceTrack('business');
+        if (this.allDecisions().length > 1) {
+          this.portfolioOverviewOpen.set(true);
+          this.narrowDetailOpen.set(true);
+        }
+        return;
+      case 'toggle-depth':
+        this.shell.toggleViewDepth();
+        return;
+      case 'open-access-privacy':
+        this.openAccessPrivacyForCurrentDecision();
+        return;
+      case 'open-ai':
+        this.shell.setWorkspaceTrack('business');
+        this.setInspectorTab('ai');
+        return;
+      case 'toggle-theme':
+        this.shell.toggleTheme();
+        return;
+      case 'nav-understand':
+        this.jumpToRuleSection('decision-overview');
+        return;
+      case 'nav-rule':
+        this.jumpToRuleSection('decision-rule');
+        return;
+      case 'nav-test':
+        this.jumpToRuleSection('decision-tests');
+        return;
+      case 'nav-operate':
+        this.jumpToRuleSection('decision-execution');
+        return;
+      case 'nav-history':
+        this.jumpToRuleSection('decision-history');
+        return;
+    }
+  }
+
+  private jumpToRuleSection(sectionId: string): void {
+    this.shell.setWorkspaceTrack('business');
+    this.portfolioOverviewOpen.set(false);
+    this.narrowDetailOpen.set(true);
+    this.navigateToSection(sectionId);
   }
 
   ngOnInit(): void {

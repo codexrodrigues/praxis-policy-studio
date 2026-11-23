@@ -60,7 +60,12 @@ export class AppComponent implements OnInit {
   }
 
   @HostListener('window:keydown', ['$event'])
-  handleDepthShortcut(event: KeyboardEvent): void {
+  handleGlobalShortcuts(event: KeyboardEvent): void {
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'k') {
+      event.preventDefault();
+      this.shell.toggleCommandPalette();
+      return;
+    }
     if (!event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.key.toLowerCase() !== 'd') return;
     const target = event.target as HTMLElement | null;

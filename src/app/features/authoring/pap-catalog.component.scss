@@ -11,3 +11,4 @@ select, input { width: 100%; margin-top: .2rem; }
 ul { padding-inline-start: 1.1rem; max-height: 16rem; overflow-y: auto; }
 li + li { margin-block-start: .4rem; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.pap-context-status { padding: .45rem .65rem; border-radius: .35rem; background: var(--pax-color-primary-container, #e0f2fe); color: var(--pax-color-on-primary-container, #0f172a); font-size: .85rem; }

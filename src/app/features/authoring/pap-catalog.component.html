@@ -3,6 +3,11 @@
   @if (busy()) { <p role="status">{{ i18n.text('loading') }}</p> }
   @if (error(); as message) { <p role="alert">{{ i18n.text(message) }}</p> }
   @if (services(); as catalogs) {
+    @if (preferredResourceKey(); as preferredRes) {
+      <p class="pap-context-status" role="status" data-testid="pap-context-match-status">
+        {{ i18n.format(hasPreferredResourceMatch() ? 'papContextMatched' : 'papContextUnmatched', { resource: preferredRes }) }}
+      </p>
+    }
     @if (catalogs.length) {
       <label>{{ i18n.text('papService') }}
         <select [value]="serviceKey()" (change)="serviceKey.set($any($event.target).value)">

@@ -214,6 +214,13 @@
   font-size: var(--pax-text-sm);
 }
 
+.inspector-bridge-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--pax-color-primary);
+}
+
 .inspector-footer {
   padding: var(--pax-space-3) var(--pax-space-4);
   border-top: 1px solid var(--pax-color-outline-variant);

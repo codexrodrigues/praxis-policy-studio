@@ -309,6 +309,16 @@
   padding-inline: 0.5rem;
 }
 
+.kbd-hint {
+  padding: 0 0.25rem;
+  border-radius: var(--pax-radius-sm);
+  border: 1px solid var(--pax-color-outline-variant);
+  background: var(--pax-color-surface-container-low);
+  color: var(--pax-color-on-surface-variant);
+  font-size: 0.65rem;
+  line-height: 1.4;
+}
+
 .bar-tool-btn:disabled {
   opacity: 0.58;
   cursor: not-allowed;
@@ -414,7 +424,8 @@
 }
 
 @media (max-width: 1380px) {
-  .scope-prefix {
+  .scope-prefix,
+  .kbd-hint {
     display: none;
   }
 }

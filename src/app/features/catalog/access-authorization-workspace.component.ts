@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
 import { PolicyStudioI18n } from '../../core/i18n';
 import type { PolicyStudioRuntimeConfig } from '../../core/runtime-config';
+import type { StudioAccessBridgeContext } from '../../core/studio-shell-state.service';
 import { StudioIconComponent } from '../../shared/studio-icon.component';
 import { AccessDraftReviewComponent } from '../authoring/access-draft-review.component';
 
@@ -21,6 +22,12 @@ export class AccessAuthorizationWorkspaceComponent {
   readonly loadError = input<string | null>(null);
   readonly permissionLimited = input(false);
   readonly signingOut = input(false);
+  readonly bridgeContext = input<StudioAccessBridgeContext | null>(null);
 
   readonly backToBusinessRequested = output<void>();
+  readonly clearBridgeContextRequested = output<void>();
+
+  sensitiveFactsBadge(count: number): string {
+    return this.i18n.format('accessBridgeBannerSensitive', { count });
+  }
 }

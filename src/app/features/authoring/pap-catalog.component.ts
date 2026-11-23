@@ -16,6 +16,8 @@ import type { PolicyStudioRuntimeConfig } from '../../core/runtime-config';
 })
 export class PapCatalogComponent {
   readonly config = input.required<PolicyStudioRuntimeConfig>();
+  readonly preferredResourceKey = input<string | null>(null);
+  readonly preferredServiceKey = input<string | null>(null);
   readonly draftGenerated = output<string>();
   readonly i18n = inject(PolicyStudioI18n);
   private readonly catalog = inject(PapAuthoringCatalogService);
@@ -25,9 +27,41 @@ export class PapCatalogComponent {
   readonly services = signal<readonly PapService[] | null>(null);
   readonly busy = signal(false);
   readonly error = signal<CopyKey | null>(null);
-  readonly serviceKey = linkedSignal(() => this.services()?.[0]?.serviceKey ?? '');
+  readonly serviceKey = linkedSignal(() => {
+    const catalogs = this.services();
+    if (!catalogs?.length) return '';
+    const preferredResource = this.preferredResourceKey()?.trim();
+    if (preferredResource) {
+      const matched = catalogs.find(item =>
+        item.decisionPoints.some(point => point.resourceKey === preferredResource)
+      );
+      if (matched) return matched.serviceKey;
+    }
+    const preferredService = this.preferredServiceKey()?.trim();
+    if (preferredService) {
+      const byService = catalogs.find(item => item.serviceKey === preferredService);
+      if (byService) return byService.serviceKey;
+    }
+    return catalogs[0]?.serviceKey ?? '';
+  });
   readonly service = computed(() => this.services()?.find(item => item.serviceKey === this.serviceKey()));
-  readonly pointKey = linkedSignal(() => this.service()?.decisionPoints[0]?.pointKey ?? '');
+  readonly pointKey = linkedSignal(() => {
+    const points = this.service()?.decisionPoints ?? [];
+    const preferredResource = this.preferredResourceKey()?.trim();
+    if (preferredResource) {
+      const matched = points.find(item => item.resourceKey === preferredResource);
+      if (matched) return matched.pointKey;
+    }
+    return points[0]?.pointKey ?? '';
+  });
+  readonly hasPreferredResourceMatch = computed(() => {
+    const preferredResource = this.preferredResourceKey()?.trim();
+    const catalogs = this.services();
+    if (!preferredResource || !catalogs) return false;
+    return catalogs.some(item =>
+      item.decisionPoints.some(point => point.resourceKey === preferredResource)
+    );
+  });
   readonly point = computed(() => this.service()?.decisionPoints.find(item => item.pointKey === this.pointKey()));
   readonly modes = computed(() => Object.keys(this.point()?.factsByMode ?? {}));
   readonly mode = linkedSignal(() => {

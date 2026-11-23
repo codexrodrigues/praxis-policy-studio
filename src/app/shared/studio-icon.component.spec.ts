@@ -76,7 +76,9 @@ describe('StudioIconComponent', () => {
       'database',
       'layout-grid',
       'layers',
-      'activity'
+      'activity',
+      'shield-alert',
+      'corner-down-left'
     ];
 
     for (const variant of variants) {

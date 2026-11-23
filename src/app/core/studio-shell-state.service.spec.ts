@@ -48,4 +48,33 @@ describe('StudioShellStateService', () => {
     shell.triggerLogout();
     expect(onLogout).toHaveBeenCalledOnce();
   });
+
+  it('tracks contextual access bridge handoff and global command palette state', () => {
+    const shell = TestBed.inject(StudioShellStateService);
+
+    expect(shell.accessBridgeContext()).toBeNull();
+    expect(shell.commandPaletteOpen()).toBe(false);
+
+    shell.openAccessBridge({
+      resourceKey: 'human-resources.attendance',
+      serviceKey: 'attendance-service',
+      domainLabel: 'Human Resources · Attendance',
+      ruleTitle: 'Retroactive entry window',
+      decisionKey: 'workforce.attendance.retroactive',
+      sensitiveFactsCount: 2
+    });
+
+    expect(shell.activeWorkspaceTrack()).toBe('authorization');
+    expect(shell.accessBridgeContext()?.resourceKey).toBe('human-resources.attendance');
+
+    shell.clearAccessBridgeContext();
+    expect(shell.accessBridgeContext()).toBeNull();
+
+    shell.toggleCommandPalette();
+    expect(shell.commandPaletteOpen()).toBe(true);
+    shell.closeCommandPalette();
+    expect(shell.commandPaletteOpen()).toBe(false);
+    shell.openCommandPalette();
+    expect(shell.commandPaletteOpen()).toBe(true);
+  });
 });

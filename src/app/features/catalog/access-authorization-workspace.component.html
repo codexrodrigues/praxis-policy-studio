@@ -15,6 +15,43 @@
     </button>
   </header>
 
+  @if (bridgeContext(); as ctx) {
+    <section class="access-bridge-banner" data-testid="access-context-bridge-banner" aria-labelledby="access-bridge-title">
+      <div class="bridge-banner-copy">
+        <p class="bridge-kicker" id="access-bridge-title">
+          <pax-icon name="shield-check" [size]="16" />
+          <span>{{ i18n.text('accessBridgeBannerTitle') }}</span>
+        </p>
+        <p class="bridge-rule-meta">
+          <strong>{{ ctx.ruleTitle }}</strong>
+          <span>· {{ ctx.domainLabel }}</span>
+          <code class="studio-mono">{{ ctx.resourceKey }}</code>
+          @if (ctx.sensitiveFactsCount > 0) {
+            <span class="bridge-sensitive-pill">{{ sensitiveFactsBadge(ctx.sensitiveFactsCount) }}</span>
+          }
+        </p>
+      </div>
+      <div class="bridge-banner-actions">
+        <button
+          type="button"
+          class="quiet-button"
+          data-testid="access-bridge-return-rule"
+          (click)="backToBusinessRequested.emit()">
+          <pax-icon name="arrow-left" [size]="14" />
+          <span>{{ i18n.text('accessBridgeReturnToRule') }}</span>
+        </button>
+        <button
+          type="button"
+          class="quiet-button"
+          data-testid="access-bridge-clear"
+          (click)="clearBridgeContextRequested.emit()">
+          <pax-icon name="x" [size]="14" />
+          <span>{{ i18n.text('accessBridgeClearContext') }}</span>
+        </button>
+      </div>
+    </section>
+  }
+
   @if (!isRemoteMode()) {
     <div class="access-empty-state" role="status">
       <p>{{ i18n.text('accessWorkspaceRemoteOnly') }}</p>
@@ -33,7 +70,10 @@
   } @else if (config(); as runtimeConfig) {
     @if ((!loadError() || permissionLimited()) && !signingOut()) {
       <div class="access-workspace-content">
-        <pax-access-draft-review [config]="runtimeConfig" />
+        <pax-access-draft-review
+          [config]="runtimeConfig"
+          [preferredResourceKey]="bridgeContext()?.resourceKey ?? null"
+          [preferredServiceKey]="bridgeContext()?.serviceKey ?? null" />
       </div>
     } @else {
       <div class="access-empty-state" role="alert">

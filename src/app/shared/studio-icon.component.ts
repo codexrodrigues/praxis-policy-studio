@@ -22,7 +22,9 @@ export type StudioIconName =
   | 'database'
   | 'layout-grid'
   | 'layers'
-  | 'activity';
+  | 'activity'
+  | 'shield-alert'
+  | 'corner-down-left';
 
 export type StudioIconSize = 12 | 14 | 16 | 18 | 20;
 
@@ -149,6 +151,15 @@ export type StudioIconSize = 12 | 14 | 16 | 18 | 20;
         }
         @case ('activity') {
           <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+        }
+        @case ('shield-alert') {
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          <path d="M12 8v4" />
+          <path d="M12 16h.01" />
+        }
+        @case ('corner-down-left') {
+          <polyline points="9 10 4 15 9 20" />
+          <path d="M20 4v7a4 4 0 0 1-4 4H4" />
         }
       }
     </svg>
