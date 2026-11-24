@@ -43,6 +43,9 @@ $studio-surfaces: (
 
 :root {
   --pax-topbar-height: 3rem;
+  --pax-rail-header-height: 3.75rem;
+  --pax-rail-footer-height: 3.5rem;
+  --pax-target-min: 2rem;
   --pax-global-nav-width: 14rem;
   --pax-global-nav-collapsed-width: 3.75rem;
   --pax-explorer-width: 21rem;
@@ -184,8 +187,11 @@ $studio-surfaces: (
   --pax-radius-xl: 1rem;
   --pax-radius-pill: 999px;
 
+  /* Scrollbar semantic tokens (>= 3:1 WCAG 1.4.11 contrast against surface/track) */
+  --pax-scrollbar-thumb: var(--pax-p-slate-500);
+  --pax-scrollbar-track: var(--pax-color-surface-container-low);
+
   font-family: var(--pax-font-sans);
-  font-size: 16px;
   color-scheme: light;
   background: var(--pax-color-surface-canvas);
   color: var(--pax-color-on-surface);
@@ -194,6 +200,8 @@ $studio-surfaces: (
 :root[data-theme='dark-tech'],
 .dark {
   color-scheme: dark;
+  --pax-scrollbar-thumb: var(--pax-p-slate-400);
+  --pax-scrollbar-track: var(--pax-color-surface-container-low);
   --pax-policy-param-bg: color-mix(in oklab, var(--pax-p-sky-400) 16%, var(--pax-color-surface));
   --pax-policy-param-fg: #bae6fd;
   --pax-policy-param-border: color-mix(in oklab, var(--pax-p-sky-400) 38%, transparent);
@@ -214,4 +222,23 @@ $studio-surfaces: (
   --pax-color-popover-border: var(--pax-color-outline);
   --pax-shadow-card: 0 2px 6px rgba(2, 6, 23, 0.35);
   --pax-shadow-popover: 0 16px 36px rgba(2, 6, 23, 0.65), 0 2px 10px rgba(2, 6, 23, 0.45);
+}
+
+@media (pointer: coarse) {
+  :root {
+    --pax-target-min: 2.75rem;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --pax-scrollbar-thumb: var(--pax-p-slate-900);
+    --pax-scrollbar-track: #ffffff;
+  }
+
+  :root[data-theme='dark-tech'],
+  .dark {
+    --pax-scrollbar-thumb: #f8fafc;
+    --pax-scrollbar-track: #020617;
+  }
 }

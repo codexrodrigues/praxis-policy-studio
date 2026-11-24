@@ -9,6 +9,8 @@
 
   @if (!selected()) {
     <h1 class="visually-hidden">{{ i18n.text(authenticationRequired() ? 'authOnboardingTitle' : 'catalog') }}</h1>
+  } @else if (!narrowDetailOpen()) {
+    <h1 class="visually-hidden narrow-explorer-h1">{{ i18n.text('catalog') }}</h1>
   }
 
   <pax-decision-explorer-rail
@@ -53,7 +55,8 @@
 
   @if (selected(); as current) {
       <article class="decision-pane" aria-labelledby="decision-title" [attr.aria-busy]="authoringBusy() || snapshotBusy() || rolloutPolicyBusy() || rolloutBusy()">
-        <button type="button" class="narrow-back quiet-button" (click)="returnToCatalog()">
+        <div class="decision-pane-body studio-scroll-region">
+          <button type="button" class="narrow-back quiet-button" (click)="returnToCatalog()">
           <pax-icon name="arrow-left" [size]="16" />
           <span>{{ i18n.text('backToCatalog') }}</span>
         </button>
@@ -996,9 +999,11 @@
           </section>
         }
 
+        </div>
+
         <footer class="fixture-boundary">
           <pax-icon class="boundary-glyph" name="shield-check" [size]="14" />
-          <span>{{ i18n.text(runtime.mode() === 'remote' ? 'governedNotice' : 'fixtureNotice') }}</span>
+          <span [attr.title]="i18n.text(runtime.mode() === 'remote' ? 'governedNotice' : 'fixtureNotice')">{{ i18n.text(runtime.mode() === 'remote' ? 'governedNotice' : 'fixtureNotice') }}</span>
         </footer>
       </article>
     } @else {

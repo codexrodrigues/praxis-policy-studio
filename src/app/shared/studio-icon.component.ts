@@ -31,6 +31,8 @@ export type StudioIconName =
   | 'inbox'
   | 'log-out'
   | 'chevron-right'
+  | 'chevrons-left'
+  | 'chevrons-right'
   | 'building'
   | 'check'
   | 'refresh-cw'
@@ -193,6 +195,14 @@ export type StudioIconSize = 12 | 14 | 16 | 18 | 20;
         }
         @case ('chevron-right') {
           <path d="M9 18l6-6-6-6" />
+        }
+        @case ('chevrons-left') {
+          <path d="M11 17l-5-5 5-5" />
+          <path d="M18 17l-5-5 5-5" />
+        }
+        @case ('chevrons-right') {
+          <path d="M13 17l5-5-5-5" />
+          <path d="M6 17l5-5-5-5" />
         }
         @case ('building') {
           <rect width="16" height="20" x="4" y="2" rx="2" ry="2" />

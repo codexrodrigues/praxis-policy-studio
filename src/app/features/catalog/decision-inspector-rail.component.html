@@ -38,11 +38,11 @@
       [attr.aria-label]="i18n.text('inspectorCollapse')"
       [attr.title]="i18n.text('inspectorCollapse')"
       (click)="collapseRequested.emit()">
-      <pax-icon name="x" [size]="14" />
+      <pax-icon name="chevrons-right" [size]="14" />
     </button>
   </header>
 
-  <div class="inspector-body">
+  <div class="inspector-body studio-scroll-region">
     @switch (activeTab()) {
       @case ('properties') {
         @if (decision(); as current) {

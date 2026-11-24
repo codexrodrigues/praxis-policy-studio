@@ -281,6 +281,17 @@ import { StudioIconComponent } from '../shared/studio-icon.component';
       }
     }
 
+    @media (max-width: 760px) {
+      .host-select-wrap {
+        max-width: 4.5rem;
+        padding-inline: 0.45rem 0.35rem;
+        gap: 0.25rem;
+      }
+      .env-details-trigger {
+        padding-inline: 0.35rem 0.45rem;
+      }
+    }
+
     @media (forced-colors: active) {
       .host-select-wrap select {
         position: static;

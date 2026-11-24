@@ -1,24 +1,35 @@
 <a class="skip-link" href="#main-content">{{ i18n.text('skip') }}</a>
 <header class="product-bar" [class.technical-lens]="shell.viewDepth() === 'technical'">
   <div class="bar-left">
-    @if (supportsExplorer()) {
-      <button
-        type="button"
-        class="bar-tool-btn icon-btn explorer-toggle-btn"
-        data-testid="studio-toggle-explorer"
-        [class.active]="shell.explorerOpen()"
-        [attr.aria-pressed]="shell.explorerOpen()"
-        [attr.aria-label]="i18n.text(shell.explorerOpen() ? 'explorerCollapse' : 'explorerExpand')"
-        [attr.title]="i18n.text(shell.explorerOpen() ? 'explorerCollapse' : 'explorerExpand')"
-        (click)="shell.toggleExplorer()">
-        <pax-icon name="panel-left" [size]="16" />
-      </button>
-    }
+    <button
+      type="button"
+      class="bar-tool-btn icon-btn ghost-btn sidebar-toggle-btn"
+      data-testid="studio-sidebar-toggle"
+      [attr.aria-expanded]="!shell.sidebarCollapsed()"
+      [attr.aria-label]="i18n.text(shell.sidebarCollapsed() ? 'sidebarExpand' : 'sidebarCollapse')"
+      [attr.title]="i18n.text(shell.sidebarCollapsed() ? 'sidebarExpand' : 'sidebarCollapse')"
+      (click)="shell.toggleSidebar()">
+      <pax-icon name="panel-left" [size]="16" />
+    </button>
 
     <a class="brand" routerLink="/catalog" queryParamsHandling="preserve" [attr.aria-label]="i18n.text('productCatalogLink')">
       <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
       <strong>{{ i18n.text('product') }}</strong>
     </a>
+
+    @if (supportsExplorer() && !shell.explorerOpen()) {
+      <button
+        type="button"
+        class="bar-tool-btn explorer-reopen-btn"
+        data-testid="studio-toggle-explorer"
+        [attr.aria-expanded]="false"
+        [attr.aria-label]="i18n.text('explorerExpand')"
+        [attr.title]="i18n.text('explorerExpand')"
+        (click)="shell.toggleExplorer()">
+        <pax-icon name="chevrons-right" [size]="14" />
+        <span>{{ i18n.text('explorerReopenShort') }}</span>
+      </button>
+    }
 
     @if (activeBreadcrumbLabel(); as crumb) {
       <span class="crumb-sep" aria-hidden="true">/</span>
@@ -76,7 +87,7 @@
     <div class="bar-icon-cluster">
       <button
         type="button"
-        class="bar-tool-btn icon-btn ai-trigger"
+        class="bar-tool-btn icon-btn ghost-btn ai-trigger"
         data-testid="studio-open-ai-inspector"
         [class.active]="supportsInspector() && shell.inspectorOpen() && shell.inspectorTab() === 'ai'"
         [attr.aria-pressed]="supportsInspector() && shell.inspectorOpen() && shell.inspectorTab() === 'ai'"
@@ -86,15 +97,14 @@
         <pax-icon name="sparkles" [size]="16" />
       </button>
 
-      @if (supportsInspector()) {
+      @if (supportsInspector() && !shell.inspectorOpen()) {
         <button
           type="button"
-          class="bar-tool-btn icon-btn"
+          class="bar-tool-btn icon-btn ghost-btn"
           data-testid="studio-toggle-inspector"
-          [class.active]="shell.inspectorOpen()"
-          [attr.aria-pressed]="shell.inspectorOpen()"
-          [attr.aria-label]="i18n.text(shell.inspectorOpen() ? 'inspectorCollapse' : 'inspectorExpand')"
-          [attr.title]="i18n.text(shell.inspectorOpen() ? 'inspectorCollapse' : 'inspectorExpand')"
+          [attr.aria-expanded]="false"
+          [attr.aria-label]="i18n.text('inspectorExpand')"
+          [attr.title]="i18n.text('inspectorExpand')"
           (click)="shell.toggleInspector()">
           <pax-icon name="panel-right" [size]="16" />
         </button>
@@ -102,7 +112,7 @@
 
       <button
         type="button"
-        class="bar-tool-btn icon-btn"
+        class="bar-tool-btn icon-btn ghost-btn"
         data-testid="studio-theme-toggle"
         [attr.aria-pressed]="shell.isDarkTheme()"
         [attr.aria-label]="i18n.text(shell.isDarkTheme() ? 'themeToggleToLight' : 'themeToggleToDark')"
@@ -114,7 +124,7 @@
       @if (shell.sessionActive()) {
         <button
           type="button"
-          class="bar-tool-btn icon-btn session-logout"
+          class="bar-tool-btn icon-btn ghost-btn session-logout"
           data-testid="studio-logout"
           [disabled]="shell.signingOut()"
           [attr.aria-label]="i18n.text(shell.signingOut() ? 'signingOut' : 'logout')"
@@ -134,8 +144,7 @@
     [activeItemId]="shell.activeNavItem()"
     [collapsed]="shell.sidebarCollapsed()"
     [isRemoteMode]="runtime.mode() === 'remote'"
-    (itemSelected)="onSidebarItemSelected($event)"
-    (toggleCollapseRequested)="shell.toggleSidebar()" />
+    (itemSelected)="onSidebarItemSelected($event)" />
 
   <main id="main-content" class="studio-main" tabindex="-1">
     @switch (runtime.state().kind) {

@@ -10,7 +10,15 @@
   box-shadow: 0 1.25rem 4rem rgb(0 0 0 / 24%);
 }
 
-.governed-confirmation::backdrop { background: rgb(10 24 31 / 56%); }
+.governed-confirmation:modal {
+  overscroll-behavior: contain;
+}
+
+.governed-confirmation::backdrop {
+  background: rgb(10 24 31 / 56%);
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
 .governed-confirmation form { display: grid; gap: 1rem; padding: 1.25rem; }
 .governed-confirmation header { display: flex; gap: .85rem; align-items: flex-start; }
 .governed-confirmation header > span {

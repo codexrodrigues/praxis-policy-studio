@@ -71,7 +71,7 @@ interface CommandPaletteGroup {
           </div>
 
           <div
-            class="palette-results"
+            class="palette-results studio-scroll-region"
             id="command-palette-listbox"
             role="listbox"
             [attr.aria-label]="i18n.text('commandPaletteDialogLabel')"
@@ -140,18 +140,20 @@ interface CommandPaletteGroup {
       padding: min(12vh, 5.5rem) var(--pax-space-3) var(--pax-space-4);
       background: color-mix(in oklab, var(--pax-color-surface-canvas) 35%, rgba(15, 23, 42, 0.45));
       backdrop-filter: blur(4px);
+      overscroll-behavior: contain;
     }
 
     .palette-dialog {
       width: min(40rem, 100%);
       max-height: min(76vh, 34rem);
+      max-height: min(76dvh, 34rem);
       display: grid;
       grid-template-rows: auto minmax(0, 1fr) auto;
       border-radius: var(--pax-radius-lg);
       border: 1px solid var(--pax-color-outline);
       background: var(--pax-color-surface);
       color: var(--pax-color-on-surface);
-      box-shadow: var(--pax-shadow-float);
+      box-shadow: var(--pax-shadow-popover);
       overflow: hidden;
     }
 
@@ -206,7 +208,7 @@ interface CommandPaletteGroup {
 
     .palette-results {
       overflow-y: auto;
-      overflow-x: hidden;
+      overflow-x: clip;
       padding: var(--pax-space-2);
       display: grid;
       grid-template-columns: minmax(0, 1fr);

@@ -114,4 +114,29 @@ describe('DecisionCreateFormComponent', () => {
     expect(errorSpy).toHaveBeenCalledTimes(1);
     expect(errorSpy.mock.calls[0]?.[0]).toContain('255');
   });
+
+  it('opens a native dialog element and closes on cancel event or backdrop click', () => {
+    const fixture = TestBed.createComponent(DecisionCreateFormComponent);
+    fixture.detectChanges();
+    const host = fixture.nativeElement as HTMLElement;
+
+    host.querySelector<HTMLButtonElement>('[data-testid="toggle-new-decision"]')!.click();
+    fixture.detectChanges();
+
+    const dialog = host.querySelector<HTMLDialogElement>('dialog[data-testid="decision-create-form"]');
+    expect(dialog).not.toBeNull();
+    expect(dialog!.hasAttribute('open')).toBe(true);
+
+    dialog!.dispatchEvent(new MouseEvent('click', { bubbles: false }));
+    fixture.detectChanges();
+    expect(host.querySelector('dialog[data-testid="decision-create-form"]')).toBeNull();
+
+    host.querySelector<HTMLButtonElement>('[data-testid="toggle-new-decision"]')!.click();
+    fixture.detectChanges();
+    const reopened = host.querySelector<HTMLDialogElement>('dialog[data-testid="decision-create-form"]');
+    expect(reopened).not.toBeNull();
+    reopened!.dispatchEvent(new Event('cancel', { cancelable: true }));
+    fixture.detectChanges();
+    expect(host.querySelector('dialog[data-testid="decision-create-form"]')).toBeNull();
+  });
 });

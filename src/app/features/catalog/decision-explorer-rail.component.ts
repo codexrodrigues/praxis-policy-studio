@@ -1,6 +1,6 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ScrollingModule, CdkVirtualScrollViewport } from '@angular/cdk/scrolling';
-import { ChangeDetectionStrategy, Component, DestroyRef, ViewChild, computed, effect, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, output, signal, viewChild } from '@angular/core';
 import type { DomainRuleDefinitionRequest } from '@praxisui/core';
 import {
   buildCatalogPortfolioSummary,
@@ -111,8 +111,9 @@ export class DecisionExplorerRailComponent {
 
   private readonly destroyRef = inject(DestroyRef);
   private stopResizeDrag: (() => void) | null = null;
+  private lastAutoScrolledKey: string | null = null;
 
-  @ViewChild(CdkVirtualScrollViewport) private virtualViewport?: CdkVirtualScrollViewport;
+  private readonly virtualViewport = viewChild(CdkVirtualScrollViewport);
 
   readonly autonomyFilter = signal<ExplorerAutonomyFilter>('all');
   readonly filtersPanelOpen = signal(false);
@@ -356,14 +357,78 @@ export class DecisionExplorerRailComponent {
       this.contextScopeFilter();
       this.autonomyFilter.set('all');
     });
-    effect(() => {
+    effect(onCleanup => {
       const current = this.selected();
       const rows = this.virtualRows();
-      if (!current || !rows.length || !this.virtualViewport) return;
-      const index = rows.findIndex(row => row.kind === 'decision' && row.decision.key === current.key);
-      if (index >= 0) {
-        this.virtualViewport.scrollToIndex(index, 'auto');
+      const viewport = this.virtualViewport();
+      if (!current || !rows.length || !viewport) {
+        this.lastAutoScrolledKey = null;
+        return;
       }
+      const index = rows.findIndex(row => row.kind === 'decision' && row.decision.key === current.key);
+      if (index < 0) return;
+
+      const selectionSignature = `${current.key}@${rows.length}`;
+      if (this.lastAutoScrolledKey === selectionSignature) return;
+      this.lastAutoScrolledKey = selectionSignature;
+
+      const itemSize = 78;
+      const ensureVisible = () => {
+        viewport.checkViewportSize();
+        const viewSize = viewport.getViewportSize();
+        if (viewSize <= 0) return;
+        const itemTop = index * itemSize;
+        const itemBottom = itemTop + itemSize;
+        const viewTop = viewport.measureScrollOffset('top');
+        if (itemTop < viewTop || itemBottom > viewTop + viewSize) {
+          const targetOffset = index <= 2 ? 0 : Math.max(0, itemTop - Math.max(0, (viewSize - itemSize) / 2));
+          viewport.scrollToOffset(targetOffset, 'auto');
+        }
+      };
+
+      if (typeof requestAnimationFrame === 'function') {
+        ensureVisible();
+        let raf2: number | null = null;
+        const raf1 = requestAnimationFrame(() => {
+          ensureVisible();
+          raf2 = requestAnimationFrame(() => ensureVisible());
+        });
+        onCleanup(() => {
+          cancelAnimationFrame(raf1);
+          if (raf2 !== null) cancelAnimationFrame(raf2);
+        });
+      } else {
+        viewport.scrollToIndex(index, 'auto');
+      }
+    });
+    effect(onCleanup => {
+      const viewport = this.virtualViewport();
+      this.filtersPanelOpen();
+      this.contextScopeFilter();
+      this.activeRuleTypeFilter();
+      this.selectionOutsideFilter();
+      this.logoutFailed();
+      if (!viewport) return;
+
+      const refreshSize = () => viewport.checkViewportSize();
+      refreshSize();
+      const rafId =
+        typeof requestAnimationFrame === 'function'
+          ? requestAnimationFrame(() => refreshSize())
+          : null;
+
+      let observer: ResizeObserver | null = null;
+      if (typeof ResizeObserver === 'function') {
+        observer = new ResizeObserver(() => refreshSize());
+        observer.observe(viewport.elementRef.nativeElement);
+      }
+
+      onCleanup(() => {
+        if (rafId !== null && typeof cancelAnimationFrame === 'function') {
+          cancelAnimationFrame(rafId);
+        }
+        observer?.disconnect();
+      });
     });
   }
 

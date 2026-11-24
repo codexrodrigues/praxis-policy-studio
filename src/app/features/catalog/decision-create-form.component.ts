@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, HostListener, computed, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, input, output, signal, viewChild } from '@angular/core';
 import type { DomainRuleDefinitionRequest } from '@praxisui/core';
 import { PolicyStudioI18n } from '../../core/i18n';
 import {
@@ -23,14 +23,16 @@ import { DecisionDocumentationEditorComponent } from '../authoring/decision-docu
         <span>{{ open() ? i18n.text('closeNewDecision') : i18n.text('newDecision') }}</span>
       </button>
 
-      @if (open()) {
-        <div class="create-modal-backdrop" (click)="onBackdropClick($event)">
-          <section
-            class="create-modal-surface"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="new-decision-modal-title"
-            data-testid="decision-create-form">
+      <dialog
+        #createDialog
+        class="create-modal-dialog"
+        aria-labelledby="new-decision-modal-title"
+        [attr.data-testid]="open() ? 'decision-create-form' : null"
+        (cancel)="onDialogCancel($event)"
+        (close)="onNativeClose()"
+        (click)="onBackdropClick($event)">
+        @if (open()) {
+          <div class="create-modal-surface">
             <header class="create-modal-header">
               <div>
                 <p class="studio-eyebrow">{{ i18n.text('trackBusinessRules') }}</p>
@@ -46,7 +48,7 @@ import { DecisionDocumentationEditorComponent } from '../authoring/decision-docu
               </button>
             </header>
 
-            <div class="create-flat-form">
+            <div class="create-flat-form studio-scroll-region">
               <div class="field-pair">
                 <div class="field-group">
                   <label for="new-decision-rule-key">{{ i18n.text('decisionKeyLabel') }}</label>
@@ -156,9 +158,9 @@ import { DecisionDocumentationEditorComponent } from '../authoring/decision-docu
                 {{ i18n.text('createGovernedDecision') }}
               </button>
             </footer>
-          </section>
-        </div>
-      }
+          </div>
+        }
+      </dialog>
     </div>
   `,
   styles: [`
@@ -167,6 +169,8 @@ import { DecisionDocumentationEditorComponent } from '../authoring/decision-docu
     }
     .create-trigger {
       width: 100%;
+      min-height: 2.25rem;
+      height: 2.25rem;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -176,26 +180,43 @@ import { DecisionDocumentationEditorComponent } from '../authoring/decision-docu
       color: var(--pax-color-on-surface);
       font-size: 0.8rem;
     }
-    .create-modal-backdrop {
-      position: fixed;
-      inset: 0;
-      z-index: 80;
+    .create-modal-dialog {
+      width: min(44rem, calc(100vw - 2rem));
+      max-width: none;
+      max-height: min(88vh, 54rem);
+      max-height: min(88dvh, 54rem);
+      margin: auto;
+      padding: 0;
+      border: 0;
+      border-radius: 0.9rem;
+      background: transparent;
+      color: var(--pax-color-on-surface);
+      box-shadow: var(--pax-shadow-popover);
+      overflow: hidden;
+    }
+    .create-modal-dialog[open] {
       display: grid;
-      place-items: center;
-      padding: 1rem;
+      grid-template-rows: minmax(0, 1fr);
+    }
+    .create-modal-dialog:modal {
+      overscroll-behavior: contain;
+    }
+    .create-modal-dialog::backdrop {
       background: color-mix(in oklab, var(--pax-color-on-surface) 38%, transparent);
       backdrop-filter: blur(2px);
+      overflow: hidden;
+      overscroll-behavior: contain;
     }
     .create-modal-surface {
-      width: min(44rem, 100%);
-      max-height: min(88vh, 54rem);
+      width: 100%;
+      height: 100%;
+      max-height: inherit;
       display: grid;
       grid-template-rows: auto minmax(0, 1fr) auto;
       border-radius: 0.9rem;
       border: 1px solid var(--pax-color-outline-variant);
       background: var(--pax-color-surface);
       color: var(--pax-color-on-surface);
-      box-shadow: var(--md-sys-elevation-level3, 0 12px 32px rgb(0 0 0 / 24%));
       overflow: hidden;
     }
     .create-modal-header {
@@ -219,6 +240,7 @@ import { DecisionDocumentationEditorComponent } from '../authoring/decision-docu
     }
     .create-flat-form {
       overflow: auto;
+      overscroll-behavior: contain;
       padding: 1.15rem 1.25rem;
       display: grid;
       gap: 0.85rem;
@@ -267,8 +289,10 @@ import { DecisionDocumentationEditorComponent } from '../authoring/decision-docu
       .field-pair {
         grid-template-columns: 1fr;
       }
-      .create-modal-surface {
+      .create-modal-dialog {
+        width: calc(100vw - 1.5rem);
         max-height: 92vh;
+        max-height: 92dvh;
       }
     }
   `],
@@ -279,6 +303,9 @@ export class DecisionCreateFormComponent {
   readonly busy = input(false);
   readonly createRequested = output<DomainRuleDefinitionRequest>();
   readonly validationFailed = output<string>();
+
+  private readonly createDialog = viewChild<ElementRef<HTMLDialogElement>>('createDialog');
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   protected readonly open = signal(false);
   protected readonly ruleKey = signal('');
@@ -295,12 +322,27 @@ export class DecisionCreateFormComponent {
     return type === 'approval_policy' || type === 'workflow_action_policy';
   });
 
+  constructor() {
+    effect(() => {
+      const isOpen = this.open();
+      const dialog = this.dialogElement();
+      if (!dialog) return;
+      this.syncDialogElement(dialog, isOpen);
+    });
+  }
+
   protected openModal(): void {
-    this.open.update(value => !value);
+    const nextOpen = !this.open();
+    this.open.set(nextOpen);
+    const dialog = this.dialogElement();
+    if (dialog) {
+      this.syncDialogElement(dialog, nextOpen);
+    }
   }
 
   protected closeModal(): void {
     if (this.busy()) return;
+    this.closeDialogElement();
     this.open.set(false);
   }
 
@@ -310,10 +352,47 @@ export class DecisionCreateFormComponent {
     }
   }
 
-  @HostListener('document:keydown.escape')
-  protected onEscape(): void {
-    if (this.open()) {
-      this.closeModal();
+  protected onDialogCancel(event: Event): void {
+    event.preventDefault();
+    this.closeModal();
+  }
+
+  protected onNativeClose(): void {
+    if (this.open() && !this.busy()) {
+      this.open.set(false);
+    }
+  }
+
+  private closeDialogElement(): void {
+    const dialog = this.dialogElement();
+    if (dialog) {
+      this.syncDialogElement(dialog, false);
+    }
+  }
+
+  private dialogElement(): HTMLDialogElement | null {
+    return this.createDialog()?.nativeElement ?? this.host.nativeElement.querySelector('dialog.create-modal-dialog');
+  }
+
+  private syncDialogElement(dialog: HTMLDialogElement, open: boolean): void {
+    if (open) {
+      if (typeof dialog.showModal === 'function') {
+        if (!dialog.open) dialog.showModal();
+      } else {
+        dialog.setAttribute('open', '');
+      }
+      if (typeof document !== 'undefined' && document.activeElement === dialog) {
+        const firstInteractive = dialog.querySelector<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])'
+        );
+        firstInteractive?.focus();
+      }
+      return;
+    }
+    if (typeof dialog.close === 'function') {
+      if (dialog.open) dialog.close();
+    } else {
+      dialog.removeAttribute('open');
     }
   }
 
@@ -369,6 +448,7 @@ export class DecisionCreateFormComponent {
         requiredApprovals: ['human-review']
       }
     });
+    this.closeDialogElement();
     this.open.set(false);
     this.ruleKey.set('');
     this.actionId.set('');

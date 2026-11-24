@@ -18,7 +18,7 @@ import { StudioIconComponent } from '../shared/studio-icon.component';
       [class.collapsed]="collapsedSignal()"
       data-testid="studio-global-sidebar"
       [attr.aria-label]="i18n.text('primaryNavigation')">
-      <div class="sidebar-groups">
+      <div class="sidebar-groups studio-scroll-region">
         @for (group of groupsSignal(); track group.id) {
           <section class="nav-group" [attr.aria-label]="i18n.text(group.labelKey)">
             @if (!collapsedSignal()) {
@@ -73,16 +73,6 @@ import { StudioIconComponent } from '../shared/studio-icon.component';
             <span>{{ i18n.text(isRemoteModeSignal() ? 'governedConfig' : 'fixture') }}</span>
           }
         </div>
-        <button
-          type="button"
-          class="collapse-btn"
-          data-testid="studio-sidebar-toggle"
-          [attr.aria-expanded]="!collapsedSignal()"
-          [attr.aria-label]="i18n.text(collapsedSignal() ? 'sidebarExpand' : 'sidebarCollapse')"
-          [attr.title]="i18n.text(collapsedSignal() ? 'sidebarExpand' : 'sidebarCollapse')"
-          (click)="toggleCollapseRequested.emit()">
-          <pax-icon [name]="collapsedSignal() ? 'chevron-right' : 'panel-left'" [size]="16" />
-        </button>
       </footer>
     </aside>
   `,
@@ -96,12 +86,13 @@ import { StudioIconComponent } from '../shared/studio-icon.component';
       position: sticky;
       top: var(--pax-topbar-height);
       height: calc(100vh - var(--pax-topbar-height));
+      height: calc(100dvh - var(--pax-topbar-height));
       width: var(--pax-global-nav-width);
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
-      gap: var(--pax-space-3);
-      padding: var(--pax-space-3) var(--pax-space-2);
+      justify-content: flex-start;
+      gap: 0;
+      padding: 0;
       background: var(--pax-color-surface-container-low);
       border-right: 1px solid var(--pax-color-outline-variant);
       box-sizing: border-box;
@@ -110,16 +101,21 @@ import { StudioIconComponent } from '../shared/studio-icon.component';
 
     .studio-sidebar.collapsed {
       width: var(--pax-global-nav-collapsed-width);
-      padding-inline: 0.375rem;
     }
 
     .sidebar-groups {
+      flex: 1 1 0;
       display: grid;
       gap: var(--pax-space-4);
+      padding: var(--pax-space-3) var(--pax-space-2);
       overflow-y: auto;
-      overflow-x: hidden;
+      overflow-x: clip;
       min-height: 0;
       align-content: start;
+    }
+
+    .studio-sidebar.collapsed .sidebar-groups {
+      padding-inline: 0.375rem;
     }
 
     .nav-group {
@@ -204,8 +200,7 @@ import { StudioIconComponent } from '../shared/studio-icon.component';
       background: var(--pax-color-primary);
     }
 
-    .nav-item:focus-visible,
-    .collapse-btn:focus-visible {
+    .nav-item:focus-visible {
       outline: 2px solid var(--pax-color-primary);
       outline-offset: 2px;
     }
@@ -241,27 +236,32 @@ import { StudioIconComponent } from '../shared/studio-icon.component';
 
     .nav-item-badge {
       flex-shrink: 0;
-      padding: 0.0625rem 0.4375rem;
+      padding: 0.25rem 0.4375rem;
       border-radius: var(--pax-radius-pill);
       background: var(--pax-color-surface);
       color: var(--pax-color-primary);
       border: 1px solid var(--pax-color-outline-variant);
       font-size: 0.6875rem;
       font-weight: 700;
+      text-box: trim-both cap alphabetic;
     }
 
     .sidebar-footer {
+      flex: 0 0 auto;
+      min-height: var(--pax-rail-footer-height);
+      box-sizing: border-box;
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-start;
       gap: var(--pax-space-2);
-      padding-top: var(--pax-space-2);
+      padding: 0 var(--pax-space-3);
       border-top: 1px solid var(--pax-color-outline-variant);
+      background: var(--pax-color-surface-container-low);
     }
 
     .studio-sidebar.collapsed .sidebar-footer {
-      flex-direction: column;
       justify-content: center;
+      padding-inline: var(--pax-space-2);
     }
 
     .mode-indicator {
@@ -286,25 +286,6 @@ import { StudioIconComponent } from '../shared/studio-icon.component';
       border-color: color-mix(in oklab, var(--pax-color-primary) 28%, var(--pax-color-outline-variant));
     }
 
-    .collapse-btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 2rem;
-      height: 2rem;
-      flex-shrink: 0;
-      border: 1px solid var(--pax-color-outline-variant);
-      border-radius: var(--pax-radius-md);
-      background: var(--pax-color-surface);
-      color: var(--pax-color-on-surface-variant);
-      cursor: pointer;
-    }
-
-    .collapse-btn:hover {
-      color: var(--pax-color-on-surface);
-      border-color: var(--pax-color-outline);
-    }
-
     @media (max-width: 760px) {
       .studio-sidebar,
       .studio-sidebar.collapsed {
@@ -318,10 +299,12 @@ import { StudioIconComponent } from '../shared/studio-icon.component';
         border-bottom: 1px solid var(--pax-color-outline-variant);
       }
 
-      .sidebar-groups {
+      .sidebar-groups,
+      .studio-sidebar.collapsed .sidebar-groups {
         display: flex;
         align-items: center;
         gap: var(--pax-space-2);
+        padding: 0;
         overflow-x: auto;
         overflow-y: hidden;
         scrollbar-width: none;
@@ -411,7 +394,6 @@ export class StudioSidebarNavComponent {
   }
 
   @Output() readonly itemSelected = new EventEmitter<VisibleStudioNavItem>();
-  @Output() readonly toggleCollapseRequested = new EventEmitter<void>();
 
   accessibleLabel(item: VisibleStudioNavItem): string {
     const label = this.i18n.text(item.labelKey);

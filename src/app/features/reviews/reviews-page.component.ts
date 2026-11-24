@@ -194,6 +194,7 @@ type ReviewBucketFilter = 'ALL' | Exclude<WorkflowBucketId, 'STABLE'>;
       line-height: var(--pax-lh-xl);
       font-weight: 700;
       letter-spacing: -0.02em;
+      text-wrap: balance;
     }
 
     .reviews-subtitle {
@@ -202,6 +203,7 @@ type ReviewBucketFilter = 'ALL' | Exclude<WorkflowBucketId, 'STABLE'>;
       font-size: var(--pax-text-sm);
       line-height: var(--pax-lh-sm);
       max-width: 48rem;
+      text-wrap: pretty;
     }
 
     .reviews-head a,
@@ -254,12 +256,13 @@ type ReviewBucketFilter = 'ALL' | Exclude<WorkflowBucketId, 'STABLE'>;
     }
 
     .tab-count {
-      padding: 0 var(--pax-space-2);
+      padding: 0.25rem var(--pax-space-2);
       border-radius: var(--pax-radius-pill);
       background: var(--pax-color-surface-container);
       color: var(--pax-color-on-surface-variant);
       font-size: 0.7rem;
       font-weight: 700;
+      text-box: trim-both cap alphabetic;
     }
 
     .queue-search {

@@ -17,7 +17,7 @@ describe('StudioSidebarNavComponent', () => {
     TestBed.resetTestingModule();
   });
 
-  it('renders grouped modules, active indicator, review badge, and emits collapse/selection events', () => {
+  it('renders grouped modules, active indicator, review badge, and aligned footer without duplicate toggle', () => {
     TestBed.configureTestingModule({
       imports: [StudioSidebarNavComponent],
       providers: [PolicyStudioI18n]
@@ -38,26 +38,23 @@ describe('StudioSidebarNavComponent', () => {
     expect(reviewsBtn.getAttribute('aria-label')).toContain('5');
     expect(fixture.debugElement.query(By.css('[data-testid="nav-badge-reviews"]')).nativeElement.textContent?.trim()).toBe('5');
     expect(fixture.debugElement.query(By.css('[data-testid="nav-badge-dot-reviews"]'))).toBeNull();
+    expect(fixture.debugElement.query(By.css('.sidebar-footer .mode-indicator'))).not.toBeNull();
+    expect(fixture.debugElement.query(By.css('[data-testid="studio-sidebar-toggle"]'))).toBeNull();
 
     fixture.componentInstance.collapsed = true;
     fixture.detectChanges();
     expect(reviewsBtn.getAttribute('title')).toContain('5');
     expect(fixture.debugElement.query(By.css('[data-testid="nav-badge-dot-reviews"]'))).not.toBeNull();
+    expect(fixture.debugElement.query(By.css('.sidebar-footer .mode-indicator span'))).toBeNull();
 
     fixture.componentInstance.collapsed = false;
     fixture.detectChanges();
 
     const selectedSpy = vi.fn();
-    const toggleSpy = vi.fn();
     fixture.componentInstance.itemSelected.subscribe(selectedSpy);
-    fixture.componentInstance.toggleCollapseRequested.subscribe(toggleSpy);
 
     const accessBtn = fixture.debugElement.query(By.css('[data-testid="workspace-track-authorization"]')).nativeElement as HTMLButtonElement;
     accessBtn.click();
     expect(selectedSpy).toHaveBeenCalledWith(expect.objectContaining({ id: 'access', route: '/access' }));
-
-    const collapseBtn = fixture.debugElement.query(By.css('[data-testid="studio-sidebar-toggle"]')).nativeElement as HTMLButtonElement;
-    collapseBtn.click();
-    expect(toggleSpy).toHaveBeenCalledOnce();
   });
 });

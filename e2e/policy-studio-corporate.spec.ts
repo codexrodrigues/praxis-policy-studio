@@ -2877,3 +2877,226 @@ test('aligns 03 Testar, 04 Operar, 05 Histórico, and /access with Business/Tech
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await page.getByTestId('studio-theme-toggle').click();
 });
+
+test('stretches explorer virtual scroll to fill tall viewport, aligns rail borders, and eliminates duplicate collapse buttons', async ({ page }, testInfo) => {
+  if (testInfo.project.name === 'desktop') {
+    await page.setViewportSize({ width: 1440, height: 1100 });
+  }
+
+  const defs = Array.from({ length: 50 }, (_, index) => {
+    const n = index + 1;
+    const ruleSetKey = n <= 25 ? 'benefits.eligibility' : 'payroll.benefits';
+    return {
+      id: `def-tall-${n}`,
+      ruleKey: `${ruleSetKey}.rule-${n}`,
+      version: 1,
+      status: 'approved',
+      ruleType: 'validation',
+      contextKey: 'benefits',
+      resourceKey: `${ruleSetKey}.requests`,
+      serviceKey: 'benefits-service',
+      condition: { '<=': [{ var: 'request.amount' }, 1000 + n] },
+      parameters: {
+        nullSemantics: 'FAIL_CLOSED',
+        operationKeys: ['CREATE'],
+        'praxis.domainRuleDocumentation': {
+          title: `Regra estruturada de elegibilidade ${n}`,
+          summary: `Valida o critério ${n} no fluxo de elegibilidade.`
+        }
+      },
+      definition: {
+        ruleSetKey,
+        slotKey: `slot_${n}`,
+        decisionStage: 'DOMAIN_DECISION',
+        overridePolicy: 'PARAMETERIZABLE',
+        requiredFactPaths: ['request.amount'],
+        documentation: {
+          title: `Regra estruturada de elegibilidade ${n}`,
+          summary: `Valida o critério ${n} no fluxo de elegibilidade.`
+        }
+      }
+    };
+  });
+
+  await page.route('**/app-config.json', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      mode: 'remote',
+      configApiBaseUrl: '',
+      locale: 'pt-BR',
+      projectionPath: null,
+      initialDecisionKey: defs[29]!.ruleKey
+    })
+  }));
+  await page.route('**/auth/session', route => route.fulfill({ status: 204 }));
+  await page.route('**/api/**', async route => {
+    const pathname = new URL(route.request().url()).pathname;
+    const json = (body: unknown, status = 200) =>
+      route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+
+    if (pathname.endsWith('/definitions/catalog')) {
+      return json({
+        schemaVersion: 'praxis-domain-rule-catalog.v1',
+        page: 0,
+        limit: 12,
+        hasMore: false,
+        candidates: defs.map(def => ({
+          definitionId: def.id,
+          ruleKey: def.ruleKey,
+          version: def.version,
+          ruleType: def.ruleType,
+          status: def.status,
+          contextKey: def.contextKey,
+          resourceKey: def.resourceKey,
+          serviceKey: def.serviceKey,
+          semanticOwner: 'benefits-owner',
+          updatedAt: '2026-11-24T10:00:00Z'
+        }))
+      });
+    }
+    if (pathname.endsWith('/definitions/capabilities')) {
+      return json({ tenantId: 'rio', environment: 'stage', definitions: [] });
+    }
+    if (pathname.endsWith('/definitions')) return json(defs);
+    for (const def of defs) {
+      if (pathname.endsWith(`/definitions/${def.id}`)) return json(def);
+      if (pathname.endsWith(`/definitions/${def.id}/facts`)) {
+        return json({
+          definitionId: def.id,
+          ruleKey: def.ruleKey,
+          definitionVersion: 1,
+          schemaVersion: 'praxis.domain-rule-fact-catalog.v1',
+          facts: [
+            {
+              path: 'request.amount',
+              valueType: 'number',
+              nullable: false,
+              labels: { 'pt-BR': 'Valor solicitado', 'en-US': 'Requested amount' },
+              descriptions: { 'pt-BR': 'Quantia solicitada no pedido.' },
+              providerRef: 'benefits.request',
+              evidenceRefs: [],
+              sensitivity: 'NON_SENSITIVE',
+              redaction: 'NONE'
+            }
+          ]
+        });
+      }
+    }
+    if (pathname.endsWith('/parameters')) return json({ schemaVersion: 'praxis.domain-rule-parameters.v1', parameters: [] });
+    if (pathname.endsWith('/workspaces')) return json([]);
+    if (pathname.endsWith('/lifecycle')) return json({ workspaceId: null, latestTestRun: null, testRuns: [], reviews: [] });
+    if (pathname.endsWith('/scenarios')) return json([]);
+    if (pathname.endsWith('/snapshots/head/status') || pathname.endsWith('/rollouts') || pathname.endsWith('/rollout-policies')) {
+      return json({ availableActions: [] });
+    }
+    if (pathname.endsWith('/snapshots') || pathname.endsWith('/reviews') || pathname.endsWith('/timeline')) return json([]);
+    return route.fallback();
+  });
+
+  await page.goto('/catalog?tenantId=rio&organizationId=ALL&environment=stage');
+  await expect(page.locator('.decision-virtual-viewport')).toBeVisible();
+
+  await expect.poll(async () => page.evaluate(() => {
+    const viewport = document.querySelector('.decision-virtual-viewport')?.getBoundingClientRect();
+    const selected = document.querySelector('.decision-row.selected')?.getBoundingClientRect();
+    if (!viewport || !selected) return false;
+    return selected.top >= viewport.top - 2 && selected.bottom <= viewport.bottom + 2;
+  })).toBe(true);
+
+  if (testInfo.project.name === 'desktop') {
+    await expect(page.locator('#decision-title')).toHaveText('Regra estruturada de elegibilidade 30');
+
+    // Unambiguous single toggle per panel: no duplicate topbar reopen buttons while panels are open
+    await expect(page.getByTestId('studio-sidebar-toggle')).toHaveCount(1);
+    await expect(page.getByTestId('explorer-collapse-btn')).toHaveCount(1);
+    await expect(page.getByTestId('inspector-collapse-btn')).toHaveCount(1);
+    await expect(page.getByTestId('studio-toggle-explorer')).toHaveCount(0);
+    await expect(page.getByTestId('studio-toggle-inspector')).toHaveCount(0);
+
+    // 4-column viewport lock: all 4 column footers align flush and outer window has no disconnected scrollbar
+    const geometry = await page.evaluate(() => {
+      const list = document.querySelector('.decision-list')?.getBoundingClientRect();
+      const viewport = document.querySelector('.decision-virtual-viewport')?.getBoundingClientRect();
+      const sidebarFooter = document.querySelector('.sidebar-footer')?.getBoundingClientRect();
+      const explorerFooter = document.querySelector('.explorer-footer')?.getBoundingClientRect();
+      const mainFooter = document.querySelector('.fixture-boundary')?.getBoundingClientRect();
+      const inspectorFooter = document.querySelector('.inspector-footer')?.getBoundingClientRect();
+      const explorerHeader = document.querySelector('.catalog-pane .pane-heading')?.getBoundingClientRect();
+      const inspectorHeader = document.querySelector('.inspector-rail .inspector-header')?.getBoundingClientRect();
+      const headerCopy = document.querySelector('.decision-header-copy')?.getBoundingClientRect();
+      const headerActions = document.querySelector('.decision-actions')?.getBoundingClientRect();
+      return {
+        listHeight: list?.height ?? 0,
+        viewportHeight: viewport?.height ?? 0,
+        sidebarFooterTop: sidebarFooter?.top ?? -1,
+        explorerFooterTop: explorerFooter?.top ?? -1,
+        mainFooterTop: mainFooter?.top ?? -1,
+        inspectorFooterTop: inspectorFooter?.top ?? -1,
+        explorerHeaderBottom: explorerHeader?.bottom ?? -1,
+        inspectorHeaderBottom: inspectorHeader?.bottom ?? -1,
+        docScrollHeight: document.documentElement.scrollHeight,
+        innerHeight: window.innerHeight,
+        copyBottom: headerCopy?.bottom ?? 0,
+        actionsTop: headerActions?.top ?? 0
+      };
+    });
+
+    expect(geometry.viewportHeight).toBeGreaterThanOrEqual(600);
+    expect(geometry.viewportHeight / geometry.listHeight).toBeGreaterThanOrEqual(0.75);
+    expect(Math.abs(geometry.sidebarFooterTop - geometry.explorerFooterTop)).toBeLessThanOrEqual(1.5);
+    expect(Math.abs(geometry.explorerFooterTop - geometry.mainFooterTop)).toBeLessThanOrEqual(1.5);
+    expect(Math.abs(geometry.mainFooterTop - geometry.inspectorFooterTop)).toBeLessThanOrEqual(1.5);
+    expect(Math.abs(geometry.explorerHeaderBottom - geometry.inspectorHeaderBottom)).toBeLessThanOrEqual(1.5);
+    expect(geometry.docScrollHeight).toBeLessThanOrEqual(geometry.innerHeight + 2);
+    expect(geometry.actionsTop).toBeGreaterThanOrEqual(geometry.copyBottom - 2);
+
+    // Scrolling back to top verifies Group #1 heading sits flush without 50px top void
+    await page.evaluate(() => {
+      const vp = document.querySelector('.decision-virtual-viewport');
+      if (vp) vp.scrollTop = 0;
+    });
+    await expect(page.locator('.virtual-heading-first')).toBeVisible();
+    const firstHeadingGap = await page.evaluate(() => {
+      const list = document.querySelector('.decision-list')?.getBoundingClientRect();
+      const heading = document.querySelector('.virtual-heading-first')?.getBoundingClientRect();
+      if (!list || !heading) return 999;
+      return heading.top - list.top;
+    });
+    expect(firstHeadingGap).toBeLessThanOrEqual(24);
+
+    // Native top-layer <dialog> create modal opens and dismisses via Escape
+    await page.getByTestId('toggle-new-decision').click();
+    const createDialog = page.locator('dialog[data-testid="decision-create-form"]');
+    await expect(createDialog).toBeVisible();
+    expect(await createDialog.evaluate(el => (el as HTMLDialogElement).open)).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(createDialog).toHaveCount(0);
+
+    // Collapse & reopen flow restores full virtual scroll height
+    await page.getByTestId('explorer-collapse-btn').click();
+    await expect(page.getByTestId('studio-toggle-explorer')).toBeVisible();
+    await page.getByTestId('studio-toggle-explorer').click();
+    await expect(page.getByTestId('studio-toggle-explorer')).toHaveCount(0);
+    await expect(page.locator('.decision-virtual-viewport')).toBeVisible();
+
+    await page.getByTestId('inspector-collapse-btn').click();
+    await expect(page.getByTestId('studio-toggle-inspector')).toBeVisible();
+    await page.getByTestId('studio-toggle-inspector').click();
+    await expect(page.getByTestId('studio-toggle-inspector')).toHaveCount(0);
+  } else {
+    const mobileHeader = await page.evaluate(() => {
+      const bar = document.querySelector('.product-bar')?.getBoundingClientRect();
+      const center = document.querySelector('.bar-center');
+      return {
+        height: bar?.height ?? 0,
+        centerOrder: center ? getComputedStyle(center).order : ''
+      };
+    });
+    expect(mobileHeader.height).toBeLessThanOrEqual(101);
+    expect(mobileHeader.centerOrder).toBe('0');
+  }
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+});
