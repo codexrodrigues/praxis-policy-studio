@@ -1,57 +1,80 @@
 <details class="review">
   <summary>{{ i18n.text('accessReview') }}</summary>
-  <p>{{ i18n.text('accessHint') }}</p>
+  <p class="access-step-kicker">{{ i18n.text('accessStepDraftKicker') }}</p>
+  <p class="access-hint">{{ i18n.text('accessHint') }}</p>
   <pax-pap-catalog
     [config]="config()"
     [preferredResourceKey]="preferredResourceKey()"
     [preferredServiceKey]="preferredServiceKey()"
     (draftGenerated)="applyGeneratedDraft($event)" />
-  <label for="access-source">{{ i18n.text('accessSource') }}</label>
-  <textarea id="access-source" rows="5" spellcheck="false" [disabled]="busy()" [value]="source()"
-    (input)="editSource($any($event.target).value)"></textarea>
-  <button type="button" [disabled]="busy() || !source().trim() || attempted()" (click)="review()">{{ i18n.text('accessInspect') }}</button>
+  <div class="access-field-block">
+    <label for="access-source">{{ i18n.text('accessSource') }}</label>
+    <textarea id="access-source" rows="5" spellcheck="false" [disabled]="busy()" [value]="source()"
+      (input)="editSource($any($event.target).value)"></textarea>
+    <div class="access-action-row">
+      <button type="button" class="access-btn-primary" [disabled]="busy() || !source().trim() || attempted()" (click)="review()">{{ i18n.text('accessInspect') }}</button>
+    </div>
+  </div>
   @if (candidate(); as draft) {
-    <section [attr.aria-label]="i18n.text('accessInspect')">
-      <h3>{{ draft.preview.title }}</h3>
-      <p>{{ draft.request.ruleKey }} · v{{ draft.request.version }}<br>{{ draft.request.serviceKey }} · {{ draft.request.resourceKey }}</p>
-      <p>{{ draft.preview.policyId }} · {{ draft.preview.version }}</p>
+    <section class="access-subcard" [attr.aria-label]="i18n.text('accessInspect')">
+      <header class="access-subcard-header">
+        <div>
+          <h3>{{ draft.preview.title }}</h3>
+          <p class="access-meta-line">{{ draft.request.ruleKey }} · v{{ draft.request.version }} · {{ draft.request.serviceKey }} · {{ draft.request.resourceKey }}</p>
+        </div>
+        <span class="access-meta-pill">{{ draft.preview.policyId }} · {{ draft.preview.version }}</span>
+      </header>
       <h4>{{ i18n.text('accessTargets') }}</h4>
-      <ul>
+      <ul class="access-item-list">
         @for (target of draft.preview.targets; track $index) {
-          <li><code>{{ target.point }}</code> · {{ target.modes.join(', ') }}<br><code>{{ target.digest }}</code></li>
+          <li>
+            <code>{{ target.point }}</code> · {{ target.modes.join(', ') }}
+            <br><code>{{ target.digest }}</code>
+          </li>
         }
       </ul>
       <h4>{{ i18n.text('accessEffects') }}</h4>
-      <ul>
+      <ul class="access-item-list">
         @for (rule of draft.preview.rules; track $index) {
-          <li>{{ rule.id }} · {{ rule.modes.join(', ') }}<br><strong>{{ rule.authority }} / {{ rule.effect }}</strong> · {{ rule.reason }}</li>
+          <li>
+            <span>{{ rule.id }} · {{ rule.modes.join(', ') }}</span>
+            <br><strong>{{ rule.authority }} / {{ rule.effect }}</strong> · {{ rule.reason }}
+          </li>
         }
       </ul>
-      <p>policy_engine / opa-policy · {{ draft.preview.artifacts.join(', ') }}</p>
-      <details><summary>{{ i18n.text('accessOriginal') }}</summary><pre>{{ draft.request | json }}</pre></details>
+      <p class="access-meta-line">policy_engine / opa-policy · {{ draft.preview.artifacts.join(', ') }}</p>
+      <details class="access-nested-details"><summary>{{ i18n.text('accessOriginal') }}</summary><pre>{{ draft.request | json }}</pre></details>
       @if (!attempted()) {
-        <button type="button" [disabled]="busy()" (click)="save()">{{ i18n.text('accessSave') }}</button>
+        <div class="access-action-row">
+          <button type="button" class="access-btn-primary" [disabled]="busy()" (click)="save()">{{ i18n.text('accessSave') }}</button>
+        </div>
       }
     </section>
   }
-  <label for="access-id">{{ i18n.text('accessId') }}</label>
-  <input id="access-id" [value]="definitionId()" [disabled]="busy()" (input)="definitionId.set($any($event.target).value); stored.set(null)">
-  <button type="button" [disabled]="busy() || !definitionId().trim()" (click)="read()">{{ i18n.text('accessRead') }}</button>
-  @if (busy()) { <p role="status">{{ i18n.text('loading') }}</p> }
-  @if (error(); as message) { <p role="alert">{{ i18n.text(message) }}</p> }
+  <div class="access-field-block">
+    <label for="access-id">{{ i18n.text('accessId') }}</label>
+    <input id="access-id" [value]="definitionId()" [disabled]="busy()" (input)="definitionId.set($any($event.target).value); stored.set(null)">
+    <div class="access-action-row">
+      <button type="button" [disabled]="busy() || !definitionId().trim()" (click)="read()">{{ i18n.text('accessRead') }}</button>
+    </div>
+  </div>
+  @if (busy()) { <p class="access-feedback" role="status">{{ i18n.text('loading') }}</p> }
+  @if (error(); as message) { <p class="access-feedback access-feedback--error" role="alert">{{ i18n.text(message) }}</p> }
   @if (stored(); as result) {
-    <section>
-      <p role="status"><strong>{{ i18n.text('accessReadConfirmed') }}</strong></p>
-      <p>{{ result.ruleKey }} · v{{ result.version }} · {{ result.status }}<br>{{ result.id }}</p>
+    <section class="access-subcard">
+      <p class="access-feedback access-feedback--ok" role="status"><strong>{{ i18n.text('accessReadConfirmed') }}</strong></p>
+      <p class="access-meta-line">{{ result.ruleKey }} · v{{ result.version }} · {{ result.status }}<br><code>{{ result.id }}</code></p>
       @if (result.tenantId || result.environment || result.createdBy) {
-        <p>{{ [result.tenantId, result.environment, result.createdBy].filter(present).join(' · ') }}</p>
+        <p class="access-meta-line">{{ [result.tenantId, result.environment, result.createdBy].filter(present).join(' · ') }}</p>
       }
       @if (result.status === 'draft' || result.status === 'proposed') {
-        <button type="button" data-testid="access-approve-definition" [disabled]="busy()" (click)="approve()">
-          {{ i18n.text('accessApprove') }}
-        </button>
+        <div class="access-action-row">
+          <button type="button" class="access-btn-primary" data-testid="access-approve-definition" [disabled]="busy()" (click)="approve()">
+            {{ i18n.text('accessApprove') }}
+          </button>
+        </div>
       }
-      <details><summary>{{ i18n.text('accessStored') }}</summary><pre>{{ result | json }}</pre></details>
+      <details class="access-nested-details"><summary>{{ i18n.text('accessStored') }}</summary><pre>{{ result | json }}</pre></details>
     </section>
   }
 </details>

@@ -1,14 +1,139 @@
-:host, label, select { display: block; min-width: 0; }
-section { padding-block: .25rem; overflow-wrap: anywhere; }
-section > * + *, details > * + * { margin-block: .65rem 0; }
-h4, p, pre { margin: 0; }
-label, summary { font-weight: 600; }
-button, select, input { box-sizing: border-box; min-height: 44px; max-width: 100%; border: 1px solid var(--pax-color-outline, #718087); border-radius: .35rem; background: var(--pax-color-surface, #fff); color: inherit; font: inherit; padding: .4rem .55rem; }
-button, summary { cursor: pointer; }
-select, input { width: 100%; margin-top: .2rem; }
-.pap-draft-builder { display: grid; gap: .6rem; padding: .75rem; border: 1px solid var(--pax-color-outline-variant, #c5d0d5); border-radius: .45rem; background: var(--pax-color-surface-container-low, #f3f6f7); }
-.pap-draft-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
-ul { padding-inline-start: 1.1rem; max-height: 16rem; overflow-y: auto; }
-li + li { margin-block-start: .4rem; }
-pre { white-space: pre-wrap; overflow-wrap: anywhere; }
-.pap-context-status { padding: .45rem .65rem; border-radius: .35rem; background: var(--pax-color-primary-container, #e0f2fe); color: var(--pax-color-on-primary-container, #0f172a); font-size: .85rem; }
+:host {
+  display: block;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+section {
+  padding-block: 0.25rem;
+  overflow-wrap: anywhere;
+}
+
+section > * + *,
+details > * + * {
+  margin-block: var(--pax-space-3) 0;
+}
+
+h4,
+p,
+pre {
+  margin: 0;
+}
+
+label,
+summary {
+  display: block;
+  min-width: 0;
+  font-size: var(--pax-text-sm);
+  font-weight: 700;
+  color: var(--pax-color-on-surface);
+}
+
+summary {
+  color: var(--pax-color-primary);
+}
+
+button,
+select,
+input {
+  box-sizing: border-box;
+  min-height: 2.75rem;
+  max-width: 100%;
+  border: 1px solid var(--pax-color-outline);
+  border-radius: var(--pax-radius-md);
+  background: var(--pax-color-surface);
+  color: var(--pax-color-on-surface);
+  font: inherit;
+  padding: 0.45rem 0.65rem;
+}
+
+button,
+summary {
+  cursor: pointer;
+}
+
+select,
+input {
+  width: 100%;
+  min-width: 0;
+  margin-top: var(--pax-space-1);
+}
+
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--pax-color-primary);
+  outline-offset: 2px;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.pap-draft-builder {
+  display: grid;
+  gap: var(--pax-space-3);
+  padding: var(--pax-space-4);
+  border: 1px solid var(--pax-color-outline-variant);
+  border-radius: var(--pax-radius-md);
+  background: var(--pax-color-surface-container-low);
+}
+
+.pap-draft-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--pax-space-3);
+}
+
+ul {
+  display: grid;
+  gap: var(--pax-space-2);
+  margin: var(--pax-space-2) 0 0;
+  padding-inline-start: 0;
+  list-style: none;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+li {
+  padding: var(--pax-space-2) var(--pax-space-3);
+  border: 1px solid var(--pax-color-outline-variant);
+  border-radius: var(--pax-radius-sm);
+  background: var(--pax-color-surface-container-low);
+  font-size: var(--pax-text-xs);
+  color: var(--pax-color-on-surface-variant);
+}
+
+li code {
+  color: var(--pax-color-on-surface);
+  font-family: var(--pax-font-mono);
+  font-weight: 700;
+}
+
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--pax-font-mono);
+  font-size: var(--pax-text-xs);
+  padding: var(--pax-space-3);
+  border: 1px solid var(--pax-color-outline-variant);
+  border-radius: var(--pax-radius-md);
+  background: var(--pax-color-surface-container-low);
+}
+
+.pap-context-status {
+  padding: var(--pax-space-2) var(--pax-space-3);
+  border-radius: var(--pax-radius-sm);
+  background: var(--pax-color-primary-container);
+  color: var(--pax-color-on-primary-container);
+  font-size: var(--pax-text-sm);
+  font-weight: 600;
+}
+
+@container (max-width: 34rem) {
+  .pap-draft-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -536,6 +536,8 @@
               [suggestions]="suggestedScenarios()"
               [canScaffoldOntology]="canScaffoldScenarioOntology()"
               [ontologyWarning]="scenarioOntologyWarning()"
+              [viewDepth]="viewDepth()"
+              [primaryFactPaths]="selectedScenarioPrimaryFactPaths()"
               (factValueChanged)="setScenarioFactValue($event.fact, $event.value)"
               (factNullChanged)="setScenarioFactNull($event.fact, $event.useNull)"
               (fallbackJsonChanged)="scenarioFactsFallback.set($event)"
@@ -550,7 +552,9 @@
               [editingScenarioId]="editingScenarioId()" [editingFactValues]="editingScenarioFactDraft()"
               [editingFactsJson]="editingScenarioFactsJson()" [busy]="authoringBusy()"
               [canManage]="hasWorkspaceAction('MANAGE_SCENARIOS')" [operationalModeEnabled]="!!operationalAction()"
-              [operationalModes]="operationalScenarioModes()" (editRequested)="editScenario($event)"
+              [operationalModes]="operationalScenarioModes()"
+              [viewDepth]="viewDepth()"
+              [primaryFactPaths]="selectedScenarioPrimaryFactPaths()" (editRequested)="editScenario($event)"
               (cancelRequested)="cancelScenarioEdit()" (editDirty)="markScenarioEditDirty()"
               (factValueChanged)="setEditingScenarioFactValue($event.fact, $event.value)"
               (factNullChanged)="setEditingScenarioFactNull($event.fact, $event.useNull)"
@@ -627,10 +631,13 @@
             <div class="review-list">
               @for (review of reviews(); track review.id) {
                 <article>
-                  <strong>{{ review.decision }}</strong>
-                  <span>{{ review.reviewerRef }} · rev {{ review.workspaceRevision }}</span>
+                  <strong
+                    class="pax-status-pill"
+                    [class]="'pax-status-pill pax-status-pill--' + reviewBadgeTone(review.decision)"
+                    [attr.title]="review.decision">{{ reviewDecisionLabel(review.decision) }}</strong>
+                  <span>{{ review.reviewerRef }} · {{ i18n.text('revision') }} {{ review.workspaceRevision }}</span>
+                  <time [attr.datetime]="review.reviewedAt" [attr.title]="review.reviewedAt">{{ formatWorkstationTime(review.reviewedAt) }}</time>
                   <p>{{ review.rationale }}</p>
-                  <time [attr.datetime]="review.reviewedAt">{{ review.reviewedAt }}</time>
                 </article>
               } @empty {
                 <p class="empty">{{ i18n.text('noReviews') }}</p>
@@ -681,15 +688,21 @@
                 <dl class="facts lifecycle-grid">
                   @for (gate of gateMatrix.gates; track gate.id) {
                     <div [attr.data-testid]="'governance-gate-' + gate.id">
-                      <dt><code>{{ gate.id }}</code></dt>
+                      <dt [attr.title]="gate.id">
+                        @if (viewDepth() === 'technical') {
+                          <code>{{ gate.id }}</code>
+                        } @else {
+                          <span>{{ governanceGateLabel(gate.id) }}</span>
+                        }
+                      </dt>
                       <dd>
                         <strong>{{ i18n.text(gate.allowed ? 'gateStatusAuthorized' : 'gateStatusSegregatedOrBlocked') }}</strong>
                         ·
-                        <small>{{ i18n.text(gate.etagBound ? 'gateEtagReady' : 'gateEtagMissing') }}@if (gate.etagValue) { (<code>{{ gate.etagValue }}</code>) }</small>
+                        <small [attr.title]="gate.etagValue ?? ''">{{ i18n.text(gate.etagBound ? 'gateEtagReady' : 'gateEtagMissing') }}@if (gate.etagValue && viewDepth() === 'technical') { (<code>{{ gate.etagValue }}</code>) }</small>
                         @if (gate.reviewerRefs.length) {
                           · <small>4-eyes: <code>{{ gate.reviewerRefs.join(', ') }}</code></small>
                         }
-                        @if (gate.blockerCodes.length) {
+                        @if (gate.blockerCodes.length && viewDepth() === 'technical') {
                           · <small><code>{{ gate.blockerCodes.join(', ') }}</code></small>
                         }
                         @if (gate.allowed && isActionableDelegatedGate(gate.id)) {
@@ -797,6 +810,7 @@
               [ruleSetKey]="current.ruleSetKey"
               [operationKeys]="current.operationKeys"
               [operationKey]="snapshots.snapshotOperationKey()"
+              [viewDepth]="viewDepth()"
               (operationSelected)="snapshots.selectSnapshotOperation($event)"
               [head]="snapshotHead()"
               [headSet]="snapshotHeadSet()"
@@ -867,7 +881,7 @@
             <ol>
               @for (item of current.evidence; track item.path + ':' + item.kind) {
                 <li>
-                  <span>{{ item.kind }}</span>
+                  <span [attr.title]="item.kind">{{ evidenceKindLabel(item.kind) }}</span>
                   <code>{{ item.path }}</code>
                   @if (item.sha256) {
                     <small>SHA-256 {{ item.sha256.slice(0, 12) }}…</small>
@@ -921,7 +935,7 @@
                         }
                       </dd>
                     </div>
-                    <div><dt>{{ i18n.text('evidenceObservedAt') }}</dt><dd><time [attr.datetime]="baseline.observedAtUtc">{{ baseline.observedAtUtc }}</time></dd></div>
+                    <div><dt>{{ i18n.text('evidenceObservedAt') }}</dt><dd><time [attr.datetime]="baseline.observedAtUtc" [attr.title]="baseline.observedAtUtc">{{ formatWorkstationTime(baseline.observedAtUtc) }}</time></dd></div>
                     <div><dt>{{ i18n.text('provenScenarios') }}</dt><dd>{{ governed.latestTestRun?.results?.length ?? 0 }}</dd></div>
                     <div><dt>{{ i18n.text('evidenceArtifact') }}</dt><dd><code>{{ baseline.artifactRef }}</code></dd></div>
                     <div><dt>{{ i18n.text('evidenceFingerprint') }}</dt><dd><code>{{ baseline.artifactDigest.slice(0, 12) }}…</code></dd></div>
@@ -936,7 +950,7 @@
                       <article class="timeline-event">
                         <strong>{{ item.scenarioKey }}</strong>
                         <dl class="facts lifecycle-grid">
-                          <div><dt>{{ i18n.text('operation') }}</dt><dd>{{ item.evidence.operationMode }}</dd></div>
+                          <div><dt>{{ i18n.text('operation') }}</dt><dd [attr.title]="item.evidence.operationMode">{{ operationModeLabel(item.evidence.operationMode) }}</dd></div>
                           <div>
                             <dt>{{ i18n.text('mutation') }}</dt>
                             <dd>{{ i18n.text(item.evidence.mutationObserved ? 'mutationObserved' : 'noMutationVerified') }}</dd>
@@ -964,9 +978,16 @@
             } @else {
               @for (event of timeline(); track event.occurredAt + event.eventType) {
                 <article class="timeline-event">
-                  <time [attr.datetime]="event.occurredAt">{{ event.occurredAt }}</time>
+                  <time [attr.datetime]="event.occurredAt" [attr.title]="event.occurredAt">{{ formatWorkstationTime(event.occurredAt) }}</time>
                   <strong>{{ event.summary }}</strong>
-                  <small>{{ event.eventType }} @if (event.status) { · {{ event.status }} } @if (event.actor) { · {{ event.actor }} }</small>
+                  <small class="timeline-event-meta">
+                    <span
+                      class="pax-status-pill"
+                      [class]="'pax-status-pill pax-status-pill--' + timelineBadgeTone(event.eventType)"
+                      [attr.title]="event.eventType">{{ timelineEventLabel(event.eventType) }}</span>
+                    @if (event.status) { <span>{{ event.status }}</span> }
+                    @if (event.actor) { <span>· {{ event.actor }}</span> }
+                  </small>
                 </article>
               } @empty {
                 <p class="empty timeline-empty">{{ i18n.text('noTimeline') }}</p>

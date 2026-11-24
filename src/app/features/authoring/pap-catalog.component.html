@@ -31,7 +31,7 @@
         </select>
       </label>
       <h4>{{ i18n.text('papFacts') }}</h4>
-      <ul>
+      <ul role="list">
         @for (fact of selected.factsByMode[mode()]; track fact.factPath) {
           <li><code>{{ fact.factPath }}</code><br>{{ fact.valueType }} · {{ fact.cardinality }} · {{ fact.presenceModel }}</li>
         } @empty { <li>{{ i18n.text('papNoFacts') }}</li> }

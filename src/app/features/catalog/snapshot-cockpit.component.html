@@ -54,13 +54,14 @@
         <div><dt>{{ i18n.text('activationRevision') }}</dt><dd>{{ currentHead.activationRevision }}</dd></div>
         <div>
           <dt>{{ i18n.text('governanceState') }}</dt>
-          <dd>{{
-            currentHead.governanceState === 'RUNTIME_INCOMPATIBLE'
-              ? i18n.text('snapshotRuntimeIncompatible')
-              : currentHead.governanceState === 'WITHDRAWN'
-                ? i18n.text('snapshotWithdrawnState')
-                : currentHead.governanceState
-          }}</dd>
+          <dd>
+            <span
+              class="pax-status-pill"
+              [class]="'pax-status-pill pax-status-pill--' + governanceStateTone(currentHead.governanceState)"
+              [attr.title]="currentHead.governanceState">
+              {{ governanceStateLabel(currentHead.governanceState) }}
+            </span>
+          </dd>
         </div>
         <div class="snapshot-etag"><dt>{{ i18n.text('headEtag') }}</dt><dd><code>{{ currentHead.headEtag }}</code></dd></div>
       </dl>
@@ -138,7 +139,15 @@
               <article class="staged-rollout">
                 <div>
                   <strong>{{ item.rollout.candidateSnapshotKey }}</strong>
-                  <small>{{ item.readiness.status }} · {{ item.rollout.enforcementMode }}</small>
+                  <small>
+                    <span
+                      class="pax-status-pill"
+                      [class]="'pax-status-pill pax-status-pill--' + rolloutBadgeTone(item.readiness.status)"
+                      [attr.title]="item.readiness.status">
+                      {{ rolloutStatusLabel(item.readiness.status) }}
+                    </span>
+                    · {{ enforcementModeLabel(item.rollout.enforcementMode) }}
+                  </small>
                 </div>
                 <dl class="facts rollout-policy-head">
                   <div><dt>{{ i18n.text('readyProbes') }}</dt><dd>{{ item.readiness.readyProbes }} / {{ item.readiness.totalProbes }}</dd></div>
@@ -199,7 +208,7 @@
             @if (policies.activePolicy; as activePolicy) {
               <dl class="facts rollout-policy-head">
                 <div><dt>{{ i18n.text('activeRolloutPolicy') }}</dt><dd><strong>{{ activePolicy.policyKey }}</strong> · v{{ activePolicy.policyVersion }}</dd></div>
-                <div><dt>{{ i18n.text('enforcementMode') }}</dt><dd>{{ activePolicy.enforcementMode }}</dd></div>
+                <div><dt>{{ i18n.text('enforcementMode') }}</dt><dd>{{ enforcementModeLabel(activePolicy.enforcementMode) }}</dd></div>
                 <div><dt>{{ i18n.text('minimumFreshProbes') }}</dt><dd>{{ activePolicy.minimumFreshProbes }}</dd></div>
                 <div><dt>{{ i18n.text('minimumReadyRatio') }}</dt><dd>{{ activePolicy.minimumReadyRatio }}</dd></div>
                 <div><dt>{{ i18n.text('blockOnIncompatible') }}</dt><dd>{{ activePolicy.blockOnIncompatible ? i18n.text('yes') : i18n.text('no') }}</dd></div>
@@ -213,7 +222,15 @@
                 <article [class.active]="policy.status === 'ACTIVE'">
                   <div>
                     <strong>{{ policy.policyKey }} · v{{ policy.policyVersion }}</strong>
-                    <small>{{ policy.status }} · {{ policy.enforcementMode }}</small>
+                    <small>
+                      <span
+                        class="pax-status-pill"
+                        [class]="'pax-status-pill pax-status-pill--' + rolloutBadgeTone(policy.status)"
+                        [attr.title]="policy.status">
+                        {{ rolloutStatusLabel(policy.status) }}
+                      </span>
+                      · {{ enforcementModeLabel(policy.enforcementMode) }}
+                    </small>
                   </div>
                   <small>{{ policy.minimumFreshProbes }} {{ i18n.text('freshProbesShort') }} · {{ policy.minimumReadyRatio }} {{ i18n.text('readyRatioShort') }}</small>
                   @if (policy.availableActions.includes('APPROVE')) {
@@ -221,7 +238,7 @@
                   } @else if (policy.availableActions.includes('ACTIVATE')) {
                     <button type="button" class="quiet-button" [disabled]="rolloutPolicyBusy() || !policies.headEtag" (click)="activateRolloutPolicy.emit(policy)">{{ policyActionLabel(policy) }}</button>
                   } @else {
-                    <span class="snapshot-action-state">{{ policyActionLabel(policy) }}</span>
+                    <span class="snapshot-action-state">{{ rolloutStatusLabel(policy.status) }}</span>
                   }
                 </article>
               }
@@ -255,7 +272,11 @@
               <summary>{{ i18n.text('rolloutPolicyTimeline') }} · {{ rolloutPolicyTimeline().length }}</summary>
               <ol>
                 @for (event of rolloutPolicyTimeline(); track event.eventId) {
-                  <li><strong>{{ event.eventType }}</strong><span>{{ event.actorRef }}</span><time [attr.datetime]="event.createdAt">{{ event.createdAt }}</time></li>
+                  <li>
+                    <strong [attr.title]="event.eventType">{{ policyEventLabel(event.eventType) }}</strong>
+                    <span>{{ event.actorRef }}</span>
+                    <time [attr.datetime]="event.createdAt" [attr.title]="event.createdAt">{{ formatTimestamp(event.createdAt) }}</time>
+                  </li>
                 }
               </ol>
             </details>
@@ -303,7 +324,7 @@
                 <div><dt>{{ i18n.text('requiredJsonLogicDialect') }}</dt><dd><code>{{ status.expectedJsonLogicDialectVersion }}</code></dd></div>
               </dl>
             }
-            <small class="authority-note">{{ i18n.text('lastHostObservation') }} {{ status.lastObservedAtUtc ?? '—' }}</small>
+            <small class="authority-note">{{ i18n.text('lastHostObservation') }} <time [attr.datetime]="status.lastObservedAtUtc ?? ''" [attr.title]="status.lastObservedAtUtc ?? ''">{{ formatTimestamp(status.lastObservedAtUtc) }}</time></small>
           }
         } @else {
           <p class="empty">{{ i18n.text('noHostStatus') }}</p>
@@ -330,12 +351,12 @@
           <dl class="execution-totals">
             <div><dt>{{ i18n.text('observedExecutions') }}</dt><dd>{{ summary.totalObservations }}</dd></div>
             <div><dt>{{ i18n.text('observedHosts') }}</dt><dd>{{ summary.distinctHosts }}</dd></div>
-            <div><dt>{{ i18n.text('firstObservation') }}</dt><dd>{{ summary.firstObservedAtUtc ?? '—' }}</dd></div>
-            <div><dt>{{ i18n.text('lastObservation') }}</dt><dd>{{ summary.lastObservedAtUtc ?? '—' }}</dd></div>
+            <div><dt>{{ i18n.text('firstObservation') }}</dt><dd><time [attr.datetime]="summary.firstObservedAtUtc ?? ''" [attr.title]="summary.firstObservedAtUtc ?? ''">{{ formatTimestamp(summary.firstObservedAtUtc) }}</time></dd></div>
+            <div><dt>{{ i18n.text('lastObservation') }}</dt><dd><time [attr.datetime]="summary.lastObservedAtUtc ?? ''" [attr.title]="summary.lastObservedAtUtc ?? ''">{{ formatTimestamp(summary.lastObservedAtUtc) }}</time></dd></div>
           </dl>
           <div class="outcome-strip" [attr.aria-label]="i18n.text('outcomeDistribution')">
             @for (outcome of outcomes; track outcome) {
-              <div [attr.data-outcome]="outcome"><span>{{ outcome }}</span><strong>{{ summary.outcomeCounts[outcome] }}</strong></div>
+              <div [attr.data-outcome]="outcome"><span [attr.title]="outcome">{{ outcomeLabel(outcome) }}</span><strong>{{ summary.outcomeCounts[outcome] }}</strong></div>
             }
           </div>
         } @else {
@@ -350,12 +371,22 @@
         <article [class.active]="version.active">
           <div class="snapshot-version-identity">
             <strong>{{ version.snapshotKey }}</strong>
-            <small>{{ version.publishedBy }} · <time [attr.datetime]="version.publishedAtUtc">{{ version.publishedAtUtc }}</time></small>
+            <small>{{ version.publishedBy }} · <time [attr.datetime]="version.publishedAtUtc" [attr.title]="version.publishedAtUtc">{{ formatTimestamp(version.publishedAtUtc) }}</time></small>
           </div>
           <dl>
             <div><dt>{{ i18n.text('ruleSetVersion') }}</dt><dd>{{ version.ruleSetVersion }}</dd></div>
             <div><dt>{{ i18n.text('publicationRevision') }}</dt><dd>{{ version.publicationRevision }}</dd></div>
-            <div><dt>{{ i18n.text('governanceState') }}</dt><dd>{{ version.governanceState === 'RUNTIME_INCOMPATIBLE' ? i18n.text('snapshotRuntimeIncompatible') : version.governanceState }}</dd></div>
+            <div>
+              <dt>{{ i18n.text('governanceState') }}</dt>
+              <dd>
+                <span
+                  class="pax-status-pill"
+                  [class]="'pax-status-pill pax-status-pill--' + governanceStateTone(version.governanceState)"
+                  [attr.title]="version.governanceState">
+                  {{ governanceStateLabel(version.governanceState) }}
+                </span>
+              </dd>
+            </div>
             <div><dt>{{ i18n.text('contentHash') }}</dt><dd><code>{{ version.snapshotContentHash }}</code></dd></div>
           </dl>
           @if (version.governanceState === 'READY' && (version.availableAction === 'ACTIVATE' || version.availableAction === 'ROLLBACK')) {

@@ -294,6 +294,7 @@ fronteira da IA está em [ADR 0002 — Policy Assistant](adr/0002-policy-assista
 ## 10. Dívidas e riscos conhecidos
 
 - o catálogo remoto navega o catálogo paginado do Config e resolve candidatos externos sob demanda (`loadDiscoveredCandidate`), usando `projectionPath` apenas como enriquecimento opcional;
+- as superfícies `03 Testar`, `04 Operar`, `05 Histórico` e `/access` consomem `workstation-presentation.ts` e `_workstation-panels.scss` para adaptar densidade semântica (`Negócio | Técnico`), datas localizadas e responsividade por `@container` sem recalcular autoridade nem estado de servidor;
 - o authoring suporta condições (`tree`, `table`, `expression`), parâmetros e políticas operacionais (`ALLOW`/`BLOCK`), além da composição de `RuleSet` no `SnapshotCockpitComponent`;
 - comparison candidate × active, baseline independente por resultado, idempotência
   do Test Run e action remota host-owned consumida por discovery existem; a prova de paridade legada no ambiente corporativo ainda é lacuna externa;

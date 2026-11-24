@@ -18,7 +18,19 @@ import { skip } from 'rxjs';
 import { AuthSessionService } from '../../core/auth-session.service';
 import type { ExplorerGlobalLens } from '../../core/catalog-portfolio';
 import type { DecisionDiscoveryCandidate } from '../../core/decision-discovery.service';
+import { partitionDecisionFacts } from '../../core/fact-presentation';
 import { GovernedHostScopeService } from '../../core/governed-host-scope.service';
+import {
+  formatLocalizedTimestamp,
+  humanizeEvidenceKind,
+  humanizeGovernanceGateLabel,
+  humanizeOperationMode,
+  humanizeReviewDecision,
+  humanizeTimelineEventType,
+  reviewDecisionTone,
+  timelineEventTone,
+  type WorkstationStatusTone
+} from '../../core/workstation-presentation';
 import { humanizeDecisionTitle, humanizeTechnicalSlug, looksLikeTechnicalSlug } from '../../core/humanize-labels';
 import { PolicyStudioI18n } from '../../core/i18n';
 import { ProjectionCatalogService } from '../../core/projection-catalog.service';
@@ -272,6 +284,12 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.hostStatusSummary(),
     this.snapshotHeadSet()
   ));
+  readonly selectedScenarioPrimaryFactPaths = computed<readonly string[]>(() => {
+    const current = this.selected();
+    if (!current) return [];
+    const partitioned = partitionDecisionFacts(current);
+    return partitioned.scopedByRule ? partitioned.evaluatedFacts.map(fact => fact.path) : [];
+  });
 
   constructor(readonly i18n: PolicyStudioI18n) {
     this.shell.registerLogoutHandler(() => this.logout());
@@ -833,6 +851,38 @@ export class CatalogWorkspaceComponent implements OnInit {
       ? this.i18n.text('comparisonMatch')
       : comparison.toUpperCase().includes('MISMATCH') ? this.i18n.text('comparisonMismatch')
         : this.i18n.text('comparisonUnavailable');
+  }
+
+  formatWorkstationTime(iso: string | null | undefined): string {
+    return formatLocalizedTimestamp(iso, this.i18n.locale(), this.viewDepth());
+  }
+
+  reviewDecisionLabel(decision: string): string {
+    return humanizeReviewDecision(decision, this.i18n.locale(), this.viewDepth());
+  }
+
+  reviewBadgeTone(decision: string): WorkstationStatusTone {
+    return reviewDecisionTone(decision);
+  }
+
+  governanceGateLabel(gateId: string): string {
+    return humanizeGovernanceGateLabel(gateId, this.i18n.locale(), this.viewDepth());
+  }
+
+  timelineEventLabel(eventType: string): string {
+    return humanizeTimelineEventType(eventType, this.i18n.locale(), this.viewDepth());
+  }
+
+  timelineBadgeTone(eventType: string): WorkstationStatusTone {
+    return timelineEventTone(eventType);
+  }
+
+  evidenceKindLabel(kind: string): string {
+    return humanizeEvidenceKind(kind, this.i18n.locale(), this.viewDepth());
+  }
+
+  operationModeLabel(mode: string): string {
+    return humanizeOperationMode(mode, this.i18n.locale(), this.viewDepth());
   }
 
   loadCatalog(): void {

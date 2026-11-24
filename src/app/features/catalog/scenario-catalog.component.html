@@ -20,6 +20,7 @@
           <label><span>{{ i18n.text('scenarioName') }}</span><input #name required [value]="scenario.name" (input)="editDirty.emit()"></label>
           @if (facts().length) {
             <pax-scenario-facts-editor [facts]="facts()" [values]="editingFactValues()"
+              [viewDepth]="viewDepth()" [primaryFactPaths]="primaryFactPaths()"
               (valueChanged)="factValueChanged.emit($event)" (nullChanged)="factNullChanged.emit($event)" />
           }
           <label class="scenario-facts" [hidden]="facts().length">

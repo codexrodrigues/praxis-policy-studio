@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
 import type { DomainRuleTestScenario } from '@praxisui/core';
 import { PolicyStudioI18n } from '../../core/i18n';
+import type { StudioViewDepth } from '../../core/studio-shell-state.service';
 import type { DecisionFact } from './catalog.fixture';
 import { ScenarioFactsEditorComponent, type ScenarioFactNullChange, type ScenarioFactValueChange } from './scenario-facts-editor.component';
 
@@ -38,6 +39,8 @@ export class ScenarioCatalogComponent {
   readonly canManage = input(false);
   readonly operationalModeEnabled = input(false);
   readonly operationalModes = input.required<Readonly<Record<string, 'CREATE' | 'UPDATE' | ''>>>();
+  readonly viewDepth = input<StudioViewDepth>('business');
+  readonly primaryFactPaths = input<readonly string[]>([]);
 
   readonly editRequested = output<string>();
   readonly cancelRequested = output<void>();

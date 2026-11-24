@@ -2,6 +2,7 @@ import { Injectable, signal } from '@angular/core';
 import { FACTS_PIPELINE_COPY_EN_US, FACTS_PIPELINE_COPY_PT_BR } from './i18n/facts-pipeline.i18n';
 import { RULE_AUTHORING_COPY_EN_US, RULE_AUTHORING_COPY_PT_BR } from './i18n/rule-authoring.i18n';
 import { SHELL_COPY_EN_US, SHELL_COPY_PT_BR } from './i18n/shell.i18n';
+import { WORKSTATION_COPY_EN_US, WORKSTATION_COPY_PT_BR } from './i18n/workstation.i18n';
 import { SupportedLocale } from './runtime-config';
 
 const copy = {
@@ -925,7 +926,8 @@ const copy = {
     commandActionNavHistory: 'Ir para aba 05 Histórico',
     ...SHELL_COPY_PT_BR,
     ...FACTS_PIPELINE_COPY_PT_BR,
-    ...RULE_AUTHORING_COPY_PT_BR
+    ...RULE_AUTHORING_COPY_PT_BR,
+    ...WORKSTATION_COPY_PT_BR
   },
   'en-US': {
     papBrowse: 'Browse host decision points',
@@ -1847,7 +1849,8 @@ const copy = {
     commandActionNavHistory: 'Jump to 05 History',
     ...SHELL_COPY_EN_US,
     ...FACTS_PIPELINE_COPY_EN_US,
-    ...RULE_AUTHORING_COPY_EN_US
+    ...RULE_AUTHORING_COPY_EN_US,
+    ...WORKSTATION_COPY_EN_US
   }
 } as const;
 

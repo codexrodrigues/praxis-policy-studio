@@ -36,6 +36,7 @@
   <label><span>{{ i18n.text('scenarioName') }}</span><input #name required></label>
   @if (facts().length) {
     <pax-scenario-facts-editor [facts]="facts()" [values]="factValues()" [preview]="factsJson()"
+      [viewDepth]="viewDepth()" [primaryFactPaths]="primaryFactPaths()"
       (valueChanged)="factValueChanged.emit($event)" (nullChanged)="factNullChanged.emit($event)" />
   } @else {
     <fieldset class="scenario-fact-editor">

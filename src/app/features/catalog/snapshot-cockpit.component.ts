@@ -17,6 +17,18 @@ import type {
   DomainRuleSnapshotVersion
 } from '@praxisui/core';
 import { PolicyStudioI18n } from '../../core/i18n';
+import type { StudioViewDepth } from '../../core/studio-shell-state.service';
+import {
+  formatLocalizedTimestamp,
+  humanizeDecisionOutcome,
+  humanizeEnforcementMode,
+  humanizeRolloutStatus,
+  humanizeSnapshotGovernanceState,
+  humanizeTimelineEventType,
+  rolloutStatusTone,
+  snapshotStateTone,
+  type WorkstationStatusTone
+} from '../../core/workstation-presentation';
 import {
   buildRuleSetImpactSummary,
   type RuleSetImpactSummary
@@ -52,6 +64,7 @@ export class SnapshotCockpitComponent {
   readonly ruleSetKey = input.required<string>();
   readonly operationKeys = input<readonly string[]>([]);
   readonly operationKey = input<string | null>(null);
+  readonly viewDepth = input<StudioViewDepth>('business');
   readonly operationSelected = output<string>();
   readonly head = input<DomainRuleSnapshotHeadStatus | null>(null);
   readonly headSet = input<DomainRuleSnapshotHeadSetResponse | null | undefined>(undefined);
@@ -166,6 +179,38 @@ export class SnapshotCockpitComponent {
     if (version.availableAction === 'ACTIVE') return this.i18n.text('activeSnapshot');
     if (version.availableAction === 'CREATE_ROLLOUT') return this.i18n.text('startRollout');
     return this.i18n.text('snapshotUnavailable');
+  }
+
+  formatTimestamp(iso: string | null | undefined): string {
+    return formatLocalizedTimestamp(iso, this.i18n.locale(), this.viewDepth());
+  }
+
+  governanceStateLabel(state: string | null | undefined): string {
+    return humanizeSnapshotGovernanceState(state, this.i18n.locale(), this.viewDepth());
+  }
+
+  governanceStateTone(state: string | null | undefined): WorkstationStatusTone {
+    return snapshotStateTone(state);
+  }
+
+  enforcementModeLabel(mode: string | null | undefined): string {
+    return humanizeEnforcementMode(mode, this.i18n.locale(), this.viewDepth());
+  }
+
+  rolloutStatusLabel(status: string | null | undefined): string {
+    return humanizeRolloutStatus(status, this.i18n.locale(), this.viewDepth());
+  }
+
+  rolloutBadgeTone(status: string | null | undefined): WorkstationStatusTone {
+    return rolloutStatusTone(status);
+  }
+
+  policyEventLabel(eventType: string | null | undefined): string {
+    return humanizeTimelineEventType(eventType, this.i18n.locale(), this.viewDepth());
+  }
+
+  outcomeLabel(outcome: DomainRuleDecision): string {
+    return humanizeDecisionOutcome(outcome, this.i18n.locale(), this.viewDepth());
   }
 
   blockerLabel(code: string): string {

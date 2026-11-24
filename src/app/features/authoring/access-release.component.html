@@ -1,48 +1,65 @@
 <details class="release">
   <summary>{{ i18n.text('releaseTitle') }}</summary>
-  <p>{{ i18n.text('releaseInstructions') }}</p>
-  <button type="button" [disabled]="busy()" (click)="loadApproved()">{{ i18n.text('releaseLoadApproved') }}</button>
+  <p class="release-step-kicker">{{ i18n.text('accessStepReleaseKicker') }}</p>
+  <p class="release-instructions">{{ i18n.text('releaseInstructions') }}</p>
+  <div class="release-action-row">
+    <button type="button" [disabled]="busy()" (click)="loadApproved()">{{ i18n.text('releaseLoadApproved') }}</button>
+  </div>
   @if (definitions(); as items) {
     @if (items.length) {
-      <label>{{ i18n.text('releaseApprovedDefinition') }}
-        <select [disabled]="busy()" [value]="definitionId()" (change)="definitionId.set($any($event.target).value); editReleaseId('')">
-          <option value="">—</option>
-          @for (item of items; track item.id) {
-            <option [value]="item.id">{{ item.title }} · {{ item.ruleKey }} · v{{ item.version }} · {{ item.id }}</option>
-          }
-        </select>
-      </label>
-      <button type="button" [disabled]="busy() || !definitionId() || !!release()" (click)="publish()">{{ i18n.text('releasePublish') }}</button>
-    } @else { <p role="status">{{ i18n.text('releaseNoApproved') }}</p> }
+      <div class="release-field-block">
+        <label>{{ i18n.text('releaseApprovedDefinition') }}
+          <select [disabled]="busy()" [value]="definitionId()" (change)="definitionId.set($any($event.target).value); editReleaseId('')">
+            <option value="">—</option>
+            @for (item of items; track item.id) {
+              <option [value]="item.id">{{ item.title }} · {{ item.ruleKey }} · v{{ item.version }} · {{ item.id }}</option>
+            }
+          </select>
+        </label>
+        <div class="release-action-row">
+          <button type="button" class="release-btn-primary" [disabled]="busy() || !definitionId() || !!release()" (click)="publish()">{{ i18n.text('releasePublish') }}</button>
+        </div>
+      </div>
+    } @else { <p class="release-feedback" role="status">{{ i18n.text('releaseNoApproved') }}</p> }
   }
-  <label>{{ i18n.text('releaseId') }}<input [disabled]="busy()" [value]="releaseId()" (input)="editReleaseId($any($event.target).value)"></label>
-  <button type="button" [disabled]="busy() || !releaseId().trim()" (click)="read()">{{ i18n.text('releaseRefresh') }}</button>
-  @if (busy()) { <p role="status">{{ i18n.text('loading') }}</p> }
-  @if (error(); as message) { <p role="alert">{{ i18n.text(message) }}</p> }
+  <div class="release-field-block">
+    <label>{{ i18n.text('releaseId') }}<input [disabled]="busy()" [value]="releaseId()" (input)="editReleaseId($any($event.target).value)"></label>
+    <div class="release-action-row">
+      <button type="button" [disabled]="busy() || !releaseId().trim()" (click)="read()">{{ i18n.text('releaseRefresh') }}</button>
+    </div>
+  </div>
+  @if (busy()) { <p class="release-feedback" role="status">{{ i18n.text('loading') }}</p> }
+  @if (error(); as message) { <p class="release-feedback release-feedback--error" role="alert">{{ i18n.text(message) }}</p> }
   @if (release(); as item) {
-    <dl>
-      <dt>{{ i18n.text('releaseState') }}</dt><dd>{{ item.state }}</dd>
-      <dt>{{ i18n.text('accessId') }}</dt><dd>{{ item.definitionId }}</dd>
-      <dt>{{ i18n.text('releaseDefinitionHash') }}</dt><dd><code>{{ item.definitionHash }}</code></dd>
-      @if (item.approvalId) { <dt>{{ i18n.text('releaseApproval') }}</dt><dd>{{ item.approvalId }}</dd> }
+    <dl class="release-facts">
+      <div><dt>{{ i18n.text('releaseState') }}</dt><dd>{{ item.state }}</dd></div>
+      <div><dt>{{ i18n.text('accessId') }}</dt><dd><code>{{ item.definitionId }}</code></dd></div>
+      <div class="release-fact-span"><dt>{{ i18n.text('releaseDefinitionHash') }}</dt><dd><code>{{ item.definitionHash }}</code></dd></div>
+      @if (item.approvalId) { <div><dt>{{ i18n.text('releaseApproval') }}</dt><dd><code>{{ item.approvalId }}</code></dd></div> }
       @if (item.expectedHead; as expected) {
-        <dt>{{ i18n.text('releaseExpected') }}</dt><dd>{{ expected.runtimeRevision }}</dd>
+        <div><dt>{{ i18n.text('releaseExpected') }}</dt><dd>{{ expected.runtimeRevision }}</dd></div>
       }
-      <dt>{{ i18n.text('releaseObserved') }}</dt>
+      <div class="release-fact-span">
+        <dt>{{ i18n.text('releaseObserved') }}</dt>
+        @if (item.observedHead; as observed) {
+          <dd>{{ observed.runtimeRevision }} · {{ observed.instanceId }} · #{{ observed.activationRevision }}</dd>
+        } @else { <dd>{{ i18n.text('releaseNoObservation') }}</dd> }
+      </div>
       @if (item.observedHead; as observed) {
-        <dd>{{ observed.runtimeRevision }} · {{ observed.instanceId }} · #{{ observed.activationRevision }}</dd>
-        <dt>policySetDigest</dt><dd><code>{{ observed.policySetDigest }}</code></dd>
-        <dt>bundleArtifactDigest</dt><dd><code>{{ observed.bundleArtifactDigest }}</code></dd>
-      } @else { <dd>{{ i18n.text('releaseNoObservation') }}</dd> }
+        <div><dt [attr.title]="'policySetDigest'">{{ i18n.text('releasePolicySetDigest') }}</dt><dd><code>{{ observed.policySetDigest }}</code></dd></div>
+        <div><dt [attr.title]="'bundleArtifactDigest'">{{ i18n.text('releaseBundleArtifactDigest') }}</dt><dd><code>{{ observed.bundleArtifactDigest }}</code></dd></div>
+      }
     </dl>
-    @if (item.current === false && item.state === 'active') { <p role="status">{{ i18n.text('releaseHistorical') }}</p> }
-    @if (item.state === 'activating' || item.state === 'reverting') { <p role="status">{{ i18n.text('releasePending') }}</p> }
-    @if (canTransition('activate', item)) {
-      <button type="button" [disabled]="busy()" (click)="command.set('activate')">{{ i18n.text(item.state === 'activating' ? 'releaseRetryActivate' : 'releaseActivate') }}</button>
-    }
-    @if (canTransition('rollback', item)) {
-      <button type="button" [disabled]="busy()" (click)="command.set('rollback')">{{ i18n.text(item.state === 'reverting' ? 'releaseRetryRollback' : item.state === 'activating' ? 'releaseRollbackPending' : 'releaseRollback') }}</button>
-    }
+    @if (item.current === false && item.state === 'active') { <p class="release-feedback" role="status">{{ i18n.text('releaseHistorical') }}</p> }
+    @if (item.state === 'activating' || item.state === 'reverting') { <p class="release-feedback release-feedback--warn" role="status">{{ i18n.text('releasePending') }}</p> }
+    <div class="release-action-row">
+      @if (canTransition('activate', item)) {
+        <button type="button" class="release-btn-primary" [disabled]="busy()" (click)="command.set('activate')">{{ i18n.text(item.state === 'activating' ? 'releaseRetryActivate' : 'releaseActivate') }}</button>
+      }
+      @if (canTransition('rollback', item)) {
+        <button type="button" [disabled]="busy()" (click)="command.set('rollback')">{{ i18n.text(item.state === 'reverting' ? 'releaseRetryRollback' : item.state === 'activating' ? 'releaseRollbackPending' : 'releaseRollback') }}</button>
+      }
+    </div>
   }
 </details>
 <pax-governed-confirmation-dialog [confirmation]="confirmation()" (cancelled)="command.set(null)" (confirmed)="confirm()" />

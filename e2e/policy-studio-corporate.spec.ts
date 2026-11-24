@@ -2714,3 +2714,166 @@ test('Fase C rule terminology, zero-"?" expression formatting, and focused edit 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 });
+
+test('aligns 03 Testar, 04 Operar, 05 Histórico, and /access with Business/Technical lens, container responsiveness, and Light/Dark WCAG AA', async ({ page }, testInfo) => {
+  await mockGovernedBackend(page, false);
+  await page.route('**/api/**', async route => {
+    const req = route.request();
+    const pathname = new URL(req.url()).pathname;
+    const json = (value: unknown, status = 200) =>
+      route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value) });
+
+    if (pathname.endsWith(`/definitions/${definition.id}/facts`)) {
+      return json({
+        definitionId: definition.id,
+        ruleKey: definition.ruleKey,
+        definitionVersion: definition.version,
+        schemaVersion: 'praxis.domain-rule-fact-catalog.v1',
+        facts: [
+          {
+            path: 'request.requestedAmount',
+            valueType: 'number',
+            nullable: false,
+            labels: { 'pt-BR': 'Valor solicitado', 'en-US': 'Requested amount' },
+            descriptions: { 'pt-BR': 'Valor informado na solicitação.', 'en-US': 'Amount supplied by the request.' },
+            providerRef: 'quickstart.extraordinary-benefit-request',
+            evidenceRefs: ['quickstart://extraordinary-benefit/requested-amount'],
+            sensitivity: 'SENSITIVE',
+            redaction: 'MASK'
+          },
+          {
+            path: 'neighborhood: previousRequests',
+            valueType: 'number',
+            nullable: true,
+            labels: { 'pt-BR': 'Solicitações anteriores', 'en-US': 'Previous requests' },
+            descriptions: { 'pt-BR': 'Fato de avaliação do RuleSet benefits-rules (v1).' },
+            providerRef: 'quickstart.extraordinary-benefit-request.history',
+            evidenceRefs: [],
+            sensitivity: 'NON_SENSITIVE',
+            redaction: 'NONE'
+          }
+        ]
+      });
+    }
+    if (pathname.endsWith(`/definitions/${definition.id}/timeline`)) {
+      return json({
+        events: [
+          {
+            eventType: 'WORKSPACE_CREATED',
+            occurredAt: '2026-10-21T15:30:00Z',
+            summary: 'Workspace aberto para ajuste do teto',
+            status: 'OPEN',
+            actor: 'author-1'
+          },
+          {
+            eventType: 'TEST_RUN_RECORDED',
+            occurredAt: '2026-10-21T16:10:00Z',
+            summary: 'Bateria sandbox validada',
+            status: 'PASSED',
+            actor: 'author-1'
+          }
+        ]
+      });
+    }
+    if (pathname.endsWith('/workspaces/workspace-1/reviews') && req.method() === 'GET') {
+      return json([
+        {
+          id: 'rev-d-1',
+          workspaceId: 'workspace-1',
+          workspaceRevision: 4,
+          reviewerRef: 'approver-lead',
+          decision: 'APPROVE',
+          rationale: 'Aprovado após verificação do limite.',
+          reviewedAt: '2026-10-21T17:00:00Z'
+        }
+      ]);
+    }
+    if (pathname.endsWith('/snapshots/head/status')) {
+      return json({
+        ruleSetKey: 'quickstart.extraordinary-benefit.eligibility',
+        operationKey: 'CREATE',
+        activeSnapshotKey: 'snapshot-active-002',
+        ruleSetVersion: 2,
+        publicationRevision: 2,
+        activationRevision: 3,
+        headEtag: '"head-phase-d"',
+        executionReady: true,
+        governanceState: 'READY'
+      });
+    }
+    if (pathname.endsWith('/execution-summary')) {
+      return json({
+        snapshotKey: 'snapshot-active-002',
+        totalObservations: 10,
+        distinctHosts: 2,
+        firstObservedAtUtc: '2026-10-21T14:00:00Z',
+        lastObservedAtUtc: '2026-10-21T17:00:00Z',
+        outcomeCounts: {
+          ALLOW: 8,
+          DENY: 2,
+          NOT_APPLICABLE: 0,
+          INCONCLUSIVE: 0,
+          TECHNICAL_ERROR: 0
+        }
+      });
+    }
+    return route.fallback();
+  });
+
+  await page.goto('/catalog');
+  if (testInfo.project.name === 'narrow') {
+    await page.getByRole('button', { name: /O valor solicitado deve respeitar o limite do programa/ }).click();
+  }
+
+  // 1. 03 Testar: scoped fact partition, clean labels, and sandbox KPI summary strip
+  await page.locator('.decision-navigation').getByRole('button', { name: /^Testar/ }).click();
+  await expect(page.getByRole('spinbutton', { name: 'Valor solicitado' })).toBeVisible();
+  const otherFacts = page.getByTestId('scenario-other-facts');
+  await expect(otherFacts).toBeVisible();
+  await expect(otherFacts).toContainText('Outros dados disponíveis na operação (1)');
+
+  await page.getByRole('button', { name: 'Comparar com a versão ativa' }).click();
+  const summaryStrip = page.getByTestId('sandbox-summary-strip');
+  await expect(summaryStrip).toBeVisible();
+  await expect(summaryStrip).toContainText('2 cenários');
+
+  // 2. 04 Operar: Business vs Technical lens across gates, reviews, and snapshot outcomes
+  await page.locator('.decision-navigation').getByRole('button', { name: /^Operar/ }).click();
+  await expect(page.getByTestId('governance-gate-REVIEW')).toContainText('Revisão independente (4-olhos)');
+  await expect(page.locator('.review-list')).toContainText('Aprovado');
+  await expect(page.locator('.review-list')).not.toContainText('2026-10-21T17:00:00Z');
+
+  const cockpit = page.locator('pax-snapshot-cockpit');
+  await cockpit.getByLabel('Operação governada', { exact: true }).selectOption('CREATE');
+  await expect(cockpit.locator('.outcome-strip [data-outcome="ALLOW"]')).toContainText('Permitida');
+
+  await page.getByTestId('view-depth-technical').click();
+  await expect(page.getByTestId('governance-gate-REVIEW')).toContainText('REVIEW');
+  await expect(page.locator('.review-list')).toContainText('APPROVE');
+  await expect(page.locator('.review-list')).toContainText('2026-10-21T17:00:00Z');
+  await expect(cockpit.locator('.outcome-strip [data-outcome="ALLOW"]')).toContainText('ALLOW');
+  await page.getByTestId('view-depth-business').click();
+
+  // 3. 05 Histórico: humanized timeline event pills and localized timestamps without overflow
+  await page.locator('.decision-navigation').getByRole('button', { name: /^Histórico/ }).click();
+  const historyTimeline = page.locator('.timeline[aria-labelledby="timeline-title"]');
+  await expect(historyTimeline).toContainText('Rascunho criado');
+  await expect(historyTimeline).toContainText('Teste registrado');
+  await expect(historyTimeline).not.toContainText('2026-10-21T15:30:00Z');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  // 4. /access: upgraded design-system cards in Light and Dark Mode + Axe 0 violations
+  await page.getByTestId('workspace-track-authorization').click();
+  await expect(page.getByTestId('access-authorization-workspace')).toBeVisible();
+  await page.locator('pax-access-draft-review details.review > summary').click();
+  await page.locator('pax-access-release details.release > summary').click();
+  await expect(page.getByText('Etapa 1 · Catálogo e rascunho')).toBeVisible();
+  await expect(page.getByText('Etapa 2 · Release e ativação OPA')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+
+  await page.getByTestId('studio-theme-toggle').click();
+  expect(await page.evaluate(() => document.documentElement.getAttribute('data-theme'))).toBe('dark-tech');
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.getByTestId('studio-theme-toggle').click();
+});

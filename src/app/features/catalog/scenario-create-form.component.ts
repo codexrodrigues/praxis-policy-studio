@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PolicyStudioI18n } from '../../core/i18n';
+import type { StudioViewDepth } from '../../core/studio-shell-state.service';
 import type { SuggestedScenarioTemplate } from './catalog-presentation';
 import type { DecisionFact } from './catalog.fixture';
 import { ScenarioFactsEditorComponent, type ScenarioFactNullChange, type ScenarioFactValueChange } from './scenario-facts-editor.component';
@@ -33,6 +34,8 @@ export class ScenarioCreateFormComponent {
   readonly suggestions = input<readonly SuggestedScenarioTemplate[]>([]);
   readonly canScaffoldOntology = input(false);
   readonly ontologyWarning = input<string | null>(null);
+  readonly viewDepth = input<StudioViewDepth>('business');
+  readonly primaryFactPaths = input<readonly string[]>([]);
 
   readonly factValueChanged = output<ScenarioFactValueChange>();
   readonly factNullChanged = output<ScenarioFactNullChange>();
