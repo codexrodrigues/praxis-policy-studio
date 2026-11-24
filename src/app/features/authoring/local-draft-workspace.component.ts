@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, computed, inject, signal } from '@angular/core';
 import { RuleEditorComponent, type RuleBuilderConfig, type RuleBuilderState } from '@praxisui/visual-builder';
 import {
   compileDecisionTableProjection,
@@ -8,7 +8,10 @@ import {
   type DecisionTableClause,
   type DecisionTableProjection
 } from '../../core/decision-inspection';
+import { formatTableOperatorLabel } from '../../core/decision-rule-presentation';
+import { formatFactDisplayLabel } from '../../core/fact-presentation';
 import { PolicyStudioI18n } from '../../core/i18n';
+import type { StudioViewDepth } from '../../core/studio-shell-state.service';
 
 export type DecisionRepresentationMode = 'tree' | 'table' | 'expression';
 
@@ -57,8 +60,8 @@ interface FieldOption {
         <praxis-rule-editor
           [embedded]="true"
           mode="condition"
-          [config]="config()"
-          [initialCondition]="$any(condition())"
+          [config]="configSignal()!"
+          [initialCondition]="$any(conditionSignal())"
           (conditionChanged)="conditionChanged.emit($event)"
           (stateChanged)="stateChanged.emit($event)" />
       }
@@ -106,10 +109,10 @@ interface FieldOption {
                       [value]="clause.factPath"
                       (change)="updateClauseFact(idx, $any($event.target).value)">
                       @for (field of fieldOptions(); track field.path) {
-                        <option [value]="field.path">{{ field.label }} ({{ field.path }})</option>
+                        <option [value]="field.path">{{ viewDepthSignal() === 'technical' ? field.label + ' (' + field.path + ')' : field.label }}</option>
                       }
                       @if (!hasFieldOption(clause.factPath)) {
-                        <option [value]="clause.factPath">{{ clause.factPath }}</option>
+                        <option [value]="clause.factPath">{{ labelForFact(clause.factPath) }}</option>
                       }
                     </select>
                   </div>
@@ -121,7 +124,7 @@ interface FieldOption {
                       [value]="clause.operator"
                       (change)="updateClauseOperator(idx, $any($event.target).value)">
                       @for (op of operators; track op) {
-                        <option [value]="op">{{ op }}</option>
+                        <option [value]="op">{{ operatorLabel(op) }}</option>
                       }
                     </select>
                   </div>
@@ -155,14 +158,14 @@ interface FieldOption {
       @case ('expression') {
         <section class="representation-surface" data-testid="decision-expression-representation" [attr.aria-label]="i18n.text('representationModeExpression')">
           <p class="representation-note">{{ i18n.text('decisionExpressionHint') }}</p>
-          <code class="domain-expression-block" data-testid="decision-domain-expression">{{ domainExpression() ?? '—' }}</code>
+          <pre class="domain-expression-block" data-testid="decision-domain-expression"><code>{{ domainExpression() ?? '—' }}</code></pre>
           @if (tableProjection().clauses.length) {
             <ul class="expression-clause-list">
               @for (clause of tableProjection().clauses; track $index) {
                 <li>
                   <strong>{{ labelForFact(clause.factPath) }}</strong>
-                  <code>{{ clause.operator }}</code>
-                  <span>{{ clause.rawValue }}</span>
+                  <code>{{ operatorLabel(clause.operator) }}</code>
+                  <span>{{ formatClauseDisplayValue(clause) }}</span>
                 </li>
               }
             </ul>
@@ -179,10 +182,10 @@ interface FieldOption {
     .table-combinator { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: .65rem; }
     .table-combinator label { display: grid; gap: .25rem; font-size: .78rem; font-weight: 700; }
     .clause-table { display: grid; gap: .45rem; }
-    .clause-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(5.5rem, .6fr) minmax(0, 1.2fr) auto; gap: .5rem; align-items: center; }
+    .clause-row { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(10.5rem, 0.9fr) minmax(0, 1.1fr) auto; gap: .5rem; align-items: center; }
     .clause-header { font-size: .75rem; font-weight: 750; color: var(--pax-color-on-surface-variant, #455a64); }
     select, input { width: 100%; min-width: 0; border: 1px solid var(--pax-color-outline-variant, #8c9ca4); border-radius: .45rem; padding: .45rem .55rem; background: var(--pax-color-surface, #fff); color: inherit; font: inherit; font-size: .82rem; }
-    .domain-expression-block { display: block; padding: .65rem .75rem; border-left: 3px solid var(--pax-color-primary, #005f73); background: var(--pax-color-surface-container-low, #f4f7f8); font-size: .84rem; overflow-wrap: anywhere; }
+    .domain-expression-block { display: block; margin: 0; padding: .65rem .75rem; border-left: 3px solid var(--pax-color-primary, #005f73); background: var(--pax-color-surface-container-low, #f4f7f8); font-family: var(--pax-font-mono); font-size: .82rem; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
     .expression-clause-list { margin: 0; padding-left: 1.1rem; display: grid; gap: .3rem; font-size: .8rem; }
     .expression-clause-list li { display: flex; flex-wrap: wrap; gap: .4rem; align-items: baseline; }
     .representation-note { margin: 0; font-size: .78rem; color: var(--pax-color-on-surface-variant, #455a64); }
@@ -194,42 +197,102 @@ interface FieldOption {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LocalDraftWorkspaceComponent {
-  readonly config = input.required<RuleBuilderConfig>();
-  readonly condition = input.required<unknown>();
-  readonly conditionChanged = output<unknown>();
-  readonly stateChanged = output<RuleBuilderState>();
+  readonly configSignal = signal<RuleBuilderConfig | null>(null);
+  readonly conditionSignal = signal<unknown>(null);
+  readonly viewDepthSignal = signal<StudioViewDepth>('business');
+
+  @Input({ required: true })
+  set config(value: RuleBuilderConfig | null | undefined) {
+    this.configSignal.set(value ?? null);
+  }
+
+  @Input({ required: true })
+  set condition(value: unknown) {
+    this.conditionSignal.set(value);
+  }
+
+  @Input()
+  set viewDepth(value: StudioViewDepth | undefined) {
+    this.viewDepthSignal.set(value ?? 'business');
+  }
+
+  @Output() readonly conditionChanged = new EventEmitter<unknown>();
+  @Output() readonly stateChanged = new EventEmitter<RuleBuilderState>();
   readonly i18n = inject(PolicyStudioI18n);
 
   readonly representationMode = signal<DecisionRepresentationMode>('tree');
   readonly operators: readonly DecisionComparisonOperator[] = ['<=', '<', '>=', '>', '===', '!==', '==', '!=', 'in'];
 
   readonly fieldOptions = computed<readonly FieldOption[]>(() => {
-    const schemas = (this.config() as unknown as { fieldSchemas?: Record<string, { name?: string; label?: string; type?: string }> })?.fieldSchemas ?? {};
-    return Object.entries(schemas).map(([key, schema]) => ({
-      path: schema?.name || key,
-      label: schema?.label || key,
-      valueType: schema?.type || 'string'
-    }));
+    const schemas = (this.configSignal() as unknown as { fieldSchemas?: Record<string, { name?: string; label?: string; type?: string }> } | null)?.fieldSchemas ?? {};
+    const locale = this.i18n.locale();
+    const depth = this.viewDepthSignal();
+    return Object.entries(schemas).map(([key, schema]) => {
+      const path = schema?.name || key;
+      const rawLabel = schema?.label || key;
+      return {
+        path,
+        label: formatFactDisplayLabel({ path, label: rawLabel }, locale, depth, true),
+        valueType: schema?.type || 'string'
+      };
+    });
   });
 
-  readonly factLabels = computed<Readonly<Record<string, string>>>(() =>
-    Object.fromEntries(this.fieldOptions().map(item => [item.path, item.label]))
-  );
+  readonly factLabels = computed<Readonly<Record<string, string>>>(() => {
+    const labels: Record<string, string> = {};
+    for (const item of this.fieldOptions()) {
+      labels[item.path] = item.label;
+      const normalized = item.path.replace(/:/g, '.');
+      if (normalized !== item.path) {
+        labels[normalized] = item.label;
+      }
+    }
+    return labels;
+  });
 
   readonly tableProjection = computed<DecisionTableProjection>(() =>
-    extractDecisionTableProjection(this.condition())
+    extractDecisionTableProjection(this.conditionSignal())
   );
 
-  readonly domainExpression = computed<string | null>(() =>
-    formatDecisionExpression(this.condition(), this.factLabels())
-  );
+  readonly domainExpression = computed<string | null>(() => {
+    const depth = this.viewDepthSignal();
+    const isTechnical = depth === 'technical';
+    return formatDecisionExpression(
+      this.conditionSignal(),
+      isTechnical ? undefined : this.factLabels(),
+      {
+        locale: this.i18n.locale(),
+        viewDepth: depth,
+        multiline: true,
+        humanizeUnknownPaths: !isTechnical
+      }
+    );
+  });
 
   hasFieldOption(path: string): boolean {
     return this.fieldOptions().some(item => item.path === path);
   }
 
   labelForFact(path: string): string {
-    return this.factLabels()[path] ?? path;
+    const depth = this.viewDepthSignal();
+    const direct = this.factLabels()[path] ?? this.factLabels()[path.replace(/:/g, '.')];
+    if (direct) return direct;
+    return formatFactDisplayLabel({ path, label: path }, this.i18n.locale(), depth, true);
+  }
+
+  operatorLabel(op: DecisionComparisonOperator): string {
+    return formatTableOperatorLabel(op, this.i18n.locale(), this.viewDepthSignal());
+  }
+
+  formatClauseDisplayValue(clause: DecisionTableClause): string {
+    if (this.viewDepthSignal() !== 'technical' && clause.valueKind === 'boolean') {
+      const truthy = clause.rawValue.toLowerCase() === 'true';
+      return this.i18n.locale() === 'pt-BR' ? (truthy ? 'Sim' : 'Não') : (truthy ? 'Yes' : 'No');
+    }
+    if (clause.valueKind === 'var') {
+      return this.labelForFact(clause.rawValue);
+    }
+    return clause.rawValue;
   }
 
   updateCombinator(combinatorRaw: string): void {

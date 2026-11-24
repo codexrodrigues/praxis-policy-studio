@@ -1,5 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import { FACTS_PIPELINE_COPY_EN_US, FACTS_PIPELINE_COPY_PT_BR } from './i18n/facts-pipeline.i18n';
+import { RULE_AUTHORING_COPY_EN_US, RULE_AUTHORING_COPY_PT_BR } from './i18n/rule-authoring.i18n';
 import { SHELL_COPY_EN_US, SHELL_COPY_PT_BR } from './i18n/shell.i18n';
 import { SupportedLocale } from './runtime-config';
 
@@ -366,7 +367,7 @@ const copy = {
     lastHostObservation: 'Última observação:',
     requiredHostContract: 'Contrato do host exigido',
     requiredEngineContract: 'Contrato do engine exigido',
-    requiredJsonLogicDialect: 'Dialeto JSON Logic exigido',
+    requiredJsonLogicDialect: 'Dialeto lógico exigido',
     observedExecutions: 'Avaliações observadas',
     observedHosts: 'Hosts distintos',
     firstObservation: 'Primeira observação',
@@ -856,8 +857,8 @@ const copy = {
     ruleReadableHeading: 'Como esta regra decide',
     ruleCombinatorAll: 'Todas as condições abaixo precisam ser verdadeiras (E)',
     ruleCombinatorAny: 'Basta que uma das condições abaixo seja verdadeira (OU)',
-    ruleFallbackNotice: 'Regra composta em lógica estruturada; consulte o resumo acima ou expanda a expressão técnica.',
-    ruleShowExpressionToggle: 'Ver expressão lógica (JSON Logic)',
+    ruleFallbackNotice: 'Regra composta em lógica estruturada; consulte o resumo acima ou expanda o critério lógico completo.',
+    ruleShowExpressionToggle: 'Ver critério lógico completo',
     ruleTechnicalContractToggle: 'Detalhes de nulidade e contrato do host',
     ruleEditDraftCta: 'Editar regra em rascunho',
     ruleCreateDraftCta: 'Criar rascunho para ajustar',
@@ -923,7 +924,8 @@ const copy = {
     commandActionNavOperate: 'Ir para aba 04 Operar',
     commandActionNavHistory: 'Ir para aba 05 Histórico',
     ...SHELL_COPY_PT_BR,
-    ...FACTS_PIPELINE_COPY_PT_BR
+    ...FACTS_PIPELINE_COPY_PT_BR,
+    ...RULE_AUTHORING_COPY_PT_BR
   },
   'en-US': {
     papBrowse: 'Browse host decision points',
@@ -1287,7 +1289,7 @@ const copy = {
     lastHostObservation: 'Last observation:',
     requiredHostContract: 'Required host contract',
     requiredEngineContract: 'Required engine contract',
-    requiredJsonLogicDialect: 'Required JSON Logic dialect',
+    requiredJsonLogicDialect: 'Required logic dialect',
     observedExecutions: 'Observed evaluations',
     observedHosts: 'Distinct hosts',
     firstObservation: 'First observation',
@@ -1777,8 +1779,8 @@ const copy = {
     ruleReadableHeading: 'How this rule evaluates',
     ruleCombinatorAll: 'All conditions below must match (AND)',
     ruleCombinatorAny: 'Any condition below may match (OR)',
-    ruleFallbackNotice: 'Structured rule logic; inspect the explanation above or expand the technical expression.',
-    ruleShowExpressionToggle: 'View logical expression (JSON Logic)',
+    ruleFallbackNotice: 'Structured rule logic; inspect the explanation above or expand the complete logical criteria.',
+    ruleShowExpressionToggle: 'View complete logical criteria',
     ruleTechnicalContractToggle: 'Null handling & host contract details',
     ruleEditDraftCta: 'Edit rule in draft',
     ruleCreateDraftCta: 'Start safe draft to adjust',
@@ -1844,7 +1846,8 @@ const copy = {
     commandActionNavOperate: 'Jump to 04 Operate',
     commandActionNavHistory: 'Jump to 05 History',
     ...SHELL_COPY_EN_US,
-    ...FACTS_PIPELINE_COPY_EN_US
+    ...FACTS_PIPELINE_COPY_EN_US,
+    ...RULE_AUTHORING_COPY_EN_US
   }
 } as const;
 

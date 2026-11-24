@@ -652,7 +652,11 @@ test('preserves the governed workspace while editing, adding a typed scenario, a
   await page.getByRole('button', { name: 'Editar regra', exact: true }).click();
   await expect(page.locator('.draft-workspace')).toBeVisible();
   await expect(page.locator('.decision-navigation').getByRole('button', { name: /^Regra/ })).toHaveAttribute('aria-current', 'page');
-  await page.locator('.draft-workspace').getByRole('spinbutton', { name: 'Valor' }).fill('2750');
+  const draftValueInput = page.locator('.draft-workspace').getByRole('spinbutton', { name: 'Valor' });
+  await expect(async () => {
+    await draftValueInput.fill('2750');
+    await expect(page.locator('.draft-workspace .draft-compare section.changed')).toBeVisible({ timeout: 1500 });
+  }).toPass({ timeout: 10000 });
   await page.getByRole('button', { name: 'Salvar draft governado' }).click();
   await expect(page.getByText('Draft salvo com controle de concorrência.')).toBeVisible();
   await page.getByRole('link', { name: 'Praxis Policy Studio — catálogo' }).click();
@@ -2413,6 +2417,299 @@ test('scopes evaluated facts with rich popovers and navigates 5-stage pipeline w
   const otherDisclosure = page.getByTestId('rule-other-catalog-facts');
   await expect(otherDisclosure).toBeVisible();
   await expect(otherDisclosure).not.toHaveAttribute('open', '');
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+});
+
+test('Fase C rule terminology, zero-"?" expression formatting, and focused edit mode on desktop and narrow', async ({ page }, testInfo) => {
+  const compoundCondition = {
+    and: [
+      {
+        or: [
+          { '!': [{ '==': [{ var: 'scheduleCode.requireEntryExit' }, true] }] },
+          { and: [{ '!=': [{ var: 'draft.entryTime' }, null] }, { '!=': [{ var: 'draft.exitTime' }, null] }] }
+        ]
+      },
+      {
+        '>=': [
+          {
+            '+': [
+              { '*': [{ toNumber: [{ substr: [{ var: 'draft.exitTime' }, 0, 2] }] }, 60] },
+              { toNumber: [{ substr: [{ var: 'draft.exitTime' }, 3, 2] }] }
+            ]
+          },
+          {
+            '+': [
+              { '*': [{ toNumber: [{ substr: [{ var: 'draft.entryTime' }, 0, 2] }] }, 60] },
+              { toNumber: [{ substr: [{ var: 'draft.entryTime' }, 3, 2] }] }
+            ]
+          }
+        ]
+      }
+    ]
+  };
+  const editableCondition = {
+    or: [
+      { '===': [{ coalesce: [{ var: 'draft.requestedAmount' }, null] }, null] },
+      { '<=': [{ var: 'draft.requestedAmount' }, 3000] }
+    ]
+  };
+
+  const timeDoc = {
+    title: 'Janela de entrada e saída',
+    summary: 'Quando a modalidade exige horário, saída deve ser maior ou igual à entrada.'
+  };
+  const amountDoc = {
+    title: 'Limite de valor solicitado',
+    summary: 'Garante que o valor não exceda o teto do benefício.'
+  };
+
+  const defs = [
+    {
+      id: 'def-phase-c-complex',
+      ruleKey: 'benefits.requests.time-window',
+      version: 1,
+      ruleType: 'validation',
+      status: 'DRAFT',
+      contextKey: 'benefits.requests',
+      resourceKey: 'benefits.requests',
+      serviceKey: 'benefits-service',
+      priority: 10,
+      condition: compoundCondition,
+      parameters: {
+        ruleKey: 'benefits.requests.time-window',
+        reasonCode: 'INVALID_TIME_WINDOW',
+        nullSemantics: 'FAIL_CLOSED',
+        operationKeys: ['CREATE'],
+        'praxis.domainRuleDocumentation': timeDoc
+      },
+      definition: { documentation: timeDoc },
+      documentation: timeDoc,
+      governance: { lifecycleBoundary: 'REFERENCE_DRAFT_ONLY' }
+    },
+    {
+      id: 'def-phase-c-editable',
+      ruleKey: 'benefits.requests.max-amount',
+      version: 1,
+      ruleType: 'validation',
+      status: 'DRAFT',
+      contextKey: 'benefits.requests',
+      resourceKey: 'benefits.requests',
+      serviceKey: 'benefits-service',
+      priority: 20,
+      condition: editableCondition,
+      parameters: {
+        ruleKey: 'benefits.requests.max-amount',
+        reasonCode: 'MAX_AMOUNT_EXCEEDED',
+        nullSemantics: 'FAIL_CLOSED',
+        operationKeys: ['CREATE'],
+        'praxis.domainRuleDocumentation': amountDoc
+      },
+      definition: { documentation: amountDoc },
+      documentation: amountDoc,
+      governance: { lifecycleBoundary: 'REFERENCE_DRAFT_ONLY' }
+    }
+  ];
+
+  await page.route('**/app-config.json', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      mode: 'remote',
+      configApiBaseUrl: '',
+      locale: 'pt-BR',
+      projectionPath: null,
+      initialDecisionKey: 'benefits.requests.time-window'
+    })
+  }));
+  await page.route('**/auth/session', route => route.fulfill({ status: 204 }));
+  await page.route('**/api/**', async route => {
+    const pathname = new URL(route.request().url()).pathname;
+    const json = (body: unknown, status = 200) =>
+      route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+
+    if (pathname.endsWith('/definitions/catalog')) {
+      return json({
+        schemaVersion: 'praxis-domain-rule-catalog.v1',
+        page: 0,
+        limit: 12,
+        hasMore: false,
+        candidates: defs.map(def => ({
+          definitionId: def.id,
+          ruleKey: def.ruleKey,
+          version: def.version,
+          ruleType: def.ruleType,
+          status: def.status,
+          contextKey: def.contextKey,
+          resourceKey: def.resourceKey,
+          serviceKey: def.serviceKey,
+          semanticOwner: 'benefits-owner',
+          updatedAt: '2026-11-24T05:00:00Z'
+        }))
+      });
+    }
+    if (pathname.endsWith('/definitions/capabilities')) {
+      return json({
+        tenantId: 'rio',
+        environment: 'local',
+        definitions: defs.map(def => ({
+          definitionId: def.id,
+          ruleKey: def.ruleKey,
+          version: def.version,
+          availableActions: ['VIEW']
+        }))
+      });
+    }
+    if (pathname.endsWith('/definitions')) return json(defs);
+    for (const def of defs) {
+      if (pathname.endsWith(`/definitions/${def.id}`)) return json(def);
+    }
+    if (pathname.endsWith('/def-phase-c-complex/facts')) {
+      return json({
+        definitionId: 'def-phase-c-complex',
+        ruleKey: 'benefits.requests.time-window',
+        definitionVersion: 1,
+        schemaVersion: 'praxis.domain-rule-fact-catalog.v1',
+        facts: [
+          {
+            path: 'scheduleCode.requireEntryExit',
+            valueType: 'boolean',
+            nullable: true,
+            labels: { 'pt-BR': 'Exige Horário', 'en-US': 'Requires schedule' },
+            descriptions: { 'pt-BR': 'Indica se a modalidade exige hora de entrada e saída.' },
+            providerRef: 'benefits.catalog',
+            evidenceRefs: [],
+            sensitivity: 'NON_SENSITIVE',
+            redaction: 'NONE'
+          },
+          {
+            path: 'draft.entryTime',
+            valueType: 'string',
+            nullable: true,
+            labels: { 'pt-BR': 'Hora Entrada', 'en-US': 'Entry time' },
+            descriptions: { 'pt-BR': 'Hora inicial informada.' },
+            providerRef: 'benefits.request',
+            evidenceRefs: [],
+            sensitivity: 'NON_SENSITIVE',
+            redaction: 'NONE'
+          },
+          {
+            path: 'draft.exitTime',
+            valueType: 'string',
+            nullable: true,
+            labels: { 'pt-BR': 'Hora Saída', 'en-US': 'Exit time' },
+            descriptions: { 'pt-BR': 'Hora final informada.' },
+            providerRef: 'benefits.request',
+            evidenceRefs: [],
+            sensitivity: 'NON_SENSITIVE',
+            redaction: 'NONE'
+          }
+        ]
+      });
+    }
+    if (pathname.endsWith('/def-phase-c-editable/facts')) {
+      return json({
+        definitionId: 'def-phase-c-editable',
+        ruleKey: 'benefits.requests.max-amount',
+        definitionVersion: 1,
+        schemaVersion: 'praxis.domain-rule-fact-catalog.v1',
+        facts: [
+          {
+            path: 'draft.requestedAmount',
+            valueType: 'number',
+            nullable: false,
+            labels: { 'pt-BR': 'Valor Solicitado', 'en-US': 'Requested amount' },
+            descriptions: { 'pt-BR': 'Valor informado na solicitação.' },
+            providerRef: 'benefits.request',
+            evidenceRefs: [],
+            sensitivity: 'NON_SENSITIVE',
+            redaction: 'NONE'
+          }
+        ]
+      });
+    }
+    if (pathname.endsWith('/parameters')) return json({ schemaVersion: 'praxis.domain-rule-parameters.v1', parameters: [] });
+    if (pathname.endsWith('/workspaces')) {
+      return json([
+        {
+          id: 'ws-phase-c-editable',
+          ruleKey: 'benefits.requests.max-amount',
+          baseDefinitionId: 'def-phase-c-editable',
+          status: 'OPEN',
+          revision: 1,
+          etag: 'etag-c-1',
+          condition: editableCondition,
+          parameters: defs[1]!.parameters,
+          documentation: amountDoc,
+          availableActions: ['VIEW', 'UPDATE_DRAFT']
+        }
+      ]);
+    }
+    if (pathname.endsWith('/workspaces/ws-phase-c-editable/capabilities')) {
+      return json({
+        workspaceId: 'ws-phase-c-editable',
+        ruleKey: 'benefits.requests.max-amount',
+        status: 'OPEN',
+        revision: 1,
+        etag: 'etag-c-1',
+        availableActions: ['VIEW', 'UPDATE_DRAFT'],
+        blockers: []
+      });
+    }
+    if (pathname.endsWith('/lifecycle')) return json({ workspaceId: 'ws-phase-c-editable', latestTestRun: null, testRuns: [], reviews: [] });
+    if (pathname.endsWith('/scenarios')) return json([]);
+    if (pathname.endsWith('/snapshots/head/status') || pathname.endsWith('/rollouts') || pathname.endsWith('/rollout-policies')) {
+      return json({ availableActions: [] });
+    }
+    if (pathname.endsWith('/snapshots') || pathname.endsWith('/reviews') || pathname.endsWith('/timeline')) return json([]);
+    return route.fallback();
+  });
+
+  await page.goto('/catalog?resourceKey=benefits.requests');
+  await expect(page.locator('#decision-title')).toHaveText('Janela de entrada e saída');
+
+  // Switch to 02 Regra and check Option A terminology + zero-"?" compound expression
+  await page.locator('.decision-navigation').getByRole('button', { name: /^Regra/ }).click();
+  await expect(page.locator('#decision-rule')).not.toContainText('JSON Logic');
+  const disclosure = page.getByTestId('rule-expression-disclosure');
+  await expect(disclosure.locator('summary')).toHaveText('Ver critério lógico completo');
+  await disclosure.locator('summary').click();
+  const formattedBusiness = page.getByTestId('rule-formatted-expression');
+  await expect(formattedBusiness).toBeVisible();
+  await expect(formattedBusiness).not.toContainText('?');
+  await expect(formattedBusiness).toContainText('minutos(Hora Saída) ≥ minutos(Hora Entrada)');
+
+  // Toggle Technical Mode and confirm header + raw expression without "?"
+  await page.getByTestId('view-depth-technical').click();
+  await expect(disclosure.locator('summary')).toHaveText('Expressão lógica da decisão');
+  await expect(formattedBusiness).not.toContainText('?');
+  await expect(formattedBusiness).toContainText('toNumber(substr(draft.exitTime, 0, 2)) * 60');
+  await page.getByTestId('view-depth-business').click();
+
+  // Select editable rule and enter Focused Edit Mode
+  if (testInfo.project.name === 'narrow') {
+    await page.locator('.narrow-back').click();
+  }
+  await page.locator('pax-decision-explorer-rail').getByRole('button', { name: /Limite de valor solicitado/ }).click();
+  await page.locator('.decision-navigation').getByRole('button', { name: /^Regra/ }).click();
+  await page.getByRole('button', { name: 'Editar regra', exact: true }).click();
+
+  const draftBox = await page.locator('.draft-workspace').boundingBox();
+  const ruleRefBox = await page.locator('#decision-rule').boundingBox();
+  expect(draftBox).not.toBeNull();
+  expect(ruleRefBox).not.toBeNull();
+  expect(draftBox!.y).toBeLessThan(ruleRefBox!.y);
+
+  await expect(page.getByTestId('draft-focused-badge')).toBeVisible();
+  await expect(page.getByTestId('draft-sticky-footer')).toBeVisible();
+  await expect(page.getByTestId('fact-redaction-summary')).toBeVisible();
+
+  await page.getByTestId('representation-mode-table').click();
+  await expect(page.getByTestId('decision-table-operator-0').locator('option:checked')).toHaveText('menor ou igual a (≤)');
+
+  await page.getByTestId('representation-mode-expression').click();
+  await expect(page.getByTestId('decision-domain-expression')).toContainText('Valor Solicitado ≤ 3000');
 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);

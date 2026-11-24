@@ -287,12 +287,6 @@ h1, h2, p { margin: 0; }
 .section-introduction > p:last-child { max-width: 60rem; margin-top: 0.35rem; color: var(--workspace-muted); font-size: 0.82rem; line-height: 1.45; }
 .empty-detail { display: grid; align-content: center; justify-items: start; gap: 1rem; }
 
-.draft-workspace { margin-top: 1.5rem; padding: 1.2rem; border: 1px solid var(--workspace-outline); border-radius: 0.85rem; background: var(--workspace-surface); }
-.draft-workspace > header, .draft-workspace > footer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
-.draft-workspace small { display: block; margin-top: 0.25rem; }
-.draft-workspace > header { margin-bottom: 1rem; }
-.draft-workspace > footer { margin-top: 1rem; }
-
 @media (max-width: 1360px) and (min-width: 1280px) {
   .workspace {
     --pax-explorer-width: 16rem;

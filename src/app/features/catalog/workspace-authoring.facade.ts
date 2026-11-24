@@ -11,6 +11,8 @@ import {
   editableDecisionCondition,
   formatDecisionExpression
 } from '../../core/decision-inspection';
+import { buildExpressionFactLabels } from '../../core/decision-rule-presentation';
+import { formatFactDisplayLabel } from '../../core/fact-presentation';
 import { PolicyStudioI18n } from '../../core/i18n';
 import { ProjectionCatalogService } from '../../core/projection-catalog.service';
 import {
@@ -19,8 +21,10 @@ import {
   normalizeAndCompactDocumentation,
   type RuleDocumentationDescriptor
 } from '../../core/rule-documentation';
+import { buildRuleParameterDisplayEntries } from '../../core/rule-parameters-display';
 import { RuntimeConfigService } from '../../core/runtime-config.service';
 import { semanticDecisionDiff } from '../../core/semantic-decision-diff';
+import { StudioShellStateService } from '../../core/studio-shell-state.service';
 import type {
   DecisionPublicationResult,
   DecisionSummary,
@@ -49,6 +53,7 @@ export class WorkspaceAuthoringFacade {
   private readonly catalog = inject(ProjectionCatalogService);
   private readonly runtime = inject(RuntimeConfigService);
   private readonly i18n = inject(PolicyStudioI18n);
+  private readonly shellState = inject(StudioShellStateService, { optional: true });
 
   readonly authoringOpen = signal(false);
   readonly reviews = signal<readonly DomainRuleWorkspaceReview[]>([]);
@@ -80,8 +85,18 @@ export class WorkspaceAuthoringFacade {
     + this.documentationValidationErrors().length
     + this.ontologyInspection().invalidVars.length
   );
-  readonly originalExpression = computed(() => formatDecisionExpression(this.store.selected()?.condition));
-  readonly draftExpression = computed(() => formatDecisionExpression(this.draftCondition()));
+  readonly originalExpression = computed(() =>
+    this.formatAuthoringComparison(
+      this.store.selected()?.condition,
+      this.effectiveParameters(this.store.selected())
+    )
+  );
+  readonly draftExpression = computed(() =>
+    this.formatAuthoringComparison(
+      this.draftCondition(),
+      this.draftParameters()
+    )
+  );
   readonly editorCondition = computed(() => editableDecisionCondition(this.draftCondition()));
   readonly draftParametersChanged = computed(() => {
     const decision = this.store.selected();
@@ -131,10 +146,12 @@ export class WorkspaceAuthoringFacade {
   readonly editorConfig = computed<RuleBuilderConfig | null>(() => {
     const decision = this.store.selected();
     if (!decision) return null;
+    const locale = this.i18n.locale();
+    const viewDepth = this.shellState?.viewDepth() ?? 'business';
     return {
       fieldSchemas: Object.fromEntries(decision.facts.map(fact => [fact.path, {
         name: fact.path,
-        label: fact.label,
+        label: formatFactDisplayLabel(fact, locale, viewDepth, true),
         type: fact.valueType,
         description: fact.description,
         required: !fact.nullable,
@@ -144,6 +161,28 @@ export class WorkspaceAuthoringFacade {
       validation: { realTime: true, strictness: 'strict' }
     };
   });
+
+  private formatAuthoringComparison(
+    condition: unknown,
+    parameterValues: Readonly<Record<string, unknown>>
+  ): string | null {
+    const decision = this.store.selected();
+    const locale = this.i18n.locale();
+    const viewDepth = this.shellState?.viewDepth() ?? 'business';
+    const isTechnical = viewDepth === 'technical';
+    const parameterEntries = decision
+      ? buildRuleParameterDisplayEntries(decision, parameterValues, locale, this.i18n.text('paramDefaultPrefix'))
+      : [];
+    const labels = isTechnical
+      ? undefined
+      : buildExpressionFactLabels(decision, parameterEntries, locale);
+    return formatDecisionExpression(condition, labels, {
+      locale,
+      viewDepth,
+      multiline: true,
+      humanizeUnknownPaths: !isTechnical
+    });
+  }
   readonly suggestedDiffProposals = computed<readonly SuggestedDraftDiffProposal[]>(() => {
     const decision = this.store.selected();
     const condition = this.authoringOpen()

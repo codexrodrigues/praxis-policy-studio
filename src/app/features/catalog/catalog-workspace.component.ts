@@ -1469,6 +1469,12 @@ export class CatalogWorkspaceComponent implements OnInit {
     requestAnimationFrame(() => this.host.nativeElement.querySelector<HTMLElement>('.draft-workspace')?.focus({ preventScroll: true }));
   }
 
+  scrollToRuleReference(): void {
+    const target = this.host.nativeElement.querySelector<HTMLElement>('#decision-rule');
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    target?.focus({ preventScroll: true });
+  }
+
   closeAuthoring(): void {
     this.authoring.closeAuthoring();
   }

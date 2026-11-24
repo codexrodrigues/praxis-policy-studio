@@ -1,5 +1,7 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, computed, inject, signal } from '@angular/core';
+import { formatDecisionExpression } from '../../core/decision-inspection';
 import {
+  buildExpressionFactLabels,
   buildReadableRuleSummary,
   humanizeBaselineAuthority,
   humanizeSemanticDiffKind
@@ -36,7 +38,9 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
         <p class="inspection-summary">{{ i18n.text('inspectionHint') }}</p>
       </div>
       <div class="rule-head-actions">
-        @if (canEditRuleSignal()) {
+        @if (editingActiveSignal()) {
+          <span class="reference-pill" data-testid="rule-reference-pill">{{ i18n.text('ruleReferenceSectionLabel') }}</span>
+        } @else if (canEditRuleSignal()) {
           <button
             type="button"
             class="quiet-button"
@@ -102,10 +106,10 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
             class="technical-disclosure"
             data-testid="rule-expression-disclosure"
             [attr.open]="viewDepthSignal() === 'technical' ? '' : null">
-            <summary>{{ i18n.text('ruleShowExpressionToggle') }}</summary>
+            <summary>{{ i18n.text(viewDepthSignal() === 'technical' ? 'ruleExpressionTechnicalTitle' : 'ruleShowExpressionToggle') }}</summary>
             <div class="disclosure-body">
-              @if (current.expression) {
-                <code class="expression">{{ current.expression }}</code>
+              @if (formattedExpression(); as expr) {
+                <pre class="expression studio-mono" data-testid="rule-formatted-expression"><code>{{ expr }}</code></pre>
               } @else {
                 <p class="inspection-empty">{{ i18n.text('noCondition') }}</p>
               }
@@ -308,6 +312,7 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
       gap: var(--pax-space-5);
       min-width: 0;
       max-width: 100%;
+      container-type: inline-size;
     }
 
     .rule-inspection-head {
@@ -497,14 +502,28 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
 
     .expression {
       display: block;
+      margin: 0;
       padding: var(--pax-space-3);
       border-inline-start: 3px solid var(--pax-color-primary);
       border-radius: var(--pax-radius-sm);
       background: var(--pax-color-surface);
       color: var(--pax-color-on-surface);
       font-size: var(--pax-text-xs);
-      line-height: 1.5;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      overflow-x: auto;
       overflow-wrap: anywhere;
+    }
+
+    .reference-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.2rem var(--pax-space-3);
+      border-radius: var(--pax-radius-pill);
+      background: var(--pax-color-surface-container);
+      color: var(--pax-color-on-surface-variant);
+      font-size: var(--pax-text-xs);
+      font-weight: 700;
     }
 
     .contract-facts {
@@ -843,6 +862,12 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
       color: var(--pax-color-primary);
     }
 
+    @container (max-width: 42rem) {
+      .rule-columns {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
     @media (max-width: 860px) {
       .rule-columns {
         grid-template-columns: minmax(0, 1fr);
@@ -873,6 +898,7 @@ export class DecisionRuleInspectionComponent {
   readonly documentationSignal = signal<RuleDocumentationDescriptor | null>(null);
   readonly semanticDiffSignal = signal<readonly SemanticDecisionDiff[]>([]);
   readonly canEditRuleSignal = signal(false);
+  readonly editingActiveSignal = signal(false);
   readonly canCreateDraftSignal = signal(false);
   readonly authoringBusySignal = signal(false);
   readonly nullSemanticsTextSignal = signal('');
@@ -914,6 +940,11 @@ export class DecisionRuleInspectionComponent {
   }
 
   @Input()
+  set editingActive(value: boolean | undefined) {
+    this.editingActiveSignal.set(Boolean(value));
+  }
+
+  @Input()
   set canCreateDraft(value: boolean | undefined) {
     this.canCreateDraftSignal.set(Boolean(value));
   }
@@ -948,6 +979,27 @@ export class DecisionRuleInspectionComponent {
       this.i18n.locale(),
       this.viewDepthSignal()
     );
+  });
+
+  readonly formattedExpression = computed<string | null>(() => {
+    const current = this.decisionSignal();
+    if (!current) return null;
+    const sourceCondition = current.workspaceCondition ?? current.condition;
+    if (sourceCondition === null || sourceCondition === undefined) {
+      return current.expression ?? null;
+    }
+    const locale = this.i18n.locale();
+    const viewDepth = this.viewDepthSignal();
+    const isTechnical = viewDepth === 'technical';
+    const labels = isTechnical
+      ? undefined
+      : buildExpressionFactLabels(current, this.parametersSignal(), locale);
+    return formatDecisionExpression(sourceCondition, labels, {
+      locale,
+      viewDepth,
+      multiline: true,
+      humanizeUnknownPaths: !isTechnical
+    });
   });
 
   readonly partitionedFacts = computed(() => partitionDecisionFacts(this.decisionSignal()));

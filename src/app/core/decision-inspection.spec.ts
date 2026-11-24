@@ -42,6 +42,110 @@ describe('decision inspection projection', () => {
     );
   });
 
+  it('formats complex expressions without emitting "?" across business and technical modes', () => {
+    const timeRangeCondition = {
+      and: [
+        {
+          or: [
+            { '!': [{ and: [{ '!=': [{ var: 'scheduleCode' }, null] }, { '==': [{ var: 'scheduleCode.requireEntryExit' }, true] }] }] },
+            { and: [{ '!=': [{ var: 'draft.entryTime' }, null] }, { '!=': [{ var: 'draft.exitTime' }, null] }] }
+          ]
+        },
+        {
+          or: [
+            { and: [{ '==': [{ var: 'draft.entryTime' }, null] }, { '==': [{ var: 'draft.exitTime' }, null] }] },
+            {
+              and: [
+                { '!=': [{ var: 'draft.entryTime' }, null] },
+                { '!=': [{ var: 'draft.exitTime' }, null] },
+                {
+                  '>=': [
+                    {
+                      '+': [
+                        { '*': [{ toNumber: [{ substr: [{ var: 'draft.exitTime' }, 0, 2] }] }, 60] },
+                        { toNumber: [{ substr: [{ var: 'draft.exitTime' }, 3, 2] }] }
+                      ]
+                    },
+                    {
+                      '+': [
+                        { '*': [{ toNumber: [{ substr: [{ var: 'draft.entryTime' }, 0, 2] }] }, 60] },
+                        { toNumber: [{ substr: [{ var: 'draft.entryTime' }, 3, 2] }] }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+    const labels = {
+      scheduleCode: 'Código de Horário',
+      'scheduleCode.requireEntryExit': 'Exige Hora Entrada e Saída',
+      'draft.entryTime': 'Hora Entrada',
+      'draft.exitTime': 'Hora Saída'
+    };
+
+    const businessRendered = formatDecisionExpression(timeRangeCondition, labels, {
+      locale: 'pt-BR',
+      viewDepth: 'business',
+      multiline: true,
+      humanizeUnknownPaths: true
+    });
+    expect(businessRendered).not.toBeNull();
+    expect(businessRendered).not.toContain('?');
+    expect(businessRendered).toContain('\n');
+    expect(businessRendered).toContain('minutos(Hora Saída) ≥ minutos(Hora Entrada)');
+    expect(businessRendered).toContain('Exige Hora Entrada e Saída = Sim');
+    expect(businessRendered).toContain('E (\n  (Hora Entrada = nulo E Hora Saída = nulo)\n  OU (');
+
+    const technicalRendered = formatDecisionExpression(timeRangeCondition, undefined, {
+      locale: 'pt-BR',
+      viewDepth: 'technical',
+      multiline: true,
+      humanizeUnknownPaths: false
+    });
+    expect(technicalRendered).not.toBeNull();
+    expect(technicalRendered).not.toContain('?');
+    expect(technicalRendered).toContain(
+      'toNumber(substr(draft.exitTime, 0, 2)) * 60 + toNumber(substr(draft.exitTime, 3, 2)) >= toNumber(substr(draft.entryTime, 0, 2)) * 60 + toNumber(substr(draft.entryTime, 3, 2))'
+    );
+
+    const higherOrderAndUnknown = {
+      and: [
+        {
+          '>': [
+            {
+              jsonGet: [
+                {
+                  reduce: [
+                    { filter: [{ var: 'neighborhood.requests' }, { none: [{ var: 'current.tags' }, { '==': [{ var: '' }, 'BLOCKED'] }] }] },
+                    { '+': [{ var: 'accumulator.total' }, { if: [{ startsWith: [{ var: 'current.code' }, 'WF'] }, 1, 0] }] },
+                    { total: 0, limit: { coalesce: [{ var: 'params.maxAllowed' }, 10] } }
+                  ]
+                },
+                'total'
+              ]
+            },
+            { '-': [{ abs: [{ var: 'draft.offset' }] }, { len: [{ var: 'draft.code' }] }] }
+          ]
+        },
+        { customFutureOp: [{ var: 'draft.extra' }, 42] }
+      ]
+    };
+
+    const formattedFuture = formatDecisionExpression(higherOrderAndUnknown, undefined, {
+      locale: 'en-US',
+      viewDepth: 'technical',
+      multiline: true
+    });
+    expect(formattedFuture).not.toBeNull();
+    expect(formattedFuture).not.toContain('?');
+    expect(formattedFuture).toContain('customFutureOp(draft.extra, 42)');
+    expect(formattedFuture).toContain('{ total: 0, limit: coalesce(params.maxAllowed, 10) }');
+  });
+
   it('extracts stable fact paths from the condition', () => {
     expect(collectFactPaths(condition)).toEqual([
       'grant.maximumDays',

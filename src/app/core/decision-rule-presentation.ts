@@ -50,6 +50,79 @@ const EN_US_OPERATORS: Readonly<Record<DecisionComparisonOperator, string>> = {
   'in': 'is one of'
 };
 
+const PT_BR_TABLE_OPERATORS: Readonly<Record<DecisionComparisonOperator, string>> = {
+  '<=': 'menor ou igual a (≤)',
+  '<': 'menor que (<)',
+  '>=': 'maior ou igual a (≥)',
+  '>': 'maior que (>)',
+  '===': 'exatamente igual a (=)',
+  '!==': 'estritamente diferente de (≠)',
+  '==': 'igual a (=)',
+  '!=': 'diferente de (≠)',
+  in: 'está entre'
+};
+
+const EN_US_TABLE_OPERATORS: Readonly<Record<DecisionComparisonOperator, string>> = {
+  '<=': 'less than or equal to (≤)',
+  '<': 'less than (<)',
+  '>=': 'greater than or equal to (≥)',
+  '>': 'greater than (>)',
+  '===': 'exactly equal to (=)',
+  '!==': 'strictly differs from (≠)',
+  '==': 'equals (=)',
+  '!=': 'differs from (≠)',
+  in: 'is one of'
+};
+
+/**
+ * Formats table-mode comparison operators cleanly for business vs. technical users
+ * without altering the canonical operator value bound to `<option [value]>`.
+ */
+export function formatTableOperatorLabel(
+  operator: DecisionComparisonOperator,
+  locale: SupportedLocale,
+  viewDepth: StudioViewDepth
+): string {
+  if (viewDepth === 'technical') {
+    return operator;
+  }
+  const table = locale === 'pt-BR' ? PT_BR_TABLE_OPERATORS : EN_US_TABLE_OPERATORS;
+  return table[operator] ?? operator;
+}
+
+/**
+ * Builds the localized label map (`fact.path` + bound parameter keys) used by
+ * business-mode expression formatters and editors.
+ */
+export function buildExpressionFactLabels(
+  decision: Pick<DecisionSummary, 'facts'> | null | undefined,
+  parameters: readonly RuleParameterDisplayEntry[],
+  locale: SupportedLocale
+): Readonly<Record<string, string>> {
+  const labels: Record<string, string> = {};
+  for (const fact of decision?.facts ?? []) {
+    const label = humanizeFactLabel(fact, locale, 'business');
+    labels[fact.path] = label;
+    const normalizedPath = fact.path.replace(/:/g, '.');
+    if (normalizedPath !== fact.path) {
+      labels[normalizedPath] = label;
+    }
+  }
+  for (const param of parameters) {
+    const paramText =
+      param.valueText && param.valueText !== '—'
+        ? `${param.label} (${param.valueText})`
+        : param.label;
+    labels[`params.${param.key}`] = paramText;
+    labels[`param.${param.key}`] = paramText;
+    labels[`parameters.${param.key}`] = paramText;
+    if (!(param.key in labels)) {
+      labels[param.key] = paramText;
+    }
+  }
+  return labels;
+}
+
 export function humanizeFactLabel(
   fact: Pick<DecisionFact, 'label' | 'path'>,
   locale: SupportedLocale,

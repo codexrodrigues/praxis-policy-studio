@@ -92,7 +92,7 @@ describe('DecisionRuleInspectionComponent', () => {
     }).compileComponents();
   });
 
-  it('renders business-readable clauses with collapsed JSON Logic by default and opens technical disclosure when toggled', () => {
+  it('renders business-readable clauses with collapsed criteria toggle by default and opens technical disclosure when toggled', () => {
     const decision = makeDecision();
     const params = buildRuleParameterDisplayEntries(decision, {}, 'pt-BR', 'padrão');
 
@@ -116,9 +116,11 @@ describe('DecisionRuleInspectionComponent', () => {
     expect(clauses.length).toBe(1);
     expect(clauses[0]?.textContent).toContain('Retroactive Days');
     expect(clauses[0]?.textContent).toContain('30 dias');
+    expect(el.textContent).not.toContain('JSON Logic');
 
     const disclosure = el.querySelector('[data-testid="rule-expression-disclosure"]');
     expect(disclosure?.hasAttribute('open')).toBe(false);
+    expect(disclosure?.querySelector('summary')?.textContent?.trim()).toBe('Ver critério lógico completo');
     expect(el.querySelector('[data-testid="fact-redaction-summary"]')?.textContent).toContain(
       '1/1 fatos sensíveis/restritos · 1/1 com política de redaction'
     );
@@ -133,7 +135,70 @@ describe('DecisionRuleInspectionComponent', () => {
     fixture.componentRef.setInput('viewDepth', 'technical');
     fixture.detectChanges();
     expect(disclosure?.hasAttribute('open')).toBe(true);
+    expect(disclosure?.querySelector('summary')?.textContent?.trim()).toBe('Expressão lógica da decisão');
     expect(el.textContent).toContain('draft:retroactiveDays');
+  });
+
+  it('renders compound substr/toNumber expressions without question marks and toggles reference pill while editing', () => {
+    const decision = makeDecision();
+    const complexDecision: DecisionSummary = {
+      ...decision,
+      condition: {
+        and: [
+          { '!=': [{ var: 'draft.horaEntrada' }, null] },
+          {
+            '>=': [
+              { '+': [{ '*': [{ toNumber: [{ substr: [{ var: 'draft.horaSaida' }, 0, 2] }] }, 60] }, { toNumber: [{ substr: [{ var: 'draft.horaSaida' }, 3, 2] }] }] },
+              { '+': [{ '*': [{ toNumber: [{ substr: [{ var: 'draft.horaEntrada' }, 0, 2] }] }, 60] }, { toNumber: [{ substr: [{ var: 'draft.horaEntrada' }, 3, 2] }] }] }
+            ]
+          }
+        ]
+      },
+      facts: [
+        {
+          path: 'draft.horaEntrada',
+          valueType: 'string',
+          nullable: true,
+          label: 'Hora Entrada',
+          description: 'Hora de início.',
+          providerRef: 'attendance',
+          evidenceRefs: [],
+          sensitivity: 'NON_SENSITIVE',
+          redaction: 'NONE'
+        },
+        {
+          path: 'draft.horaSaida',
+          valueType: 'string',
+          nullable: true,
+          label: 'Hora Saída',
+          description: 'Hora de término.',
+          providerRef: 'attendance',
+          evidenceRefs: [],
+          sensitivity: 'NON_SENSITIVE',
+          redaction: 'NONE'
+        }
+      ]
+    };
+
+    fixture = TestBed.createComponent(DecisionRuleInspectionComponent);
+    fixture.componentRef.setInput('decision', complexDecision);
+    fixture.componentRef.setInput('viewDepth', 'business');
+    fixture.componentRef.setInput('canEditRule', true);
+    fixture.componentRef.setInput('editingActive', true);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const formatted = el.querySelector('[data-testid="rule-formatted-expression"]')?.textContent ?? '';
+    expect(formatted).not.toContain('?');
+    expect(formatted).toContain('minutos(Hora Saída) ≥ minutos(Hora Entrada)');
+    expect(el.querySelector('[data-testid="rule-reference-pill"]')).toBeTruthy();
+    expect(el.querySelector('[data-testid="rule-edit-draft-btn"]')).toBeNull();
+
+    fixture.componentRef.setInput('viewDepth', 'technical');
+    fixture.detectChanges();
+    const techFormatted = el.querySelector('[data-testid="rule-formatted-expression"]')?.textContent ?? '';
+    expect(techFormatted).not.toContain('?');
+    expect(techFormatted).toContain('toNumber(substr(draft.horaSaida, 0, 2)) * 60');
   });
 
   it('filters rule fact cards from catalog-only facts and hides technical path details in business mode', () => {

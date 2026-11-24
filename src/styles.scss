@@ -1,5 +1,6 @@
 @use './styles/tokens';
 @use './styles/studio-shell';
+@use './styles/draft-workspace';
 
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
@@ -19,12 +20,6 @@ body { min-height: 100vh; margin: 0; background: var(--pax-color-surface-canvas)
 button, input, select, textarea { font: inherit; color: inherit; }
 ::selection { background: var(--pax-color-primary-container); color: var(--pax-color-on-primary-container); }
 
-.draft-compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--pax-space-3); margin-top: var(--pax-space-4); }
-.draft-compare section { min-width: 0; padding: var(--pax-space-4); border: 1px solid var(--pax-color-outline-variant); border-radius: var(--pax-radius-lg); background: var(--pax-color-surface-container-low); }
-.draft-compare section.changed { border-color: var(--pax-color-primary); }
-.draft-compare span { display: block; margin-bottom: var(--pax-space-2); font-weight: 600; }
-.draft-compare code { display: block; font-family: var(--pax-font-mono); font-size: var(--pax-text-sm); overflow-wrap: anywhere; white-space: normal; }
-@media (max-width: 760px) { .draft-compare { grid-template-columns: 1fr; } }
 .scenario-workspace { display: grid; gap: var(--pax-space-4); max-width: 68rem; margin-top: var(--pax-space-6); padding-top: var(--pax-space-6); border-top: 1px solid var(--pax-color-outline-variant); }
 .scenario-workspace > header, .governed-actions, .authoring-actions { display: flex; align-items: center; justify-content: space-between; gap: var(--pax-space-4); flex-wrap: wrap; }
 .scenario-facts { grid-column: 1 / -1; }

@@ -393,39 +393,38 @@
             (conceptRootSelected)="filterByOntologyRoot($event)" />
         </div>
 
-        <section class="inspection anchored-section work-mode-panel" id="decision-rule" tabindex="-1" aria-labelledby="inspection-title" [hidden]="activeMode() !== 'rule'">
-          <pax-decision-rule-inspection
-            [decision]="current"
-            [viewDepth]="viewDepth()"
-            [maturityPosture]="maturityPosture()"
-            [parameters]="evaluatedParameterEntries(current)"
-            [documentation]="effectiveDocumentation(current)"
-            [semanticDiff]="semanticDiff()"
-            [canEditRule]="canShowNextStepEdit(current)"
-            [canCreateDraft]="canShowNextStepCreateDraft(current)"
-            [authoringBusy]="authoringBusy()"
-            [nullSemanticsText]="nullSemanticsLabel(current.nullSemantics)"
-            [configStatusText]="current.configStatus ? configStatusLabel(current.configStatus) : ''"
-            (editRuleRequested)="openAuthoringAndFocus()"
-            (createDraftRequested)="createWorkspace()"
-            (openAccessPrivacyRequested)="openAccessPrivacyForCurrentDecision()" />
-        </section>
-
         @if (authoringOpen() && editorConfig(); as authoringConfig) {
           <section class="draft-workspace work-mode-panel" tabindex="-1" aria-labelledby="draft-workspace-title" [hidden]="activeMode() !== 'rule'">
             <header>
               <div>
+                <div class="draft-header-badges">
+                  <span class="draft-mode-pill" data-testid="draft-focused-badge">{{ i18n.text('draftFocusedModeBadge') }}</span>
+                  <span class="draft-dirty-pill" [class.is-dirty]="draftChanged()" data-testid="draft-dirty-badge">
+                    {{ i18n.text(draftChanged() ? 'draftDirtyBadge' : 'draftCleanBadge') }}
+                  </span>
+                  @if (totalAuthoringValidationErrors() > 0) {
+                    <span class="draft-validation-pill has-errors" data-testid="draft-header-validation-badge">
+                      {{ totalAuthoringValidationErrors() }} {{ i18n.text('validationIssues') }}
+                    </span>
+                  }
+                </div>
                 <p class="section-label">{{ i18n.text('localDraft') }}</p>
                 <h2 id="draft-workspace-title">{{ current.name }}</h2>
                 <p>{{ i18n.text('localDraftBoundary') }}</p>
               </div>
-              <button type="button" class="quiet-button" (click)="closeAuthoring()">{{ i18n.text('close') }}</button>
+              <div class="draft-header-actions">
+                <button type="button" class="quiet-button" data-testid="draft-scroll-reference" (click)="scrollToRuleReference()">
+                  {{ i18n.text('draftScrollToReference') }}
+                </button>
+                <button type="button" class="quiet-button" (click)="closeAuthoring()">{{ i18n.text('close') }}</button>
+              </div>
             </header>
             @if (draftCondition() !== null) {
               @defer (when authoringOpen()) {
                 <pax-local-draft-workspace
                   [config]="authoringConfig"
                   [condition]="editorCondition()"
+                  [viewDepth]="viewDepth()"
                   (conditionChanged)="updateDraft($event)"
                   (stateChanged)="updateEditorState($event)" />
               } @placeholder {
@@ -466,11 +465,11 @@
             <div class="draft-compare" [attr.aria-label]="i18n.text('loadedDraftConditionComparison')">
               <section>
                 <span>{{ i18n.text('loadedCondition') }}</span>
-                <code>{{ originalExpression() ?? '—' }}</code>
+                <pre><code>{{ originalExpression() ?? '—' }}</code></pre>
               </section>
               <section [class.changed]="draftChanged()">
                 <span>{{ i18n.text('localCondition') }}</span>
-                <code>{{ draftExpression() ?? '—' }}</code>
+                <pre><code>{{ draftExpression() ?? '—' }}</code></pre>
               </section>
             </div>
             @if (ontologicalWarning(); as ontologyAlert) {
@@ -486,9 +485,11 @@
                 </button>
               </div>
             }
-            <footer>
-              <div>
-                <strong>{{ totalAuthoringValidationErrors() }} {{ i18n.text('validationIssues') }}</strong>
+            <footer class="draft-sticky-footer" data-testid="draft-sticky-footer">
+              <div class="draft-footer-status">
+                <strong class="draft-validation-pill" [class.has-errors]="totalAuthoringValidationErrors() > 0">
+                  {{ totalAuthoringValidationErrors() }} {{ i18n.text('validationIssues') }}
+                </strong>
                 <small>{{ draftChanged() ? i18n.text('unsavedLocalChanges') : i18n.text('unchangedDraft') }}</small>
               </div>
               <div class="authoring-actions">
@@ -500,6 +501,25 @@
             </footer>
           </section>
         }
+
+        <section class="inspection anchored-section work-mode-panel" id="decision-rule" tabindex="-1" aria-labelledby="inspection-title" [hidden]="activeMode() !== 'rule'">
+          <pax-decision-rule-inspection
+            [decision]="current"
+            [viewDepth]="viewDepth()"
+            [maturityPosture]="maturityPosture()"
+            [parameters]="evaluatedParameterEntries(current)"
+            [documentation]="effectiveDocumentation(current)"
+            [semanticDiff]="semanticDiff()"
+            [canEditRule]="canShowNextStepEdit(current)"
+            [editingActive]="authoringOpen()"
+            [canCreateDraft]="canShowNextStepCreateDraft(current)"
+            [authoringBusy]="authoringBusy()"
+            [nullSemanticsText]="nullSemanticsLabel(current.nullSemantics)"
+            [configStatusText]="current.configStatus ? configStatusLabel(current.configStatus) : ''"
+            (editRuleRequested)="openAuthoringAndFocus()"
+            (createDraftRequested)="createWorkspace()"
+            (openAccessPrivacyRequested)="openAccessPrivacyForCurrentDecision()" />
+        </section>
 
         @if (current.workspaceId) {
           <section class="scenario-workspace anchored-section work-mode-panel" id="decision-tests" tabindex="-1" aria-labelledby="scenario-title" [hidden]="activeMode() !== 'test'">
