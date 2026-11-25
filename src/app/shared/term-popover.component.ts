@@ -324,17 +324,21 @@ let nextTermPopoverId = 0;
       display: flex;
       flex-wrap: wrap;
       gap: 0.375rem;
+      min-width: 0;
     }
 
     .pax-term-card-meta-pill {
       display: inline-flex;
       align-items: center;
+      max-width: 100%;
       padding: 0.125rem 0.5rem;
       border-radius: var(--pax-radius-pill, 999px);
       background: var(--pax-color-surface-container, #e2e8f0);
       color: var(--pax-color-on-surface-variant, #334155);
       font-size: var(--pax-text-xs, 0.75rem);
       font-weight: 600;
+      overflow-wrap: anywhere;
+      text-align: left;
     }
 
     .pax-term-card-meta-pill[data-tone='info'] {

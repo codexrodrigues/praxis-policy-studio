@@ -286,6 +286,10 @@ describe('fact-presentation', () => {
     expect(humanizeComplianceTag('COMPLIANCE', 'pt-BR')).toBe('Conformidade');
     expect(humanizeComplianceTag('INTERNAL_POLICY', 'pt-BR')).toBe('Política interna');
     expect(humanizeComplianceTag('REGULATORY', 'en-US')).toBe('Regulatory');
+    expect(humanizeComplianceTag('PUBLIC_TRANSPARENCY', 'pt-BR')).toBe('Transparência pública');
+    expect(humanizeComplianceTag('PUBLIC_TRANSPARENCY', 'en-US')).toBe('Public transparency');
+    expect(humanizeComplianceTag('PUBLIC_TRANSPARENCY_REMUNERATION', 'pt-BR')).toBe('Transparência remuneratória');
+    expect(humanizeComplianceTag('PUBLIC_TRANSPARENCY_REMUNERATION', 'en-US')).toBe('Public remuneration transparency');
     expect(humanizeComplianceTag('LGPD_ART_5_I', 'pt-BR')).toBe('LGPD_ART_5_I');
     expect(humanizeComplianceTag('LAI', 'pt-BR')).toBe('LAI');
   });

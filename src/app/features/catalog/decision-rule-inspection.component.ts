@@ -718,6 +718,8 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
       color: var(--pax-color-on-surface-variant);
       font-size: var(--pax-text-xs);
       line-height: var(--pax-lh-xs);
+      min-width: 0;
+      overflow-wrap: anywhere;
     }
 
     .fact-hint-note pax-icon {
@@ -807,6 +809,8 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
       color: var(--pax-color-on-surface-variant);
       font-size: var(--pax-text-xs);
       line-height: var(--pax-lh-xs);
+      min-width: 0;
+      overflow-wrap: anywhere;
     }
 
     .fact-meta {
@@ -816,6 +820,14 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
       color: var(--pax-color-on-surface-variant);
       font-size: var(--pax-text-xs);
       font-weight: 600;
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    .fact-meta > span {
+      min-width: 0;
+      max-width: 100%;
+      overflow-wrap: anywhere;
     }
 
     .fact-tech-meta {

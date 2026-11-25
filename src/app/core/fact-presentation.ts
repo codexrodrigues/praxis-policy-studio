@@ -729,6 +729,10 @@ export function humanizeComplianceTag(
       return dict.complianceTagStatutory;
     case 'CONTRACTUAL':
       return dict.complianceTagContractual;
+    case 'PUBLIC_TRANSPARENCY':
+      return dict.complianceTagPublicTransparency;
+    case 'PUBLIC_TRANSPARENCY_REMUNERATION':
+      return dict.complianceTagPublicTransparencyRemuneration;
     default:
       return trimmed;
   }

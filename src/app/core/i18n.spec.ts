@@ -31,4 +31,9 @@ describe('PolicyStudioI18n', () => {
     i18n.locale.set('en-US');
     expect(i18n.format('explorerAllScopes', { count: 12 })).toContain('12');
   });
+
+  it('avoids raw EXACT/TARGET jargon in releaseNoApproved empty-state messages', () => {
+    expect(POLICY_STUDIO_COPY['pt-BR'].releaseNoApproved).not.toContain('EXACT/TARGET');
+    expect(POLICY_STUDIO_COPY['en-US'].releaseNoApproved).not.toContain('EXACT/TARGET');
+  });
 });
