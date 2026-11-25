@@ -10,8 +10,12 @@ import {
   signal
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import {
+  PraxisRelationshipGraphComponent,
+  type PraxisRelationshipGraphNodeEvent
+} from '@praxisui/list';
 import type { DomainRuleTestRun } from '@praxisui/core';
-import { humanizeDecisionTitle } from '../../core/humanize-labels';
+import { humanizeDecisionTitle, stripLeadingDecisionCode } from '../../core/humanize-labels';
 import { PolicyStudioI18n } from '../../core/i18n';
 import type { StudioViewDepth } from '../../core/studio-shell-state.service';
 import { StudioIconComponent, type StudioIconName } from '../../shared/studio-icon.component';
@@ -26,6 +30,7 @@ import type {
   PolicySandboxScenarioResult,
   SlotOverridePolicyId
 } from './catalog.fixture';
+import { buildDecisionPlanGraph, type DagGraphLens } from './decision-plan-graph.builder';
 
 export interface DagStageLane {
   readonly id: DecisionStageId;
@@ -119,7 +124,7 @@ const CANONICAL_STAGES: readonly {
 @Component({
   selector: 'pax-rule-decision-plan-dag',
   standalone: true,
-  imports: [NgTemplateOutlet, StudioIconComponent],
+  imports: [NgTemplateOutlet, StudioIconComponent, PraxisRelationshipGraphComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @let viewMode = effectiveViewMode();
@@ -179,12 +184,97 @@ const CANONICAL_STAGES: readonly {
       </header>
 
       <div
+        class="dag-graph-frame"
+        [class.is-impact]="graphLens() === 'impact'"
+        data-testid="dag-relationship-graph-frame">
+        <div class="dag-graph-bar">
+          <div
+            class="dag-view-toggle"
+            role="group"
+            [attr.aria-label]="i18n.text('dagGraphModeLabel')">
+            <button
+              type="button"
+              class="dag-mode-btn"
+              data-testid="dag-graph-mode-flow"
+              [class.active]="graphLens() === 'flow'"
+              [attr.aria-pressed]="graphLens() === 'flow'"
+              (click)="setGraphLens('flow')">
+              {{ i18n.text('dagGraphModeFlow') }}
+            </button>
+            <button
+              type="button"
+              class="dag-mode-btn"
+              data-testid="dag-graph-mode-impact"
+              [class.active]="graphLens() === 'impact'"
+              [attr.aria-pressed]="graphLens() === 'impact'"
+              (click)="setGraphLens('impact')">
+              {{ i18n.text('dagGraphModeImpact') }}
+            </button>
+          </div>
+
+          <div class="dag-graph-bar-tools">
+            <div class="dag-graph-legend" aria-hidden="true">
+              <span class="dag-legend-pill is-fixed">{{ i18n.text('overrideForbiddenShort') }}</span>
+              <span class="dag-legend-pill is-param">{{ i18n.text('overrideParameterizableShort') }}</span>
+              <span class="dag-legend-pill is-custom">{{ i18n.text('overrideEditableShort') }}</span>
+              <span class="dag-legend-pill is-block">{{ isPtBr() ? 'Bloqueio obrigatório' : 'Mandatory block' }}</span>
+            </div>
+
+            <div
+              class="dag-graph-zoom"
+              role="group"
+              data-testid="dag-graph-zoom-controls"
+              [attr.aria-label]="i18n.text('dagGraphZoomGroupLabel')">
+              <button
+                type="button"
+                class="dag-zoom-btn"
+                data-testid="dag-graph-zoom-out"
+                [attr.aria-label]="i18n.text('dagGraphZoomOut')"
+                [attr.title]="i18n.text('dagGraphZoomOut')"
+                (click)="planGraph.zoomOut()">
+                −
+              </button>
+              <button
+                type="button"
+                class="dag-zoom-btn is-fit"
+                data-testid="dag-graph-zoom-fit"
+                [attr.aria-label]="i18n.text('dagGraphZoomFit')"
+                [attr.title]="i18n.text('dagGraphZoomFit')"
+                (click)="planGraph.fitToView()">
+                {{ isPtBr() ? 'Ajustar' : 'Fit' }}
+              </button>
+              <button
+                type="button"
+                class="dag-zoom-btn"
+                data-testid="dag-graph-zoom-in"
+                [attr.aria-label]="i18n.text('dagGraphZoomIn')"
+                [attr.title]="i18n.text('dagGraphZoomIn')"
+                (click)="planGraph.zoomIn()">
+                +
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <praxis-relationship-graph
+          #planGraph
+          data-testid="dag-relationship-graph"
+          [graphId]="'decision-plan-' + (selectedDecision()?.key ?? 'default')"
+          configPersistenceStrategy="volatile"
+          [config]="graphModel().config"
+          [dataset]="graphModel().dataset"
+          [pathHighlight]="graphModel().pathHighlight"
+          (nodeSelect)="onGraphNodeSelected($event)" />
+      </div>
+
+      <div
         class="dag-stepper"
         role="tablist"
         [attr.aria-label]="i18n.text('dagViewModeLabel')">
         @for (lane of lanes(); track lane.id; let idx = $index) {
           @let isFocused = focusedStageId() === lane.id;
           @let hasCurrentRule = currentStageId === lane.id;
+          @let breakdown = stageAutonomyBreakdown(lane);
           <button
             type="button"
             role="tab"
@@ -200,7 +290,8 @@ const CANONICAL_STAGES: readonly {
             (keydown)="onStepKeydown($event, idx)">
             <div class="step-top">
               <span class="step-index studio-mono">
-                {{ viewDepthSignal() === 'technical' ? lane.codeLabel : '0' + lane.index }}
+                <pax-icon [name]="stageIcon(lane.id)" [size]="12" />
+                <span>{{ viewDepthSignal() === 'technical' ? lane.codeLabel : '0' + lane.index }}</span>
               </span>
               <span class="step-indicators">
                 @if (hasCurrentRule) {
@@ -211,7 +302,23 @@ const CANONICAL_STAGES: readonly {
                 <span class="lane-count">{{ lane.decisions.length }}</span>
               </span>
             </div>
-            <strong class="step-title">{{ stageTitle(lane) }}</strong>
+            <strong class="step-title">
+              <span class="step-title-full">{{ stageTitle(lane) }}</span>
+              <span class="step-title-short" aria-hidden="true">{{ stageShortTitle(lane) }}</span>
+            </strong>
+            @if (breakdown; as bars) {
+              <span class="step-autonomy-bar" aria-hidden="true">
+                @if (bars.fixedPct > 0) {
+                  <span class="bar-segment is-fixed" [style.width.%]="bars.fixedPct"></span>
+                }
+                @if (bars.paramPct > 0) {
+                  <span class="bar-segment is-param" [style.width.%]="bars.paramPct"></span>
+                }
+                @if (bars.customPct > 0) {
+                  <span class="bar-segment is-custom" [style.width.%]="bars.customPct"></span>
+                }
+              </span>
+            }
           </button>
         }
       </div>
@@ -605,10 +712,8 @@ const CANONICAL_STAGES: readonly {
       min-width: 0;
     }
 
-    @container (max-width: 720px) {
-      .dag-stepper {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
+    .step-title-short {
+      display: none;
     }
 
     .dag-step {
@@ -656,9 +761,37 @@ const CANONICAL_STAGES: readonly {
 
     .step-index,
     .lane-code {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
       font-size: 0.6875rem;
       color: var(--pax-color-on-surface-variant, inherit);
       font-weight: 700;
+    }
+
+    .step-autonomy-bar {
+      display: flex;
+      width: 100%;
+      height: 3px;
+      border-radius: var(--pax-radius-pill, 999px);
+      overflow: hidden;
+      background: var(--pax-color-surface-container, rgba(128, 128, 128, 0.14));
+    }
+
+    .step-autonomy-bar .bar-segment {
+      height: 100%;
+    }
+
+    .step-autonomy-bar .bar-segment.is-fixed {
+      background: var(--pax-color-outline, #64748b);
+    }
+
+    .step-autonomy-bar .bar-segment.is-param {
+      background: var(--pax-color-primary, #076487);
+    }
+
+    .step-autonomy-bar .bar-segment.is-custom {
+      background: var(--pax-color-success, #187457);
     }
 
     .step-indicators {
@@ -699,7 +832,55 @@ const CANONICAL_STAGES: readonly {
       color: var(--pax-color-on-surface, inherit);
     }
 
-    .focused-stage-panel,
+    @container (max-width: 740px) {
+      .dag-stepper {
+        gap: 0.35rem;
+      }
+
+      .dag-step {
+        padding: 0.45rem 0.5rem;
+        gap: 0.25rem;
+      }
+
+      .step-top {
+        flex-wrap: wrap;
+        gap: 0.2rem;
+      }
+
+      .step-here-pill {
+        font-size: 0.625rem;
+        padding: 0.0625rem 0.3rem;
+      }
+
+      .step-title-full {
+        display: none;
+      }
+
+      .step-title-short {
+        display: inline;
+      }
+    }
+
+    @container (max-width: 500px) {
+      .dag-stepper {
+        grid-template-columns: repeat(5, minmax(6.75rem, 1fr));
+        overflow-x: auto;
+        padding-bottom: 0.25rem;
+        scrollbar-width: thin;
+      }
+    }
+
+    .focused-stage-panel {
+      border: 0;
+      border-top: 1px solid var(--pax-color-outline-variant, rgba(128, 128, 128, 0.22));
+      border-radius: 0;
+      padding: var(--pax-space-3, 0.75rem) 0 0;
+      background: transparent;
+      display: grid;
+      gap: var(--pax-space-3, 0.75rem);
+      min-width: 0;
+    }
+
     .stacked-stage-band {
       border: 1px solid var(--pax-color-outline-variant, rgba(128, 128, 128, 0.22));
       border-radius: var(--pax-radius-md, 0.5rem);
@@ -1078,6 +1259,7 @@ export class RuleDecisionPlanDagComponent {
   readonly activeConceptRoot = signal<string | null>(null);
   readonly focusedStageId = signal<DecisionStageId>('DOMAIN_DECISION');
   readonly userViewMode = signal<'focused' | 'all' | null>(null);
+  readonly graphLens = signal<DagGraphLens>('flow');
   readonly expandedStages = signal<ReadonlySet<DecisionStageId>>(new Set());
 
   @Input({ required: true })
@@ -1193,6 +1375,10 @@ export class RuleDecisionPlanDagComponent {
     return this.isPtBr() ? lane.titlePtBr : lane.titleEnUs;
   }
 
+  stageShortTitle(lane: Pick<DagStageLane, 'shortTitlePtBr' | 'shortTitleEnUs'>): string {
+    return this.isPtBr() ? lane.shortTitlePtBr : lane.shortTitleEnUs;
+  }
+
   setUserViewMode(mode: 'focused' | 'all'): void {
     this.userViewMode.set(mode);
   }
@@ -1261,7 +1447,10 @@ export class RuleDecisionPlanDagComponent {
       item.workspaceDocumentation?.title ??
       item.documentation?.title ??
       item.definitionDocumentation?.title;
-    return humanizeDecisionTitle(item.name, item.code, docTitle, this.viewDepthSignal());
+    const title = humanizeDecisionTitle(item.name, item.code, docTitle, this.viewDepthSignal(), this.i18n.locale());
+    return this.viewDepthSignal() === 'technical'
+      ? stripLeadingDecisionCode(title, item.code)
+      : title;
   }
 
   readonly ontologyRoots = computed(() => {
@@ -1283,6 +1472,137 @@ export class RuleDecisionPlanDagComponent {
   readonly conceptNeighborGroups = computed<readonly ConceptRootNeighborGroup[]>(() =>
     buildConceptRootNeighborhood(this.selectedDecision(), this.allDecisions())
   );
+
+  readonly graphModel = computed(() =>
+    buildDecisionPlanGraph({
+      selectedDecision: this.selectedDecision(),
+      lanes: this.lanes(),
+      viewDepth: this.viewDepthSignal(),
+      locale: this.i18n.locale(),
+      graphLens: this.graphLens(),
+      traceOverview: this.traceOverview(),
+      nodeTrace: item => this.nodeTrace(item),
+      resolveOverridePolicy: item => this.resolveOverridePolicy(item),
+      overridePolicyLabel: policy => this.overridePolicyLabel(policy),
+      displayNodeTitle: item => this.displayNodeTitle(item),
+      conceptNeighborGroups: this.conceptNeighborGroups()
+    })
+  );
+
+  setGraphLens(lens: DagGraphLens): void {
+    this.graphLens.set(lens);
+  }
+
+  onGraphNodeSelected(event: PraxisRelationshipGraphNodeEvent): void {
+    const rawContainer = event.raw as Record<string, unknown> | undefined;
+    const nestedRaw =
+      rawContainer && typeof rawContainer['raw'] === 'object' && rawContainer['raw'] !== null
+        ? (rawContainer['raw'] as Record<string, unknown>)
+        : undefined;
+    const attrs = event.node?.attributes as Record<string, unknown> | undefined;
+    const meta = (attrs ?? nestedRaw ?? rawContainer ?? event.node?.raw) as
+      | { decisionKey?: unknown; jumpStageId?: unknown; conceptRoot?: unknown }
+      | undefined;
+
+    const nodeId = event.node?.id ?? (typeof rawContainer?.['id'] === 'string' ? rawContainer['id'] : '');
+
+    const decisionKey =
+      typeof meta?.decisionKey === 'string'
+        ? meta.decisionKey
+        : nodeId.startsWith('rule:')
+          ? nodeId.slice('rule:'.length)
+          : null;
+    if (decisionKey) {
+      const match =
+        this.ruleSetDecisions().find(item => item.key === decisionKey)
+        ?? this.allDecisions().find(item => item.key === decisionKey);
+      if (match) {
+        if (match.key !== this.selectedDecision()?.key) {
+          this.decisionSelected.emit(match);
+        } else {
+          this.jumpToCurrentRuleStage();
+        }
+        return;
+      }
+    }
+
+    const validStages: readonly DecisionStageId[] = [
+      'PROTECTED_GUARD',
+      'DOMAIN_DECISION',
+      'POST_DECISION',
+      'TRANSFORMATION_INTENT',
+      'EFFECT_INTENT'
+    ];
+    let jumpStageId: DecisionStageId | null =
+      typeof meta?.jumpStageId === 'string' && validStages.includes(meta.jumpStageId as DecisionStageId)
+        ? (meta.jumpStageId as DecisionStageId)
+        : null;
+    if (!jumpStageId && nodeId.startsWith('bucket:')) {
+      const candidateStage = nodeId.split(':')[1] as DecisionStageId | undefined;
+      if (candidateStage && validStages.includes(candidateStage)) {
+        jumpStageId = candidateStage;
+      }
+    }
+    if (!jumpStageId && nodeId === 'node:blocked') {
+      jumpStageId = 'PROTECTED_GUARD';
+    }
+    if (jumpStageId) {
+      this.selectStageStep(jumpStageId);
+      return;
+    }
+
+    const conceptRoot =
+      typeof meta?.conceptRoot === 'string'
+        ? meta.conceptRoot
+        : nodeId.startsWith('concept:')
+          ? nodeId.slice('concept:'.length)
+          : null;
+    if (conceptRoot) {
+      this.selectConceptRoot(conceptRoot);
+    }
+  }
+
+  stageIcon(stageId: DecisionStageId): StudioIconName {
+    switch (stageId) {
+      case 'PROTECTED_GUARD':
+        return 'shield-check';
+      case 'DOMAIN_DECISION':
+        return 'sliders';
+      case 'POST_DECISION':
+        return 'layers';
+      case 'TRANSFORMATION_INTENT':
+        return 'sparkles';
+      case 'EFFECT_INTENT':
+        return 'activity';
+    }
+  }
+
+  stageAutonomyBreakdown(
+    lane: DagStageLane
+  ): { readonly fixedPct: number; readonly paramPct: number; readonly customPct: number } | null {
+    const total = lane.decisions.length;
+    if (total === 0) {
+      return null;
+    }
+    let fixed = 0;
+    let param = 0;
+    let custom = 0;
+    for (const item of lane.decisions) {
+      const policy = this.resolveOverridePolicy(item);
+      if (policy === 'FORBIDDEN' || policy === 'LOCKED') {
+        fixed += 1;
+      } else if (policy === 'PARAMETERIZABLE') {
+        param += 1;
+      } else {
+        custom += 1;
+      }
+    }
+    return {
+      fixedPct: (fixed / total) * 100,
+      paramPct: (param / total) * 100,
+      customPct: (custom / total) * 100
+    };
+  }
 
   readonly visibleNeighborGroups = computed<readonly ConceptRootNeighborGroup[]>(() => {
     const active = this.activeConceptRoot();

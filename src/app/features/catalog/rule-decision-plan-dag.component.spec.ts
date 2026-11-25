@@ -276,4 +276,88 @@ describe('RuleDecisionPlanDagComponent', () => {
     expect(host.querySelector('[data-testid="dag-all-stages-panel"]')).toBeTruthy();
     expect(host.querySelector('[data-testid="dag-focused-stage-panel"]')).toBeNull();
   });
+
+  it('mounts canonical praxis-relationship-graph, toggles flow/impact lenses, and routes nodeSelect events', () => {
+    const fixture = TestBed.createComponent(RuleDecisionPlanDagComponent);
+    const guardRule = createDecision({
+      key: 'workforce.guard.rule_0',
+      code: 'WF-000',
+      name: 'Pré-requisito obrigatório',
+      decisionStage: 'PROTECTED_GUARD',
+      slotOverridePolicy: 'FORBIDDEN',
+      authoringSupported: false
+    });
+    const domainRule = createDecision({
+      key: 'workforce.domain.rule_1',
+      code: 'WF-001',
+      name: 'Regra de negócio selecionável',
+      decisionStage: 'DOMAIN_DECISION',
+      slotOverridePolicy: 'PARAMETERIZABLE'
+    });
+
+    fixture.componentInstance.selected = guardRule;
+    fixture.componentInstance.decisions = [guardRule, domainRule];
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const graphHost = host.querySelector('[data-testid="dag-relationship-graph"]');
+    expect(graphHost).toBeTruthy();
+    expect(graphHost?.querySelector('svg')).toBeTruthy();
+
+    const flowBtn = host.querySelector<HTMLButtonElement>('[data-testid="dag-graph-mode-flow"]')!;
+    const impactBtn = host.querySelector<HTMLButtonElement>('[data-testid="dag-graph-mode-impact"]')!;
+    expect(flowBtn.getAttribute('aria-pressed')).toBe('true');
+    expect(impactBtn.getAttribute('aria-pressed')).toBe('false');
+
+    impactBtn.click();
+    fixture.detectChanges();
+    expect(impactBtn.getAttribute('aria-pressed')).toBe('true');
+    expect(fixture.componentInstance.graphModel().config.layout?.algorithm).toBe('ego-radial');
+
+    flowBtn.click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.graphModel().config.layout?.algorithm).toBe('layered-dag');
+
+    const selectedSpy = vi.fn();
+    fixture.componentInstance.decisionSelected.subscribe(selectedSpy);
+    fixture.componentInstance.onGraphNodeSelected({
+      node: { id: `rule:${domainRule.key}`, type: 'rule', label: domainRule.name },
+      raw: { decisionKey: domainRule.key }
+    });
+    expect(selectedSpy).toHaveBeenCalledWith(domainRule);
+
+    fixture.componentInstance.onGraphNodeSelected({
+      node: { id: 'bucket:DOMAIN_DECISION:parameterizable', type: 'bucket', label: '1 parametrizável' },
+      raw: { jumpStageId: 'DOMAIN_DECISION' }
+    });
+    expect(fixture.componentInstance.focusedStageId()).toBe('DOMAIN_DECISION');
+
+    // End-to-end real <praxis-relationship-graph> click with normalized raw envelope on dense stage buckets
+    const denseDomainRules = Array.from({ length: 5 }, (_, idx) =>
+      createDecision({
+        key: `workforce.domain.rule_${idx + 1}`,
+        code: `WF-10${idx + 1}`,
+        name: `Regra densa ${idx + 1}`,
+        decisionStage: 'DOMAIN_DECISION',
+        slotOverridePolicy: 'PARAMETERIZABLE'
+      })
+    );
+    fixture.componentInstance.selected = guardRule;
+    fixture.componentInstance.decisions = [guardRule, ...denseDomainRules];
+    fixture.detectChanges();
+    host.querySelector<HTMLButtonElement>('[data-testid="dag-stage-PROTECTED_GUARD"]')!.click();
+    fixture.detectChanges();
+
+    expect(host.querySelector('[data-testid="dag-graph-zoom-controls"]')).toBeTruthy();
+    expect(host.querySelector('[data-testid="dag-stage-PROTECTED_GUARD"]')?.classList.contains('focused')).toBe(true);
+
+    const bucketBtn = host.querySelector<HTMLButtonElement>('[data-node-id="bucket:DOMAIN_DECISION:parameterizable"]');
+    expect(bucketBtn).toBeTruthy();
+    bucketBtn!.click();
+    fixture.detectChanges();
+
+    const domainStageBtn = host.querySelector<HTMLButtonElement>('[data-testid="dag-stage-DOMAIN_DECISION"]');
+    expect(domainStageBtn?.classList.contains('focused')).toBe(true);
+    expect(domainStageBtn?.getAttribute('aria-selected')).toBe('true');
+  });
 });

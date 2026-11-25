@@ -78,7 +78,15 @@ export const FACTS_PIPELINE_COPY_PT_BR = {
   dagStagePurposePost: 'Checagens cruzadas entre registros ou consistência posterior.',
   dagStagePurposeTransform: 'Ajustes automáticos ou derivações de valores na operação.',
   dagStagePurposeEffect: 'Consequências, auditorias ou registros gerados ao final.',
-  dagEmptyStageDetailed: 'Nenhuma regra cadastrada em {stage} para esta operação.'
+  dagEmptyStageDetailed: 'Nenhuma regra cadastrada em {stage} para esta operação.',
+  dagGraphModeFlow: 'Fluxo visual',
+  dagGraphModeImpact: 'Mapa de impacto',
+  dagGraphModeLabel: 'Visualização gráfica do plano',
+  dagGraphAriaLabel: 'Diagrama interativo da sequência de avaliação',
+  dagGraphZoomOut: 'Reduzir zoom',
+  dagGraphZoomFit: 'Ajustar ao quadro',
+  dagGraphZoomIn: 'Ampliar zoom',
+  dagGraphZoomGroupLabel: 'Controles de zoom do diagrama'
 } as const;
 
 export const FACTS_PIPELINE_COPY_EN_US: Record<keyof typeof FACTS_PIPELINE_COPY_PT_BR, string> = {
@@ -161,5 +169,13 @@ export const FACTS_PIPELINE_COPY_EN_US: Record<keyof typeof FACTS_PIPELINE_COPY_
   dagStagePurposePost: 'Cross-record checks and post-evaluation consistency.',
   dagStagePurposeTransform: 'Automatic adjustments or derived values during the operation.',
   dagStagePurposeEffect: 'Consequences, audit trails, or side-effect intents emitted at the end.',
-  dagEmptyStageDetailed: 'No rules registered under {stage} for this operation.'
+  dagEmptyStageDetailed: 'No rules registered under {stage} for this operation.',
+  dagGraphModeFlow: 'Visual flow',
+  dagGraphModeImpact: 'Impact map',
+  dagGraphModeLabel: 'Graphical plan view',
+  dagGraphAriaLabel: 'Interactive evaluation sequence diagram',
+  dagGraphZoomOut: 'Zoom out',
+  dagGraphZoomFit: 'Fit to view',
+  dagGraphZoomIn: 'Zoom in',
+  dagGraphZoomGroupLabel: 'Diagram zoom controls'
 };
