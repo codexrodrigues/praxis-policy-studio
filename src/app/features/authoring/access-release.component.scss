@@ -67,6 +67,7 @@ input,
 select {
   display: block;
   width: 100%;
+  max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
   margin-top: var(--pax-space-1);
@@ -76,6 +77,12 @@ select {
   background: var(--pax-color-surface);
   color: var(--pax-color-on-surface);
   font: inherit;
+}
+
+select {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 input:focus-visible,

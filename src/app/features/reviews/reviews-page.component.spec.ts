@@ -280,9 +280,22 @@ describe('ReviewsPageComponent', () => {
       expect.objectContaining({ mode: 'remote' }),
       { page: 0, limit: 50 }
     );
-    const listText = el.querySelector('[data-testid="reviews-authz-list"]')?.textContent ?? '';
+    const listEl = el.querySelector('[data-testid="reviews-authz-list"]') as HTMLElement;
+    const listText = listEl.textContent ?? '';
     expect(listText).toContain('Política em rascunho');
     expect(listText).toContain('Política aprovada');
     expect(listText).not.toContain('Política ativa');
+    expect(listText).toContain('Rascunho');
+    expect(listText).toContain('Aprovado');
+    expect(listText).not.toContain('workforce.docs');
+    expect(listText).toContain('Workforce · Docs');
+
+    const approvedBadge = el.querySelector('[data-testid="reviews-authz-item-access.docs.approved"] .studio-badge');
+    expect(approvedBadge?.getAttribute('data-tone')).toBe('success');
+    expect(approvedBadge?.textContent?.trim()).toBe('Aprovado');
+
+    TestBed.inject(StudioShellStateService).setViewDepth('technical');
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="reviews-authz-list"]')?.textContent).toContain('workforce.docs');
   });
 });

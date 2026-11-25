@@ -13,6 +13,7 @@ import {
 import { type PolicyStudioRuntimeConfig } from '../../core/runtime-config';
 import { AUTHORIZATION_RULE_TYPE, accessPreview, readPreparedAccessDraft } from '../../core/prepared-access-draft';
 import type { StudioViewDepth } from '../../core/studio-shell-state.service';
+import { humanizeTimelineEventStatus } from '../../core/workstation-presentation';
 import { CatalogSelectionStore } from '../catalog/catalog-selection.store';
 import { AccessReleaseComponent } from './access-release.component';
 import { PapCatalogComponent } from './pap-catalog.component';
@@ -154,6 +155,10 @@ export class AccessDraftReviewComponent {
     return this.i18n.format('accessShowingCount', { loaded, total });
   }
 
+  statusLabel(status: string | null | undefined): string {
+    return humanizeTimelineEventStatus(status, this.i18n.locale());
+  }
+
   review(): void {
     this.error.set(null);
     try {
@@ -238,6 +243,7 @@ export class AccessDraftReviewComponent {
           }
           accessPreview(definition.definition);
           this.stored.set(definition);
+          this.syncExistingPolicyStatus(definition);
         } catch {
           this.error.set('accessReadMismatch');
         }
@@ -270,12 +276,41 @@ export class AccessDraftReviewComponent {
       next: approved => {
         this.busy.set(false);
         this.stored.set(approved);
+        this.syncExistingPolicyStatus(approved);
       },
       error: failure => {
         this.busy.set(false);
         this.error.set(this.errorFor(failure, 'accessApproveFailed'));
       }
     });
+  }
+
+  private syncExistingPolicyStatus(definition: DomainRuleDefinition): void {
+    const currentList = this.existingPolicies();
+    if (!currentList?.length) return;
+    const targetId = definition.id;
+    if (!currentList.some(item => item.definitionId === targetId)) return;
+    const statusFilter = this.existingStatusFilter().trim().toLowerCase();
+    const updatedStatus = definition.status ?? 'draft';
+    const nextList = currentList
+      .map(item => (
+        item.definitionId === targetId
+          ? {
+              ...item,
+              status: updatedStatus,
+              version: definition.version ?? item.version,
+              updatedAt: definition.updatedAt ?? item.updatedAt
+            }
+          : item
+      ))
+      .filter(item => !statusFilter || (item.status ?? '').toLowerCase() === statusFilter);
+    this.existingPolicies.set(nextList);
+    if (statusFilter && nextList.length < currentList.length) {
+      const currentTotal = this.existingTotalElements();
+      if (typeof currentTotal === 'number' && currentTotal > 0) {
+        this.existingTotalElements.set(currentTotal - (currentList.length - nextList.length));
+      }
+    }
   }
 
   private isId(id: unknown): id is string {

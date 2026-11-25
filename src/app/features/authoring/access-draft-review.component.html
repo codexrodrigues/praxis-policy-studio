@@ -50,7 +50,7 @@
                 [attr.data-testid]="'access-existing-item-' + item.ruleKey"
                 (click)="selectExistingPolicy(item)">
                 <span class="access-existing-title">{{ item.displayName || item.ruleKey }}</span>
-                <span class="access-existing-meta">v{{ item.version }} · {{ item.status }} · <code>{{ item.definitionId }}</code></span>
+                <span class="access-existing-meta">v{{ item.version }} · {{ statusLabel(item.status) }} · <code>{{ item.definitionId }}</code></span>
               </button>
             </li>
           }
@@ -80,7 +80,7 @@
   @if (stored(); as result) {
     <section class="access-subcard">
       <p class="access-feedback access-feedback--ok" role="status"><strong>{{ i18n.text('accessReadConfirmed') }}</strong></p>
-      <p class="access-meta-line">{{ result.ruleKey }} · v{{ result.version }} · {{ result.status }}<br><code>{{ result.id }}</code></p>
+      <p class="access-meta-line">{{ result.ruleKey }} · v{{ result.version }} · {{ statusLabel(result.status) }}<br><code>{{ result.id }}</code></p>
       @if (result.tenantId || result.environment || result.createdBy) {
         <p class="access-meta-line">{{ [result.tenantId, result.environment, result.createdBy].filter(present).join(' · ') }}</p>
       }

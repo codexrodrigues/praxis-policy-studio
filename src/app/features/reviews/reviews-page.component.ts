@@ -10,6 +10,7 @@ import {
   type ExtendedCatalogCandidate,
   ProjectionCatalogService
 } from '../../core/projection-catalog.service';
+import { humanizeTimelineEventStatus } from '../../core/workstation-presentation';
 import { RuntimeConfigService } from '../../core/runtime-config.service';
 import { StudioCatalogBootstrapService } from '../../core/studio-catalog-bootstrap.service';
 import { StudioShellStateService } from '../../core/studio-shell-state.service';
@@ -198,15 +199,17 @@ type ReviewBucketFilter = 'ALL' | Exclude<WorkflowBucketId, 'STABLE'>;
                       </span>
                       <div class="row-copy">
                         <div class="row-meta">
-                          <span class="row-scope">{{ policy.resourceKey || policy.contextKey || 'AUTHORIZATION' }}</span>
+                          <span class="row-scope">{{ displayAuthzScope(policy) }}</span>
                           @if (shell.viewDepth() === 'technical') {
                             <code class="row-code studio-mono">{{ policy.ruleKey }}</code>
                           }
                         </div>
-                        <strong>{{ policy.displayName || policy.ruleKey }}</strong>
+                        <strong>{{ displayAuthzTitle(policy) }}</strong>
                       </div>
                       <div class="row-status">
-                        <span class="studio-badge" data-tone="info">{{ policy.status }}</span>
+                        <span class="studio-badge" [attr.data-tone]="authzStatusTone(policy.status)">
+                          {{ authzStatusLabel(policy.status) }}
+                        </span>
                         <small class="studio-mono">v{{ policy.version }}</small>
                       </div>
                       <a class="quiet-button row-open-btn" routerLink="/access" queryParamsHandling="preserve">
@@ -653,6 +656,41 @@ export class ReviewsPageComponent implements OnInit {
       return raw;
     }
     return humanizeTechnicalSlug(raw, 2, this.i18n.locale()) || raw;
+  }
+
+  displayAuthzScope(policy: ExtendedCatalogCandidate): string {
+    const raw = policy.domainLabel?.trim() || policy.resourceKey?.trim() || policy.contextKey?.trim() || '';
+    if (!raw) {
+      return this.shell.viewDepth() === 'technical' ? 'AUTHORIZATION' : this.i18n.text('navItemAccess');
+    }
+    if (this.shell.viewDepth() === 'technical' || !looksLikeTechnicalSlug(raw)) {
+      return raw;
+    }
+    return humanizeTechnicalSlug(raw, 2, this.i18n.locale()) || raw;
+  }
+
+  displayAuthzTitle(policy: ExtendedCatalogCandidate): string {
+    const label = policy.displayName?.trim();
+    if (label) return label;
+    if (this.shell.viewDepth() === 'technical' || !looksLikeTechnicalSlug(policy.ruleKey)) {
+      return policy.ruleKey;
+    }
+    return humanizeTechnicalSlug(policy.ruleKey, undefined, this.i18n.locale()) || policy.ruleKey;
+  }
+
+  authzStatusLabel(status: string | null | undefined): string {
+    return humanizeTimelineEventStatus(status, this.i18n.locale());
+  }
+
+  authzStatusTone(status: string | null | undefined): 'info' | 'success' | 'warning' {
+    switch (status?.trim().toLowerCase()) {
+      case 'approved':
+        return 'success';
+      case 'proposed':
+        return 'warning';
+      default:
+        return 'info';
+    }
   }
 
   bucketTone(decision: DecisionSummary): 'warning' | 'info' | 'success' | 'danger' {
