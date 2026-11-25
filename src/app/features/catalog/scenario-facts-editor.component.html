@@ -1,22 +1,51 @@
 <fieldset class="scenario-fact-editor">
   <legend>{{ i18n.text('scenarioFacts') }}</legend>
   @let groups = partitionedFacts();
+  @if (showSearchInput()) {
+    <label class="scenario-facts-search">
+      <span>{{ i18n.text('factListSearchLabel') }}</span>
+      <input
+        type="search"
+        data-testid="scenario-facts-search"
+        [value]="filterQuery()"
+        [attr.placeholder]="i18n.text('factListSearchPlaceholder')"
+        (input)="filterQuery.set($any($event.target).value)">
+    </label>
+  }
   @if (groups.other.length > 0) {
     <p class="scenario-facts-subheading">{{ i18n.text('scenarioRuleFactsHeading') }}</p>
   }
-  <div class="scenario-fact-grid">
-    @for (fact of groups.primary; track fact.path) {
-      <ng-container *ngTemplateOutlet="factFieldTpl; context: { $implicit: fact }" />
+  @for (group of primaryGroups(); track group.key) {
+    @if (group.showHeading) {
+      <p class="scenario-fact-group-heading">{{ group.label }}</p>
     }
-  </div>
+    <div class="scenario-fact-grid">
+      @for (fact of group.facts; track fact.path) {
+        <ng-container *ngTemplateOutlet="factFieldTpl; context: { $implicit: fact, inOther: false }" />
+      }
+    </div>
+  } @empty {
+    @if (filterQuery().trim()) {
+      <p class="scenario-facts-empty">{{ i18n.text('factListSearchEmpty') }}</p>
+    }
+  }
   @if (groups.other.length > 0) {
     <details class="scenario-other-facts" data-testid="scenario-other-facts">
       <summary>{{ i18n.format('scenarioOtherFactsToggle', { count: groups.other.length }) }}</summary>
-      <div class="scenario-fact-grid">
-        @for (fact of groups.other; track fact.path) {
-          <ng-container *ngTemplateOutlet="factFieldTpl; context: { $implicit: fact }" />
+      @for (group of otherGroups(); track group.key) {
+        @if (group.showHeading) {
+          <p class="scenario-fact-group-heading">{{ group.label }}</p>
         }
-      </div>
+        <div class="scenario-fact-grid">
+          @for (fact of group.facts; track fact.path) {
+            <ng-container *ngTemplateOutlet="factFieldTpl; context: { $implicit: fact, inOther: true }" />
+          }
+        </div>
+      } @empty {
+        @if (filterQuery().trim()) {
+          <p class="scenario-facts-empty">{{ i18n.text('factListSearchEmpty') }}</p>
+        }
+      }
     </details>
   }
   @if (preview()) {
@@ -27,38 +56,72 @@
   }
 </fieldset>
 
-<ng-template #factFieldTpl let-fact>
+<ng-template #factFieldTpl let-fact let-inOther="inOther">
   @let desc = factDescription(fact);
+  @let unitLabel = localizedUnit(fact);
+  @let warnings = constraintWarnings(fact);
+  @let privacy = privacyNotice(fact);
+  @let describedById = hasFactHelpBlock(fact) ? factDescriptionId(fact) : null;
   <div class="scenario-fact-field">
-    <label [attr.title]="fact.path">
-      <span>{{ factLabel(fact) }}</span>
-      @switch (fact.valueType) {
-        @case ('boolean') {
-          <select [disabled]="isNull(fact.path)" [value]="displayValue(fact.path)"
-            (change)="valueChanged.emit({ fact, value: $any($event.target).value === 'true' })">
-            <option value="false">{{ i18n.text('booleanFalse') }}</option>
-            <option value="true">{{ i18n.text('booleanTrue') }}</option>
-          </select>
+    <label [attr.title]="viewDepth() === 'technical' ? fact.path : null">
+      <span class="scenario-fact-label-row">
+        <span>{{ factLabel(fact) }}</span>
+        @if (unitLabel) {
+          <span class="scenario-fact-unit">{{ unitLabel }}</span>
         }
-        @case ('number') {
-          <input type="number" inputmode="decimal" [required]="!fact.nullable"
-            [disabled]="isNull(fact.path)" [value]="displayValue(fact.path)"
-            (input)="valueChanged.emit({ fact, value: $any($event.target).value })">
-        }
-        @case ('date') {
-          <input type="date" [required]="!fact.nullable" [disabled]="isNull(fact.path)"
-            [value]="displayValue(fact.path)"
-            (input)="valueChanged.emit({ fact, value: $any($event.target).value })">
-        }
-        @default {
-          <input type="text" [required]="!fact.nullable" [disabled]="isNull(fact.path)"
-            [value]="displayValue(fact.path)"
-            (input)="valueChanged.emit({ fact, value: $any($event.target).value })">
+      </span>
+      @if (hasScalarAllowedValues(fact)) {
+        <select [required]="!inOther && !fact.nullable" [disabled]="isNull(fact.path)"
+          [attr.aria-describedby]="describedById"
+          [value]="displayValue(fact.path)"
+          (change)="emitAllowedValueChange(fact, $any($event.target).value)">
+          <option value="">{{ i18n.text('scenarioSelectPlaceholder') }}</option>
+          @for (opt of fact.allowedValues ?? []; track opt.value) {
+            <option [value]="opt.value" [attr.title]="opt.description ?? null">{{ opt.label }}</option>
+          }
+          @if (displayValue(fact.path) && !hasMatchingAllowedOption(fact)) {
+            <option [value]="displayValue(fact.path)">{{ displayValue(fact.path) }}</option>
+          }
+        </select>
+      } @else {
+        @switch (fact.valueType) {
+          @case ('boolean') {
+            <select [required]="!inOther && !fact.nullable" [disabled]="isNull(fact.path)"
+              [attr.aria-describedby]="describedById"
+              [value]="displayValue(fact.path)"
+              (change)="emitBooleanChange(fact, $any($event.target).value)">
+              <option value="">{{ i18n.text('scenarioSelectPlaceholder') }}</option>
+              <option value="false">{{ i18n.text('booleanFalse') }}</option>
+              <option value="true">{{ i18n.text('booleanTrue') }}</option>
+            </select>
+          }
+          @case ('number') {
+            <input type="number" inputmode="decimal" [required]="!inOther && !fact.nullable"
+              [disabled]="isNull(fact.path)" [value]="displayValue(fact.path)"
+              [attr.aria-describedby]="describedById"
+              [attr.placeholder]="examplePlaceholder(fact)"
+              [attr.step]="fact.constraints?.step ?? 'any'"
+              (input)="valueChanged.emit({ fact, value: $any($event.target).value })">
+          }
+          @case ('date') {
+            <input type="date" [required]="!inOther && !fact.nullable" [disabled]="isNull(fact.path)"
+              [attr.aria-describedby]="describedById"
+              [value]="displayValue(fact.path)"
+              [attr.placeholder]="examplePlaceholder(fact)"
+              (input)="valueChanged.emit({ fact, value: $any($event.target).value })">
+          }
+          @default {
+            <input type="text" [required]="!inOther && !fact.nullable" [disabled]="isNull(fact.path)"
+              [attr.aria-describedby]="describedById"
+              [value]="displayValue(fact.path)"
+              [attr.placeholder]="examplePlaceholder(fact)"
+              (input)="valueChanged.emit({ fact, value: $any($event.target).value })">
+          }
         }
       }
     </label>
-    @if ((viewDepth() === 'technical' || (!desc.isTemplatePlaceholder && desc.description)) || desc.hint || viewDepth() === 'technical') {
-      <small>
+    @if (hasFactHelpBlock(fact)) {
+      <small [id]="factDescriptionId(fact)">
         @if (viewDepth() === 'technical' && fact.description) {
           <span>{{ fact.description }}</span>
         } @else if (!desc.isTemplatePlaceholder && desc.description) {
@@ -66,6 +129,15 @@
         }
         @if (desc.hint) {
           <span class="scenario-fact-hint">{{ desc.hint }}</span>
+        }
+        @if (hasDynamicLookupHint(fact)) {
+          <span class="scenario-fact-lookup">{{ i18n.text('scenarioDynamicLookupHint') }}@if (viewDepth() === 'technical' && fact.optionSourceRef?.sourceKey) { (<code>{{ fact.optionSourceRef?.sourceKey }}</code>)}</span>
+        }
+        @if (privacy; as privacyNote) {
+          <span class="scenario-fact-privacy" [attr.data-tone]="privacyNote.tone">{{ privacyNote.message }}</span>
+        }
+        @for (warning of warnings; track warning) {
+          <span class="scenario-fact-advisory" role="status" data-testid="scenario-fact-advisory">{{ warning }}</span>
         }
         @if (viewDepth() === 'technical') {
           <code class="scenario-fact-path">{{ fact.path }}</code>
@@ -75,6 +147,7 @@
     @if (fact.nullable) {
       <label class="scenario-fact-null">
         <input type="checkbox" [checked]="isNull(fact.path)"
+          [attr.aria-label]="i18n.format('scenarioUseNullForFact', { fact: factLabel(fact) })"
           (change)="nullChanged.emit({ fact, useNull: $any($event.target).checked })">
         <span>{{ i18n.text('scenarioFactNull') }}</span>
       </label>

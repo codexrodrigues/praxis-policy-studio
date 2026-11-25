@@ -1,7 +1,8 @@
 import '@angular/compiler';
+import { ɵresolveComponentResources as resolveComponentResources, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { BrowserTestingModule, platformBrowserTesting } from '@angular/platform-browser/testing';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PolicyStudioI18n } from '../../core/i18n';
 import { buildSuggestedScenarioTemplates } from './catalog-presentation';
 import type { DecisionSummary } from './catalog.fixture';
@@ -10,10 +11,35 @@ import { ScenarioCreateFormComponent } from './scenario-create-form.component';
 TestBed.initTestEnvironment(BrowserTestingModule, platformBrowserTesting());
 
 describe('ScenarioCreateFormComponent', () => {
+  beforeAll(async () => {
+    const fsModule = (
+      globalThis as unknown as {
+        process?: {
+          getBuiltinModule?: (id: string) => {
+            readFileSync: (file: URL, encoding: string) => string;
+          };
+        };
+      }
+    ).process?.getBuiltinModule?.('node:fs');
+
+    await resolveComponentResources(async url => {
+      if (url.endsWith('.scss')) {
+        return '';
+      }
+      return fsModule?.readFileSync(new URL(url, import.meta.url), 'utf8') ?? '';
+    });
+  });
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [ScenarioCreateFormComponent],
+      providers: [PolicyStudioI18n]
+    }).compileComponents();
+  });
+
   afterEach(() => TestBed.resetTestingModule());
 
   it('projects canonical outcomes as human labels', () => {
-    TestBed.configureTestingModule({ providers: [PolicyStudioI18n] });
     const component = TestBed.runInInjectionContext(() => new ScenarioCreateFormComponent());
     expect(component.outcome('ALLOW')).toBe('Permitida');
     expect(component.outcome('TECHNICAL_ERROR')).toBe('Erro técnico');
@@ -104,7 +130,6 @@ describe('ScenarioCreateFormComponent', () => {
       }
     });
 
-    TestBed.configureTestingModule({ providers: [PolicyStudioI18n] });
     const component = TestBed.runInInjectionContext(() => new ScenarioCreateFormComponent());
     const emitted = vi.fn();
     component.suggestionApplied.subscribe(emitted);
@@ -120,5 +145,73 @@ describe('ScenarioCreateFormComponent', () => {
     expect(decisionSelect.value).toBe('DENY');
     expect(reasonsTextarea.value).toBe('GRANT-10');
     expect(emitted).toHaveBeenCalledWith(suggestions[1]);
+  });
+
+  it('never leaks condition literals or examples into scenario suggestions when facts are SECRET or OMIT', () => {
+    const restrictedDecision: DecisionSummary = {
+      order: 1,
+      totalDecisions: 1,
+      key: 'security.token.validation',
+      code: 'SEC-01',
+      name: 'Valida token restrito',
+      domain: 'security',
+      ruleSet: 'Security',
+      ruleSetKey: 'security.rules',
+      state: 'verified',
+      meaning: 'Valida credencial.',
+      resourceKey: 'sec-res',
+      serviceKey: 'sec-svc',
+      authority: 'CONFIG',
+      baselineAuthority: 'SYNTHETIC_BASELINE',
+      source: 'quickstart',
+      evidenceCount: 1,
+      authoringSupported: true,
+      availableDefinitionActions: [],
+      expression: 'actor.secret == "TOP_SECRET_LITERAL"',
+      condition: { '===': [{ var: 'actor.secret' }, 'TOP_SECRET_LITERAL'] },
+      factPaths: ['actor.secret'],
+      facts: [
+        {
+          path: 'actor.secret',
+          label: 'Segredo',
+          valueType: 'string',
+          nullable: false,
+          description: 'Token restrito',
+          providerRef: 'sec',
+          evidenceRefs: [],
+          sensitivity: 'SECRET',
+          redaction: 'OMIT',
+          example: 'REAL_SECRET_EXAMPLE'
+        }
+      ],
+      nullSemantics: 'FAIL_CLOSED',
+      operationKeys: ['CREATE'],
+      hostContractVersion: 'v1',
+      evidence: [],
+      draftLifecycle: null,
+      parameters: {}
+    };
+
+    const suggestions = buildSuggestedScenarioTemplates(restrictedDecision);
+    expect(suggestions[0]?.factValues['actor.secret']).toBe('SYNTHETIC_VALID');
+    expect(suggestions[1]?.factValues['actor.secret']).toBe('SYNTHETIC_INVALID');
+  });
+
+  it('renders unified studio-control inputs/selects and primary-action submit button', () => {
+    const fixture = TestBed.createComponent(ScenarioCreateFormComponent);
+    const setSig = <T>(name: string, val: T): void => {
+      Object.defineProperty(fixture.componentInstance, name, { configurable: true, value: signal(val) });
+    };
+    setSig('facts', []);
+    setSig('factValues', {});
+    setSig('factsJson', '{}');
+    setSig('fallbackJson', '{}');
+    setSig('canManage', true);
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const submitButton = root.querySelector('.scenario-form-actions button[type="submit"].primary-action');
+    expect(submitButton?.textContent?.trim()).toBe('Adicionar cenário');
+    expect(root.querySelectorAll('.scenario-form .studio-control').length).toBeGreaterThanOrEqual(7);
   });
 });

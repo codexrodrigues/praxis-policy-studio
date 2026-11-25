@@ -382,7 +382,15 @@ export class ScenarioSandboxFacade {
       request.expectedEffectIntents, request.form, onWorkspaceUpdated);
   }
 
-  setScenarioFactValue(fact: DecisionFact, rawValue: string | boolean): void {
+  setScenarioFactValue(fact: DecisionFact, rawValue: string | boolean | undefined): void {
+    if (rawValue === undefined) {
+      this.scenarioFactDraft.update(current => {
+        const next = { ...current };
+        delete next[fact.path];
+        return next;
+      });
+      return;
+    }
     const value = parseScenarioFactValue(fact, rawValue);
     this.scenarioFactDraft.update(current => ({ ...current, [fact.path]: value }));
   }
@@ -432,9 +440,17 @@ export class ScenarioSandboxFacade {
 
   markScenarioEditDirty(): void { this.editingScenarioDirty.set(true); }
 
-  setEditingScenarioFactValue(fact: DecisionFact, rawValue: string | boolean): void {
-    const value = parseScenarioFactValue(fact, rawValue);
-    this.editingScenarioFactDraft.update(current => ({ ...current, [fact.path]: value }));
+  setEditingScenarioFactValue(fact: DecisionFact, rawValue: string | boolean | undefined): void {
+    if (rawValue === undefined) {
+      this.editingScenarioFactDraft.update(current => {
+        const next = { ...current };
+        delete next[fact.path];
+        return next;
+      });
+    } else {
+      const value = parseScenarioFactValue(fact, rawValue);
+      this.editingScenarioFactDraft.update(current => ({ ...current, [fact.path]: value }));
+    }
     this.editingScenarioDirty.set(true);
   }
 

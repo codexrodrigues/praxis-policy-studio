@@ -672,7 +672,7 @@ test('preserves the governed workspace while editing, adding a typed scenario, a
   await expect(page.getByText('Limite permitido', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: 'Comparar com a versão ativa' }).click();
-  await expect(page.getByText('Sandbox concluído e evidência imutável registrada.')).toBeVisible();
+  await expect(page.getByText('Simulação concluída e evidência registrada.')).toBeVisible();
   await expect(page.locator('.sandbox-results').getByText('limit-boundary', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   const violations = await new AxeBuilder({ page }).analyze();
@@ -3097,6 +3097,167 @@ test('stretches explorer virtual scroll to fill tall viewport, aligns rail borde
     expect(mobileHeader.centerOrder).toBe('0');
   }
 
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+});
+
+test('surfaces canonical rich fact metadata across 01 Entender, 02 Regra, and 03 Testar', async ({ page }, testInfo) => {
+  const consoleErrors: string[] = [];
+  const pageErrors: string[] = [];
+  page.on('console', msg => {
+    if (msg.type() === 'error') consoleErrors.push(msg.text());
+  });
+  page.on('pageerror', err => pageErrors.push(String(err)));
+
+  await mockGovernedBackend(page, true);
+  await page.route('**/app-config.json', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      mode: 'remote',
+      configApiBaseUrl: '',
+      locale: 'pt-BR',
+      projectionPath: null,
+      initialDecisionKey: definition.ruleKey
+    })
+  }));
+  const richCondition = {
+    and: [
+      { '===': [{ var: 'worker.status' }, 'ACTIVE'] },
+      { '<=': [{ var: 'request.requestedAmount' }, 3000] }
+    ]
+  };
+  await page.route(`**/definitions/${definition.id}`, async route => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...definition,
+        condition: richCondition,
+        definition: {
+          labels: { 'pt-BR': 'Validação de valor e situação' },
+          descriptions: { 'pt-BR': 'Valida situação funcional ativa e valor dentro do teto.' }
+        }
+      })
+    });
+  });
+  await page.route('**/workspaces', async route => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{ ...workspace, condition: richCondition }])
+    });
+  });
+  await page.route(`**/definitions/${definition.id}/facts`, async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        definitionId: definition.id,
+        ruleKey: definition.ruleKey,
+        definitionVersion: definition.version,
+        schemaVersion: 'praxis.domain-rule-fact-catalog.v1',
+        facts: [
+          {
+            path: 'worker.status',
+            valueType: 'string',
+            nullable: false,
+            labels: { 'pt-BR': 'Situação funcional' },
+            descriptions: { 'pt-BR': 'Situação cadastral ativa do colaborador.' },
+            hints: { 'pt-BR': 'Exige vínculo ativo na data de análise.' },
+            groupKey: 'valores-orcamento',
+            groupLabels: { 'pt-BR': 'Valores e orçamento' },
+            allowedValues: [
+              { value: 'ACTIVE', labels: { 'pt-BR': 'Ativo' }, tone: 'success' },
+              { value: 'ON_LEAVE', labels: { 'pt-BR': 'Afastado' }, tone: 'warning' }
+            ],
+            providerRef: 'quickstart.worker',
+            evidenceRefs: ['quickstart://worker/status'],
+            sensitivity: 'PERSONAL',
+            redaction: 'MASK'
+          },
+          {
+            path: 'request.requestedAmount',
+            valueType: 'number',
+            nullable: false,
+            labels: { 'pt-BR': 'Valor solicitado' },
+            descriptions: { 'pt-BR': 'Valor monetário informado na solicitação.' },
+            hints: { 'pt-BR': 'Informar valor líquido sem acréscimos.' },
+            groupKey: 'valores-orcamento',
+            groupLabels: { 'pt-BR': 'Valores e orçamento' },
+            valuePresentation: 'currency',
+            unit: 'BRL',
+            example: '1500.00',
+            constraints: { min: 100, max: 50000, step: 0.01 },
+            providerRef: 'quickstart.extraordinary-benefit-request',
+            evidenceRefs: ['quickstart://extraordinary-benefit/requested-amount'],
+            sensitivity: 'SENSITIVE',
+            redaction: 'MASK'
+          },
+          {
+            path: 'actor.secretToken',
+            valueType: 'string',
+            nullable: true,
+            labels: { 'pt-BR': 'Token restrito' },
+            descriptions: { 'pt-BR': 'Credencial protegida.' },
+            governance: { aiVisibility: 'deny' },
+            providerRef: 'quickstart.auth',
+            evidenceRefs: ['quickstart://auth/token'],
+            sensitivity: 'SECRET',
+            redaction: 'OMIT'
+          }
+        ]
+      })
+    });
+  });
+
+  await page.goto('/catalog');
+  if (testInfo.project.name === 'narrow') {
+    await page.getByRole('button', { name: /Validação de valor e situação/ }).click();
+  }
+
+  // 01 Entender: canonical groupLabels, hints, presentation, constraints and allowedValues preview
+  const evaluatedStrip = page.getByTestId('evaluated-facts-strip');
+  await expect(evaluatedStrip).toBeVisible();
+  await expect(page.getByTestId('fact-group-valores-orcamento')).toContainText('Valores e orçamento');
+  await page.getByTestId('fact-group-valores-orcamento').getByRole('button', { name: /Valor solicitado/ }).click();
+  const popoverDialog = page.getByRole('dialog', { name: 'Valor solicitado' });
+  await expect(popoverDialog).toContainText('Informar valor líquido sem acréscimos.');
+  await expect(popoverDialog).toContainText('Monetário');
+  await expect(popoverDialog).toContainText('Faixa: 100 a 50000');
+
+  // 02 Regra: allowedValues <select> in table mode and currency/label formatting in expression mode
+  await page.getByRole('button', { name: 'Editar regra', exact: true }).click();
+  await page.getByTestId('representation-mode-table').click();
+  const statusSelect = page.locator('select[data-testid="decision-table-value-0"]');
+  await expect(statusSelect).toBeVisible();
+  await expect(statusSelect.locator('option')).toHaveText(['Ativo', 'Afastado']);
+  await page.getByTestId('representation-mode-expression').click();
+  const exprSection = page.getByTestId('decision-expression-representation');
+  await expect(exprSection).toContainText('Ativo');
+  await expect(exprSection).toContainText('3.000,00');
+
+  // 03 Testar: unit badge, example placeholder, non-blocking min/max advisories, and explicit-placeholder allowedValues select
+  await page.getByRole('button', { name: 'Testar regra', exact: true }).click();
+  const factsEditor = page.locator('pax-scenario-facts-editor').first();
+  await expect(factsEditor.locator('.scenario-fact-unit')).toHaveText('BRL');
+  const amountInput = factsEditor.locator('input[type="number"]');
+  await expect(amountInput).not.toHaveAttribute('min', /.+/);
+  await expect(amountInput).not.toHaveAttribute('max', /.+/);
+  await expect(amountInput).toHaveAttribute('step', '0.01');
+  await expect(amountInput).toHaveAttribute('placeholder', /1500\.00/);
+  await amountInput.fill('50');
+  await expect(factsEditor.getByTestId('scenario-fact-advisory')).toContainText('100');
+  const scenarioStatusSelect = factsEditor.locator('select');
+  await expect(scenarioStatusSelect).toHaveValue('');
+  await expect(scenarioStatusSelect.locator('option')).toHaveText(['Selecione uma opção…', 'Ativo', 'Afastado']);
+  await page.getByTestId('apply-scenario-suggestion-ALLOW').click();
+  await expect(scenarioStatusSelect).toHaveValue('ACTIVE');
+
+  expect(consoleErrors).toEqual([]);
+  expect(pageErrors).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 });

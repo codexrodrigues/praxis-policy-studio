@@ -657,6 +657,12 @@ export class CatalogWorkspaceComponent implements OnInit {
     return { beforeDraft, betweenDraftAndFourEyes, afterFourEyes };
   }
 
+  nextStepLockedMessage(decision: DecisionSummary): string {
+    return this.i18n.text(
+      decision.workspaceId ? 'nextStepLockedBody' : 'nextStepLockedInspectOnlyBody'
+    );
+  }
+
   evaluatedParameterEntries(decision: DecisionSummary): readonly RuleParameterDisplayEntry[] {
     return buildRuleParameterDisplayEntries(
       decision,
@@ -1646,7 +1652,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.testing.scaffoldScenarioOntology();
   }
 
-  setScenarioFactValue(fact: DecisionFact, rawValue: string | boolean): void {
+  setScenarioFactValue(fact: DecisionFact, rawValue: string | boolean | undefined): void {
     this.testing.setScenarioFactValue(fact, rawValue);
   }
 
@@ -1666,7 +1672,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.testing.markScenarioEditDirty();
   }
 
-  setEditingScenarioFactValue(fact: DecisionFact, rawValue: string | boolean): void {
+  setEditingScenarioFactValue(fact: DecisionFact, rawValue: string | boolean | undefined): void {
     this.testing.setEditingScenarioFactValue(fact, rawValue);
   }
 

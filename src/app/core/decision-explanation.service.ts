@@ -1,12 +1,13 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Inject, Injectable } from '@angular/core';
+import { Inject, Injectable, Optional } from '@angular/core';
 import {
   AgenticAuthoringTurnClientService,
   type AgenticAuthoringTurnClientEvent,
   type AgenticAuthoringTurnStreamRequest,
   type AiJsonObject
 } from '@praxisui/ai';
-import { Observable, catchError, filter, map, of, takeWhile } from 'rxjs';
+import { Observable, catchError, filter, map, of, switchMap, takeWhile } from 'rxjs';
+import { AuthSessionService } from './auth-session.service';
 import type { PolicyStudioRuntimeConfig, SupportedLocale } from './runtime-config';
 import { createClientRequestId } from './client-request-id';
 
@@ -18,6 +19,21 @@ export interface DecisionExplanationRequest {
   readonly config: PolicyStudioRuntimeConfig;
 }
 
+export interface DecisionExplanationSafeFact {
+  readonly path: string;
+  readonly label: string;
+  readonly valueType: string;
+  readonly nullable: boolean;
+  readonly sensitivity: string;
+  readonly redaction: string;
+  readonly description?: string;
+  readonly hint?: string;
+  readonly unit?: string;
+  readonly valuePresentation?: string;
+  readonly mask?: string;
+  readonly example?: string;
+}
+
 export interface DecisionExplanationEvidence {
   readonly schemaVersion: string;
   readonly definitionHash: string;
@@ -26,6 +42,8 @@ export interface DecisionExplanationEvidence {
   readonly exposureMode: string;
   readonly redactionMode: string;
   readonly sourceRefCount: number;
+  readonly facts?: readonly DecisionExplanationSafeFact[];
+  readonly omittedFields?: readonly string[];
 }
 
 export type DecisionExplanationProgressPhase =
@@ -57,7 +75,9 @@ export class DecisionExplanationService {
 
   constructor(
     @Inject(AgenticAuthoringTurnClientService)
-    private readonly turns: AgenticAuthoringTurnClientService
+    private readonly turns: AgenticAuthoringTurnClientService,
+    @Optional() @Inject(AuthSessionService)
+    private readonly authSession?: AuthSessionService
   ) {}
 
   explain(request: DecisionExplanationRequest): Observable<DecisionExplanationEvent> {
@@ -79,11 +99,12 @@ export class DecisionExplanationService {
     };
     const baseUrl = `${(request.config.configApiBaseUrl ?? '').replace(/\/$/, '')}/api/praxis/config/ai/authoring`;
 
-    return this.turns.streamEvents(turnRequest, {
-      baseUrl,
-      resultTimeoutMs: 75_000,
-      streamTimeoutMs: 90_000
-    }).pipe(
+    return (this.authSession ? this.authSession.ensureCsrf(request.config) : of(undefined)).pipe(
+      switchMap(() => this.turns.streamEvents(turnRequest, {
+        baseUrl,
+        resultTimeoutMs: 75_000,
+        streamTimeoutMs: 90_000
+      })),
       map(event => this.mapEvent(event, request)),
       filter((event): event is DecisionExplanationEvent => event !== null),
       takeWhile(event => event.kind === 'progress', true),
@@ -136,6 +157,8 @@ export class DecisionExplanationService {
     const conditionEvidence = this.object(domainDecision['conditionEvidence']);
     const redaction = this.object(domainDecision['redaction']);
     const sourceRefs = Array.isArray(domainDecision['sourceRefs']) ? domainDecision['sourceRefs'] : [];
+    const facts = this.parseSafeFacts(domainDecision['facts']);
+    const omittedFields = this.parseOmittedFields(redaction?.['omittedFields']);
     if (!message) return { kind: 'failed', reason: 'failed' };
 
     return {
@@ -149,9 +172,62 @@ export class DecisionExplanationService {
         resolvedVersion: request.version,
         exposureMode: this.text(conditionEvidence?.['exposureMode']),
         redactionMode: this.text(redaction?.['mode']),
-        sourceRefCount: sourceRefs.length
+        sourceRefCount: sourceRefs.length,
+        facts,
+        omittedFields
       }
     };
+  }
+
+  private parseSafeFacts(rawFacts: unknown): readonly DecisionExplanationSafeFact[] {
+    if (!Array.isArray(rawFacts)) return [];
+    const parsed: DecisionExplanationSafeFact[] = [];
+    for (const candidate of rawFacts) {
+      const rec = this.object(candidate);
+      if (!rec) continue;
+      const path = this.text(rec['path']);
+      if (!path) continue;
+      const label = this.text(rec['label']) || path;
+      const valueType = this.text(rec['valueType']) || 'string';
+      const nullable = typeof rec['nullable'] === 'boolean' ? rec['nullable'] : true;
+      const sensitivity = this.text(rec['sensitivity']) || 'NON_SENSITIVE';
+      const redaction = this.text(rec['redaction']) || 'NONE';
+      const description = this.text(rec['description']);
+      const hint = this.text(rec['hint']);
+      const unit = this.text(rec['unit']);
+      const valuePresentation = this.text(rec['valuePresentation']);
+      const mask = this.text(rec['mask']);
+      const example = this.text(rec['example']);
+      parsed.push({
+        path,
+        label,
+        valueType,
+        nullable,
+        sensitivity,
+        redaction,
+        ...(description ? { description } : {}),
+        ...(hint ? { hint } : {}),
+        ...(unit ? { unit } : {}),
+        ...(valuePresentation ? { valuePresentation } : {}),
+        ...(mask ? { mask } : {}),
+        ...(example ? { example } : {})
+      });
+    }
+    return parsed;
+  }
+
+  private parseOmittedFields(rawOmitted: unknown): readonly string[] {
+    if (!Array.isArray(rawOmitted)) return [];
+    const seen = new Set<string>();
+    const omitted: string[] = [];
+    for (const item of rawOmitted) {
+      if (typeof item !== 'string') continue;
+      const trimmed = item.trim();
+      if (!trimmed || seen.has(trimmed)) continue;
+      seen.add(trimmed);
+      omitted.push(trimmed);
+    }
+    return omitted;
   }
 
   private prompt(locale: SupportedLocale): string {

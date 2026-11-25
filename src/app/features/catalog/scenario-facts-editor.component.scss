@@ -1,5 +1,6 @@
 :host {
   display: block;
+  grid-column: 1 / -1;
   min-width: 0;
   container-type: inline-size;
 }
@@ -19,6 +20,26 @@
   text-transform: uppercase;
 }
 
+.scenario-fact-group-heading {
+  margin: 0.2rem 0 -0.25rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid color-mix(in oklab, var(--pax-color-outline-variant, #c5d0d5) 60%, transparent);
+  color: var(--pax-color-on-surface-variant, #455a64);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.scenario-facts-search {
+  max-width: 24rem;
+}
+
+.scenario-facts-empty {
+  margin: 0;
+  color: var(--pax-color-on-surface-variant, #455a64);
+  font-size: var(--pax-text-xs, 0.75rem);
+}
+
 label {
   display: grid;
   gap: 0.3rem;
@@ -27,21 +48,71 @@ label {
   color: var(--pax-color-on-surface, inherit);
 }
 
-input,
-select {
-  min-width: 0;
-  border: 1px solid var(--pax-color-outline, #8c9ca4);
-  border-radius: var(--pax-radius-md, 0.5rem);
-  padding: 0.6rem 0.7rem;
-  background: var(--pax-color-surface, #fff);
-  color: var(--pax-color-on-surface, inherit);
-  font: inherit;
+.scenario-fact-label-row {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
 }
 
-input:focus-visible,
+.scenario-fact-unit {
+  padding: 0.05rem 0.35rem;
+  border-radius: var(--pax-radius-sm, 0.25rem);
+  background: var(--pax-color-surface-container, #eef3f5);
+  border: 1px solid var(--pax-color-outline-variant, #c5d0d5);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--pax-color-on-surface-variant, #455a64);
+}
+
+input:not([type='checkbox']),
+select {
+  min-width: 0;
+  min-height: 2.25rem;
+  border: 1px solid var(--pax-color-outline);
+  border-radius: var(--pax-radius-md);
+  padding: 0.45rem 0.7rem;
+  background: var(--pax-color-surface);
+  color: var(--pax-color-on-surface);
+  font: inherit;
+  font-size: var(--pax-text-sm);
+  line-height: var(--pax-lh-sm);
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+select {
+  cursor: pointer;
+}
+
+select option {
+  background: var(--pax-color-surface);
+  color: var(--pax-color-on-surface);
+}
+
+input:not([type='checkbox']):hover:not(:disabled),
+select:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--pax-color-primary) 55%, var(--pax-color-outline));
+}
+
+input:not([type='checkbox']):focus-visible,
 select:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--pax-color-primary, #076487) 35%, transparent);
-  border-color: var(--pax-color-primary, #076487);
+  outline: 3px solid color-mix(in srgb, var(--pax-color-primary) 38%, transparent);
+  outline-offset: 1px;
+  border-color: var(--pax-color-primary);
+}
+
+input:not([type='checkbox']):disabled,
+select:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  background: var(--pax-color-surface-container-low);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  input:not([type='checkbox']),
+  select {
+    transition: none;
+  }
 }
 
 .scenario-fact-grid,
@@ -74,6 +145,32 @@ select:focus-visible {
   font-style: italic;
 }
 
+.scenario-fact-lookup {
+  color: var(--pax-color-primary, #076487);
+}
+
+.scenario-fact-privacy {
+  padding: 0.2rem 0.45rem;
+  border-radius: var(--pax-radius-sm, 0.25rem);
+  border-left: 2px solid var(--pax-color-warning, #8c5308);
+  background: color-mix(in oklab, var(--pax-color-warning-container, #fef3c7) 42%, transparent);
+  color: var(--pax-color-on-surface, inherit);
+}
+
+.scenario-fact-privacy[data-tone='restricted'] {
+  border-left-color: var(--pax-color-error, #991b1b);
+  background: color-mix(in oklab, var(--pax-color-error-container, #fee2e2) 48%, transparent);
+}
+
+.scenario-fact-advisory {
+  padding: 0.2rem 0.45rem;
+  border-radius: var(--pax-radius-sm, 0.25rem);
+  border-left: 2px solid var(--pax-color-primary, #076487);
+  background: var(--pax-color-surface-container-low, #f3f6f7);
+  color: var(--pax-color-on-surface, inherit);
+  font-weight: 600;
+}
+
 .scenario-fact-path {
   justify-self: start;
   padding: 0.05rem 0.35rem;
@@ -95,6 +192,10 @@ select:focus-visible {
 
 .scenario-fact-null input {
   min-width: auto;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--pax-color-primary);
 }
 
 .scenario-other-facts,

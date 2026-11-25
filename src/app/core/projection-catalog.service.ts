@@ -1,11 +1,17 @@
 import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { catchError, EMPTY, expand, forkJoin, map, Observable, of, reduce, switchMap, tap, throwError } from 'rxjs';
+import { catchError, EMPTY, expand, forkJoin, from, map, mergeMap, Observable, of, reduce, switchMap, tap, throwError, toArray } from 'rxjs';
 import { PolicyStudioRuntimeConfig, SupportedLocale } from './runtime-config';
+import { AuthSessionService } from './auth-session.service';
 import { AUTHORIZATION_RULE_TYPE } from './prepared-access-draft';
 import { createClientRequestId } from './client-request-id';
 import { DomainProjection, validateDomainProjection } from './domain-projection';
 import {
+  type DecisionFactAllowedValue,
+  type DecisionFactConstraints,
+  type DecisionFactGovernance,
+  type DecisionFactLineage,
+  type DecisionFactOptionSourceRef,
   DecisionLegacyOccurrence,
   DecisionLifecycleSummary,
   DecisionParameterCatalog,
@@ -77,6 +83,7 @@ export class ProjectionCatalogService {
   private readonly http = inject(HttpClient);
   private readonly domainRules = inject(DomainRuleService);
   private readonly discovery = inject(ResourceDiscoveryService);
+  private readonly authSession = inject(AuthSessionService);
   private cachedCatalogMeta: {
     readonly baseUrl: string;
     readonly workspaces: readonly DomainRuleChangeWorkspace[];
@@ -163,7 +170,7 @@ export class ProjectionCatalogService {
                   matchesRequestedDeepLink(candidate)
                   || isFirstRepresentativeOfResourceKey(candidate)
                   || (candidate.status !== 'retired' && idx < 36));
-        const detailReads = eagerCandidates.map(candidate => forkJoin({
+        const detailRead$ = (candidate: DomainRuleCatalogCandidate) => forkJoin({
           definitionWithParameters: this.domainRules.getDefinition(candidate.definitionId, this.requestOptions(config)).pipe(
             switchMap(definition => (this.hasParameterTemplate(definition)
               ? this.fetchDefinitionParameters(candidate.definitionId, config)
@@ -171,8 +178,11 @@ export class ProjectionCatalogService {
             ).pipe(map(serverParameterCatalog => ({ definition, serverParameterCatalog }))))
           ),
           factCatalog: this.domainRules.getDefinitionFacts(candidate.definitionId, this.requestOptions(config))
-        }));
-        return (detailReads.length ? forkJoin(detailReads) : of([])).pipe(map(definitionDetails => {
+        });
+        return (eagerCandidates.length
+          ? from(eagerCandidates).pipe(mergeMap(detailRead$, 6), toArray())
+          : of([])
+        ).pipe(map(definitionDetails => {
           const details = new Map(definitionDetails.map(detail => [detail.definitionWithParameters.definition.id, detail]));
           const ruleSetMetaByResourceKey = new Map<string, {
             ruleSetKey: string;
@@ -601,28 +611,148 @@ export class ProjectionCatalogService {
       .filter(fact => fact.path.includes('.') || !allPaths.some(other => other.startsWith(`${fact.path}.`)))
       .map(fact => {
         const extra = fact as unknown as Record<string, unknown>;
+        const restricted = fact.sensitivity === 'SECRET' || fact.redaction === 'OMIT';
         const hint = this.localizedText(extra['hints'], locale) ?? this.stringValue(extra, 'hint');
+        const groupKey = this.stringValue(extra, 'groupKey');
         const groupLabel = this.localizedText(extra['groupLabels'], locale) ?? this.stringValue(extra, 'groupLabel');
         const unit = this.stringValue(extra, 'unit');
         const valuePresentation = this.stringValue(extra, 'valuePresentation');
+        const mask = this.stringValue(extra, 'mask');
+        const example = restricted ? null : this.stringValue(extra, 'example');
+        const allowedValues = restricted ? null : this.parseFactAllowedValues(extra['allowedValues'], locale);
+        const optionSourceRef = this.parseFactOptionSourceRef(extra['optionSourceRef']);
+        const constraints = this.parseFactConstraints(extra['constraints']);
+        const governance = this.parseFactGovernance(extra['governance']);
+        const lineage = this.parseFactLineage(extra['lineage']);
         return {
           path: fact.path,
           valueType: fact.valueType === 'string' && this.conditionImpliesNumericFact(condition, fact.path)
             ? 'number'
             : fact.valueType,
           nullable: fact.nullable,
-          label: fact.labels[locale] ?? fact.labels['en-US'] ?? fact.path,
-          description: fact.descriptions[locale] ?? fact.descriptions['en-US'] ?? '',
+          label: this.localizedText(fact.labels, locale) ?? fact.path,
+          description: this.localizedText(fact.descriptions, locale) ?? '',
           providerRef: fact.providerRef,
           evidenceRefs: fact.evidenceRefs,
           sensitivity: fact.sensitivity,
           redaction: fact.redaction,
           ...(hint ? { hint } : {}),
+          ...(groupKey ? { groupKey } : {}),
           ...(groupLabel ? { groupLabel } : {}),
           ...(unit ? { unit } : {}),
-          ...(valuePresentation ? { valuePresentation } : {})
+          ...(valuePresentation ? { valuePresentation } : {}),
+          ...(mask ? { mask } : {}),
+          ...(allowedValues ? { allowedValues } : {}),
+          ...(optionSourceRef ? { optionSourceRef } : {}),
+          ...(example ? { example } : {}),
+          ...(constraints ? { constraints } : {}),
+          ...(governance ? { governance } : {}),
+          ...(lineage ? { lineage } : {})
         };
       });
+  }
+
+  private parseFactAllowedValues(
+    raw: unknown,
+    locale: SupportedLocale
+  ): readonly DecisionFactAllowedValue[] | null {
+    if (!Array.isArray(raw) || raw.length === 0) return null;
+    const options: DecisionFactAllowedValue[] = [];
+    for (const item of raw) {
+      const rec = this.record(item);
+      if (!rec) continue;
+      const val = rec['value'];
+      if (typeof val !== 'string' && typeof val !== 'number' && typeof val !== 'boolean') {
+        continue;
+      }
+      const label = this.localizedText(rec['labels'], locale)
+        ?? this.stringValue(rec, 'label')
+        ?? String(val);
+      const icon = this.stringValue(rec, 'icon');
+      const tone = this.stringValue(rec, 'tone');
+      const description = this.stringValue(rec, 'description');
+      options.push({
+        value: val,
+        label,
+        ...(icon ? { icon } : {}),
+        ...(tone ? { tone } : {}),
+        ...(description ? { description } : {})
+      });
+    }
+    return options.length > 0 ? options : null;
+  }
+
+  private parseFactOptionSourceRef(raw: unknown): DecisionFactOptionSourceRef | null {
+    const rec = this.record(raw);
+    if (!rec) return null;
+    const sourceKey = this.stringValue(rec, 'sourceKey');
+    if (!sourceKey) return null;
+    const resourceKey = this.stringValue(rec, 'resourceKey');
+    return { sourceKey, ...(resourceKey ? { resourceKey } : {}) };
+  }
+
+  private parseFactConstraints(raw: unknown): DecisionFactConstraints | null {
+    const rec = this.record(raw);
+    if (!rec) return null;
+    const num = (key: string): number | null =>
+      typeof rec[key] === 'number' && Number.isFinite(rec[key] as number) ? (rec[key] as number) : null;
+    const int = (key: string): number | null => {
+      const value = num(key);
+      return value !== null && Number.isInteger(value) ? value : null;
+    };
+    const min = num('min');
+    const max = num('max');
+    const step = num('step');
+    const minLength = int('minLength');
+    const maxLength = int('maxLength');
+    const pattern = this.stringValue(rec, 'pattern');
+    if (min === null && max === null && step === null && minLength === null && maxLength === null && pattern === null) {
+      return null;
+    }
+    return {
+      ...(min !== null ? { min } : {}),
+      ...(max !== null ? { max } : {}),
+      ...(step !== null ? { step } : {}),
+      ...(minLength !== null ? { minLength } : {}),
+      ...(maxLength !== null ? { maxLength } : {}),
+      ...(pattern ? { pattern } : {})
+    };
+  }
+
+  private parseFactGovernance(raw: unknown): DecisionFactGovernance | null {
+    const rec = this.record(raw);
+    if (!rec) return null;
+    const classification = this.stringValue(rec, 'classification');
+    const dataCategory = this.stringValue(rec, 'dataCategory');
+    const exportable = typeof rec['exportable'] === 'boolean' ? (rec['exportable'] as boolean) : null;
+    const aiVisibility = this.stringValue(rec, 'aiVisibility');
+    const complianceTags = Array.isArray(rec['complianceTags'])
+      ? rec['complianceTags'].filter((tag): tag is string => typeof tag === 'string' && tag.trim().length > 0)
+      : null;
+    if (!classification && !dataCategory && exportable === null && !aiVisibility && (!complianceTags || complianceTags.length === 0)) {
+      return null;
+    }
+    return {
+      ...(classification ? { classification } : {}),
+      ...(dataCategory ? { dataCategory } : {}),
+      ...(exportable !== null ? { exportable } : {}),
+      ...(aiVisibility ? { aiVisibility } : {}),
+      ...(complianceTags && complianceTags.length > 0 ? { complianceTags } : {})
+    };
+  }
+
+  private parseFactLineage(raw: unknown): DecisionFactLineage | null {
+    const rec = this.record(raw);
+    if (!rec) return null;
+    const attributeId = this.stringValue(rec, 'attributeId');
+    const sourceResourceKey = this.stringValue(rec, 'sourceResourceKey');
+    const transformation = this.stringValue(rec, 'transformation');
+    if (!attributeId && !sourceResourceKey && !transformation) return null;
+    return {
+      ...(attributeId ? { attributeId } : {}),
+      ...(sourceResourceKey ? { sourceResourceKey } : {}),
+      ...(transformation ? { transformation } : {})
+    };
   }
 
   private conditionImpliesNumericFact(node: unknown, factPath: string): boolean {
@@ -637,10 +767,10 @@ export class ProjectionCatalogService {
       const equality = op === '==' || op === '===' || op === '!=' || op === '!==';
       if ((relational || equality) && Array.isArray(rawArgs) && rawArgs.length === 2) {
         const [lhs, rhs] = rawArgs;
-        if (this.matchesVarPath(lhs, factPath) && (relational || typeof rhs === 'number')) {
+        if (this.matchesVarPath(lhs, factPath) && typeof rhs === 'number' && Number.isFinite(rhs)) {
           return true;
         }
-        if (this.matchesVarPath(rhs, factPath) && (relational || typeof lhs === 'number')) {
+        if (this.matchesVarPath(rhs, factPath) && typeof lhs === 'number' && Number.isFinite(lhs)) {
           return true;
         }
       }
@@ -687,7 +817,17 @@ export class ProjectionCatalogService {
   private localizedText(value: unknown, locale: SupportedLocale): string | null {
     const record = this.record(value);
     if (!record) return null;
-    return this.stringValue(record, locale) ?? this.stringValue(record, 'en-US') ?? this.stringValue(record, 'pt-BR');
+    const prefix = locale.split('-')[0]?.toLowerCase();
+    const direct = this.stringValue(record, locale)
+      ?? (prefix ? this.stringValue(record, prefix) : null)
+      ?? this.stringValue(record, 'pt-BR')
+      ?? this.stringValue(record, 'en-US');
+    if (direct) return direct;
+    for (const key of Object.keys(record)) {
+      const candidate = this.stringValue(record, key);
+      if (candidate) return candidate;
+    }
+    return null;
   }
 
   private operationalPolicyString(
@@ -850,8 +990,10 @@ export class ProjectionCatalogService {
     request: DomainRuleDefinitionRequest,
     config: PolicyStudioRuntimeConfig
   ): Observable<DomainRuleDefinition> {
-    return this.domainRules.createDefinition(request, this.requestOptions(config)).pipe(
-      tap(() => this.invalidateCatalogMetaCache())
+    return this.withRemoteCsrf(config, () =>
+      this.domainRules.createDefinition(request, this.requestOptions(config)).pipe(
+        tap(() => this.invalidateCatalogMetaCache())
+      )
     );
   }
 
@@ -860,11 +1002,13 @@ export class ProjectionCatalogService {
   }
 
   approveAccessDefinition(id: string, config: PolicyStudioRuntimeConfig): Observable<DomainRuleDefinition> {
-    return this.domainRules.transitionDefinitionStatus(
-      id,
-      { status: 'approved', validationResult: { review: 'approved', source: 'praxis-policy-studio' } },
-      this.requestOptions(config)
-    ).pipe(tap(() => this.invalidateCatalogMetaCache()));
+    return this.withRemoteCsrf(config, () =>
+      this.domainRules.transitionDefinitionStatus(
+        id,
+        { status: 'approved', validationResult: { review: 'approved', source: 'praxis-policy-studio' } },
+        this.requestOptions(config)
+      ).pipe(tap(() => this.invalidateCatalogMetaCache()))
+    );
   }
 
   createWorkspace(
@@ -872,8 +1016,10 @@ export class ProjectionCatalogService {
     title: string,
     config: PolicyStudioRuntimeConfig
   ): Observable<DomainRuleChangeWorkspace> {
-    return this.domainRules.createChangeWorkspace({ baseDefinitionId, title }, this.requestOptions(config)).pipe(
-      tap(() => this.invalidateCatalogMetaCache())
+    return this.withRemoteCsrf(config, () =>
+      this.domainRules.createChangeWorkspace({ baseDefinitionId, title }, this.requestOptions(config)).pipe(
+        tap(() => this.invalidateCatalogMetaCache())
+      )
     );
   }
 
@@ -892,12 +1038,14 @@ export class ProjectionCatalogService {
     if (documentation !== undefined) {
       payload['documentation'] = documentation;
     }
-    return this.domainRules.updateChangeWorkspaceDraft(
-      workspace.id,
-      payload as unknown as DomainRuleChangeWorkspaceUpdateRequest,
-      workspace.etag,
-      this.requestOptions(config)
-    ).pipe(tap(() => this.invalidateCatalogMetaCache()));
+    return this.withRemoteCsrf(config, () =>
+      this.domainRules.updateChangeWorkspaceDraft(
+        workspace.id,
+        payload as unknown as DomainRuleChangeWorkspaceUpdateRequest,
+        workspace.etag,
+        this.requestOptions(config)
+      ).pipe(tap(() => this.invalidateCatalogMetaCache()))
+    );
   }
 
   scenarios(workspaceId: string, config: PolicyStudioRuntimeConfig): Observable<DomainRuleTestScenario[]> {
@@ -917,10 +1065,12 @@ export class ProjectionCatalogService {
     config: PolicyStudioRuntimeConfig
   ): Observable<{ readonly scenario: DomainRuleTestScenario; readonly workspace: DomainRuleChangeWorkspace }> {
     const options = this.requestOptions(config);
-    return this.domainRules.createTestScenario(workspaceId, request, options).pipe(
-      switchMap(scenario => this.domainRules.getChangeWorkspace(workspaceId, options).pipe(
-        map(workspace => ({ scenario, workspace }))
-      ))
+    return this.withRemoteCsrf(config, () =>
+      this.domainRules.createTestScenario(workspaceId, request, options).pipe(
+        switchMap(scenario => this.domainRules.getChangeWorkspace(workspaceId, options).pipe(
+          map(workspace => ({ scenario, workspace }))
+        ))
+      )
     );
   }
 
@@ -932,10 +1082,12 @@ export class ProjectionCatalogService {
     config: PolicyStudioRuntimeConfig
   ): Observable<{ readonly scenario: DomainRuleTestScenario; readonly workspace: DomainRuleChangeWorkspace }> {
     const options = this.requestOptions(config);
-    return this.domainRules.updateTestScenario(workspaceId, scenarioId, request, scenarioEtag, options).pipe(
-      switchMap(scenario => this.domainRules.getChangeWorkspace(workspaceId, options).pipe(
-        map(workspace => ({ scenario, workspace }))
-      ))
+    return this.withRemoteCsrf(config, () =>
+      this.domainRules.updateTestScenario(workspaceId, scenarioId, request, scenarioEtag, options).pipe(
+        switchMap(scenario => this.domainRules.getChangeWorkspace(workspaceId, options).pipe(
+          map(workspace => ({ scenario, workspace }))
+        ))
+      )
     );
   }
 
@@ -947,13 +1099,15 @@ export class ProjectionCatalogService {
     config: PolicyStudioRuntimeConfig
   ): Observable<PolicySandboxRun> {
     const baseUrl = (config.configApiBaseUrl ?? '').replace(/\/$/, '');
-    return this.http.post<PolicySandboxRun>(`${baseUrl}/api/praxis/rules-studio/sandbox/runs`, {
-      workspaceId,
-      scenarioIds,
-      userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-      idempotencyKey,
-      evaluatedAtUtc
-    });
+    return this.withRemoteCsrf(config, () =>
+      this.http.post<PolicySandboxRun>(`${baseUrl}/api/praxis/rules-studio/sandbox/runs`, {
+        workspaceId,
+        scenarioIds,
+        userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+        idempotencyKey,
+        evaluatedAtUtc
+      })
+    );
   }
 
   operationalTestAction(
@@ -1002,16 +1156,18 @@ export class ProjectionCatalogService {
       userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
       evaluatedAtUtc
     };
-    return this.http.request<RestApiResponse<DomainRuleTestRun>>(
-      action.method,
-      this.discovery.resolveHref(action.path, this.requestOptions(config)),
-      { body, headers, observe: 'response' }
-    ).pipe(map(response => {
-      if (!response.body?.data) throw new Error('OPERATIONAL_TEST_RUN_MISSING');
-      const nextEtag = response.headers.get('ETag')?.trim();
-      if (!nextEtag) throw new Error('OPERATIONAL_WORKSPACE_ETAG_MISSING');
-      return { run: response.body.data, workspaceEtag: nextEtag };
-    }));
+    return this.withRemoteCsrf(config, () =>
+      this.http.request<RestApiResponse<DomainRuleTestRun>>(
+        action.method,
+        this.discovery.resolveHref(action.path, this.requestOptions(config)),
+        { body, headers, observe: 'response' }
+      ).pipe(map(response => {
+        if (!response.body?.data) throw new Error('OPERATIONAL_TEST_RUN_MISSING');
+        const nextEtag = response.headers.get('ETag')?.trim();
+        if (!nextEtag) throw new Error('OPERATIONAL_WORKSPACE_ETAG_MISSING');
+        return { run: response.body.data, workspaceEtag: nextEtag };
+      }))
+    );
   }
 
   submitWorkspace(
@@ -1019,8 +1175,10 @@ export class ProjectionCatalogService {
     etag: string,
     config: PolicyStudioRuntimeConfig
   ): Observable<DomainRuleChangeWorkspace> {
-    return this.domainRules.submitChangeWorkspace(workspaceId, etag, this.requestOptions(config)).pipe(
-      tap(() => this.invalidateCatalogMetaCache())
+    return this.withRemoteCsrf(config, () =>
+      this.domainRules.submitChangeWorkspace(workspaceId, etag, this.requestOptions(config)).pipe(
+        tap(() => this.invalidateCatalogMetaCache())
+      )
     );
   }
 
@@ -1036,9 +1194,11 @@ export class ProjectionCatalogService {
     config: PolicyStudioRuntimeConfig
   ): Observable<DomainRuleChangeWorkspace> {
     const options = this.requestOptions(config);
-    return this.domainRules.reviewChangeWorkspace(workspaceId, { decision, rationale }, etag, options).pipe(
-      tap(() => this.invalidateCatalogMetaCache()),
-      switchMap(() => this.domainRules.getChangeWorkspace(workspaceId, options))
+    return this.withRemoteCsrf(config, () =>
+      this.domainRules.reviewChangeWorkspace(workspaceId, { decision, rationale }, etag, options).pipe(
+        tap(() => this.invalidateCatalogMetaCache()),
+        switchMap(() => this.domainRules.getChangeWorkspace(workspaceId, options))
+      )
     );
   }
 
@@ -1047,8 +1207,10 @@ export class ProjectionCatalogService {
     etag: string,
     config: PolicyStudioRuntimeConfig
   ): Observable<DomainRuleChangeWorkspace> {
-    return this.domainRules.promoteChangeWorkspace(workspaceId, etag, this.requestOptions(config)).pipe(
-      tap(() => this.invalidateCatalogMetaCache())
+    return this.withRemoteCsrf(config, () =>
+      this.domainRules.promoteChangeWorkspace(workspaceId, etag, this.requestOptions(config)).pipe(
+        tap(() => this.invalidateCatalogMetaCache())
+      )
     );
   }
 
@@ -1092,18 +1254,20 @@ export class ProjectionCatalogService {
     definitionId: string,
     config: PolicyStudioRuntimeConfig
   ): Observable<DecisionPublicationResult> {
-    return this.domainRules.publish({
-      ruleDefinitionId: definitionId,
-      applyEligibleMaterializations: true,
-      publicationNotes: { source: 'praxis-policy-studio', intent: 'publish-governed-definition' }
-    }, this.requestOptions(config)).pipe(
-      tap(() => this.invalidateCatalogMetaCache()),
-      map(publication => ({
-        status: publication.publicationStatus ?? null,
-        readiness: publication.publicationReadiness ?? null,
-        materializationCount: publication.materializations?.length ?? 0,
-        outcomes: publication.explainability?.publicationDiagnostics?.materializationOutcomes ?? []
-      }))
+    return this.withRemoteCsrf(config, () =>
+      this.domainRules.publish({
+        ruleDefinitionId: definitionId,
+        applyEligibleMaterializations: true,
+        publicationNotes: { source: 'praxis-policy-studio', intent: 'publish-governed-definition' }
+      }, this.requestOptions(config)).pipe(
+        tap(() => this.invalidateCatalogMetaCache()),
+        map(publication => ({
+          status: publication.publicationStatus ?? null,
+          readiness: publication.publicationReadiness ?? null,
+          materializationCount: publication.materializations?.length ?? 0,
+          outcomes: publication.explainability?.publicationDiagnostics?.materializationOutcomes ?? []
+        }))
+      )
     );
   }
 
@@ -1185,14 +1349,18 @@ export class ProjectionCatalogService {
     request: DomainRuleRolloutPolicyCreateRequest,
     config: PolicyStudioRuntimeConfig
   ): Observable<DomainRuleRolloutPolicyMutation> {
-    return this.domainRules.createRolloutPolicy(request, this.requestOptions(config));
+    return this.withRemoteCsrf(config, () =>
+      this.domainRules.createRolloutPolicy(request, this.requestOptions(config))
+    );
   }
 
   approveRolloutPolicy(
     policy: Pick<DomainRuleRolloutPolicy, 'policyId'>,
     config: PolicyStudioRuntimeConfig
   ): Observable<DomainRuleRolloutPolicyMutation> {
-    return this.domainRules.approveRolloutPolicy(policy.policyId, this.requestOptions(config));
+    return this.withRemoteCsrf(config, () =>
+      this.domainRules.approveRolloutPolicy(policy.policyId, this.requestOptions(config))
+    );
   }
 
   activateRolloutPolicy(
@@ -1200,7 +1368,9 @@ export class ProjectionCatalogService {
     policyHeadEtag: string,
     config: PolicyStudioRuntimeConfig
   ): Observable<DomainRuleRolloutPolicyMutation> {
-    return this.domainRules.activateRolloutPolicy(policy.policyId, policyHeadEtag, this.requestOptions(config));
+    return this.withRemoteCsrf(config, () =>
+      this.domainRules.activateRolloutPolicy(policy.policyId, policyHeadEtag, this.requestOptions(config))
+    );
   }
 
   rolloutCatalog(ruleSetKey: string, operationKey: string, config: PolicyStudioRuntimeConfig): Observable<DomainRuleRolloutCatalog> {
@@ -1212,8 +1382,9 @@ export class ProjectionCatalogService {
     headEtag: string | null,
     config: PolicyStudioRuntimeConfig
   ): Observable<DomainRuleRollout> {
-    return this.domainRules.createRollout(
-      { candidateSnapshotKey }, headEtag, this.requestOptions(config));
+    return this.withRemoteCsrf(config, () =>
+      this.domainRules.createRollout({ candidateSnapshotKey }, headEtag, this.requestOptions(config))
+    );
   }
 
   probeRolloutCandidate(
@@ -1223,9 +1394,11 @@ export class ProjectionCatalogService {
     config: PolicyStudioRuntimeConfig
   ): Observable<{ readonly updated: boolean; readonly observedAtUtc: string }> {
     const baseUrl = (config.configApiBaseUrl ?? '').replace(/\/$/, '');
-    return this.http.post<{ readonly updated: boolean; readonly observedAtUtc: string }>(
-      `${baseUrl}/api/praxis/rules-studio/rule-sets/${encodeURIComponent(ruleSetKey)}/rollouts/${encodeURIComponent(rolloutId)}/probe?operationKey=${encodeURIComponent(operationKey)}`,
-      {}
+    return this.withRemoteCsrf(config, () =>
+      this.http.post<{ readonly updated: boolean; readonly observedAtUtc: string }>(
+        `${baseUrl}/api/praxis/rules-studio/rule-sets/${encodeURIComponent(ruleSetKey)}/rollouts/${encodeURIComponent(rolloutId)}/probe?operationKey=${encodeURIComponent(operationKey)}`,
+        {}
+      )
     );
   }
 
@@ -1233,18 +1406,23 @@ export class ProjectionCatalogService {
     rollout: Pick<DomainRuleRolloutCatalogItem, 'rollout'>,
     config: PolicyStudioRuntimeConfig
   ): Observable<void> {
-    return this.domainRules.cancelRollout(rollout.rollout.rolloutId, this.requestOptions(config));
+    return this.withRemoteCsrf(config, () =>
+      this.domainRules.cancelRollout(rollout.rollout.rolloutId, this.requestOptions(config))
+    );
   }
 
   activateRolloutCandidate(
     rollout: Pick<DomainRuleRolloutCatalogItem, 'rollout'>,
     config: PolicyStudioRuntimeConfig
   ): Observable<DomainRuleSnapshotActivation> {
-    return this.domainRules.activateSnapshotCandidate(
-      rollout.rollout.candidateSnapshotKey,
-      rollout.rollout.expectedHeadEtag,
-      rollout.rollout.rolloutId,
-      this.requestOptions(config));
+    return this.withRemoteCsrf(config, () =>
+      this.domainRules.activateSnapshotCandidate(
+        rollout.rollout.candidateSnapshotKey,
+        rollout.rollout.expectedHeadEtag,
+        rollout.rollout.rolloutId,
+        this.requestOptions(config)
+      )
+    );
   }
 
   operateSnapshot(
@@ -1254,10 +1432,14 @@ export class ProjectionCatalogService {
   ): Observable<DomainRuleSnapshotActivation> {
     const options = this.requestOptions(config);
     if (version.availableAction === 'ACTIVATE') {
-      return this.domainRules.activateSnapshot(version.snapshotKey, headEtag, options);
+      return this.withRemoteCsrf(config, () =>
+        this.domainRules.activateSnapshot(version.snapshotKey, headEtag, options)
+      );
     }
     if (version.availableAction === 'ROLLBACK') {
-      return this.domainRules.rollbackSnapshot(version.snapshotKey, headEtag, options);
+      return this.withRemoteCsrf(config, () =>
+        this.domainRules.rollbackSnapshot(version.snapshotKey, headEtag, options)
+      );
     }
     return throwError(() => new Error(`SNAPSHOT_ACTION_NOT_AVAILABLE ${version.availableAction}`));
   }
@@ -1281,7 +1463,9 @@ export class ProjectionCatalogService {
     config: PolicyStudioRuntimeConfig
   ): Observable<DomainRuleSnapshotWithdrawalResponse> {
     this.candidateHeadPrecondition(headEtag);
-    return this.domainRules.withdrawSnapshotHead(request, headEtag, this.requestOptions(config));
+    return this.withRemoteCsrf(config, () =>
+      this.domainRules.withdrawSnapshotHead(request, headEtag, this.requestOptions(config))
+    );
   }
 
   prepareRuleSetCandidate(
@@ -1289,7 +1473,9 @@ export class ProjectionCatalogService {
     request: RuleSetCompositionCandidateRequest,
     config: PolicyStudioRuntimeConfig
   ): Observable<RuleSetCompositionCandidate> {
-    return this.domainRules.prepareRuleSetCandidate(ruleSetKey, request, this.requestOptions(config));
+    return this.withRemoteCsrf(config, () =>
+      this.domainRules.prepareRuleSetCandidate(ruleSetKey, request, this.requestOptions(config))
+    );
   }
 
   approveRuleSetCandidate(
@@ -1297,7 +1483,9 @@ export class ProjectionCatalogService {
     command: RuleSetCompositionCandidateCommand,
     config: PolicyStudioRuntimeConfig
   ): Observable<DomainRuleCompositionApproval> {
-    return this.domainRules.approveRuleSetCandidate(ruleSetKey, command, this.requestOptions(config));
+    return this.withRemoteCsrf(config, () =>
+      this.domainRules.approveRuleSetCandidate(ruleSetKey, command, this.requestOptions(config))
+    );
   }
 
   publishRuleSetCandidate(
@@ -1307,21 +1495,27 @@ export class ProjectionCatalogService {
     config: PolicyStudioRuntimeConfig
   ): Observable<RuleSetCompositionPublication> {
     this.candidateHeadPrecondition(currentHeadEtag);
-    return this.domainRules.publishRuleSetCandidate(ruleSetKey, command, currentHeadEtag, this.requestOptions(config));
+    return this.withRemoteCsrf(config, () =>
+      this.domainRules.publishRuleSetCandidate(ruleSetKey, command, currentHeadEtag, this.requestOptions(config))
+    );
   }
 
   prepareSnapshotComposition(
     request: DomainRuleSnapshotCompositionRequest,
     config: PolicyStudioRuntimeConfig
   ): Observable<DomainRuleCompositionManifest> {
-    return this.domainRules.prepareSnapshotComposition(request, this.requestOptions(config));
+    return this.withRemoteCsrf(config, () =>
+      this.domainRules.prepareSnapshotComposition(request, this.requestOptions(config))
+    );
   }
 
   approveSnapshotComposition(
     request: DomainRuleSnapshotCompositionRequest,
     config: PolicyStudioRuntimeConfig
   ): Observable<DomainRuleCompositionApproval> {
-    return this.domainRules.approveSnapshotComposition(request, this.requestOptions(config));
+    return this.withRemoteCsrf(config, () =>
+      this.domainRules.approveSnapshotComposition(request, this.requestOptions(config))
+    );
   }
 
   publishSnapshot(
@@ -1329,7 +1523,9 @@ export class ProjectionCatalogService {
     currentHeadEtag: string | null,
     config: PolicyStudioRuntimeConfig
   ): Observable<DomainRuleSnapshotStored> {
-    return this.domainRules.publishSnapshot(request, currentHeadEtag, this.requestOptions(config));
+    return this.withRemoteCsrf(config, () =>
+      this.domainRules.publishSnapshot(request, currentHeadEtag, this.requestOptions(config))
+    );
   }
 
   timeline(definitionId: string, config: PolicyStudioRuntimeConfig): Observable<readonly DecisionTimelineEvent[]> {
@@ -1512,6 +1708,13 @@ export class ProjectionCatalogService {
       ...(baseCapability?.availableActions ?? []),
       ...(promotedCapability?.availableActions ?? [])
     ])];
+  }
+
+  private withRemoteCsrf<T>(
+    config: PolicyStudioRuntimeConfig,
+    action: () => Observable<T>
+  ): Observable<T> {
+    return this.authSession.ensureCsrf(config).pipe(switchMap(action));
   }
 
   private requestOptions(config: PolicyStudioRuntimeConfig): DomainRuleRequestOptions {

@@ -40,6 +40,44 @@
                 <div><dt>{{ i18n.text('redactionPolicy') }}</dt><dd>{{ evidenceModeLabel(completed.evidence.redactionMode) }}</dd></div>
                 <div><dt>{{ i18n.text('groundingSources') }}</dt><dd>{{ completed.evidence.sourceRefCount }}</dd></div>
               </dl>
+              @let omitted = completed.evidence.omittedFields ?? [];
+              @if (omitted.length > 0) {
+                <div class="explanation-redaction-note" data-testid="ai-explanation-omitted-fields">
+                  <p class="subsection-label">{{ i18n.text('aiExplanationOmittedNotice') }}</p>
+                  <ul>
+                    @for (code of omitted; track code) {
+                      <li>{{ omittedFieldLabel(code) }}</li>
+                    }
+                  </ul>
+                </div>
+              }
+              @let attestedFacts = completed.evidence.facts ?? [];
+              @if (attestedFacts.length > 0) {
+                <div class="explanation-attested-facts" data-testid="ai-explanation-attested-facts">
+                  <p class="subsection-label">{{ i18n.text('aiExplanationAttestedFacts') }}</p>
+                  <ul>
+                    @for (fact of attestedFacts; track fact.path) {
+                      <li>
+                        <div class="attested-fact-head">
+                          <strong>{{ fact.label }}</strong>
+                          @if (safeFactMeta(fact); as meta) {
+                            <small>{{ meta }}</small>
+                          }
+                        </div>
+                        @if (fact.description) {
+                          <p>{{ fact.description }}</p>
+                        }
+                        @if (fact.hint) {
+                          <small class="attested-fact-hint">{{ fact.hint }}</small>
+                        }
+                        @if (viewDepth === 'technical') {
+                          <code class="attested-fact-path">{{ fact.path }}</code>
+                        }
+                      </li>
+                    }
+                  </ul>
+                </div>
+              }
               <small>{{ i18n.text('aiNoApply') }}</small>
             </div>
           }

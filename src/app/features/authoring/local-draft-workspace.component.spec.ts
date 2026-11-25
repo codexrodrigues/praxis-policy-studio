@@ -98,4 +98,75 @@ describe('LocalDraftWorkspaceComponent', () => {
     expect(exprText).not.toContain('?');
     expect(exprText).toContain('minutos(Hora Saída) ≥ minutos(Hora Entrada)');
   });
+
+  it('renders allowedValues dropdown with numeric coercion and currency formatting in table and expression modes', () => {
+    fixture = TestBed.createComponent(LocalDraftWorkspaceComponent);
+    const emitted: unknown[] = [];
+    fixture.componentInstance.conditionChanged.subscribe(value => emitted.push(value));
+    fixture.componentRef.setInput('config', {
+      fieldSchemas: {
+        'worker.tier': {
+          name: 'worker.tier',
+          label: 'Faixa salarial',
+          type: 'number',
+          origin: 'field',
+          allowedValues: [
+            { value: 1, label: 'Faixa I' },
+            { value: 2, label: 'Faixa II' }
+          ]
+        }
+      }
+    } as unknown as RuleBuilderConfig);
+    fixture.componentRef.setInput('condition', { '===': [{ var: 'worker.tier' }, 1] });
+    fixture.componentRef.setInput('viewDepth', 'business');
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    (el.querySelector('[data-testid="representation-mode-table"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    const valueSelect = el.querySelector('select[data-testid="decision-table-value-0"]') as HTMLSelectElement;
+    expect(valueSelect).toBeTruthy();
+    expect(Array.from(valueSelect.options).map(o => o.textContent?.trim())).toEqual(['Faixa I', 'Faixa II']);
+    valueSelect.value = '2';
+    valueSelect.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    expect(emitted.at(-1)).toEqual({ '===': [{ var: 'worker.tier' }, 2] });
+  });
+
+  it('initializes new table clauses with first allowedValues option and shows disabled placeholder when rawValue is empty', () => {
+    fixture = TestBed.createComponent(LocalDraftWorkspaceComponent);
+    const emitted: unknown[] = [];
+    fixture.componentInstance.conditionChanged.subscribe(value => emitted.push(value));
+    fixture.componentRef.setInput('config', {
+      fieldSchemas: {
+        'worker.status': {
+          name: 'worker.status',
+          label: 'Situação',
+          type: 'string',
+          origin: 'field',
+          allowedValues: [
+            { value: 'ACTIVE', label: 'Ativo' },
+            { value: 'INACTIVE', label: 'Inativo' }
+          ]
+        }
+      }
+    } as unknown as RuleBuilderConfig);
+    fixture.componentRef.setInput('condition', null);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    (el.querySelector('[data-testid="representation-mode-table"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    (el.querySelector('[data-testid="decision-table-add-clause"]') as HTMLButtonElement).click();
+    expect(emitted.at(-1)).toEqual({ '<=': [{ var: 'worker.status' }, 'ACTIVE'] });
+
+    fixture.componentRef.setInput('condition', { '===': [{ var: 'worker.status' }, ''] });
+    fixture.detectChanges();
+    const selectEl = el.querySelector('select[data-testid="decision-table-value-0"]') as HTMLSelectElement;
+    expect(selectEl.options[0]?.disabled).toBe(true);
+    expect(selectEl.options[0]?.value).toBe('');
+  });
 });

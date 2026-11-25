@@ -158,4 +158,54 @@ describe('DecisionExplanationService', () => {
       expect.objectContaining({ kind: 'completed', canApply: false })
     ]);
   });
+
+  it('parses SafeFactEvidence facts and omittedFields redaction disclosures cleanly', () => {
+    const streamEvents = vi.fn().mockReturnValue(of(result({
+      redaction: {
+        mode: 'summary_only',
+        omittedFields: ['factCatalog.secretOrDeniedFacts', 'conditionAst.containsRestrictedFacts']
+      },
+      facts: [
+        {
+          path: 'request.requestedAmount',
+          label: 'Valor solicitado',
+          valueType: 'number',
+          nullable: false,
+          sensitivity: 'PERSONAL',
+          redaction: 'MASK',
+          description: 'Montante pedido.',
+          hint: 'Valor sem acréscimos.',
+          unit: 'days',
+          mask: '###0.00'
+        }
+      ]
+    })));
+    const service = new DecisionExplanationService({ streamEvents } as unknown as AgenticAuthoringTurnClientService);
+    const events: unknown[] = [];
+
+    service.explain(request).subscribe(event => events.push(event));
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        kind: 'completed',
+        evidence: expect.objectContaining({
+          omittedFields: ['factCatalog.secretOrDeniedFacts', 'conditionAst.containsRestrictedFacts'],
+          facts: [
+            {
+              path: 'request.requestedAmount',
+              label: 'Valor solicitado',
+              valueType: 'number',
+              nullable: false,
+              sensitivity: 'PERSONAL',
+              redaction: 'MASK',
+              description: 'Montante pedido.',
+              hint: 'Valor sem acréscimos.',
+              unit: 'days',
+              mask: '###0.00'
+            }
+          ]
+        })
+      })
+    ]);
+  });
 });

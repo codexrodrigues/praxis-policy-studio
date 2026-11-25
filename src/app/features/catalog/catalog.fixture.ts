@@ -114,6 +114,42 @@ export interface DecisionParameterCatalog {
   readonly parameters: readonly DecisionParameterDescriptor[];
 }
 
+export interface DecisionFactAllowedValue {
+  readonly value: string | number | boolean;
+  readonly label: string;
+  readonly icon?: string | null;
+  readonly tone?: string | null;
+  readonly description?: string | null;
+}
+
+export interface DecisionFactOptionSourceRef {
+  readonly sourceKey: string;
+  readonly resourceKey?: string | null;
+}
+
+export interface DecisionFactConstraints {
+  readonly min?: number | null;
+  readonly max?: number | null;
+  readonly step?: number | null;
+  readonly minLength?: number | null;
+  readonly maxLength?: number | null;
+  readonly pattern?: string | null;
+}
+
+export interface DecisionFactGovernance {
+  readonly classification?: string | null;
+  readonly dataCategory?: string | null;
+  readonly exportable?: boolean | null;
+  readonly aiVisibility?: string | null;
+  readonly complianceTags?: readonly string[] | null;
+}
+
+export interface DecisionFactLineage {
+  readonly attributeId?: string | null;
+  readonly sourceResourceKey?: string | null;
+  readonly transformation?: string | null;
+}
+
 export interface DecisionFact {
   readonly path: string;
   readonly valueType: 'boolean' | 'string' | 'number' | 'date' | 'string-array' | 'date-array' | 'number-array' | 'array<number>';
@@ -125,9 +161,17 @@ export interface DecisionFact {
   readonly sensitivity: 'NON_SENSITIVE' | 'PERSONAL' | 'SENSITIVE' | 'SECRET';
   readonly redaction: 'NONE' | 'MASK' | 'HASH' | 'OMIT';
   readonly hint?: string | null;
+  readonly groupKey?: string | null;
   readonly groupLabel?: string | null;
   readonly unit?: string | null;
   readonly valuePresentation?: string | null;
+  readonly mask?: string | null;
+  readonly allowedValues?: readonly DecisionFactAllowedValue[] | null;
+  readonly optionSourceRef?: DecisionFactOptionSourceRef | null;
+  readonly example?: string | null;
+  readonly constraints?: DecisionFactConstraints | null;
+  readonly governance?: DecisionFactGovernance | null;
+  readonly lineage?: DecisionFactLineage | null;
 }
 
 export interface DecisionEvidence {

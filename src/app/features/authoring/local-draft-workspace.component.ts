@@ -8,7 +8,7 @@ import {
   type DecisionTableClause,
   type DecisionTableProjection
 } from '../../core/decision-inspection';
-import { formatTableOperatorLabel } from '../../core/decision-rule-presentation';
+import { formatFactConditionValue, formatTableOperatorLabel } from '../../core/decision-rule-presentation';
 import { formatFactDisplayLabel } from '../../core/fact-presentation';
 import { PolicyStudioI18n } from '../../core/i18n';
 import type { StudioViewDepth } from '../../core/studio-shell-state.service';
@@ -19,6 +19,13 @@ interface FieldOption {
   readonly path: string;
   readonly label: string;
   readonly valueType: string;
+  readonly unit?: string | null;
+  readonly valuePresentation?: string | null;
+  readonly allowedValues?: readonly {
+    readonly value: string | number | boolean;
+    readonly label: string;
+    readonly description?: string | null;
+  }[];
 }
 
 @Component({
@@ -129,13 +136,33 @@ interface FieldOption {
                     </select>
                   </div>
                   <div role="cell">
-                    <input
-                      type="text"
-                      [attr.aria-label]="i18n.text('decisionTableValueColumn') + ' ' + (idx + 1)"
-                      [attr.data-testid]="'decision-table-value-' + idx"
-                      [disabled]="!tableProjection().lossless"
-                      [value]="clause.rawValue"
-                      (input)="updateClauseValue(idx, $any($event.target).value)" />
+                    @let selectedField = fieldOptionForPath(clause.factPath);
+                    @if (hasSelectOptions(selectedField, clause)) {
+                      <select
+                        [attr.aria-label]="i18n.text('decisionTableValueColumn') + ' ' + (idx + 1)"
+                        [attr.data-testid]="'decision-table-value-' + idx"
+                        [disabled]="!tableProjection().lossless"
+                        [value]="clause.rawValue"
+                        (change)="updateClauseAllowedValue(idx, $any($event.target).value, selectedField!.valueType)">
+                        @if (!clause.rawValue) {
+                          <option value="" disabled>{{ i18n.text('scenarioSelectPlaceholder') }}</option>
+                        }
+                        @for (opt of selectedField!.allowedValues!; track opt.value) {
+                          <option [value]="opt.value" [attr.title]="opt.description ?? null">{{ opt.label }}</option>
+                        }
+                        @if (clause.rawValue && !hasMatchingAllowedOption(selectedField!, clause.rawValue)) {
+                          <option [value]="clause.rawValue">{{ clause.rawValue }}</option>
+                        }
+                      </select>
+                    } @else {
+                      <input
+                        type="text"
+                        [attr.aria-label]="i18n.text('decisionTableValueColumn') + ' ' + (idx + 1)"
+                        [attr.data-testid]="'decision-table-value-' + idx"
+                        [disabled]="!tableProjection().lossless"
+                        [value]="clause.rawValue"
+                        (input)="updateClauseValue(idx, $any($event.target).value)" />
+                    }
                   </div>
                   <div role="cell">
                     <button
@@ -224,19 +251,64 @@ export class LocalDraftWorkspaceComponent {
   readonly operators: readonly DecisionComparisonOperator[] = ['<=', '<', '>=', '>', '===', '!==', '==', '!=', 'in'];
 
   readonly fieldOptions = computed<readonly FieldOption[]>(() => {
-    const schemas = (this.configSignal() as unknown as { fieldSchemas?: Record<string, { name?: string; label?: string; type?: string }> } | null)?.fieldSchemas ?? {};
+    const schemas = (this.configSignal() as unknown as {
+      fieldSchemas?: Record<string, {
+        name?: string;
+        label?: string;
+        type?: string;
+        allowedValues?: readonly { value: string | number | boolean; label: string; description?: string | null }[];
+        format?: { numberFormat?: { currency?: string; percentage?: boolean } };
+      }>;
+    } | null)?.fieldSchemas ?? {};
     const locale = this.i18n.locale();
     const depth = this.viewDepthSignal();
     return Object.entries(schemas).map(([key, schema]) => {
       const path = schema?.name || key;
       const rawLabel = schema?.label || key;
+      const currency = schema?.format?.numberFormat?.currency;
+      const percentage = schema?.format?.numberFormat?.percentage;
+      const valuePresentation = currency ? 'currency' : percentage ? 'percentage' : null;
       return {
         path,
         label: formatFactDisplayLabel({ path, label: rawLabel }, locale, depth, true),
-        valueType: schema?.type || 'string'
+        valueType: schema?.type || 'string',
+        unit: currency ?? (percentage ? '%' : null),
+        valuePresentation,
+        allowedValues: schema?.allowedValues
       };
     });
   });
+
+  fieldOptionForPath(path: string): FieldOption | undefined {
+    return this.fieldOptions().find(item => item.path === path);
+  }
+
+  hasSelectOptions(field: FieldOption | undefined, clause: DecisionTableClause): boolean {
+    if (!field?.allowedValues?.length || clause.operator === 'in') return false;
+    return !/^(?:parameters|params|param)\./i.test(clause.rawValue.trim());
+  }
+
+  hasMatchingAllowedOption(field: FieldOption, rawValue: string): boolean {
+    const trimmed = rawValue.trim();
+    if (!trimmed) return false;
+    const numeric = Number.isFinite(Number(trimmed)) ? Number(trimmed) : null;
+    return (field.allowedValues ?? []).some(opt =>
+      String(opt.value) === trimmed || (typeof opt.value === 'number' && numeric !== null && opt.value === numeric));
+  }
+
+  updateClauseAllowedValue(index: number, rawValue: string, valueType: string): void {
+    const current = this.tableProjection();
+    const clauses = current.clauses.map((clause, idx) =>
+      idx === index
+        ? {
+            ...clause,
+            rawValue,
+            valueKind: this.inferValueKind(valueType, clause.operator)
+          }
+        : clause
+    );
+    this.emitTableProjection({ ...current, clauses });
+  }
 
   readonly factLabels = computed<Readonly<Record<string, string>>>(() => {
     const labels: Record<string, string> = {};
@@ -285,14 +357,26 @@ export class LocalDraftWorkspaceComponent {
   }
 
   formatClauseDisplayValue(clause: DecisionTableClause): string {
-    if (this.viewDepthSignal() !== 'technical' && clause.valueKind === 'boolean') {
-      const truthy = clause.rawValue.toLowerCase() === 'true';
-      return this.i18n.locale() === 'pt-BR' ? (truthy ? 'Sim' : 'Não') : (truthy ? 'Yes' : 'No');
-    }
     if (clause.valueKind === 'var') {
       return this.labelForFact(clause.rawValue);
     }
-    return clause.rawValue;
+    const field = this.fieldOptionForPath(clause.factPath);
+    return formatFactConditionValue(
+      field
+        ? {
+            valueType: field.valueType as 'boolean' | 'string' | 'number' | 'date',
+            valuePresentation: field.valuePresentation,
+            unit: field.unit,
+            allowedValues: field.allowedValues,
+            sensitivity: 'NON_SENSITIVE',
+            redaction: 'NONE'
+          }
+        : undefined,
+      clause.rawValue,
+      clause.valueKind,
+      this.i18n.locale(),
+      this.viewDepthSignal()
+    );
   }
 
   updateCombinator(combinatorRaw: string): void {
@@ -306,7 +390,14 @@ export class LocalDraftWorkspaceComponent {
     const firstField = this.fieldOptions()[0];
     const factPath = firstField?.path ?? 'value';
     const valueKind = this.inferValueKind(firstField?.valueType, '<=');
-    const defaultRaw = valueKind === 'number' ? '0' : valueKind === 'boolean' ? 'true' : '';
+    const firstAllowed = firstField?.allowedValues?.[0]?.value;
+    const defaultRaw = firstAllowed !== undefined
+      ? String(firstAllowed)
+      : valueKind === 'number'
+        ? '0'
+        : valueKind === 'boolean'
+          ? 'true'
+          : '';
     const nextClause: DecisionTableClause = {
       factPath,
       operator: '<=',
@@ -328,15 +419,24 @@ export class LocalDraftWorkspaceComponent {
   updateClauseFact(index: number, factPath: string): void {
     const field = this.fieldOptions().find(item => item.path === factPath);
     const current = this.tableProjection();
-    const clauses = current.clauses.map((clause, idx) =>
-      idx === index
-        ? {
-            ...clause,
-            factPath,
-            valueKind: this.inferValueKind(field?.valueType, clause.operator)
-          }
-        : clause
-    );
+    const clauses = current.clauses.map((clause, idx) => {
+      if (idx !== index) return clause;
+      const valueKind = this.inferValueKind(field?.valueType, clause.operator);
+      let rawValue = clause.rawValue;
+      if (field?.allowedValues?.length && clause.operator !== 'in' && !this.hasMatchingAllowedOption(field, rawValue)) {
+        rawValue = String(field.allowedValues[0]!.value);
+      } else if (valueKind === 'boolean' && rawValue !== 'true' && rawValue !== 'false') {
+        rawValue = 'true';
+      } else if (valueKind === 'number' && (rawValue.trim() === '' || !Number.isFinite(Number(rawValue)))) {
+        rawValue = '0';
+      }
+      return {
+        ...clause,
+        factPath,
+        rawValue,
+        valueKind
+      };
+    });
     this.emitTableProjection({ ...current, clauses });
   }
 

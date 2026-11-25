@@ -168,7 +168,7 @@
 
         @if (policyConfig(); as studioConfig) {
           @if (decision(); as current) {
-            <pax-decision-explanation [decision]="current" [config]="studioConfig" />
+            <pax-decision-explanation [decision]="current" [config]="studioConfig" [viewDepth]="viewDepth()" />
           }
           <pax-decision-discovery
             [config]="studioConfig"

@@ -426,7 +426,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
 
     expect(updateScenario).not.toHaveBeenCalled();
     expect(component.scenarioError()).toBe(true);
-    expect(component.scenarioFeedback()).toBe('Facts JSON deve ser um objeto válido.');
+    expect(component.scenarioFeedback()).toBe('Os dados do cenário em JSON devem formar um objeto válido.');
     expect(component.authoringFeedback()).toBeNull();
   });
 
@@ -911,7 +911,7 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
 
     expect(createScenario).not.toHaveBeenCalled();
     expect(component.scenarioError()).toBe(true);
-    expect(component.scenarioFeedback()).toBe('O output esperado deve ser um JSON válido ou ficar vazio.');
+    expect(component.scenarioFeedback()).toBe('A saída esperada deve ser um JSON válido ou ficar vazia.');
     expect(component.authoringFeedback()).toBeNull();
   });
 
@@ -2189,5 +2189,27 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(component.isCreateDraftPrimary(promotedDecision)).toBe(true);
     expect(component.canShowNextStepEdit(promotedDecision)).toBe(false);
     expect(component.canShowNextStepCreateDraft(promotedDecision)).toBe(true);
+  });
+
+  it('uses inspect-only locked banner copy when workspaceId is absent and scenario-capable copy when workspaceId exists', () => {
+    const withWorkspace: DecisionSummary = {
+      ...decision('locked.with-workspace'),
+      slotOverridePolicy: 'LOCKED',
+      authoringSupported: false,
+      workspaceId: 'workspace-locked-1'
+    };
+    const withoutWorkspace: DecisionSummary = {
+      ...withWorkspace,
+      key: 'locked.without-workspace',
+      workspaceId: undefined
+    };
+
+    const withWsCopy = component.nextStepLockedMessage(withWorkspace);
+    const withoutWsCopy = component.nextStepLockedMessage(withoutWorkspace);
+
+    expect(withWsCopy).toBe(TestBed.inject(PolicyStudioI18n).text('nextStepLockedBody'));
+    expect(withWsCopy).toContain('simular cenários');
+    expect(withoutWsCopy).toBe(TestBed.inject(PolicyStudioI18n).text('nextStepLockedInspectOnlyBody'));
+    expect(withoutWsCopy).not.toContain('simular cenários');
   });
 });

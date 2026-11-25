@@ -149,14 +149,42 @@ export class WorkspaceAuthoringFacade {
     const locale = this.i18n.locale();
     const viewDepth = this.shellState?.viewDepth() ?? 'business';
     return {
-      fieldSchemas: Object.fromEntries(decision.facts.map(fact => [fact.path, {
-        name: fact.path,
-        label: formatFactDisplayLabel(fact, locale, viewDepth, true),
-        type: fact.valueType,
-        description: fact.description,
-        required: !fact.nullable,
-        origin: 'field'
-      }])),
+      fieldSchemas: Object.fromEntries(decision.facts.map(fact => {
+        const restricted = fact.sensitivity === 'SECRET' || fact.redaction === 'OMIT';
+        const allowedValues = !restricted && fact.allowedValues?.length
+          ? fact.allowedValues.map(opt => ({
+              value: opt.value,
+              label: opt.label,
+              ...(opt.description ? { description: opt.description } : {})
+            }))
+          : undefined;
+        const numberFormat = fact.valuePresentation === 'currency'
+          ? { currency: fact.unit?.trim() || 'BRL' }
+          : fact.valuePresentation === 'percentage'
+            ? { percentage: true }
+            : undefined;
+        const minimum = fact.constraints?.min ?? fact.constraints?.minLength;
+        const maximum = fact.constraints?.max ?? fact.constraints?.maxLength;
+        const format = fact.constraints || numberFormat
+          ? {
+              ...(minimum != null ? { minimum } : {}),
+              ...(maximum != null ? { maximum } : {}),
+              ...(fact.constraints?.pattern ? { pattern: fact.constraints.pattern } : {}),
+              ...(numberFormat ? { numberFormat } : {})
+            }
+          : undefined;
+        return [fact.path, {
+          name: fact.path,
+          label: formatFactDisplayLabel(fact, locale, viewDepth, true),
+          type: fact.valueType,
+          description: fact.description,
+          required: !fact.nullable,
+          origin: 'field',
+          ...(allowedValues ? { allowedValues } : {}),
+          ...(format ? { format } : {}),
+          ...(fact.groupLabel ? { uiConfig: { category: fact.groupLabel } } : {})
+        }];
+      })),
       ui: { showAdvanced: false, enableDragDrop: true, showInlineErrors: true },
       validation: { realTime: true, strictness: 'strict' }
     };
@@ -191,7 +219,7 @@ export class WorkspaceAuthoringFacade {
     const parameters = this.authoringOpen()
       ? this.draftParameters()
       : this.effectiveParameters(decision);
-    return buildSuggestedDraftDiffProposals(decision, condition, parameters);
+    return buildSuggestedDraftDiffProposals(decision, condition, parameters, this.i18n.locale());
   });
 
   private reviewsLoadRevision = 0;

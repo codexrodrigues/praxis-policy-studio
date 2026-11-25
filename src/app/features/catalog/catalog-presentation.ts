@@ -7,6 +7,8 @@ import type {
   DomainRuleWorkspaceReview
 } from '@praxisui/core';
 import { editableDecisionCondition } from '../../core/decision-inspection';
+import { formatFactDisplayLabel } from '../../core/fact-presentation';
+import type { SupportedLocale } from '../../core/runtime-config';
 import type {
   DecisionFact,
   DecisionLifecycleSummary,
@@ -182,7 +184,9 @@ export function isPublishableSnapshotSource(item: DecisionSummary): boolean {
 }
 
 export function parseScenarioFactValue(fact: DecisionFact, rawValue: string | boolean): unknown {
-  if (fact.valueType === 'boolean') return Boolean(rawValue);
+  if (fact.valueType === 'boolean') {
+    return typeof rawValue === 'boolean' ? rawValue : String(rawValue).trim().toLowerCase() === 'true';
+  }
   const text = String(rawValue).trim();
   if (fact.valueType === 'number') return text === '' ? null : Number(text);
   if (fact.valueType === 'number-array' || fact.valueType === 'array<number>') {
@@ -484,7 +488,8 @@ function suggestedFactValue(
   hint: ConditionFactHint | undefined,
   outcome: 'ALLOW' | 'DENY'
 ): unknown {
-  if (hint) {
+  const restricted = fact.sensitivity === 'SECRET' || fact.redaction === 'OMIT';
+  if (!restricted && hint) {
     const { operator, targetValue } = hint;
     if (typeof targetValue === 'number' && Number.isFinite(targetValue)) {
       if (outcome === 'ALLOW') {
@@ -517,12 +522,28 @@ function suggestedFactValue(
     }
   }
 
+  if (!restricted && fact.allowedValues && fact.allowedValues.length > 0) {
+    if (outcome === 'ALLOW') {
+      return fact.allowedValues[0]!.value;
+    }
+    if (fact.allowedValues.length > 1) {
+      return fact.allowedValues[1]!.value;
+    }
+  }
+  if (outcome === 'ALLOW' && !restricted && fact.example && fact.example.trim()) {
+    const parsedExample = parseScenarioFactValue(fact, fact.example);
+    if (parsedExample !== null && (typeof parsedExample !== 'number' || Number.isFinite(parsedExample))) {
+      return parsedExample;
+    }
+  }
+
   if (fact.valueType === 'number') return outcome === 'ALLOW' ? 100 : 999999;
   if (fact.valueType === 'boolean') return outcome === 'ALLOW';
   if (fact.valueType === 'date') return outcome === 'ALLOW' ? '2026-01-15' : '2099-12-31';
   if (fact.valueType === 'number-array' || fact.valueType === 'array<number>') return outcome === 'ALLOW' ? [100] : [999999];
   if (fact.valueType === 'string-array') return outcome === 'ALLOW' ? ['VALID'] : ['INVALID'];
   if (fact.valueType === 'date-array') return outcome === 'ALLOW' ? ['2026-01-15'] : ['2099-12-31'];
+  if (restricted) return outcome === 'ALLOW' ? 'SYNTHETIC_VALID' : 'SYNTHETIC_INVALID';
   return outcome === 'ALLOW' ? 'VALID' : 'INVALID';
 }
 
@@ -832,10 +853,23 @@ function replaceFirstNumericComparison(
   return { nextNode: node, changed: null };
 }
 
+function proposalFactDisplayLabel(
+  decision: DecisionSummary,
+  factPath: string,
+  locale: SupportedLocale
+): string {
+  const matched = decision.facts.find(fact => fact.path === factPath);
+  if (matched) {
+    return formatFactDisplayLabel(matched, locale, 'business', true);
+  }
+  return formatFactDisplayLabel({ path: factPath, label: factPath }, locale, 'business', true);
+}
+
 export function buildSuggestedDraftDiffProposals(
   decision: DecisionSummary | null | undefined,
   currentCondition?: unknown,
-  currentParameters?: Readonly<Record<string, unknown>>
+  currentParameters?: Readonly<Record<string, unknown>>,
+  locale: SupportedLocale = 'pt-BR'
 ): readonly SuggestedDraftDiffProposal[] {
   if (!decision) return [];
   const proposals: SuggestedDraftDiffProposal[] = [];
@@ -856,10 +890,11 @@ export function buildSuggestedDraftDiffProposals(
   });
   if (relaxResult.changed && relaxResult.changed.nextValue !== relaxResult.changed.previousValue) {
     const signLabel = relaxResult.changed.nextValue > relaxResult.changed.previousValue ? '+10%' : '-10%';
+    const factLabel = proposalFactDisplayLabel(decision, relaxResult.changed.factPath, locale);
     proposals.push({
       id: 'RELAX_THRESHOLD_10',
       kind: 'CONDITION_THRESHOLD',
-      label: `${relaxResult.changed.factPath} ${relaxResult.changed.operator} ${relaxResult.changed.nextValue} (${signLabel})`,
+      label: `${factLabel} ${relaxResult.changed.operator} ${relaxResult.changed.nextValue} (${signLabel})`,
       summary: `${relaxResult.changed.previousValue} → ${relaxResult.changed.nextValue}`,
       condition: relaxResult.nextNode,
       parameters: null
@@ -876,10 +911,11 @@ export function buildSuggestedDraftDiffProposals(
   });
   if (tightenResult.changed && tightenResult.changed.nextValue !== tightenResult.changed.previousValue) {
     const signLabel = tightenResult.changed.nextValue > tightenResult.changed.previousValue ? '+10%' : '-10%';
+    const factLabel = proposalFactDisplayLabel(decision, tightenResult.changed.factPath, locale);
     proposals.push({
       id: 'TIGHTEN_THRESHOLD_10',
       kind: 'CONDITION_THRESHOLD',
-      label: `${tightenResult.changed.factPath} ${tightenResult.changed.operator} ${tightenResult.changed.nextValue} (${signLabel})`,
+      label: `${factLabel} ${tightenResult.changed.operator} ${tightenResult.changed.nextValue} (${signLabel})`,
       summary: `${tightenResult.changed.previousValue} → ${tightenResult.changed.nextValue}`,
       condition: tightenResult.nextNode,
       parameters: null

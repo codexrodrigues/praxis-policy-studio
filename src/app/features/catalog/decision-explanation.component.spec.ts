@@ -1,8 +1,9 @@
 import '@angular/compiler';
+import { ɵresolveComponentResources as resolveComponentResources } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { BrowserTestingModule, platformBrowserTesting } from '@angular/platform-browser/testing';
 import { Subject } from 'rxjs';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DecisionExplanationService, type DecisionExplanationEvent } from '../../core/decision-explanation.service';
 import { PolicyStudioI18n } from '../../core/i18n';
 import type { DecisionSummary } from './catalog.fixture';
@@ -37,19 +38,41 @@ describe('DecisionExplanationComponent', () => {
   const explanationEvents = new Subject<DecisionExplanationEvent>();
   const explain = vi.fn();
 
-  beforeEach(() => {
+  beforeAll(async () => {
+    const fsModule = (
+      globalThis as unknown as {
+        process?: {
+          getBuiltinModule?: (id: string) => {
+            readFileSync: (file: URL, encoding: string) => string;
+          };
+        };
+      }
+    ).process?.getBuiltinModule?.('node:fs');
+
+    await resolveComponentResources(async url => {
+      if (url.endsWith('.scss')) {
+        return '';
+      }
+      return fsModule?.readFileSync(new URL(url, import.meta.url), 'utf8') ?? '';
+    });
+  });
+
+  beforeEach(async () => {
     explain.mockReset();
     explain.mockReturnValue(explanationEvents.asObservable());
-    TestBed.configureTestingModule({ providers: [
-      PolicyStudioI18n,
-      { provide: DecisionExplanationService, useValue: { explain } }
-    ] });
+    await TestBed.configureTestingModule({
+      imports: [DecisionExplanationComponent],
+      providers: [
+        PolicyStudioI18n,
+        { provide: DecisionExplanationService, useValue: { explain } }
+      ]
+    }).compileComponents();
   });
 
   afterEach(() => TestBed.resetTestingModule());
 
   it('requests the exact selected version and exposes only a consultative result', () => {
-    const component = TestBed.runInInjectionContext(() => new DecisionExplanationComponent(TestBed.inject(PolicyStudioI18n)));
+    const component = TestBed.runInInjectionContext(() => new DecisionExplanationComponent());
     component.decision = decision();
     component.config = config;
     component.explain();
@@ -73,7 +96,7 @@ describe('DecisionExplanationComponent', () => {
     const first = new Subject<DecisionExplanationEvent>();
     const second = new Subject<DecisionExplanationEvent>();
     explain.mockReturnValueOnce(first.asObservable()).mockReturnValueOnce(second.asObservable());
-    const component = TestBed.runInInjectionContext(() => new DecisionExplanationComponent(TestBed.inject(PolicyStudioI18n)));
+    const component = TestBed.runInInjectionContext(() => new DecisionExplanationComponent());
     component.decision = decision(2);
     component.config = config;
     component.explain();
@@ -87,7 +110,7 @@ describe('DecisionExplanationComponent', () => {
   });
 
   it('does not expose the command for fixture or unversioned decisions', () => {
-    const component = TestBed.runInInjectionContext(() => new DecisionExplanationComponent(TestBed.inject(PolicyStudioI18n)));
+    const component = TestBed.runInInjectionContext(() => new DecisionExplanationComponent());
     component.decision = { ...decision(), configVersion: undefined };
     component.config = config;
     expect(component.available()).toBe(false);
@@ -96,7 +119,7 @@ describe('DecisionExplanationComponent', () => {
   });
 
   it('lets the user cancel a request that is still in progress', () => {
-    const component = TestBed.runInInjectionContext(() => new DecisionExplanationComponent(TestBed.inject(PolicyStudioI18n)));
+    const component = TestBed.runInInjectionContext(() => new DecisionExplanationComponent());
     component.decision = decision();
     component.config = config;
     component.explain();
@@ -107,7 +130,7 @@ describe('DecisionExplanationComponent', () => {
 
   it('leaves progress with a recoverable failure after the absolute timeout', () => {
     vi.useFakeTimers();
-    const component = TestBed.runInInjectionContext(() => new DecisionExplanationComponent(TestBed.inject(PolicyStudioI18n)));
+    const component = TestBed.runInInjectionContext(() => new DecisionExplanationComponent());
     component.decision = decision();
     component.config = config;
     component.explain();
@@ -118,7 +141,7 @@ describe('DecisionExplanationComponent', () => {
   });
 
   it('surfaces observable progress phase labels before terminal completion', () => {
-    const component = TestBed.runInInjectionContext(() => new DecisionExplanationComponent(TestBed.inject(PolicyStudioI18n)));
+    const component = TestBed.runInInjectionContext(() => new DecisionExplanationComponent());
     component.decision = decision();
     component.config = config;
     component.explain();
@@ -128,5 +151,57 @@ describe('DecisionExplanationComponent', () => {
 
     explanationEvents.next({ kind: 'progress', phase: 'synthesizing', eventSeq: 3 });
     expect(component.progressPhaseLabel(component.state())).toContain('Sintetizando explicação');
+  });
+
+  it('renders attested safe facts and omittedFields disclosures without nested cards in DOM', () => {
+    const fixture = TestBed.createComponent(DecisionExplanationComponent);
+    fixture.componentRef.setInput('decision', decision());
+    fixture.componentRef.setInput('config', config);
+    fixture.componentRef.setInput('viewDepth', 'business');
+    fixture.detectChanges();
+
+    const trigger = fixture.nativeElement.querySelector('.explain-button') as HTMLButtonElement;
+    trigger.click();
+    explanationEvents.next({
+      kind: 'completed',
+      message: 'Regra avaliada com segurança.',
+      canApply: false,
+      evidence: {
+        schemaVersion: 'v1',
+        definitionHash: 'd',
+        conditionHash: 'c',
+        resolvedVersion: 2,
+        exposureMode: 'summary_only',
+        redactionMode: 'summary_only',
+        sourceRefCount: 1,
+        omittedFields: ['factCatalog.secretOrDeniedFacts', 'conditionAst.containsRestrictedFacts'],
+        facts: [
+          {
+            path: 'request.days',
+            label: 'Dias solicitados',
+            valueType: 'number',
+            nullable: false,
+            sensitivity: 'NON_SENSITIVE',
+            redaction: 'NONE',
+            unit: 'days',
+            mask: '999',
+            description: 'Total de dias pedidos.',
+            hint: 'Até 30 dias.'
+          }
+        ]
+      }
+    });
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const omittedEl = el.querySelector('[data-testid="ai-explanation-omitted-fields"]');
+    expect(omittedEl?.textContent).toContain('Fatos secretos ou vedados para IA omitidos');
+    expect(omittedEl?.textContent).toContain('Expressão completa omitida por referenciar dado restrito');
+
+    const attestedEl = el.querySelector('[data-testid="ai-explanation-attested-facts"]');
+    expect(attestedEl?.textContent).toContain('Dias solicitados');
+    expect(attestedEl?.textContent).toContain('dias');
+    expect(attestedEl?.textContent).toContain('999');
+    fixture.destroy();
   });
 });

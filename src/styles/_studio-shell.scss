@@ -204,6 +204,50 @@
   opacity: 0.58;
 }
 
+.studio-control {
+  min-width: 0;
+  min-height: 2.25rem;
+  border: 1px solid var(--pax-color-outline);
+  border-radius: var(--pax-radius-md);
+  padding: 0.45rem 0.7rem;
+  background: var(--pax-color-surface);
+  color: var(--pax-color-on-surface);
+  font: inherit;
+  font-size: var(--pax-text-sm);
+  line-height: var(--pax-lh-sm);
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+textarea.studio-control {
+  min-height: 4.5rem;
+  resize: vertical;
+}
+
+select.studio-control {
+  cursor: pointer;
+}
+
+select.studio-control option {
+  background: var(--pax-color-surface);
+  color: var(--pax-color-on-surface);
+}
+
+.studio-control:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--pax-color-primary) 55%, var(--pax-color-outline));
+}
+
+.studio-control:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--pax-color-primary) 38%, transparent);
+  outline-offset: 1px;
+  border-color: var(--pax-color-primary);
+}
+
+.studio-control:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  background: var(--pax-color-surface-container-low);
+}
+
 .studio-scroll-region {
   scrollbar-gutter: stable;
   overscroll-behavior: contain;
@@ -233,7 +277,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .quiet-button,
-  .primary-action {
+  .primary-action,
+  .studio-control {
     transition: none;
   }
 

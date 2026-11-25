@@ -27,6 +27,20 @@ describe('humanize-labels', () => {
     );
     expect(humanizeTechnicalSlug('tipoFrequencia')).toBe('Tipo Frequência');
     expect(humanizeTechnicalSlug('api_cpf_check')).toBe('API CPF Check');
+    expect(humanizeTechnicalSlug('diasDecorridosAnaliseTce', undefined, 'pt-BR')).toBe(
+      'Dias Decorridos Análise TCE'
+    );
+    expect(humanizeTechnicalSlug('idadeNoObitoValidoInss', undefined, 'pt-BR')).toBe(
+      'Idade no Óbito Válido INSS'
+    );
+    expect(humanizeTechnicalSlug('operation', undefined, 'pt-BR')).toBe('Operação');
+    expect(humanizeTechnicalSlug('operation', undefined, 'en-US')).toBe('Operation');
+    expect(humanizeTechnicalSlug('registroConcomitanteCount', undefined, 'pt-BR')).toBe(
+      'Registro Concomitante (Quantidade)'
+    );
+    expect(humanizeTechnicalSlug('registroConcomitanteCount', undefined, 'en-US')).toBe(
+      'Registro Concomitante Count'
+    );
   });
 
   it('strips leading rule codes when presenting in business mode while preserving full titles', () => {

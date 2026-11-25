@@ -118,3 +118,67 @@ button:disabled { cursor: wait; opacity: 0.65; }
   color: var(--pax-color-on-surface-variant);
   font-size: var(--pax-text-xs);
 }
+
+.subsection-label {
+  margin: 0;
+  color: var(--pax-color-on-surface-variant);
+  font-size: var(--pax-text-xs);
+  font-weight: 700;
+}
+
+.explanation-redaction-note,
+.explanation-attested-facts {
+  display: grid;
+  gap: 0.4rem;
+  padding-top: 0.55rem;
+  border-top: 1px dashed var(--pax-color-outline-variant);
+}
+
+.explanation-redaction-note ul,
+.explanation-attested-facts ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.explanation-redaction-note li {
+  padding: 0.28rem 0.5rem;
+  border-radius: 0.35rem;
+  border-inline-start: 2px solid var(--pax-color-warning);
+  background: color-mix(in oklab, var(--pax-color-warning-container) 38%, transparent);
+  font-size: var(--pax-text-xs);
+  line-height: 1.4;
+}
+
+.explanation-attested-facts li {
+  display: grid;
+  gap: 0.15rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--pax-color-outline-variant) 45%, transparent);
+  font-size: var(--pax-text-xs);
+}
+
+.explanation-attested-facts li:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.attested-fact-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.35rem;
+  font-size: var(--pax-text-xs);
+}
+
+.attested-fact-hint {
+  font-style: italic;
+}
+
+.attested-fact-path {
+  font-family: var(--pax-font-mono);
+  font-size: 0.7rem;
+  color: var(--pax-color-on-surface-variant);
+}

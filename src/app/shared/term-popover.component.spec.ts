@@ -126,4 +126,29 @@ describe('TermPopoverComponent', () => {
     expect(card.querySelectorAll('.pax-term-card-meta-pill').length).toBe(2);
     expect(card.querySelector('.pax-term-card-detail')).toBeNull();
   });
+
+  it('does not open involuntarily on passive focus, uses role="dialog" when clicked, and uses role="tooltip" on hover for passive content', () => {
+    const component = createComponent({ actionLabel: null });
+    const trigger = fixture.debugElement.query(By.css('.pax-term-trigger')).nativeElement as HTMLButtonElement;
+
+    trigger.dispatchEvent(new FocusEvent('focus'));
+    fixture.detectChanges();
+    expect(component.open()).toBe(false);
+
+    vi.useFakeTimers();
+    const host = fixture.debugElement.query(By.css('.pax-term-host')).nativeElement as HTMLElement;
+    host.dispatchEvent(new MouseEvent('mouseenter'));
+    vi.advanceTimersByTime(160);
+    fixture.detectChanges();
+    vi.useRealTimers();
+
+    expect(component.open()).toBe(true);
+    let card = fixture.debugElement.query(By.css('.pax-term-card')).nativeElement as HTMLElement;
+    expect(card.getAttribute('role')).toBe('tooltip');
+
+    trigger.click();
+    fixture.detectChanges();
+    card = fixture.debugElement.query(By.css('.pax-term-card')).nativeElement as HTMLElement;
+    expect(card.getAttribute('role')).toBe('dialog');
+  });
 });

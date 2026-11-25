@@ -211,7 +211,8 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
                   </p>
                 }
                 <div class="fact-meta">
-                  @for (tag of model.metaTags; track tag.label + ':' + $index; let last = $last) {
+                  @let tags = cardMetaTags(fact, model, sensitivity.label);
+                  @for (tag of tags; track tag.label + ':' + $index; let last = $last) {
                     <span>{{ tag.label }}</span>
                     @if (!last) {
                       <span>·</span>
@@ -222,6 +223,9 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
                   <div class="fact-tech-meta studio-mono">
                     <code>{{ fact.path }}</code>
                     <span>{{ fact.sensitivity }} / {{ fact.redaction }}</span>
+                    @if (technicalLineageText(fact); as lineageText) {
+                      <small class="fact-tech-lineage">{{ lineageText }}</small>
+                    }
                   </div>
                 }
               </li>
@@ -235,8 +239,19 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
               <summary>
                 <span>{{ i18n.format('ruleOtherCatalogFactsHeading', { count: partitioned.catalogOnlyFacts.length }) }}</span>
               </summary>
+              @if (partitioned.catalogOnlyFacts.length >= 8) {
+                <label class="catalog-facts-search">
+                  <span>{{ i18n.text('factListSearchLabel') }}</span>
+                  <input
+                    type="search"
+                    data-testid="rule-other-facts-search"
+                    [value]="catalogFactsQuery()"
+                    [attr.placeholder]="i18n.text('factListSearchPlaceholder')"
+                    (input)="catalogFactsQuery.set($any($event.target).value)">
+                </label>
+              }
               <ul class="catalog-only-cards">
-                @for (fact of partitioned.catalogOnlyFacts; track fact.path) {
+                @for (fact of filteredCatalogOnlyFacts(); track fact.path) {
                   @let model = factCardModel(fact);
                   <li class="fact-card is-catalog-only">
                     <div class="fact-card-head">
@@ -261,6 +276,8 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
                       }
                     </div>
                   </li>
+                } @empty {
+                  <li class="inspection-empty">{{ i18n.text('factListSearchEmpty') }}</li>
                 }
               </ul>
             </details>
@@ -639,9 +656,9 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
       grid-template-columns: minmax(0, 1fr);
       gap: 0.25rem;
       padding: var(--pax-space-3);
-      border-radius: var(--pax-radius-md);
-      border: 1px solid var(--pax-color-outline-variant);
-      background: var(--pax-color-surface);
+      border-radius: var(--pax-radius-sm);
+      border: 1px solid color-mix(in oklab, var(--pax-color-outline-variant) 55%, transparent);
+      background: var(--pax-color-surface-container-low);
       min-width: 0;
       max-width: 100%;
       box-sizing: border-box;
@@ -703,6 +720,34 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
       font-size: var(--pax-text-xs);
       font-weight: 600;
       margin-bottom: var(--pax-space-2);
+    }
+
+    .catalog-facts-search {
+      display: grid;
+      gap: 0.25rem;
+      margin-bottom: var(--pax-space-2);
+      font-size: var(--pax-text-xs);
+      font-weight: 600;
+      color: var(--pax-color-on-surface-variant);
+    }
+
+    .catalog-facts-search input {
+      width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+      border: 1px solid var(--pax-color-outline-variant);
+      border-radius: var(--pax-radius-sm);
+      padding: 0.4rem 0.6rem;
+      background: var(--pax-color-surface);
+      color: var(--pax-color-on-surface);
+      font: inherit;
+    }
+
+    .fact-tech-lineage {
+      flex-basis: 100%;
+      color: var(--pax-color-on-surface-variant);
+      font-size: 0.7rem;
+      overflow-wrap: anywhere;
     }
 
     .fact-card.is-catalog-only {
@@ -1003,9 +1048,64 @@ export class DecisionRuleInspectionComponent {
   });
 
   readonly partitionedFacts = computed(() => partitionDecisionFacts(this.decisionSignal()));
+  readonly catalogFactsQuery = signal('');
+  readonly filteredCatalogOnlyFacts = computed<readonly DecisionFact[]>(() => {
+    const facts = this.partitionedFacts().catalogOnlyFacts;
+    const query = this.catalogFactsQuery().trim().toLowerCase();
+    if (!query) return facts;
+    return facts.filter(fact => {
+      const model = this.factCardModel(fact);
+      return model.chipLabel.toLowerCase().includes(query)
+        || model.group.label.toLowerCase().includes(query)
+        || fact.path.toLowerCase().includes(query);
+    });
+  });
 
   factCardModel(fact: DecisionFact): FactPopoverModel {
     return formatFactPopoverModel(fact, this.i18n.locale(), this.viewDepthSignal());
+  }
+
+  cardMetaTags(
+    fact: DecisionFact,
+    model: FactPopoverModel,
+    sensitivityLabel: string
+  ) {
+    const normalizedSensitivity = sensitivityLabel.trim().toLowerCase();
+    return model.metaTags
+      .map(tag => {
+        const label = tag.label.trim();
+        const lower = label.toLowerCase();
+        if (lower === normalizedSensitivity || lower === fact.sensitivity.trim().toLowerCase()) {
+          return null;
+        }
+        const prefix = `${normalizedSensitivity} · `;
+        if (lower.startsWith(prefix)) {
+          const remainder = label.slice(prefix.length).trim();
+          return remainder ? { ...tag, label: remainder } : null;
+        }
+        return tag;
+      })
+      .filter((tag): tag is FactPopoverModel['metaTags'][number] => tag !== null);
+  }
+
+  technicalLineageText(fact: DecisionFact): string | null {
+    const parts: string[] = [];
+    const lineageParts = [
+      fact.lineage?.sourceResourceKey?.trim(),
+      fact.lineage?.attributeId?.trim(),
+      fact.lineage?.transformation?.trim()
+    ].filter((item): item is string => Boolean(item));
+    if (lineageParts.length > 0) {
+      parts.push(`lineage: ${lineageParts.join(' · ')}`);
+    }
+    const lookupParts = [
+      fact.optionSourceRef?.sourceKey?.trim(),
+      fact.optionSourceRef?.resourceKey?.trim()
+    ].filter((item): item is string => Boolean(item));
+    if (lookupParts.length > 0) {
+      parts.push(`lookup: ${lookupParts.join(' · ')}`);
+    }
+    return parts.length > 0 ? parts.join(' | ') : null;
   }
 
   factDisplayLabel(fact: DecisionFact): string {

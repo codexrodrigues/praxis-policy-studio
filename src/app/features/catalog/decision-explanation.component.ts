@@ -1,8 +1,14 @@
 import { ChangeDetectionStrategy, Component, Input, OnChanges, OnDestroy, inject, signal } from '@angular/core';
 import { Subscription, map, merge, takeWhile, timer } from 'rxjs';
-import { DecisionExplanationService, type DecisionExplanationEvent } from '../../core/decision-explanation.service';
+import {
+  DecisionExplanationService,
+  type DecisionExplanationEvent,
+  type DecisionExplanationSafeFact
+} from '../../core/decision-explanation.service';
+import { localizeGenericUnit } from '../../core/humanize-labels';
 import { PolicyStudioI18n } from '../../core/i18n';
 import type { PolicyStudioRuntimeConfig } from '../../core/runtime-config';
+import type { StudioViewDepth } from '../../core/studio-shell-state.service';
 import type { DecisionSummary } from './catalog.fixture';
 
 @Component({
@@ -15,13 +21,13 @@ export class DecisionExplanationComponent implements OnChanges, OnDestroy {
   private static readonly REQUEST_TIMEOUT_MS = 90_000;
   @Input({ required: true }) decision!: DecisionSummary;
   @Input({ required: true }) config!: PolicyStudioRuntimeConfig;
+  @Input() viewDepth: StudioViewDepth = 'business';
 
   private readonly explanations = inject(DecisionExplanationService);
+  readonly i18n = inject(PolicyStudioI18n);
   private subscription: Subscription | null = null;
   private activeRequestKey: string | null = null;
   readonly state = signal<DecisionExplanationEvent | { readonly kind: 'idle' }>({ kind: 'idle' });
-
-  constructor(readonly i18n: PolicyStudioI18n) {}
 
   ngOnChanges(): void {
     this.reset();
@@ -95,6 +101,25 @@ export class DecisionExplanationComponent implements OnChanges, OnDestroy {
     if (event.phase === 'connecting') return this.i18n.text('aiExplanationPhaseConnecting');
     if (event.phase === 'inspecting_evidence') return this.i18n.text('aiExplanationPhaseInspectingEvidence');
     return this.i18n.text('aiExplanationPhaseSynthesizing');
+  }
+
+  omittedFieldLabel(code: string): string {
+    const map: Readonly<Record<string, string>> = {
+      'factCatalog.secretOrDeniedFacts': this.i18n.text('aiOmittedSecretOrDeniedFacts'),
+      'factCatalog.summarizedOrMaskedFacts': this.i18n.text('aiOmittedSummarizedOrMaskedFacts'),
+      'conditionAst.containsRestrictedFacts': this.i18n.text('aiOmittedConditionAstRestricted'),
+      'conditionFactPaths.restrictedFacts': this.i18n.text('aiOmittedConditionPathsRestricted')
+    };
+    const translated = map[code] ?? this.i18n.text('aiOmittedOtherField');
+    return this.viewDepth === 'technical' ? `${translated} (${code})` : translated;
+  }
+
+  safeFactMeta(fact: DecisionExplanationSafeFact): string | null {
+    const parts: string[] = [];
+    const localizedUnit = localizeGenericUnit(fact.unit, this.i18n.locale());
+    if (localizedUnit) parts.push(localizedUnit);
+    if (fact.mask?.trim()) parts.push(fact.mask.trim());
+    return parts.length > 0 ? parts.join(' · ') : null;
   }
 
   failureMessage(reason: Extract<DecisionExplanationEvent, { kind: 'failed' }>['reason']): string {

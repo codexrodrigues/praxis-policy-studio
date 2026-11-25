@@ -1,11 +1,12 @@
 import '@angular/compiler';
-import { provideHttpClient } from '@angular/common/http';
+import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { BrowserTestingModule, platformBrowserTesting } from '@angular/platform-browser/testing';
 import { API_URL, DomainRuleService, type ResourceActionCatalogItem } from '@praxisui/core';
 import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { GovernedHostScopeService } from './governed-host-scope.service';
 import { ProjectionCatalogService } from './projection-catalog.service';
 
 TestBed.initTestEnvironment(BrowserTestingModule, platformBrowserTesting());
@@ -66,6 +67,10 @@ describe('ProjectionCatalogService', () => {
     ] });
     service = TestBed.inject(ProjectionCatalogService);
     http = TestBed.inject(HttpTestingController);
+    const scopeService = TestBed.inject(GovernedHostScopeService);
+    const tenantId = scopeService.syncFromQueryString().tenantId;
+    scopeService.rotateCsrfSession(document.location.origin, tenantId, 'spec-csrf-token');
+    scopeService.rotateCsrfSession('http://localhost:8088', tenantId, 'spec-csrf-token');
   });
 
   afterEach(() => {
@@ -1607,5 +1612,235 @@ describe('ProjectionCatalogService', () => {
       unit: 'BRL',
       valuePresentation: 'CURRENCY'
     });
+  });
+
+  it('maps allowedValues optionSourceRef constraints governance lineage and redacts SECRET/OMIT examples', () => {
+    const http = TestBed.inject(HttpTestingController);
+    const service = TestBed.inject(ProjectionCatalogService);
+    const config = {
+      mode: 'remote' as const, configApiBaseUrl: '', locale: 'en-US' as const,
+      projectionPath: null, initialDecisionKey: null
+    };
+    let summaries: readonly import('../features/catalog/catalog.fixture').DecisionSummary[] = [];
+
+    service.load('en-US', config).subscribe(value => { summaries = value; });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/catalog?page=0&limit=12').flush({
+      page: 0, limit: 12, hasMore: false, candidates: [{
+        definitionId: 'def-rich',
+        ruleKey: 'benefits.rich-fact',
+        version: 1,
+        ruleType: 'selection_eligibility',
+        status: 'active',
+        contextKey: 'benefits',
+        resourceKey: 'benefits.requests',
+        serviceKey: 'benefits-service',
+        updatedAt: '2026-11-24T12:00:00Z'
+      }]
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities').flush({
+      tenantId: 'rio', environment: 'local', definitions: []
+    });
+    http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([]);
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-rich').flush({
+      id: 'def-rich',
+      ruleKey: 'benefits.rich-fact',
+      version: 1,
+      ruleType: 'selection_eligibility',
+      status: 'active',
+      serviceKey: 'benefits-service',
+      definition: { ruleSetKey: 'benefits.requests' },
+      condition: { '===': [{ var: 'worker.status' }, 'ACTIVE'] },
+      parameters: {}
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-rich/facts').flush({
+      definitionId: 'def-rich',
+      ruleKey: 'benefits.rich-fact',
+      definitionVersion: 1,
+      schemaVersion: 'praxis.domain-rule-fact-catalog.v1',
+      facts: [
+        {
+          path: 'worker.status',
+          valueType: 'string',
+          nullable: false,
+          labels: { 'pt-BR': 'Situação do servidor' },
+          descriptions: { 'pt-BR': 'Situação funcional.' },
+          hints: { 'pt-BR': 'Somente ativos.' },
+          groupKey: 'eligibilidade',
+          groupLabels: { 'pt-BR': 'Elegibilidade' },
+          mask: 'AAAA',
+          example: 'ACTIVE',
+          allowedValues: [{ value: 'ACTIVE', labels: { 'pt-BR': 'Ativo', 'en-US': 'Active' }, tone: 'success' }],
+          optionSourceRef: { sourceKey: 'statuses', resourceKey: 'workforce.statuses' },
+          constraints: { minLength: 3, maxLength: 20, pattern: '^[A-Z_]+$' },
+          governance: { classification: 'internal', dataCategory: 'personal', exportable: true, aiVisibility: 'allow' },
+          lineage: { attributeId: 'workforce.worker.status', sourceResourceKey: 'workforce.workers', transformation: 'DIRECT' },
+          providerRef: 'benefits',
+          evidenceRefs: ['ev-1'],
+          sensitivity: 'PERSONAL',
+          redaction: 'MASK'
+        },
+        {
+          path: 'actor.secretToken',
+          valueType: 'string',
+          nullable: false,
+          labels: { 'pt-BR': 'Token' },
+          descriptions: { 'pt-BR': 'Segredo.' },
+          example: 'should-redact',
+          allowedValues: [{ value: 'ROOT', labels: { 'pt-BR': 'Root' } }],
+          governance: { aiVisibility: 'deny' },
+          providerRef: 'auth',
+          evidenceRefs: ['ev-2'],
+          sensitivity: 'SECRET',
+          redaction: 'OMIT'
+        }
+      ]
+    });
+
+    const facts = summaries[0]!.facts;
+    expect(facts[0]).toMatchObject({
+      label: 'Situação do servidor',
+      groupKey: 'eligibilidade',
+      groupLabel: 'Elegibilidade',
+      mask: 'AAAA',
+      example: 'ACTIVE',
+      allowedValues: [{ value: 'ACTIVE', label: 'Active', tone: 'success' }],
+      optionSourceRef: { sourceKey: 'statuses', resourceKey: 'workforce.statuses' },
+      constraints: { minLength: 3, maxLength: 20, pattern: '^[A-Z_]+$' },
+      governance: { aiVisibility: 'allow' },
+      lineage: { attributeId: 'workforce.worker.status', sourceResourceKey: 'workforce.workers', transformation: 'DIRECT' }
+    });
+    expect(facts[1]!.example).toBeUndefined();
+    expect(facts[1]!.allowedValues).toBeUndefined();
+  });
+
+  it('does not corrupt string date/time facts into number on relational operators and bounds catalog detail concurrency', () => {
+    let summaries: readonly import('../features/catalog/catalog.fixture').DecisionSummary[] = [];
+    service.load('pt-BR', {
+      mode: 'remote',
+      configApiBaseUrl: '',
+      locale: 'pt-BR',
+      projectionPath: null,
+      initialDecisionKey: null
+    }).subscribe(value => summaries = value);
+
+    http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([]);
+    http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities').flush({
+      tenantId: 'default',
+      environment: 'dev',
+      definitions: []
+    });
+
+    const candidates = Array.from({ length: 8 }, (_, idx) => ({
+      definitionId: `def-${idx}`,
+      ruleKey: `workforce.rule.${idx}`,
+      version: 1,
+      ruleType: 'validation',
+      status: 'active',
+      contextKey: 'workforce',
+      resourceKey: `workforce.res.${idx}`,
+      serviceKey: 'workforce-service'
+    }));
+    http.expectOne(req => req.url.endsWith('/definitions/catalog')).flush({
+      schemaVersion: 'praxis-domain-rule-catalog.v1',
+      page: 0,
+      limit: 12,
+      hasMore: false,
+      candidates
+    });
+
+    // At concurrency 6, only first 6 detail requests should be in-flight before flushing!
+    for (let idx = 0; idx < 6; idx++) {
+      const id = `def-${idx}`;
+      http.expectOne(`/api/praxis/config/domain-rules/definitions/${id}`).flush({
+        id,
+        ruleKey: `workforce.rule.${idx}`,
+        version: 1,
+        status: 'active',
+        condition: idx === 0
+          ? { and: [{ '<=': [{ var: 'draft.entryTime' }, '18:00'] }, { '<=': [{ var: 'draft.days' }, 10] }] }
+          : null,
+        parameters: {}
+      });
+      http.expectOne(`/api/praxis/config/domain-rules/definitions/${id}/facts`).flush(
+        factCatalog(id, `workforce.rule.${idx}`, idx === 0
+          ? [
+              {
+                path: 'draft.entryTime',
+                valueType: 'string',
+                nullable: false,
+                labels: { 'pt-BR': 'Hora de entrada' },
+                descriptions: { 'pt-BR': 'Hora' },
+                providerRef: 'workforce',
+                evidenceRefs: [],
+                sensitivity: 'NON_SENSITIVE',
+                redaction: 'NONE'
+              },
+              {
+                path: 'draft.days',
+                valueType: 'string',
+                nullable: false,
+                labels: { 'pt-BR': 'Dias' },
+                descriptions: { 'pt-BR': 'Dias' },
+                providerRef: 'workforce',
+                evidenceRefs: [],
+                sensitivity: 'NON_SENSITIVE',
+                redaction: 'NONE'
+              }
+            ]
+          : [])
+      );
+    }
+
+    for (let idx = 6; idx < 8; idx++) {
+      const id = `def-${idx}`;
+      http.expectOne(`/api/praxis/config/domain-rules/definitions/${id}`).flush({
+        id,
+        ruleKey: `workforce.rule.${idx}`,
+        version: 1,
+        status: 'active',
+        condition: null,
+        parameters: {}
+      });
+      http.expectOne(`/api/praxis/config/domain-rules/definitions/${id}/facts`).flush(
+        factCatalog(id, `workforce.rule.${idx}`, [])
+      );
+    }
+
+    expect(summaries).toHaveLength(8);
+    expect(summaries[0]?.facts[0]?.valueType).toBe('string');
+    expect(summaries[0]?.facts[1]?.valueType).toBe('number');
+  });
+
+  it('hydrates remote CSRF via /auth/session before createWorkspace when memory token is missing', () => {
+    const scopeService = TestBed.inject(GovernedHostScopeService);
+    const tenantId = scopeService.syncFromQueryString().tenantId;
+    scopeService.rotateCsrfSession(document.location.origin, tenantId, null);
+    const config = {
+      mode: 'remote' as const,
+      configApiBaseUrl: '',
+      locale: 'pt-BR' as const,
+      projectionPath: null,
+      initialDecisionKey: null
+    };
+
+    let unauthorizedStatus: number | null = null;
+    service.createWorkspace('def-1', 'Draft 1', config).subscribe({
+      error: (err: unknown) => {
+        if (err instanceof HttpErrorResponse) unauthorizedStatus = err.status;
+      }
+    });
+    http.expectOne('/auth/session').flush(null, { status: 401, statusText: 'Unauthorized' });
+    http.expectNone('/api/praxis/config/domain-rules/workspaces');
+    expect(unauthorizedStatus).toBe(401);
+
+    let createdId: string | null = null;
+    service.createWorkspace('def-1', 'Draft 1', config).subscribe(ws => {
+      createdId = ws.id;
+    });
+    http.expectOne('/auth/session').flush(null, { status: 204, statusText: 'No Content' });
+    const createReq = http.expectOne('/api/praxis/config/domain-rules/workspaces');
+    expect(createReq.request.method).toBe('POST');
+    createReq.flush({ id: 'ws-hydrated-1', ruleKey: 'rule.1', status: 'OPEN', etag: 'etag-1', revision: 1 });
+    expect(createdId).toBe('ws-hydrated-1');
   });
 });

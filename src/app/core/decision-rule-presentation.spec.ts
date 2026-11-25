@@ -146,4 +146,125 @@ describe('decision-rule-presentation', () => {
     expect(humanizeSemanticDiffKind('CHANGED', 'pt-BR')).toBe('Alterado');
     expect(humanizeSemanticDiffKind('ADDED', 'en-US')).toBe('Added');
   });
+
+  it('formats rule clauses using allowedValues labels currency and percentage presentation in business mode', () => {
+    const decision = makeDecision({
+      condition: {
+        and: [
+          { '===': [{ var: 'worker.status' }, 'ACTIVE'] },
+          { '<=': [{ var: 'request.amount' }, 1500] },
+          { '<=': [{ var: 'request.rate' }, 12.5] }
+        ]
+      },
+      facts: [
+        {
+          path: 'worker.status',
+          valueType: 'string',
+          nullable: false,
+          label: 'Situação',
+          description: 'Situação funcional.',
+          providerRef: 'prov',
+          evidenceRefs: ['ev'],
+          sensitivity: 'NON_SENSITIVE',
+          redaction: 'NONE',
+          allowedValues: [{ value: 'ACTIVE', label: 'Ativo' }]
+        },
+        {
+          path: 'request.amount',
+          valueType: 'number',
+          nullable: false,
+          label: 'Valor solicitado',
+          description: 'Valor monetário.',
+          providerRef: 'prov',
+          evidenceRefs: ['ev'],
+          sensitivity: 'SENSITIVE',
+          redaction: 'MASK',
+          valuePresentation: 'currency',
+          unit: 'BRL'
+        },
+        {
+          path: 'request.rate',
+          valueType: 'number',
+          nullable: false,
+          label: 'Percentual',
+          description: 'Taxa.',
+          providerRef: 'prov',
+          evidenceRefs: ['ev'],
+          sensitivity: 'NON_SENSITIVE',
+          redaction: 'NONE',
+          valuePresentation: 'percentage',
+          unit: '%'
+        }
+      ]
+    });
+
+    const summary = buildReadableRuleSummary(decision, [], 'pt-BR', 'business');
+    expect(summary.clauses[0]?.valueText).toBe('Ativo');
+    expect(summary.clauses[1]?.valueText).toContain('1.500,00');
+    expect(summary.clauses[2]?.valueText).toBe('12,5%');
+
+    const enSummary = buildReadableRuleSummary(decision, [], 'en-US', 'business');
+    expect(enSummary.clauses[2]?.valueText).toBe('12.5%');
+
+    const techSummary = buildReadableRuleSummary(decision, [], 'pt-BR', 'technical');
+    expect(techSummary.clauses[0]?.valueText).toBe('ACTIVE');
+    expect(techSummary.clauses[1]?.valueText).toBe('1500');
+  });
+
+  it('formats multi-value in-list options, UTC-safe dates, and localized units cleanly in business mode', () => {
+    const decision = makeDecision({
+      condition: {
+        and: [
+          { in: [{ var: 'worker.status' }, ['ACTIVE', 'ON_LEAVE']] },
+          { '<=': [{ var: 'draft.dtini' }, '2026-01-15'] },
+          { '<=': [{ var: 'draft.retroactiveDays' }, 30] }
+        ]
+      },
+      facts: [
+        {
+          path: 'worker.status',
+          valueType: 'string',
+          nullable: false,
+          label: 'Situação',
+          description: '',
+          providerRef: 'prov',
+          evidenceRefs: [],
+          sensitivity: 'NON_SENSITIVE',
+          redaction: 'NONE',
+          allowedValues: [
+            { value: 'ACTIVE', label: 'Ativo' },
+            { value: 'ON_LEAVE', label: 'Afastado' }
+          ]
+        },
+        {
+          path: 'draft.dtini',
+          valueType: 'date',
+          nullable: false,
+          label: 'Data de início',
+          description: '',
+          providerRef: 'prov',
+          evidenceRefs: [],
+          sensitivity: 'NON_SENSITIVE',
+          redaction: 'NONE'
+        },
+        {
+          path: 'draft.retroactiveDays',
+          valueType: 'number',
+          nullable: false,
+          label: 'Dias retroativos',
+          description: '',
+          providerRef: 'prov',
+          evidenceRefs: [],
+          sensitivity: 'NON_SENSITIVE',
+          redaction: 'NONE',
+          unit: 'days'
+        }
+      ]
+    });
+
+    const summary = buildReadableRuleSummary(decision, [], 'pt-BR', 'business');
+    expect(summary.clauses[0]?.valueText).toBe('Ativo, Afastado');
+    expect(summary.clauses[1]?.valueText).toContain('15/01');
+    expect(summary.clauses[2]?.valueText).toBe('30 dias');
+  });
 });

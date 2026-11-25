@@ -32,8 +32,8 @@
   @if (ontologyWarning(); as warning) {
     <p class="state-message" role="alert" data-testid="scenario-ontology-warning">{{ warning }}</p>
   }
-  <label><span>{{ i18n.text('scenarioKey') }}</span><input #key required></label>
-  <label><span>{{ i18n.text('scenarioName') }}</span><input #name required></label>
+  <label><span>{{ i18n.text('scenarioKey') }}</span><input #key class="studio-control" required></label>
+  <label><span>{{ i18n.text('scenarioName') }}</span><input #name class="studio-control" required></label>
   @if (facts().length) {
     <pax-scenario-facts-editor [facts]="facts()" [values]="factValues()" [preview]="factsJson()"
       [viewDepth]="viewDepth()" [primaryFactPaths]="primaryFactPaths()"
@@ -42,12 +42,12 @@
     <fieldset class="scenario-fact-editor">
       <legend>{{ i18n.text('scenarioFacts') }}</legend>
       <p>{{ i18n.text('scenarioFactsFallback') }}</p>
-      <textarea name="scenarioFactsFallback" rows="4" required [ngModel]="fallbackJson()"
+      <textarea class="studio-control" name="scenarioFactsFallback" rows="4" required [ngModel]="fallbackJson()"
         (ngModelChange)="fallbackJsonChanged.emit($event)"></textarea>
     </fieldset>
   }
   <label><span>{{ i18n.text('expectedDecision') }}</span>
-    <select #decision>
+    <select #decision class="studio-control">
       <option value="ALLOW">{{ outcome('ALLOW') }}</option><option value="DENY">{{ outcome('DENY') }}</option>
       <option value="NOT_APPLICABLE">{{ outcome('NOT_APPLICABLE') }}</option>
       <option value="INCONCLUSIVE">{{ outcome('INCONCLUSIVE') }}</option>
@@ -57,9 +57,11 @@
   <details class="scenario-assertions">
     <summary>{{ i18n.text('expectedAssertions') }}</summary>
     <p>{{ i18n.text('expectedAssertionsHint') }}</p>
-    <label><span>{{ i18n.text('expectedOutput') }}</span><textarea #output rows="3"></textarea></label>
-    <label><span>{{ i18n.text('expectedReasonCodes') }}</span><textarea #reasons rows="2"></textarea></label>
-    <label><span>{{ i18n.text('expectedEffectIntents') }}</span><textarea #effects rows="2"></textarea></label>
+    <label><span>{{ i18n.text('expectedOutput') }}</span><textarea #output class="studio-control" rows="3"></textarea></label>
+    <label><span>{{ i18n.text('expectedReasonCodes') }}</span><textarea #reasons class="studio-control" rows="2"></textarea></label>
+    <label><span>{{ i18n.text('expectedEffectIntents') }}</span><textarea #effects class="studio-control" rows="2"></textarea></label>
   </details>
-  <button type="submit" [disabled]="busy() || !canManage()">{{ i18n.text('addScenario') }}</button>
+  <div class="scenario-form-actions">
+    <button type="submit" class="primary-action" [disabled]="busy() || !canManage()">{{ i18n.text('addScenario') }}</button>
+  </div>
 </form>

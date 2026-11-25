@@ -244,7 +244,7 @@
                     [detail]="fourEyesGlossary.detail ?? null" />{{ parts.afterFourEyes }}
                 </span>
               } @else {
-                <span>{{ i18n.text('nextStepLockedBody') }}</span>
+                <span>{{ nextStepLockedMessage(current) }}</span>
               }
             </div>
             <div class="guidance-actions">

@@ -238,4 +238,52 @@ describe('DecisionRuleInspectionComponent', () => {
     expect(otherDisclosure?.hasAttribute('open')).toBe(false);
     expect(otherDisclosure?.textContent).toContain('Outros dados disponíveis na operação (1)');
   });
+
+  it('deduplicates sensitivity labels in evaluated fact metadata and filters large catalog-only fact lists', () => {
+    const decision = makeDecision();
+    const extraCatalogFacts = Array.from({ length: 8 }, (_, idx) => ({
+      path: `catalog.extra${idx}`,
+      valueType: 'string' as const,
+      nullable: true,
+      label: idx === 0 ? 'Campo Especializado' : `Outro Campo ${idx}`,
+      description: 'Campo complementar.',
+      providerRef: 'attendance',
+      evidenceRefs: [],
+      sensitivity: 'NON_SENSITIVE' as const,
+      redaction: 'NONE' as const
+    }));
+
+    fixture = TestBed.createComponent(DecisionRuleInspectionComponent);
+    fixture.componentRef.setInput('decision', {
+      ...decision,
+      evaluatedFactPaths: ['draft:retroactiveDays'],
+      facts: [
+        {
+          ...decision.facts[0]!,
+          sensitivity: 'SENSITIVE',
+          redaction: 'MASK',
+          lineage: { sourceResourceKey: 'workforce.attendance', attributeId: 'retroactiveDays' }
+        },
+        ...extraCatalogFacts
+      ]
+    });
+    fixture.componentRef.setInput('viewDepth', 'business');
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const primaryCard = el.querySelector('.fact-cards > .fact-card') as HTMLElement;
+    expect(primaryCard.querySelector('.sensitivity-pill')?.textContent?.trim()).toBe('Sensível / LGPD');
+    const metaText = primaryCard.querySelector('.fact-meta')?.textContent ?? '';
+    expect(metaText).toContain('Mascarado');
+    expect(metaText).not.toContain('Sensível / LGPD');
+
+    const searchInput = el.querySelector('[data-testid="rule-other-facts-search"]') as HTMLInputElement;
+    expect(searchInput).toBeTruthy();
+    searchInput.value = 'Especializado';
+    searchInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    expect(el.querySelectorAll('.catalog-only-cards > .fact-card')).toHaveLength(1);
+    expect(el.querySelector('.catalog-only-cards')?.textContent).toContain('Campo Especializado');
+  });
 });

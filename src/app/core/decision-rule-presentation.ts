@@ -5,7 +5,7 @@ import {
   humanizeFactSensitivityPosture,
   humanizeFactValueTypeLabel
 } from './fact-presentation';
-import { humanizeTechnicalSlug } from './humanize-labels';
+import { humanizeTechnicalSlug, localizeGenericUnit } from './humanize-labels';
 import { POLICY_STUDIO_COPY } from './i18n';
 import type { RuleParameterDisplayEntry } from './rule-parameters-display';
 import type { SupportedLocale } from './runtime-config';
@@ -131,6 +131,108 @@ export function humanizeFactLabel(
   return formatFactDisplayLabel(fact, locale, viewDepth, true);
 }
 
+export function formatFactConditionValue(
+  fact: Pick<DecisionFact, 'valueType' | 'valuePresentation' | 'unit' | 'allowedValues' | 'sensitivity' | 'redaction'> | undefined,
+  rawValue: string,
+  valueKind: string | undefined,
+  locale: SupportedLocale,
+  viewDepth: StudioViewDepth
+): string {
+  if (viewDepth === 'technical') {
+    return rawValue;
+  }
+  const restricted = fact?.sensitivity === 'SECRET' || fact?.redaction === 'OMIT';
+  const trimmed = rawValue.trim();
+
+  if (valueKind === 'array') {
+    const items = trimmed
+      .split(',')
+      .map(item => item.trim())
+      .filter(Boolean);
+    if (items.length > 0) {
+      return items
+        .map(item => formatSingleFactConditionScalar(fact, item, undefined, locale, restricted))
+        .join(', ');
+    }
+    return rawValue;
+  }
+
+  return formatSingleFactConditionScalar(fact, trimmed, valueKind, locale, restricted, rawValue);
+}
+
+function formatSingleFactConditionScalar(
+  fact: Pick<DecisionFact, 'valueType' | 'valuePresentation' | 'unit' | 'allowedValues' | 'sensitivity' | 'redaction'> | undefined,
+  trimmed: string,
+  valueKind: string | undefined,
+  locale: SupportedLocale,
+  restricted: boolean,
+  fallbackRaw = trimmed
+): string {
+  if (!restricted && fact?.allowedValues?.length) {
+    const numericCandidate = trimmed !== '' && Number.isFinite(Number(trimmed)) ? Number(trimmed) : null;
+    const matchedOption = fact.allowedValues.find(opt => {
+      if (String(opt.value) === trimmed) return true;
+      return typeof opt.value === 'number' && numericCandidate !== null && opt.value === numericCandidate;
+    });
+    if (matchedOption) {
+      return matchedOption.label?.trim() || String(matchedOption.value);
+    }
+  }
+  if (valueKind === 'boolean' || fact?.valueType === 'boolean') {
+    const lower = trimmed.toLowerCase();
+    if (lower === 'true' || lower === 'false') {
+      const truthy = lower === 'true';
+      return locale === 'pt-BR' ? (truthy ? 'Sim' : 'Não') : (truthy ? 'Yes' : 'No');
+    }
+  }
+  const presentation = fact?.valuePresentation?.trim().toLowerCase();
+  if ((fact?.valueType === 'date' || presentation === 'date') && /^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const [year, month, day] = trimmed.split('-').map(Number);
+    const utcDate = new Date(Date.UTC(year!, month! - 1, day!));
+    if (!Number.isNaN(utcDate.getTime())) {
+      try {
+        return new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeZone: 'UTC' }).format(utcDate);
+      } catch {
+        return trimmed;
+      }
+    }
+  }
+  if (presentation === 'datetime' && /^\d{4}-\d{2}-\d{2}T/.test(trimmed)) {
+    const parsedDate = new Date(trimmed);
+    if (!Number.isNaN(parsedDate.getTime())) {
+      try {
+        return new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short' }).format(parsedDate);
+      } catch {
+        return trimmed;
+      }
+    }
+  }
+  const numericValue = trimmed !== '' && Number.isFinite(Number(trimmed)) ? Number(trimmed) : null;
+  if (numericValue !== null && fact) {
+    const rawUnit = fact.unit?.trim();
+    const localizedUnit = localizeGenericUnit(rawUnit, locale);
+    if (presentation === 'currency') {
+      const currencyCode = rawUnit && /^[A-Z]{3}$/i.test(rawUnit) ? rawUnit.toUpperCase() : 'BRL';
+      try {
+        return new Intl.NumberFormat(locale, { style: 'currency', currency: currencyCode }).format(numericValue);
+      } catch {
+        return localizedUnit ? `${fallbackRaw} ${localizedUnit}` : fallbackRaw;
+      }
+    }
+    if (presentation === 'percentage') {
+      return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 4 }).format(numericValue)}%`;
+    }
+    const formattedNumber = presentation === 'integer'
+      ? new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(Math.trunc(numericValue))
+      : new Intl.NumberFormat(locale, { maximumFractionDigits: 6 }).format(numericValue);
+    if (localizedUnit) {
+      return `${formattedNumber} ${localizedUnit}`;
+    }
+    return formattedNumber;
+  }
+  return fallbackRaw;
+}
+
 export function buildReadableRuleSummary(
   decision: DecisionSummary,
   parameters: readonly RuleParameterDisplayEntry[],
@@ -139,8 +241,10 @@ export function buildReadableRuleSummary(
 ): ReadableRuleSummary {
   const sourceCondition = decision.workspaceCondition ?? decision.condition;
   const projection = extractDecisionTableProjection(sourceCondition);
+  const factByPath = new Map<string, DecisionFact>();
   const factLookup = new Map<string, string>();
   for (const fact of decision.facts) {
+    factByPath.set(fact.path, fact);
     factLookup.set(fact.path, humanizeFactLabel(fact, locale, viewDepth));
   }
   const paramLookup = new Map<string, RuleParameterDisplayEntry>();
@@ -150,6 +254,7 @@ export function buildReadableRuleSummary(
   const operatorTable = locale === 'pt-BR' ? PT_BR_OPERATORS : EN_US_OPERATORS;
 
   const clauses: ReadableRuleClause[] = projection.clauses.map((clause) => {
+    const matchedFact = factByPath.get(clause.factPath);
     const factLabel =
       factLookup.get(clause.factPath) ??
       (viewDepth === 'technical'
@@ -177,9 +282,14 @@ export function buildReadableRuleSummary(
       } else if (viewDepth !== 'technical') {
         valueText = humanizeTechnicalSlug(clause.rawValue, undefined, locale) || clause.rawValue;
       }
-    } else if (clause.valueKind === 'boolean' && viewDepth !== 'technical') {
-      const truthy = clause.rawValue.toLowerCase() === 'true';
-      valueText = locale === 'pt-BR' ? (truthy ? 'Sim' : 'Não') : (truthy ? 'Yes' : 'No');
+    } else {
+      valueText = formatFactConditionValue(
+        matchedFact,
+        clause.rawValue,
+        clause.valueKind,
+        locale,
+        viewDepth
+      );
     }
 
     return {

@@ -38,7 +38,7 @@ export class ScenarioCatalogComponent {
   readonly busy = input(false);
   readonly canManage = input(false);
   readonly operationalModeEnabled = input(false);
-  readonly operationalModes = input.required<Readonly<Record<string, 'CREATE' | 'UPDATE' | ''>>>();
+  readonly operationalModes = input.required<Readonly<Record<string, 'CREATE' | 'UPDATE' | '' | undefined>>>();
   readonly viewDepth = input<StudioViewDepth>('business');
   readonly primaryFactPaths = input<readonly string[]>([]);
 

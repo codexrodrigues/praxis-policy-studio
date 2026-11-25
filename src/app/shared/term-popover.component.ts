@@ -50,14 +50,13 @@ let nextTermPopoverId = 0;
         [attr.aria-expanded]="open()"
         [attr.aria-controls]="open() ? cardId : null"
         (click)="toggleFromClick($event)"
-        (focus)="openImmediately()"
         (blur)="onTriggerBlur($event)"
       >@if (iconSignal(); as iconName) {<pax-icon class="pax-term-icon" [name]="iconName" [size]="14" />}<span class="pax-term-label">{{ termSignal() }}</span>@if (badgeSignal()) {<span class="pax-term-badge">{{ badgeSignal() }}</span>}</button>@if (open()) {
         <div
           #popoverCard
           class="pax-term-card"
           [id]="cardId"
-          role="dialog"
+          [attr.role]="(pinnedByClick() || actionLabelSignal() || externalHrefSignal()) ? 'dialog' : 'tooltip'"
           [attr.aria-label]="resolvedTitle()"
           [style.left.px]="cardLeft()"
           [style.top.px]="cardTop()"
@@ -244,6 +243,8 @@ let nextTermPopoverId = 0;
       position: fixed;
       z-index: 2000;
       width: min(21rem, calc(100vw - 1.5rem));
+      max-height: calc(100vh - 24px);
+      overflow-y: auto;
       display: grid;
       gap: var(--pax-space-2, 0.5rem);
       padding: var(--pax-space-4, 1rem);
@@ -382,6 +383,7 @@ let nextTermPopoverId = 0;
 export class TermPopoverComponent implements OnDestroy {
   private readonly hostRef = inject(ElementRef<HTMLElement>);
   private readonly triggerBtn = viewChild<ElementRef<HTMLButtonElement>>('triggerBtn');
+  private readonly popoverCard = viewChild<ElementRef<HTMLDivElement>>('popoverCard');
 
   readonly termSignal = signal('');
   readonly categorySignal = signal<string | null>(null);
@@ -472,6 +474,7 @@ export class TermPopoverComponent implements OnDestroy {
 
   readonly cardId = `pax-term-card-${++nextTermPopoverId}`;
   readonly open = signal(false);
+  readonly pinnedByClick = signal(false);
   readonly cardLeft = signal(12);
   readonly cardTop = signal(12);
 
@@ -479,7 +482,7 @@ export class TermPopoverComponent implements OnDestroy {
 
   private openTimer: ReturnType<typeof setTimeout> | null = null;
   private closeTimer: ReturnType<typeof setTimeout> | null = null;
-  private pinnedByClick = false;
+  private measureFrameId: number | null = null;
 
   ngOnDestroy(): void {
     this.clearTimers();
@@ -498,7 +501,7 @@ export class TermPopoverComponent implements OnDestroy {
 
   scheduleClose(): void {
     this.clearOpenTimer();
-    if (this.pinnedByClick) {
+    if (this.pinnedByClick()) {
       return;
     }
     this.cancelClose();
@@ -524,11 +527,11 @@ export class TermPopoverComponent implements OnDestroy {
   toggleFromClick(event: MouseEvent): void {
     event.stopPropagation();
     this.clearTimers();
-    if (this.open() && this.pinnedByClick) {
+    if (this.open() && this.pinnedByClick()) {
       this.closePopover();
       return;
     }
-    this.pinnedByClick = true;
+    this.pinnedByClick.set(true);
     this.openPopover();
   }
 
@@ -537,7 +540,7 @@ export class TermPopoverComponent implements OnDestroy {
     if (related && this.hostRef.nativeElement.contains(related)) {
       return;
     }
-    if (!this.pinnedByClick) {
+    if (!this.pinnedByClick()) {
       this.scheduleClose();
     }
   }
@@ -569,28 +572,51 @@ export class TermPopoverComponent implements OnDestroy {
   @HostListener('window:scroll')
   repositionIfOpen(): void {
     if (this.open()) {
-      this.updateCardPosition();
+      const measuredHeight = this.readMeasuredCardHeight();
+      this.updateCardPosition(measuredHeight);
     }
   }
 
   private openPopover(): void {
-    this.updateCardPosition();
+    this.updateCardPosition(240);
     this.open.set(true);
+    this.scheduleMeasuredReposition();
   }
 
   private closePopover(): void {
     this.clearTimers();
-    this.pinnedByClick = false;
+    this.pinnedByClick.set(false);
     this.open.set(false);
   }
 
-  private updateCardPosition(): void {
+  private readMeasuredCardHeight(): number {
+    const card = this.popoverCard()?.nativeElement;
+    if (!card || typeof card.getBoundingClientRect !== 'function') {
+      return 240;
+    }
+    const measured = card.getBoundingClientRect().height;
+    return measured > 0 ? measured : 240;
+  }
+
+  private scheduleMeasuredReposition(): void {
+    this.cancelMeasureFrame();
+    if (typeof requestAnimationFrame !== 'function') {
+      return;
+    }
+    this.measureFrameId = requestAnimationFrame(() => {
+      this.measureFrameId = null;
+      if (!this.open()) return;
+      this.updateCardPosition(this.readMeasuredCardHeight());
+    });
+  }
+
+  private updateCardPosition(estimatedHeight = 240): void {
     const trigger = this.triggerBtn()?.nativeElement;
     const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1280;
     const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 720;
     const margin = 12;
     const estimatedWidth = Math.min(336, Math.max(220, viewportWidth - margin * 2));
-    const estimatedHeight = 200;
+    const boundedHeight = Math.min(estimatedHeight, Math.max(120, viewportHeight - margin * 2));
 
     if (!trigger || typeof trigger.getBoundingClientRect !== 'function') {
       this.cardLeft.set(margin);
@@ -602,12 +628,21 @@ export class TermPopoverComponent implements OnDestroy {
     const maxLeft = Math.max(margin, viewportWidth - estimatedWidth - margin);
     const left = Math.min(maxLeft, Math.max(margin, rect.left));
     const belowTop = rect.bottom + 8;
-    const fitsBelow = belowTop + estimatedHeight <= viewportHeight - margin;
-    const aboveTop = Math.max(margin, rect.top - estimatedHeight - 8);
-    const top = fitsBelow ? belowTop : aboveTop;
+    const fitsBelow = belowTop + boundedHeight <= viewportHeight - margin;
+    const aboveTop = Math.max(margin, rect.top - boundedHeight - 8);
+    const maxTop = Math.max(margin, viewportHeight - boundedHeight - margin);
+    const rawTop = fitsBelow ? belowTop : aboveTop;
+    const top = Math.min(maxTop, Math.max(margin, rawTop));
 
     this.cardLeft.set(Math.round(left));
     this.cardTop.set(Math.round(top));
+  }
+
+  private cancelMeasureFrame(): void {
+    if (this.measureFrameId !== null && typeof cancelAnimationFrame === 'function') {
+      cancelAnimationFrame(this.measureFrameId);
+      this.measureFrameId = null;
+    }
   }
 
   private clearOpenTimer(): void {
@@ -620,5 +655,6 @@ export class TermPopoverComponent implements OnDestroy {
   private clearTimers(): void {
     this.clearOpenTimer();
     this.cancelClose();
+    this.cancelMeasureFrame();
   }
 }

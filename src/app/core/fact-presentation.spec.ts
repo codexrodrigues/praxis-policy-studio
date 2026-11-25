@@ -123,6 +123,28 @@ describe('fact-presentation', () => {
 
     const titleCasePrefixed = makeFact({ path: 'record.docId', label: 'Documento Legal ID' });
     expect(formatFactDisplayLabel(titleCasePrefixed, 'pt-BR', 'business')).toBe('Documento Legal ID');
+
+    const dotPrefixedOperation = makeFact({ path: 'context.operation', label: 'context.operation' });
+    expect(formatFactDisplayLabel(dotPrefixedOperation, 'pt-BR', 'business')).toBe('Operação');
+    expect(formatFactDisplayLabel(dotPrefixedOperation, 'en-US', 'business')).toBe('Operation');
+    expect(formatFactDisplayLabel(dotPrefixedOperation, 'pt-BR', 'technical')).toBe('context.operation');
+
+    const middleDotPrefixed = makeFact({ path: 'context.operation', label: 'Context · Operation' });
+    expect(formatFactDisplayLabel(middleDotPrefixed, 'pt-BR', 'business')).toBe('Operação');
+
+    const dotPrefixedValidation = makeFact({ path: 'context.cpfValido', label: 'context.cpfValido' });
+    expect(formatFactDisplayLabel(dotPrefixedValidation, 'pt-BR', 'business')).toBe('CPF Válido');
+
+    const dotPrefixedCount = makeFact({
+      path: 'neighborhood.concomitanciaRegistroCount',
+      label: 'neighborhood.concomitanciaRegistroCount'
+    });
+    expect(formatFactDisplayLabel(dotPrefixedCount, 'pt-BR', 'business')).toBe(
+      'Concomitância Registro (Quantidade)'
+    );
+    expect(formatFactDisplayLabel(dotPrefixedCount, 'pt-BR', 'technical')).toBe(
+      'neighborhood.concomitanciaRegistroCount'
+    );
   });
 
   it('resolves origin groups and builds rich business popovers without raw nullable or path leakage', () => {
@@ -175,5 +197,87 @@ describe('fact-presentation', () => {
       'Autoridade do solicitante',
       'Histórico e registros relacionados'
     ]);
+  });
+
+  it('consumes groupKey boilerplate fallbacks presentation constraints allowedValues lookup and aiVisibility deny safely', () => {
+    const richCurrencyFact = makeFact({
+      path: 'request.requestedAmount',
+      valueType: 'number',
+      nullable: false,
+      label: 'Valor solicitado',
+      description: 'Fato governado do RuleSet grant.amount (request.requestedAmount).',
+      hint: 'Valor sem acréscimos.',
+      groupKey: 'valores-orcamento',
+      groupLabel: 'Valores e orçamento',
+      unit: 'BRL',
+      valuePresentation: 'currency',
+      constraints: { min: 10, max: 5000, step: 0.01 }
+    });
+    const popover = formatFactPopoverModel(richCurrencyFact, 'pt-BR', 'business');
+    expect(popover.group.key).toBe('valores-orcamento');
+    expect(popover.group.label).toBe('Valores e orçamento');
+    expect(popover.summary).toBe('Informação consultada em Valores e orçamento durante a avaliação desta regra.');
+    expect(popover.hint).toBe('Valor sem acréscimos.');
+    expect(popover.metaTags.map(t => t.label)).toContain('Monetário');
+    expect(popover.metaTags.map(t => t.label)).toContain('Faixa: 10 a 5000');
+
+    const statusFact = makeFact({
+      path: 'worker.status',
+      valueType: 'string',
+      nullable: false,
+      label: 'Situação',
+      description: 'Situação do vínculo.',
+      allowedValues: [
+        { value: 'ACTIVE', label: 'Ativo' },
+        { value: 'ON_LEAVE', label: 'Afastado' }
+      ],
+      optionSourceRef: { sourceKey: 'worker-statuses', resourceKey: 'workforce.statuses' },
+      governance: { aiVisibility: 'deny' }
+    });
+    const statusPopover = formatFactPopoverModel(statusFact, 'pt-BR', 'business');
+    expect(statusPopover.metaTags.map(t => t.label)).toContain('Opções: Ativo, Afastado');
+    expect(statusPopover.metaTags.map(t => t.label)).toContain('Catálogo dinâmico');
+    expect(statusPopover.metaTags.map(t => t.label)).toContain('IA vedada');
+  });
+
+  it('surfaces standalone length/step/pattern constraints, mask, governance compliance tags, technical lineage, and dedups hints', () => {
+    const richFact = makeFact({
+      path: 'actor.cpf',
+      valueType: 'string',
+      nullable: false,
+      label: 'CPF',
+      description: 'Documento cadastral.',
+      hint: 'Documento cadastral.',
+      mask: '000.000.000-00',
+      constraints: { maxLength: 14, pattern: '^\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}$' },
+      governance: {
+        classification: 'restricted',
+        exportable: false,
+        aiVisibility: 'mask',
+        complianceTags: ['LGPD_ART_5_I', 'LAI']
+      },
+      optionSourceRef: { sourceKey: 'actors', resourceKey: 'hr.actors' },
+      lineage: { attributeId: 'actor.cpf', sourceResourceKey: 'hr.actors', transformation: 'MASKED' },
+      sensitivity: 'SENSITIVE',
+      redaction: 'MASK'
+    });
+
+    const businessPopover = formatFactPopoverModel(richFact, 'pt-BR', 'business');
+    expect(businessPopover.hint).toBeNull();
+    const businessLabels = businessPopover.metaTags.map(t => t.label);
+    expect(businessLabels).toContain('Máx. 14 caracteres');
+    expect(businessLabels).toContain('Formato validado');
+    expect(businessLabels).toContain('Máscara: 000.000.000-00');
+    expect(businessLabels).toContain('Restrito');
+    expect(businessLabels).toContain('IA mascarada');
+    expect(businessLabels).toContain('Exportação bloqueada');
+    expect(businessLabels).toContain('LGPD_ART_5_I');
+    expect(businessLabels).toContain('LAI');
+    expect(businessLabels).toContain('Catálogo dinâmico');
+
+    const techPopover = formatFactPopoverModel(richFact, 'pt-BR', 'technical');
+    expect(techPopover.detail).toContain('Lineage: hr.actors · actor.cpf · (MASKED)');
+    expect(techPopover.detail).toContain('Lookup: actors · hr.actors');
+    expect(techPopover.metaTags.map(t => t.label).some(l => l.startsWith('Padrão: '))).toBe(true);
   });
 });
