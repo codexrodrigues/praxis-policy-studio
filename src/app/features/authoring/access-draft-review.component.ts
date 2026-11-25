@@ -1,16 +1,21 @@
-import { AccessReleaseComponent } from './access-release.component';
-import { PapCatalogComponent } from './pap-catalog.component';
 import { JsonPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, input, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { type DomainRuleDefinition, type DomainRuleDefinitionRequest } from '@praxisui/core';
-import { EMPTY, switchMap } from 'rxjs';
+import { EMPTY, of, switchMap } from 'rxjs';
 import { AuthSessionService } from '../../core/auth-session.service';
 import { type CopyKey, PolicyStudioI18n } from '../../core/i18n';
-import { ProjectionCatalogService } from '../../core/projection-catalog.service';
+import {
+  type ExtendedCatalogCandidate,
+  ProjectionCatalogService
+} from '../../core/projection-catalog.service';
 import { type PolicyStudioRuntimeConfig } from '../../core/runtime-config';
 import { AUTHORIZATION_RULE_TYPE, accessPreview, readPreparedAccessDraft } from '../../core/prepared-access-draft';
+import type { StudioViewDepth } from '../../core/studio-shell-state.service';
+import { CatalogSelectionStore } from '../catalog/catalog-selection.store';
+import { AccessReleaseComponent } from './access-release.component';
+import { PapCatalogComponent } from './pap-catalog.component';
 
 @Component({
   selector: 'pax-access-draft-review',
@@ -21,21 +26,31 @@ import { AUTHORIZATION_RULE_TYPE, accessPreview, readPreparedAccessDraft } from 
 })
 export class AccessDraftReviewComponent {
   readonly config = input.required<PolicyStudioRuntimeConfig>();
+  readonly viewDepth = input<StudioViewDepth>('business');
   readonly preferredResourceKey = input<string | null>(null);
   readonly preferredServiceKey = input<string | null>(null);
   readonly i18n = inject(PolicyStudioI18n);
   protected readonly present = Boolean;
   private readonly auth = inject(AuthSessionService);
   private readonly catalog = inject(ProjectionCatalogService);
+  private readonly store = inject(CatalogSelectionStore, { optional: true });
   private readonly destroy = inject(DestroyRef);
 
   readonly source = signal('');
   readonly candidate = signal<ReturnType<typeof readPreparedAccessDraft> | null>(null);
   readonly stored = signal<DomainRuleDefinition | null>(null);
   readonly definitionId = signal('');
+  readonly existingPolicies = signal<readonly ExtendedCatalogCandidate[] | null>(null);
+  readonly existingLoading = signal(false);
+  readonly existingQuery = signal('');
+  readonly existingStatusFilter = signal('');
+  readonly existingHasMore = signal(false);
+  readonly existingTotalElements = signal<number | null>(null);
   readonly busy = signal(false);
   readonly error = signal<CopyKey | null>(null);
   readonly attempted = signal(false);
+  private existingPage = 0;
+  private existingLoadRevision = 0;
   private receipt: DomainRuleDefinition | null = null;
 
   editSource(value: string): void {
@@ -51,6 +66,92 @@ export class AccessDraftReviewComponent {
   applyGeneratedDraft(value: string): void {
     this.editSource(value);
     this.review();
+  }
+
+  loadExistingPolicies(append = false): void {
+    const config = this.config();
+    if (config.mode !== 'remote' || this.existingLoading() || this.busy()) return;
+    const loadRevision = ++this.existingLoadRevision;
+    const targetPage = append ? this.existingPage + 1 : 0;
+    this.existingLoading.set(true);
+    this.error.set(null);
+    const sessionCheck$ = this.store?.sessionActive()
+      ? of(true)
+      : this.auth.hasSession(config);
+    sessionCheck$.pipe(
+      switchMap(active => {
+        if (loadRevision !== this.existingLoadRevision) return EMPTY;
+        if (!active) {
+          this.existingLoading.set(false);
+          this.error.set('authenticationRequired');
+          return EMPTY;
+        }
+        if (typeof this.catalog.browseAccessCatalog === 'function') {
+          return this.catalog.browseAccessCatalog(config, {
+            page: targetPage,
+            limit: this.store?.catalogSummary() ? 25 : 12,
+            query: this.existingQuery(),
+            status: this.existingStatusFilter()
+          });
+        }
+        return this.catalog.listAccessDefinitions(config).pipe(
+          switchMap(items => of({
+            candidates: items.map(item => ({
+              definitionId: item.id,
+              ruleKey: item.ruleKey,
+              version: item.version ?? 1,
+              ruleType: item.ruleType ?? 'authorization_policy',
+              status: item.status ?? 'draft',
+              contextKey: item.contextKey ?? null,
+              resourceKey: item.resourceKey ?? null,
+              serviceKey: item.serviceKey ?? null,
+              semanticOwner: item.semanticOwner ?? null,
+              updatedAt: item.updatedAt ?? ''
+            })),
+            page: 0,
+            limit: Math.max(items.length, 1),
+            hasMore: false,
+            totalElements: items.length,
+            truncated: false
+          }))
+        );
+      }),
+      takeUntilDestroyed(this.destroy)
+    ).subscribe({
+      next: pageResult => {
+        if (loadRevision !== this.existingLoadRevision) return;
+        this.existingLoading.set(false);
+        this.existingPage = pageResult.page;
+        this.existingHasMore.set(pageResult.hasMore);
+        this.existingTotalElements.set(pageResult.totalElements);
+        const existing = append ? (this.existingPolicies() ?? []) : [];
+        const seen = new Set(existing.map(item => item.definitionId));
+        const merged = [
+          ...existing,
+          ...pageResult.candidates.filter(item => !seen.has(item.definitionId))
+        ];
+        this.existingPolicies.set(merged);
+      },
+      error: failure => {
+        if (loadRevision !== this.existingLoadRevision) return;
+        this.existingLoading.set(false);
+        this.error.set(this.errorFor(failure, 'accessLoadExistingFailed'));
+      }
+    });
+  }
+
+  selectExistingPolicy(item: ExtendedCatalogCandidate): void {
+    this.definitionId.set(item.definitionId);
+    this.stored.set(null);
+    this.error.set(null);
+    this.read();
+  }
+
+  existingCountSummary(): string | null {
+    const loaded = this.existingPolicies()?.length ?? 0;
+    const total = this.existingTotalElements();
+    if (!loaded || total === null || total <= loaded) return null;
+    return this.i18n.format('accessShowingCount', { loaded, total });
   }
 
   review(): void {
@@ -121,9 +222,12 @@ export class AccessDraftReviewComponent {
       next: definition => {
         this.busy.set(false);
         try {
+          const allowedStatuses = receipt
+            ? ['draft', 'proposed', 'approved']
+            : ['draft', 'proposed', 'approved', 'active'];
           if (definition.id !== id
             || definition.ruleType !== AUTHORIZATION_RULE_TYPE
-            || !['draft', 'proposed', 'approved'].includes(definition.status ?? '')) {
+            || !allowedStatuses.includes(definition.status ?? '')) {
             throw new Error('ACCESS_DRAFT_REQUIRED');
           }
           if (receipt && expected && (!matchesSubmittedDraft(expected, definition)

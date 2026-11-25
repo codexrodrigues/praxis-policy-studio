@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
 import { PolicyStudioI18n } from '../../core/i18n';
 import type { PolicyStudioRuntimeConfig } from '../../core/runtime-config';
-import type { StudioAccessBridgeContext } from '../../core/studio-shell-state.service';
+import type { StudioAccessBridgeContext, StudioViewDepth } from '../../core/studio-shell-state.service';
 import { StudioIconComponent } from '../../shared/studio-icon.component';
 import { AccessDraftReviewComponent } from '../authoring/access-draft-review.component';
 
@@ -16,6 +16,7 @@ export class AccessAuthorizationWorkspaceComponent {
   readonly i18n = inject(PolicyStudioI18n);
 
   readonly config = input<PolicyStudioRuntimeConfig | null>(null);
+  readonly viewDepth = input<StudioViewDepth>('business');
   readonly isRemoteMode = input(false);
   readonly sessionActive = input(false);
   readonly loading = input(false);

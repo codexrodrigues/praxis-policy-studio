@@ -6,6 +6,11 @@ import {
 } from '../../core/catalog-portfolio';
 import { humanizeDecisionTitle, humanizeTechnicalSlug, looksLikeTechnicalSlug } from '../../core/humanize-labels';
 import { PolicyStudioI18n } from '../../core/i18n';
+import {
+  type ExtendedCatalogCandidate,
+  ProjectionCatalogService
+} from '../../core/projection-catalog.service';
+import { RuntimeConfigService } from '../../core/runtime-config.service';
 import { StudioCatalogBootstrapService } from '../../core/studio-catalog-bootstrap.service';
 import { StudioShellStateService } from '../../core/studio-shell-state.service';
 import { StudioIconComponent, type StudioIconName } from '../../shared/studio-icon.component';
@@ -38,10 +43,12 @@ type ReviewBucketFilter = 'ALL' | Exclude<WorkflowBucketId, 'STABLE'>;
             <pax-icon name="refresh-cw" [size]="14" />
             <span>{{ i18n.text('refreshQueueCta') }}</span>
           </button>
-          <a class="quiet-button" routerLink="/catalog" queryParamsHandling="preserve">
-            <span>{{ i18n.text('reviewsGoToCatalogCta') }}</span>
-            <pax-icon name="arrow-right" [size]="14" />
-          </a>
+          @if (queueItems().length > 0) {
+            <a class="quiet-button" routerLink="/catalog" queryParamsHandling="preserve">
+              <span>{{ i18n.text('reviewsGoToCatalogCta') }}</span>
+              <pax-icon name="arrow-right" [size]="14" />
+            </a>
+          }
         </div>
       </header>
 
@@ -149,6 +156,72 @@ type ReviewBucketFilter = 'ALL' | Exclude<WorkflowBucketId, 'STABLE'>;
             </a>
           </div>
         }
+
+        @if (!store.authenticationRequired() && runtime.mode() === 'remote') {
+          <section class="reviews-authz-section" data-testid="reviews-authorization-section" aria-labelledby="reviews-authz-title">
+            <header class="reviews-authz-head">
+              <div>
+                <h2 id="reviews-authz-title">
+                  {{ i18n.text('reviewsAuthzSectionTitle') }}
+                  @if (knownAuthzCount(); as totalCount) {
+                    <span class="tab-count studio-mono">{{ totalCount }}</span>
+                  }
+                </h2>
+                <p class="reviews-subtitle">{{ i18n.text('reviewsAuthzSectionSubtitle') }}</p>
+              </div>
+              <div class="reviews-authz-actions">
+                <button
+                  type="button"
+                  class="quiet-button"
+                  data-testid="reviews-load-authz-btn"
+                  [disabled]="authzLoading()"
+                  (click)="loadAuthzQueue()">
+                  {{ i18n.text('accessLoadExistingCta') }}
+                </button>
+                <a class="quiet-button" routerLink="/access" queryParamsHandling="preserve">
+                  <span>{{ i18n.text('reviewsAuthzOpenTrackCta') }}</span>
+                  <pax-icon name="arrow-right" [size]="14" />
+                </a>
+              </div>
+            </header>
+            @if (authzLoading()) {
+              <p class="reviews-subtitle" aria-live="polite">{{ i18n.text('loading') }}</p>
+            } @else if (authzError()) {
+              <p class="reviews-subtitle" role="alert">{{ i18n.text('accessLoadExistingFailed') }}</p>
+            } @else if (authzLoaded()) {
+              @if (pendingAuthzPolicies().length > 0) {
+                <ul class="reviews-list" data-testid="reviews-authz-list">
+                  @for (policy of pendingAuthzPolicies(); track policy.definitionId) {
+                    <li class="review-row" [attr.data-testid]="'reviews-authz-item-' + policy.ruleKey">
+                      <span class="row-icon" data-tone="info" aria-hidden="true">
+                        <pax-icon name="shield-check" [size]="16" />
+                      </span>
+                      <div class="row-copy">
+                        <div class="row-meta">
+                          <span class="row-scope">{{ policy.resourceKey || policy.contextKey || 'AUTHORIZATION' }}</span>
+                          @if (shell.viewDepth() === 'technical') {
+                            <code class="row-code studio-mono">{{ policy.ruleKey }}</code>
+                          }
+                        </div>
+                        <strong>{{ policy.displayName || policy.ruleKey }}</strong>
+                      </div>
+                      <div class="row-status">
+                        <span class="studio-badge" data-tone="info">{{ policy.status }}</span>
+                        <small class="studio-mono">v{{ policy.version }}</small>
+                      </div>
+                      <a class="quiet-button row-open-btn" routerLink="/access" queryParamsHandling="preserve">
+                        <span>{{ i18n.text('reviewsAuthzOpenTrackCta') }}</span>
+                        <pax-icon name="arrow-right" [size]="14" />
+                      </a>
+                    </li>
+                  }
+                </ul>
+              } @else {
+                <p class="reviews-subtitle" role="status">{{ i18n.text('reviewsAuthzEmpty') }}</p>
+              }
+            }
+          </section>
+        }
       }
     </section>
   `,
@@ -174,7 +247,8 @@ type ReviewBucketFilter = 'ALL' | Exclude<WorkflowBucketId, 'STABLE'>;
       gap: var(--pax-space-4);
     }
 
-    .reviews-head-actions {
+    .reviews-head-actions,
+    .reviews-authz-actions {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
@@ -416,9 +490,11 @@ type ReviewBucketFilter = 'ALL' | Exclude<WorkflowBucketId, 'STABLE'>;
 
     .reviews-state-card {
       display: grid;
-      justify-items: start;
+      justify-items: center;
+      text-align: center;
       gap: var(--pax-space-3);
-      max-width: 38rem;
+      margin-inline: auto;
+      max-width: 36rem;
       padding: var(--pax-space-6);
       border-radius: var(--pax-radius-lg);
       border: 1px solid var(--pax-color-outline-variant);
@@ -435,6 +511,34 @@ type ReviewBucketFilter = 'ALL' | Exclude<WorkflowBucketId, 'STABLE'>;
       margin: 0;
       color: var(--pax-color-on-surface-variant);
       font-size: var(--pax-text-sm);
+    }
+
+    .reviews-authz-section {
+      display: grid;
+      gap: var(--pax-space-3);
+      padding-top: var(--pax-space-4);
+      border-top: 1px solid var(--pax-color-outline-variant);
+    }
+
+    .reviews-authz-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: var(--pax-space-3);
+    }
+
+    .reviews-authz-head h2 {
+      margin: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: var(--pax-space-2);
+      font-family: var(--pax-font-display);
+      font-size: var(--pax-text-md);
+    }
+
+    .reviews-authz-section a {
+      text-decoration: none;
     }
 
     @media (max-width: 760px) {
@@ -462,9 +566,19 @@ export class ReviewsPageComponent implements OnInit {
   readonly shell = inject(StudioShellStateService);
   readonly bootstrap = inject(StudioCatalogBootstrapService);
   readonly i18n = inject(PolicyStudioI18n);
+  private readonly catalog = inject(ProjectionCatalogService);
+  readonly runtime = inject(RuntimeConfigService);
 
   readonly activeBucket = signal<ReviewBucketFilter>('ALL');
   readonly searchQuery = signal('');
+  readonly authzLoading = signal(false);
+  readonly authzLoaded = signal(false);
+  readonly authzError = signal(false);
+  readonly authzPolicies = signal<readonly ExtendedCatalogCandidate[]>([]);
+  readonly knownAuthzCount = computed(() => this.store.catalogSummary()?.totalAuthorizationPolicies ?? null);
+  readonly pendingAuthzPolicies = computed(() =>
+    this.authzPolicies().filter(item => ['draft', 'proposed', 'approved'].includes((item.status ?? '').toLowerCase()))
+  );
 
   readonly queueItems = computed(() => {
     const items = [...this.store.reviewQueueDecisions()];
@@ -592,5 +706,25 @@ export class ReviewsPageComponent implements OnInit {
     const targetMode: DecisionWorkMode =
       bucket === 'SUBMITTED' || bucket === 'APPROVED' ? 'operate' : 'rule';
     this.bootstrap.requestOpenInCatalog(decision, targetMode);
+  }
+
+  loadAuthzQueue(): void {
+    const state = this.runtime.state();
+    if (state.kind !== 'ready' || state.config.mode !== 'remote' || this.authzLoading()) return;
+    if (typeof this.catalog.browseAccessCatalog !== 'function') return;
+    this.authzLoading.set(true);
+    this.authzError.set(false);
+    const limit = this.store.catalogSummary() !== null ? 50 : 12;
+    this.catalog.browseAccessCatalog(state.config, { page: 0, limit }).subscribe({
+      next: page => {
+        this.authzLoading.set(false);
+        this.authzLoaded.set(true);
+        this.authzPolicies.set(page.candidates);
+      },
+      error: () => {
+        this.authzLoading.set(false);
+        this.authzError.set(true);
+      }
+    });
   }
 }

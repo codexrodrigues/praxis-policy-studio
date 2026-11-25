@@ -1,9 +1,10 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
+import { DestroyRef, Injectable, inject } from '@angular/core';
+import { EMPTY, type Observable, type Subscription, map, of, switchMap } from 'rxjs';
 import { AuthSessionService } from './auth-session.service';
 import { GovernedHostScopeService } from './governed-host-scope.service';
 import { PolicyStudioI18n } from './i18n';
-import { ProjectionCatalogService } from './projection-catalog.service';
+import { ProjectionCatalogService, type ProgressiveCatalogChunk } from './projection-catalog.service';
 import type { PolicyStudioRuntimeConfig } from './runtime-config';
 import { RuntimeConfigService } from './runtime-config.service';
 import { StudioCapabilitiesService } from './studio-capabilities.service';
@@ -11,6 +12,17 @@ import { StudioShellStateService } from './studio-shell-state.service';
 import { StudioTitleStrategy } from './studio-title.strategy';
 import { CatalogSelectionStore, type DecisionWorkMode } from '../features/catalog/catalog-selection.store';
 import type { DecisionSummary } from '../features/catalog/catalog.fixture';
+
+export interface CatalogLoadOptions {
+  readonly onChunk?: (
+    chunk: ProgressiveCatalogChunk,
+    decisions: readonly DecisionSummary[],
+    replaceExisting: boolean
+  ) => void;
+  readonly onDecisionReady?: (decision: DecisionSummary) => void;
+  readonly onAuthRequired?: () => void;
+  readonly onError?: (error: unknown) => void;
+}
 
 @Injectable()
 export class StudioCatalogBootstrapService {
@@ -23,6 +35,48 @@ export class StudioCatalogBootstrapService {
   private readonly shell = inject(StudioShellStateService);
   private readonly capabilities = inject(StudioCapabilitiesService);
   private readonly titleStrategy = inject(StudioTitleStrategy, { optional: true });
+  private readonly destroyRef = inject(DestroyRef, { optional: true });
+  private catalogLoadSubscription: Subscription | null = null;
+  private catalogSummarySubscription: Subscription | null = null;
+  private streamingEnvironmentSignature: string | null = null;
+  private activeChunkListener: CatalogLoadOptions['onChunk'] | null = null;
+
+  constructor() {
+    this.destroyRef?.onDestroy(() => this.cancelCatalogLoad());
+  }
+
+  private cancelCatalogLoad(): void {
+    const wasActive = this.catalogLoadSubscription !== null;
+    this.catalogLoadSubscription?.unsubscribe();
+    this.catalogLoadSubscription = null;
+    this.catalogSummarySubscription?.unsubscribe();
+    this.catalogSummarySubscription = null;
+    this.streamingEnvironmentSignature = null;
+    this.activeChunkListener = null;
+    if (wasActive && this.store.catalogStreaming()) {
+      this.store.catalogStreaming.set(false);
+      this.store.catalogTotalHint.set(null);
+      this.store.catalogTruncated.set(false);
+      this.store.loadedEnvironmentSignature.set(null);
+    }
+  }
+
+  detachChunkListener(): void {
+    this.activeChunkListener = null;
+  }
+
+  attachChunkListener(listener: CatalogLoadOptions['onChunk'] | null): void {
+    this.activeChunkListener = listener ?? null;
+  }
+
+  cancelActiveLoad(): void {
+    this.cancelCatalogLoad();
+  }
+
+  isStreamingCurrentEnvironment(): boolean {
+    const sig = this.currentEnvironmentSignature();
+    return Boolean(sig && this.store.catalogStreaming() && this.streamingEnvironmentSignature === sig);
+  }
 
   syncScopeFromLocation(): boolean {
     if (typeof window === 'undefined') return false;
@@ -64,7 +118,7 @@ export class StudioCatalogBootstrapService {
 
   hasLoadedCurrentEnvironment(): boolean {
     const sig = this.currentEnvironmentSignature();
-    if (!sig || this.store.loadedEnvironmentSignature() !== sig) {
+    if (!sig || this.store.loadedEnvironmentSignature() !== sig || this.store.catalogStreaming()) {
       return false;
     }
     return (
@@ -82,54 +136,152 @@ export class StudioCatalogBootstrapService {
     const state = this.runtime.state();
     if (state.kind !== 'ready') return;
     this.syncScopeFromLocation();
-    if (this.hasLoadedCurrentEnvironment()) {
+    if (this.hasLoadedCurrentEnvironment() || this.isStreamingCurrentEnvironment()) {
       this.syncDerivedShellBadges();
       return;
     }
     this.loadCatalog();
   }
 
-  loadCatalog(onDecisionReady?: (decision: DecisionSummary) => void): void {
+  loadCatalog(callbackOrOptions?: ((decision: DecisionSummary) => void) | CatalogLoadOptions): void {
+    const options: CatalogLoadOptions = typeof callbackOrOptions === 'function'
+      ? { onDecisionReady: callbackOrOptions }
+      : (callbackOrOptions ?? {});
+    this.cancelCatalogLoad();
     const loadRevision = ++this.store.catalogLoadRevision;
     const state = this.runtime.state();
     if (state.kind !== 'ready') return;
     const envSignature = this.currentEnvironmentSignature();
+    this.streamingEnvironmentSignature = envSignature;
+    this.activeChunkListener = options.onChunk ?? null;
     this.store.loading.set(true);
+    this.store.catalogStreaming.set(false);
+    this.store.catalogTotalHint.set(null);
+    this.store.catalogTruncated.set(false);
+    this.store.catalogPartialError.set(null);
+    this.store.catalogSummary.set(null);
     this.i18n.locale.set(state.config.locale);
     this.titleStrategy?.refreshCurrentTitle();
     this.store.loadError.set(null);
     this.store.authenticationRequired.set(false);
     this.store.permissionLimited.set(false);
-    this.catalog.load(this.i18n.locale(), state.config).subscribe({
-      next: decisions => {
+    const sessionCheck$ = state.config.mode === 'remote'
+      && !this.store.sessionActive()
+      && typeof this.auth.hasSession === 'function'
+      ? this.auth.hasSession(state.config)
+      : of(true);
+    let receivedFirstChunk = false;
+    let initialDispatched = false;
+    let summaryRequested = false;
+    this.catalogLoadSubscription = sessionCheck$.pipe(
+      switchMap(active => {
+        if (loadRevision !== this.store.catalogLoadRevision) return EMPTY;
+        if (!active) {
+          this.streamingEnvironmentSignature = null;
+          this.activeChunkListener = null;
+          this.store.loadedEnvironmentSignature.set(envSignature);
+          this.store.catalogStreaming.set(false);
+          this.store.catalogTotalHint.set(null);
+          this.store.catalogTruncated.set(false);
+          this.store.loading.set(false);
+          this.store.allDecisions.set([]);
+          this.store.selected.set(null);
+          this.store.sessionActive.set(false);
+          this.shell.syncSessionState(false, false);
+          this.store.authenticationRequired.set(true);
+          this.store.loadError.set('AUTHENTICATION_REQUIRED');
+          this.syncDerivedShellBadges();
+          options.onAuthRequired?.();
+          return EMPTY;
+        }
+        const catalogStream$: Observable<ProgressiveCatalogChunk> = typeof this.catalog.loadProgressive === 'function'
+          ? this.catalog.loadProgressive(this.i18n.locale(), state.config)
+          : this.catalog.load(this.i18n.locale(), state.config).pipe(
+              map(decisions => ({ decisions, complete: true, totalKnown: decisions.length }))
+            );
+        return catalogStream$;
+      })
+    ).subscribe({
+      next: chunk => {
         if (loadRevision !== this.store.catalogLoadRevision) return;
-        this.store.loadedEnvironmentSignature.set(envSignature);
+        const replaceExisting = !receivedFirstChunk;
+        receivedFirstChunk = true;
+        if (
+          chunk.supportsServerSummary
+          && !summaryRequested
+          && state.config.mode === 'remote'
+          && typeof this.catalog.loadCatalogSummary === 'function'
+        ) {
+          summaryRequested = true;
+          this.catalogSummarySubscription?.unsubscribe();
+          this.catalogSummarySubscription = this.catalog.loadCatalogSummary(state.config).subscribe({
+            next: summary => {
+              if (loadRevision !== this.store.catalogLoadRevision || !summary) return;
+              this.store.catalogSummary.set(summary);
+            },
+            error: () => {
+              // Summary is a progressive acceleration aid; keep catalog stream intact on failure.
+            }
+          });
+        }
+        this.store.loadedEnvironmentSignature.set(chunk.complete ? envSignature : null);
+        if (chunk.complete) {
+          this.streamingEnvironmentSignature = null;
+        }
         this.store.authenticationFailed.set(false);
         this.store.sessionActive.set(state.config.mode === 'remote');
         this.store.signingOut.set(false);
         this.shell.syncSessionState(state.config.mode === 'remote', false);
         this.store.logoutFailed.set(false);
-        this.store.activeRuleTypeFilter.set(null);
-        this.store.allDecisions.set(decisions);
+        if (replaceExisting) {
+          this.store.activeRuleTypeFilter.set(null);
+        }
+        const decisions = this.store.mergeProgressiveDecisions(chunk.decisions, replaceExisting);
+        this.store.catalogStreaming.set(!chunk.complete);
+        this.store.catalogTotalHint.set(chunk.totalKnown);
+        this.store.catalogTruncated.set(Boolean(chunk.truncated));
+        this.store.catalogPartialError.set(chunk.partialError ?? null);
+        this.store.catalogChunkRevision.update(v => v + 1);
         this.syncDerivedShellBadges();
-        const currentSelected = this.store.selected();
-        const preserved = currentSelected ? decisions.find(item => item.key === currentSelected.key) : null;
-        const initial = preserved
-          ?? decisions.find(item => item.key === state.config.initialDecisionKey)
-          ?? decisions[0]
-          ?? null;
-        if (initial) {
-          this.store.selected.set(initial);
-          onDecisionReady?.(initial);
+        if (this.activeChunkListener) {
+          this.activeChunkListener(chunk, decisions, replaceExisting);
         } else {
-          this.store.selected.set(null);
+          const currentSelected = this.store.selected();
+          const preserved = currentSelected ? decisions.find(item => item.key === currentSelected.key) : null;
+          const initial = preserved
+            ?? decisions.find(item => item.key === state.config.initialDecisionKey)
+            ?? decisions[0]
+            ?? null;
+          if (initial) {
+            this.store.selected.set(initial);
+            if (!initialDispatched) {
+              initialDispatched = true;
+              options.onDecisionReady?.(initial);
+            }
+          } else {
+            this.store.selected.set(null);
+          }
         }
         this.store.loading.set(false);
       },
       error: (error: unknown) => {
         if (loadRevision !== this.store.catalogLoadRevision) return;
-        this.store.loadedEnvironmentSignature.set(null);
+        this.streamingEnvironmentSignature = null;
+        this.activeChunkListener = null;
+        this.store.catalogStreaming.set(false);
         this.store.loading.set(false);
+        const isAuthError = error instanceof HttpErrorResponse && (error.status === 401 || error.status === 403);
+        if (receivedFirstChunk && !isAuthError && this.store.allDecisions().length > 0) {
+          this.store.loadedEnvironmentSignature.set(null);
+          this.store.catalogPartialError.set('CATALOG_PARTIAL_LOAD');
+          this.syncDerivedShellBadges();
+          options.onError?.(error);
+          return;
+        }
+        this.store.catalogTotalHint.set(null);
+        this.store.catalogTruncated.set(false);
+        this.store.catalogPartialError.set(null);
+        this.store.loadedEnvironmentSignature.set(null);
         this.store.allDecisions.set([]);
         this.store.selected.set(null);
         this.syncDerivedShellBadges();
@@ -141,6 +293,7 @@ export class StudioCatalogBootstrapService {
         } else if (error instanceof HttpErrorResponse && error.status === 403) {
           this.resolveForbiddenResponse(state.config, loadRevision);
         }
+        options.onError?.(error);
       }
     });
   }
@@ -171,6 +324,7 @@ export class StudioCatalogBootstrapService {
     this.store.logoutFailed.set(false);
     this.auth.logout(state.config).subscribe({
       next: () => {
+        this.cancelCatalogLoad();
         ++this.store.catalogLoadRevision;
         this.store.loadedEnvironmentSignature.set(null);
         this.store.signingOut.set(false);

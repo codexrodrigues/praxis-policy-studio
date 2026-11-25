@@ -1,6 +1,23 @@
 import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { catchError, EMPTY, expand, forkJoin, from, map, mergeMap, Observable, of, reduce, switchMap, tap, throwError, toArray } from 'rxjs';
+import {
+  catchError,
+  EMPTY,
+  expand,
+  forkJoin,
+  from,
+  map,
+  mergeMap,
+  Observable,
+  of,
+  reduce,
+  retry,
+  switchMap,
+  tap,
+  throwError,
+  timer,
+  toArray
+} from 'rxjs';
 import { PolicyStudioRuntimeConfig, SupportedLocale } from './runtime-config';
 import { AuthSessionService } from './auth-session.service';
 import { AUTHORIZATION_RULE_TYPE } from './prepared-access-draft';
@@ -44,6 +61,7 @@ import {
   type DomainRuleChangeWorkspace,
   type DomainRuleChangeWorkspaceUpdateRequest,
   type DomainRuleCatalogCandidate,
+  type DomainRuleCatalogPage,
   type DomainRuleCompositionApproval,
   type DomainRuleCompositionManifest,
   type DomainRuleDefinition,
@@ -78,8 +96,76 @@ import {
   type DomainRuleWorkspaceCapabilities
 } from '@praxisui/core';
 
+export interface CatalogSummaryBucketCount {
+  readonly key: string;
+  readonly count: number;
+}
+
+export interface CatalogWorkspaceQueueSummary {
+  readonly openDrafts: number;
+  readonly inReview: number;
+  readonly approved: number;
+  readonly rejected: number;
+  readonly promoted: number;
+  readonly totalPending: number;
+}
+
+export interface DomainRuleCatalogSummary {
+  readonly schemaVersion: string;
+  readonly totalDefinitions: number;
+  readonly totalBusinessRules: number;
+  readonly totalAuthorizationPolicies: number;
+  readonly byContextKey: readonly CatalogSummaryBucketCount[];
+  readonly byResourceKey: readonly CatalogSummaryBucketCount[];
+  readonly byRuleType: readonly CatalogSummaryBucketCount[];
+  readonly byDefinitionStatus: readonly CatalogSummaryBucketCount[];
+  readonly reviewQueue: CatalogWorkspaceQueueSummary;
+}
+
+export interface ExtendedCatalogCandidate extends DomainRuleCatalogCandidate {
+  readonly displayName?: string | null;
+  readonly domainLabel?: string | null;
+  readonly ruleSetLabel?: string | null;
+}
+
+export interface AccessCatalogPage {
+  readonly candidates: readonly ExtendedCatalogCandidate[];
+  readonly page: number;
+  readonly limit: number;
+  readonly hasMore: boolean;
+  readonly totalElements: number | null;
+  readonly truncated: boolean;
+}
+
+interface ExtendedCatalogPage extends DomainRuleCatalogPage {
+  readonly candidates: ExtendedCatalogCandidate[];
+  readonly totalElements?: number | null;
+  readonly totalPages?: number | null;
+  readonly truncated?: boolean | null;
+}
+
+type CatalogPageFetchOutcome =
+  | { readonly ok: true; readonly page: ExtendedCatalogPage }
+  | { readonly ok: false; readonly pageNumber: number; readonly error: unknown };
+
+export interface ProgressiveCatalogChunk {
+  readonly decisions: readonly DecisionSummary[];
+  readonly complete: boolean;
+  readonly totalKnown: number | null;
+  readonly truncated?: boolean;
+  readonly partialError?: string | null;
+  readonly supportsServerSummary?: boolean;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ProjectionCatalogService {
+  private static readonly CATALOG_PAGE_LIMIT = 12;
+  private static readonly WORKSTATION_PAGE_LIMIT = 100;
+  private static readonly PROGRESSIVE_BATCH_SIZE = 6;
+  private static readonly MAX_CATALOG_PAGE = 100;
+  private static readonly MAX_WORKSTATION_PAGE = 500;
+  transientRetryDelayMs = 150;
+
   private readonly http = inject(HttpClient);
   private readonly domainRules = inject(DomainRuleService);
   private readonly discovery = inject(ResourceDiscoveryService);
@@ -106,11 +192,7 @@ export class ProjectionCatalogService {
       ? this.domainRules.getDefinitionCapabilities(this.requestOptions(config))
       : of({ tenantId: '', environment: '', definitions: [] } satisfies DomainRuleDefinitionCapabilities);
     return forkJoin({
-      projection: config.projectionPath
-        ? this.http.get<unknown>(config.projectionPath).pipe(
-            map(validateDomainProjection),
-            catchError(error => config.mode === 'remote' ? of(null) : throwError(() => error)))
-        : of(null),
+      projection: this.loadProjection(config),
       catalog,
       definitionCapabilities,
       workspaces
@@ -119,232 +201,854 @@ export class ProjectionCatalogService {
         if (config.mode === 'fixture') {
           return of(this.fixtureSummaries(projection!, locale));
         }
-        this.cachedCatalogMeta = {
-          baseUrl: (config.configApiBaseUrl ?? '').replace(/\/$/, ''),
+        const baseUrl = (config.configApiBaseUrl ?? '').replace(/\/$/, '');
+        this.cachedCatalogMeta = { baseUrl, workspaces, definitionCapabilities };
+        const deepLinkCtx = this.resolveRequestedDeepLinkContext(config, workspaces);
+        const eagerCandidates = this.selectEagerCandidates(catalog, projection, deepLinkCtx, catalog.length <= 12);
+        return this.hydrateAndBuildSummaries({
+          projection,
+          allCandidates: catalog,
+          candidatesToHydrate: eagerCandidates,
+          hydratedByKey: new Map(),
+          ruleSetMetaByResourceKey: new Map(),
           workspaces,
-          definitionCapabilities
-        };
-        const searchParams = typeof window !== 'undefined' && window.location?.search
-          ? new URLSearchParams(window.location.search)
-          : null;
-        const requestedDecisionKey = searchParams?.get('decisionKey')?.trim() || null;
-        const requestedBindingKey = searchParams?.get('bindingKey')?.trim() || null;
-        const requestedSlotKey = searchParams?.get('slotKey')?.trim() || null;
-        const requestedRuleSetKey = searchParams?.get('ruleSetKey')?.trim() || null;
-        const requestedResourceKey = searchParams?.get('resourceKey')?.trim() || null;
-        const hasRequestedDeepLink = Boolean(
-          requestedDecisionKey || requestedBindingKey || requestedSlotKey || requestedRuleSetKey || requestedResourceKey
-        );
-        const eagerRuleKeys = new Set<string>([
-          ...(projection?.decisionRefs.map(item => item.decisionKey) ?? []),
-          ...(config.initialDecisionKey ? [config.initialDecisionKey] : []),
-          ...(requestedDecisionKey ? [requestedDecisionKey] : []),
-          ...(requestedBindingKey ? [requestedBindingKey] : []),
-          ...(requestedSlotKey ? [requestedSlotKey] : []),
-          ...workspaces.map(item => item.ruleKey)
-        ]);
-        const matchesRequestedDeepLink = (candidate: DomainRuleCatalogCandidate): boolean =>
-          eagerRuleKeys.has(candidate.ruleKey)
-          || (!!requestedSlotKey && candidate.ruleKey.startsWith(`${requestedSlotKey}.`))
-          || (!!requestedRuleSetKey && candidate.resourceKey === requestedRuleSetKey)
-          || (!!requestedResourceKey && candidate.resourceKey === requestedResourceKey);
-        const projectionMatchesCatalog = !!projection
-          && catalog.some(candidate => projection.decisionRefs.some(ref => ref.decisionKey === candidate.ruleKey));
-        const seenRepresentativeResourceKeys = new Set<string>();
-        const isFirstRepresentativeOfResourceKey = (candidate: DomainRuleCatalogCandidate): boolean => {
-          if (candidate.status === 'retired') return false;
-          const rk = candidate.resourceKey?.trim();
-          if (!rk || seenRepresentativeResourceKeys.has(rk)) return false;
-          seenRepresentativeResourceKeys.add(rk);
-          return true;
-        };
-        const deepLinkHasMatches = hasRequestedDeepLink && catalog.some(matchesRequestedDeepLink);
-        const eagerCandidates = catalog.length <= 12
-          ? catalog
-          : projectionMatchesCatalog
-            ? catalog.filter(matchesRequestedDeepLink)
-            : deepLinkHasMatches
-              ? catalog.filter(candidate =>
-                  matchesRequestedDeepLink(candidate) || isFirstRepresentativeOfResourceKey(candidate))
-              : catalog.filter((candidate, idx) =>
-                  matchesRequestedDeepLink(candidate)
-                  || isFirstRepresentativeOfResourceKey(candidate)
-                  || (candidate.status !== 'retired' && idx < 36));
-        const detailRead$ = (candidate: DomainRuleCatalogCandidate) => forkJoin({
-          definitionWithParameters: this.domainRules.getDefinition(candidate.definitionId, this.requestOptions(config)).pipe(
-            switchMap(definition => (this.hasParameterTemplate(definition)
-              ? this.fetchDefinitionParameters(candidate.definitionId, config)
-              : of<DomainRuleParameterCatalog | null>(null)
-            ).pipe(map(serverParameterCatalog => ({ definition, serverParameterCatalog }))))
-          ),
-          factCatalog: this.domainRules.getDefinitionFacts(candidate.definitionId, this.requestOptions(config))
-        });
-        return (eagerCandidates.length
-          ? from(eagerCandidates).pipe(mergeMap(detailRead$, 6), toArray())
-          : of([])
-        ).pipe(map(definitionDetails => {
-          const details = new Map(definitionDetails.map(detail => [detail.definitionWithParameters.definition.id, detail]));
-          const ruleSetMetaByResourceKey = new Map<string, {
-            ruleSetKey: string;
-            resourceKey: string | null;
-            availableRoots: readonly string[];
-            conceptRoots: readonly string[];
-          }>();
-          for (const detail of definitionDetails) {
-            const def = detail.definitionWithParameters.definition;
-            const rk = def.resourceKey?.trim();
-            if (!rk || ruleSetMetaByResourceKey.has(rk)) continue;
-            const defBody = this.record(def.definition);
-            const paramsBody = this.record(def.parameters);
-            const slotMeta = this.extractSlotPlanMetadata(defBody, undefined);
-            ruleSetMetaByResourceKey.set(rk, {
-              ruleSetKey: this.stringValue(defBody, 'ruleSetKey')
-                ?? this.stringValue(paramsBody, 'ruleSetKey')
-                ?? rk,
-              resourceKey: this.stringValue(defBody, 'operationalResourceKey')
-                ?? this.stringValue(paramsBody, 'operationalResourceKey')
-                ?? rk,
-              availableRoots: slotMeta.availableRoots ?? [],
-              conceptRoots: slotMeta.conceptRoots ?? []
-            });
-          }
-          const summaries = catalog.map((candidate, index) => {
-        const detail = details.get(candidate.definitionId);
-        const definition = detail?.definitionWithParameters.definition;
-        const serverParameterCatalog = detail?.definitionWithParameters.serverParameterCatalog ?? null;
-        const factCatalog = detail?.factCatalog ?? undefined;
-        const decision = projection?.decisionRefs.find(item => item.decisionKey === candidate.ruleKey);
-        const workspace = this.latestWorkspace(workspaces, candidate.ruleKey);
-        const availableDefinitionActions = this.mergeDefinitionActions(
           definitionCapabilities,
-          candidate.definitionId,
-          candidate.ruleKey,
-          candidate.version,
-          workspace?.promotedDefinitionId ?? null
-        );
-        if (!projection || !decision) {
-          const baseSummary = this.catalogSummary(candidate, index, catalog.length, locale,
-            availableDefinitionActions, factCatalog, definition, workspace, serverParameterCatalog);
-          const siblingMeta = candidate.resourceKey?.trim()
-            ? ruleSetMetaByResourceKey.get(candidate.resourceKey.trim())
-            : undefined;
-          if (!definition && siblingMeta) {
-            return {
-              ...baseSummary,
-              ruleSetKey: siblingMeta.ruleSetKey,
-              resourceKey: siblingMeta.resourceKey,
-              ...(siblingMeta.availableRoots.length ? { availableRoots: siblingMeta.availableRoots } : {}),
-              ...(siblingMeta.conceptRoots.length ? { conceptRoots: siblingMeta.conceptRoots } : {})
-            };
-          }
-          return baseSummary;
-        }
-        const conditionFactPaths = collectFactPaths(definition?.condition);
-        if (conditionFactPaths.some(factPath => !decision.factPaths.includes(factPath))) {
-          throw new Error(`CONFIG_FACT_OUTSIDE_GOVERNED_PROJECTION ${decision.decisionKey}`);
-        }
-        const hasCatalogFacts = (factCatalog?.facts.length ?? 0) > 0;
-        const facts = hasCatalogFacts
-          ? this.decisionFacts(factCatalog, locale)
-          : this.projectionFacts(decision.factPaths, projection.factSchemas);
-        if (hasCatalogFacts && conditionFactPaths.some(factPath => !facts.some(fact => fact.path === factPath))) {
-          throw new Error(`CONFIG_FACT_CATALOG_INCOMPLETE ${decision.decisionKey}`);
-        }
-        const parameterCatalog = this.overlayParameterCatalog(
-          this.parameterCatalog(definition, serverParameterCatalog),
-          workspace?.parameters
-        );
-        const definitionBody = this.record(definition?.definition);
-        const slotPlanMeta = this.extractSlotPlanMetadata(definitionBody, decision);
-        const executorKind = this.stringValue(definitionBody, 'executorKind');
-        const isForbiddenSlot =
-          slotPlanMeta.slotOverridePolicy === 'FORBIDDEN'
-          || slotPlanMeta.slotOverridePolicy === 'LOCKED'
-          || executorKind === 'JAVA'
-          || executorKind === 'JAVA_EXECUTOR';
-        const definitionDocumentation = this.resolveDefinitionDocumentation(definitionBody, decision);
-        const hasWorkspaceDocField = !!workspace
-          && Object.prototype.hasOwnProperty.call(workspace, DOMAIN_RULE_DOCUMENTATION_KEY)
-          && (workspace as { documentation?: unknown }).documentation !== undefined;
-        const workspaceDocumentation = workspace
-          ? (hasWorkspaceDocField
-              ? extractRuleDocumentation((workspace as { documentation?: unknown }).documentation)
-              : definitionDocumentation)
-          : null;
-        const documentation = workspaceDocumentation ?? definitionDocumentation ?? null;
-        const decisionKind = (definition?.ruleType ?? candidate.ruleType) === 'authorization_policy'
-          ? 'AUTHORIZATION' as const
-          : 'BUSINESS' as const;
-        return {
-          order: decision.order,
-          // Projection order is scoped to the governed decision set, not to the
-          // filtered/paginated catalog returned by discovery.
-          totalDecisions: projection.decisionRefs.length,
-          key: decision.decisionKey,
-          code: decision.reasonCode ?? decision.decisionKey,
-          name: decision.presentationLabel || documentation?.title || decision.decisionKey,
-          domain: projection.presentationLabels.domain[locale] ?? projection.ruleSetRef.boundedContextKey,
-          ruleSet: projection.presentationLabels.ruleSet[locale] ?? projection.ruleSetRef.ruleSetKey,
-          ruleSetKey: projection.ruleSetRef.ruleSetKey,
-          resourceKey: projection.ruleSetRef.operationalResourceKey?.trim() || null,
-          serviceKey: definition?.serviceKey?.trim() || null,
-          state: decision.semanticStatus === 'REFERENCE_IMPLEMENTED' ? 'verified' as const : 'technical-draft' as const,
-          meaning: decision.presentationLabel || documentation?.summary || decision.decisionKey,
-          authority: `${projection.authorityEvidence.currentAuthority} · ${projection.authorityEvidence.baselineAuthority}`,
-          baselineAuthority: projection.authorityEvidence.baselineAuthority,
-          source: decision.semanticSourceRef,
-          evidenceCount: projection.sourceArtifacts.length,
-          authoringSupported: !isForbiddenSlot && (decision.editable
-            || (parameterCatalog?.parameters.length ?? 0) > 0
-            || this.hasEditableOperationalPolicy(definition)),
-          availableDefinitionActions,
-          reviewStatus: decision.reviewStatus,
-          configDefinitionId: candidate.definitionId,
-          configVersion: candidate.version,
-          configStatus: candidate.status,
-          workspaceId: workspace?.id,
-          workspaceStatus: workspace?.status,
-          workspaceEtag: workspace?.etag,
-          workspaceRevision: workspace?.revision,
-          promotedDefinitionId: workspace?.promotedDefinitionId ?? null,
-          workspaceCondition: workspace?.condition ?? null,
-          workspaceParameters: workspace?.parameters ?? {},
-          expression: formatDecisionExpression(definition?.condition),
-          condition: definition?.condition ?? null,
-          factPaths: conditionFactPaths.length ? conditionFactPaths : decision.factPaths,
-          evaluatedFactPaths: (() => {
-            const activePaths = collectFactPaths(workspace?.condition ?? definition?.condition)
-              .filter(path => !isParameterFactPath(path));
-            return activePaths.length ? activePaths : decision.factPaths;
-          })(),
-          facts,
-          nullSemantics: this.stringValue(definition?.parameters, 'nullSemantics'),
-          operationKeys: this.stringArrayValue(definition?.parameters, 'operationKeys') ?? projection.ruleSetRef.operationKeys,
-          hostContractVersion: this.stringValue(definition?.parameters, 'hostContractVersion') ??
-            projection.ruleSetRef.hostContractVersion ?? null,
-          evidence: projection.sourceArtifacts,
-          draftLifecycle: this.stringValue(definition?.governance, 'lifecycleBoundary'),
-          ruleType: definition?.ruleType ?? candidate.ruleType,
-          decisionKind,
-          parameters: definition?.parameters ?? {},
-          parameterCatalog,
-          detailHydrated: definition !== undefined,
-          documentation,
-          definitionDocumentation,
-          workspaceDocumentation,
-          ...slotPlanMeta
-        };
-      });
-          if (!projection) return summaries;
-          const projectionKeys = new Set(projection.decisionRefs.map(item => item.decisionKey));
-          const governed = summaries
-            .filter(item => projectionKeys.has(item.key))
-            .sort((left, right) => left.order - right.order);
-          const others = summaries.filter(item => !projectionKeys.has(item.key));
-          return [...governed, ...others];
-        }));
+          locale,
+          config
+        }).pipe(map(result => result.summaries));
       })
     );
+  }
+
+  /** Streams page 0 immediately and then fetches remaining catalog pages in bounded batches. */
+  loadProgressive(locale: SupportedLocale, config: PolicyStudioRuntimeConfig): Observable<ProgressiveCatalogChunk> {
+    if (config.mode === 'fixture') {
+      return this.load(locale, config).pipe(
+        map(decisions => ({ decisions, complete: true, totalKnown: decisions.length }))
+      );
+    }
+    this.invalidateCatalogMetaCache();
+    const options = this.requestOptions(config);
+    return forkJoin({
+      projection: this.loadProjection(config),
+      page0: this.domainRules.browseDefinitionCatalog({ page: 0, limit: ProjectionCatalogService.CATALOG_PAGE_LIMIT }, options),
+      definitionCapabilities: this.domainRules.getDefinitionCapabilities(options),
+      workspaces: this.domainRules.listChangeWorkspaces(options)
+    }).pipe(
+      switchMap(({ projection, page0, definitionCapabilities, workspaces }) => {
+        const baseUrl = (config.configApiBaseUrl ?? '').replace(/\/$/, '');
+        this.cachedCatalogMeta = { baseUrl, workspaces, definitionCapabilities };
+        const page0Ext = page0 as ExtendedCatalogPage;
+        const serverTotalElements = typeof page0Ext.totalElements === 'number' ? page0Ext.totalElements : null;
+        const serverTotalPages = typeof page0Ext.totalPages === 'number' ? page0Ext.totalPages : null;
+        const supportsWorkstationPaging = serverTotalElements !== null && serverTotalPages !== null;
+        const deepLinkCtx = this.resolveRequestedDeepLinkContext(config, workspaces);
+        const hydratedByKey = new Map<string, DecisionSummary>();
+        const ruleSetMetaByResourceKey = new Map<string, {
+          ruleSetKey: string;
+          resourceKey: string | null;
+          availableRoots: readonly string[];
+          conceptRoots: readonly string[];
+        }>();
+        const page0Candidates = this.latestCatalogCandidates(
+          page0.candidates.filter(candidate => candidate.ruleType !== AUTHORIZATION_RULE_TYPE)
+        );
+        const isSmallCatalog = !page0.hasMore && page0Candidates.length <= ProjectionCatalogService.CATALOG_PAGE_LIMIT;
+        const page0Eager = this.selectEagerCandidates(page0Candidates, projection, deepLinkCtx, isSmallCatalog);
+
+        const nextLimit = supportsWorkstationPaging
+          ? ProjectionCatalogService.WORKSTATION_PAGE_LIMIT
+          : ProjectionCatalogService.CATALOG_PAGE_LIMIT;
+        const maxPage = supportsWorkstationPaging
+          ? ProjectionCatalogService.MAX_WORKSTATION_PAGE
+          : ProjectionCatalogService.MAX_CATALOG_PAGE;
+        const knownTotalPages = supportsWorkstationPaging
+          ? Math.min(
+              Math.max(1, Math.ceil(serverTotalElements / ProjectionCatalogService.WORKSTATION_PAGE_LIMIT)),
+              ProjectionCatalogService.MAX_WORKSTATION_PAGE + 1
+            )
+          : null;
+        const initialBatchSize = supportsWorkstationPaging
+          ? ProjectionCatalogService.PROGRESSIVE_BATCH_SIZE
+          : page0.candidates.length >= ProjectionCatalogService.CATALOG_PAGE_LIMIT
+            ? ProjectionCatalogService.PROGRESSIVE_BATCH_SIZE
+            : 1;
+        const hasMoreAfterPage0 = page0.hasMore && (supportsWorkstationPaging || page0.page < maxPage);
+        const initialTruncated = supportsWorkstationPaging
+          ? Math.ceil(serverTotalElements / ProjectionCatalogService.WORKSTATION_PAGE_LIMIT) >
+              ProjectionCatalogService.MAX_WORKSTATION_PAGE + 1
+          : Boolean(page0Ext.truncated) || (page0.hasMore && page0.page >= maxPage);
+
+        const initial$ = this.hydrateAndBuildSummaries({
+          projection,
+          allCandidates: page0Candidates,
+          candidatesToHydrate: page0Eager,
+          hydratedByKey,
+          ruleSetMetaByResourceKey,
+          workspaces,
+          definitionCapabilities,
+          locale,
+          config
+        }).pipe(
+          map(({ summaries }) => ({
+            allCandidates: page0Candidates,
+            nextPage: supportsWorkstationPaging ? 0 : page0.page + 1,
+            limit: nextLimit,
+            maxPage,
+            knownTotalPages,
+            serverTotalElements,
+            batchSize: initialBatchSize,
+            hasMore: hasMoreAfterPage0,
+            chunk: {
+              decisions: summaries,
+              complete: !hasMoreAfterPage0,
+              totalKnown: !hasMoreAfterPage0 ? summaries.length : serverTotalElements,
+              truncated: initialTruncated,
+              partialError: null,
+              supportsServerSummary: supportsWorkstationPaging
+            } satisfies ProgressiveCatalogChunk
+          }))
+        );
+        return initial$.pipe(
+          expand(state => {
+            if (!state.hasMore) return EMPTY;
+            return this.fetchNextCatalogBatch(
+              state.nextPage,
+              state.limit,
+              state.maxPage,
+              state.knownTotalPages,
+              options,
+              state.batchSize
+            ).pipe(
+              switchMap(({ batchCandidates, nextPage, reachedEnd, partialError, hitMaxCeiling }) => {
+                const newCandidates = batchCandidates.filter(
+                  candidate => candidate.ruleType !== AUTHORIZATION_RULE_TYPE
+                );
+                const mergedCandidates = this.latestCatalogCandidates([...state.allCandidates, ...newCandidates]);
+                const mergedByKey = new Map(mergedCandidates.map(candidate => [candidate.ruleKey, candidate]));
+                const unhydratedNew = newCandidates.filter(candidate => {
+                  const latestForKey = mergedByKey.get(candidate.ruleKey);
+                  if (!latestForKey || latestForKey.definitionId !== candidate.definitionId) return false;
+                  const prev = hydratedByKey.get(candidate.ruleKey);
+                  return !(prev?.detailHydrated && prev.configDefinitionId === candidate.definitionId);
+                });
+                const candidatesToHydrate = this.selectIncrementalHydrationCandidates(
+                  unhydratedNew,
+                  hydratedByKey,
+                  deepLinkCtx
+                );
+                const chunkTruncated = state.chunk.truncated || hitMaxCeiling;
+                return this.hydrateAndBuildSummaries({
+                  projection,
+                  allCandidates: mergedCandidates,
+                  candidatesToHydrate,
+                  hydratedByKey,
+                  ruleSetMetaByResourceKey,
+                  workspaces,
+                  definitionCapabilities,
+                  locale,
+                  config
+                }).pipe(
+                  map(({ summaries }) => ({
+                    ...state,
+                    allCandidates: mergedCandidates,
+                    nextPage,
+                    hasMore: !reachedEnd,
+                    chunk: {
+                      decisions: summaries,
+                      complete: reachedEnd,
+                      totalKnown: reachedEnd && !partialError ? summaries.length : state.serverTotalElements,
+                      truncated: chunkTruncated,
+                      partialError,
+                      supportsServerSummary: supportsWorkstationPaging
+                    } satisfies ProgressiveCatalogChunk
+                  }))
+                );
+              })
+            );
+          }),
+          map(state => state.chunk)
+        );
+      })
+    );
+  }
+
+  /** Fetches server-computed portfolio counts when supported by the backend host. */
+  loadCatalogSummary(config: PolicyStudioRuntimeConfig): Observable<DomainRuleCatalogSummary | null> {
+    if (config.mode !== 'remote') return of(null);
+    const baseUrl = (config.configApiBaseUrl ?? '').replace(/\/$/, '');
+    return this.http.get<DomainRuleCatalogSummary>(
+      `${baseUrl}/api/praxis/config/domain-rules/definitions/catalog/summary`,
+      { withCredentials: true }
+    ).pipe(
+      catchError(error => (
+        error instanceof HttpErrorResponse && (error.status === 401 || error.status === 403)
+          ? throwError(() => error)
+          : of(null)
+      ))
+    );
+  }
+
+  /** Hydrates sibling definitions in the same RuleSet in one resource-scoped query for instant DAG rendering. */
+  hydrateRuleSetSiblings(
+    resourceKey: string,
+    siblings: readonly DecisionSummary[],
+    totalDecisions: number,
+    locale: SupportedLocale,
+    config: PolicyStudioRuntimeConfig
+  ): Observable<readonly DecisionSummary[]> {
+    if (config.mode !== 'remote' || !siblings.length) return of([]);
+    const trimmedResource = resourceKey.trim();
+    const options = this.requestOptions(config);
+    const baseUrl = (config.configApiBaseUrl ?? '').replace(/\/$/, '');
+    const cached = this.cachedCatalogMeta?.baseUrl === baseUrl ? this.cachedCatalogMeta : null;
+    const siblingByKey = new Map(siblings.map(item => [item.key, item]));
+
+    const fallbackBounded = (missing: readonly DecisionSummary[]): Observable<readonly DecisionSummary[]> =>
+      missing.length
+        ? from(missing).pipe(
+            mergeMap(sibling => this.loadDiscoveredCandidate(
+              {
+                definitionId: sibling.configDefinitionId!,
+                ruleKey: sibling.key,
+                version: sibling.configVersion!,
+                status: sibling.configStatus ?? 'draft',
+                ruleType: sibling.ruleType ?? 'validation',
+                contextKey: sibling.domain,
+                resourceKey: sibling.ruleSetKey || sibling.resourceKey,
+                serviceKey: sibling.serviceKey,
+                semanticOwner: null,
+                updatedAt: ''
+              },
+              Math.max(0, sibling.order - 1),
+              totalDecisions,
+              locale,
+              config
+            ).pipe(catchError(() => EMPTY)), 4),
+            toArray()
+          )
+        : of([]);
+
+    if (!trimmedResource) {
+      return fallbackBounded(siblings);
+    }
+
+    return this.domainRules.listDefinitions({ resourceKey: trimmedResource }, options).pipe(
+      switchMap(definitions => {
+        const latestByRuleKey = new Map<string, DomainRuleDefinition>();
+        for (const def of definitions) {
+          if (def.ruleType === AUTHORIZATION_RULE_TYPE || !siblingByKey.has(def.ruleKey)) continue;
+          const prev = latestByRuleKey.get(def.ruleKey);
+          const expectedId = siblingByKey.get(def.ruleKey)?.configDefinitionId;
+          if (!prev || def.id === expectedId || (prev.id !== expectedId && (def.version ?? 0) > (prev.version ?? 0))) {
+            latestByRuleKey.set(def.ruleKey, def);
+          }
+        }
+        const resolved: DecisionSummary[] = [];
+        const missing: DecisionSummary[] = [];
+        for (const sibling of siblings) {
+          const def = latestByRuleKey.get(sibling.key);
+          if (!def) {
+            missing.push(sibling);
+            continue;
+          }
+          const workspace = cached ? this.latestWorkspace(cached.workspaces, sibling.key) : undefined;
+          const actions = cached
+            ? this.mergeDefinitionActions(
+                cached.definitionCapabilities,
+                def.id,
+                sibling.key,
+                def.version ?? sibling.configVersion ?? null,
+                workspace?.promotedDefinitionId ?? null
+              )
+            : sibling.availableDefinitionActions;
+          const candidate: ExtendedCatalogCandidate = {
+            definitionId: def.id,
+            ruleKey: def.ruleKey,
+            version: def.version ?? sibling.configVersion ?? 1,
+            ruleType: def.ruleType ?? sibling.ruleType ?? 'validation',
+            status: def.status ?? sibling.configStatus ?? 'draft',
+            contextKey: def.contextKey ?? sibling.domain,
+            resourceKey: def.resourceKey ?? sibling.resourceKey,
+            serviceKey: def.serviceKey ?? sibling.serviceKey,
+            semanticOwner: def.semanticOwner ?? null,
+            updatedAt: def.updatedAt ?? '',
+            displayName: sibling.name,
+            domainLabel: sibling.domainLabel ?? null,
+            ruleSetLabel: sibling.ruleSetLabel ?? null
+          };
+          const built = this.catalogSummary(
+            candidate,
+            Math.max(0, sibling.order - 1),
+            totalDecisions,
+            locale,
+            actions,
+            undefined,
+            def,
+            workspace,
+            null
+          );
+          resolved.push({
+            ...built,
+            detailHydrated: false
+          });
+        }
+        if (!missing.length) {
+          return of(resolved);
+        }
+        return fallbackBounded(missing).pipe(
+          map(extra => [...resolved, ...extra])
+        );
+      }),
+      catchError(() => fallbackBounded(siblings))
+    );
+  }
+
+  /** Lists authorization definitions with pagination and server-side search, degrading gracefully on older hosts. */
+  browseAccessCatalog(
+    config: PolicyStudioRuntimeConfig,
+    params?: {
+      readonly page?: number;
+      readonly limit?: number;
+      readonly query?: string | null;
+      readonly status?: string | null;
+      readonly resourceKey?: string | null;
+    }
+  ): Observable<AccessCatalogPage> {
+    if (config.mode !== 'remote') {
+      return of({ candidates: [], page: 0, limit: 25, hasMore: false, totalElements: 0, truncated: false });
+    }
+    const page = params?.page ?? 0;
+    const requestedLimit = params?.limit ?? 25;
+    const options = this.requestOptions(config);
+    const query = params?.query?.trim() || undefined;
+    const status = params?.status?.trim() || undefined;
+    const resourceKey = params?.resourceKey?.trim() || undefined;
+
+    const toAccessPage = (res: DomainRuleCatalogPage): AccessCatalogPage => {
+      const ext = res as ExtendedCatalogPage;
+      const filtered = (ext.candidates ?? []).filter(item => item.ruleType === AUTHORIZATION_RULE_TYPE);
+      return {
+        candidates: filtered,
+        page: ext.page ?? page,
+        limit: ext.limit ?? requestedLimit,
+        hasMore: Boolean(ext.hasMore),
+        totalElements: typeof ext.totalElements === 'number' ? ext.totalElements : null,
+        truncated: Boolean(ext.truncated)
+      };
+    };
+
+    const callCatalog = (limit: number): Observable<AccessCatalogPage> =>
+      this.domainRules.browseDefinitionCatalog(
+        {
+          page,
+          limit,
+          ruleType: AUTHORIZATION_RULE_TYPE,
+          ...(query ? { query } : {}),
+          ...(status ? { status: status as DomainRuleCatalogCandidate['status'] } : {}),
+          ...(resourceKey ? { resourceKey } : {})
+        },
+        options
+      ).pipe(map(toAccessPage));
+
+    const fallbackToList = (error: unknown): Observable<AccessCatalogPage> => {
+      if (error instanceof HttpErrorResponse && (error.status === 404 || error.status === 405)) {
+        return this.listAccessDefinitions(config).pipe(
+          map(items => {
+            const matched = items.filter(item => {
+              if (status && item.status !== status) return false;
+              if (resourceKey && item.resourceKey !== resourceKey) return false;
+              if (query) {
+                const needle = query.toLowerCase();
+                return `${item.ruleKey} ${item.resourceKey ?? ''} ${item.serviceKey ?? ''}`.toLowerCase().includes(needle);
+              }
+              return true;
+            });
+            const candidates: ExtendedCatalogCandidate[] = matched.map(item => ({
+              definitionId: item.id,
+              ruleKey: item.ruleKey,
+              version: item.version ?? 1,
+              ruleType: item.ruleType ?? AUTHORIZATION_RULE_TYPE,
+              status: item.status ?? 'draft',
+              contextKey: item.contextKey ?? null,
+              resourceKey: item.resourceKey ?? null,
+              serviceKey: item.serviceKey ?? null,
+              semanticOwner: item.semanticOwner ?? null,
+              updatedAt: item.updatedAt ?? ''
+            }));
+            return {
+              candidates,
+              page: 0,
+              limit: Math.max(candidates.length, 1),
+              hasMore: false,
+              totalElements: candidates.length,
+              truncated: false
+            };
+          })
+        );
+      }
+      return throwError(() => error);
+    };
+
+    return callCatalog(requestedLimit).pipe(
+      catchError((error: unknown) => {
+        if (
+          error instanceof HttpErrorResponse
+          && (error.status === 400 || error.status === 500)
+          && requestedLimit > ProjectionCatalogService.CATALOG_PAGE_LIMIT
+        ) {
+          return callCatalog(ProjectionCatalogService.CATALOG_PAGE_LIMIT).pipe(
+            catchError(fallbackToList)
+          );
+        }
+        return fallbackToList(error);
+      })
+    );
+  }
+
+  /** Lists authorization definitions for assisted /access discovery. */
+  listAccessDefinitions(config: PolicyStudioRuntimeConfig): Observable<readonly DomainRuleDefinition[]> {
+    if (config.mode !== 'remote') return of([]);
+    return this.domainRules.listDefinitions({ ruleType: AUTHORIZATION_RULE_TYPE }, this.requestOptions(config)).pipe(
+      map(items => items.filter(item => item.ruleType === AUTHORIZATION_RULE_TYPE))
+    );
+  }
+
+  private loadProjection(config: PolicyStudioRuntimeConfig): Observable<DomainProjection | null> {
+    return config.projectionPath
+      ? this.http.get<unknown>(config.projectionPath).pipe(
+          map(validateDomainProjection),
+          catchError(error => config.mode === 'remote' ? of(null) : throwError(() => error)))
+      : of(null);
+  }
+
+  private fetchNextCatalogBatch(
+    startPage: number,
+    limit: number,
+    maxPage: number,
+    knownTotalPages: number | null,
+    options: DomainRuleRequestOptions,
+    batchSize: number = ProjectionCatalogService.PROGRESSIVE_BATCH_SIZE
+  ): Observable<{
+    readonly batchCandidates: readonly DomainRuleCatalogCandidate[];
+    readonly nextPage: number;
+    readonly reachedEnd: boolean;
+    readonly partialError: string | null;
+    readonly hitMaxCeiling: boolean;
+  }> {
+    const batchPages = Array.from(
+      { length: batchSize },
+      (_, offset) => startPage + offset
+    ).filter(pageNum => pageNum <= maxPage && (knownTotalPages === null || pageNum < knownTotalPages));
+    if (!batchPages.length) {
+      return of({
+        batchCandidates: [],
+        nextPage: startPage,
+        reachedEnd: true,
+        partialError: null,
+        hitMaxCeiling: knownTotalPages === null && startPage > maxPage
+      });
+    }
+    return forkJoin(
+      batchPages.map(pageNum => this.fetchCatalogPageWithOutcome(pageNum, limit, options, true))
+    ).pipe(
+      map(outcomes => {
+        const okPages = outcomes
+          .filter((item): item is Extract<CatalogPageFetchOutcome, { ok: true }> => item.ok)
+          .map(item => item.page);
+        const partialError = outcomes.some(item => !item.ok) ? 'CATALOG_PARTIAL_LOAD' : null;
+        const lastBatchPage = batchPages[batchPages.length - 1] ?? startPage;
+        const lastReturnedPage = okPages[okPages.length - 1];
+        const hitLegacyCeiling = knownTotalPages === null
+          && !partialError
+          && lastBatchPage >= maxPage
+          && okPages.some(page => page.hasMore);
+        const hitServerCeiling = okPages.some(page => Boolean(page.truncated) && limit >= ProjectionCatalogService.WORKSTATION_PAGE_LIMIT);
+        const reachedEnd = Boolean(partialError)
+          || okPages.some(page => !page.hasMore || page.candidates.length === 0)
+          || lastBatchPage >= maxPage
+          || (knownTotalPages !== null && lastBatchPage + 1 >= knownTotalPages);
+        return {
+          batchCandidates: okPages.flatMap(page => page.candidates),
+          nextPage: (lastReturnedPage?.page ?? lastBatchPage) + 1,
+          reachedEnd,
+          partialError,
+          hitMaxCeiling: hitLegacyCeiling || hitServerCeiling
+        };
+      })
+    );
+  }
+
+  private fetchCatalogPageSafely(
+    page: number,
+    options: DomainRuleRequestOptions,
+    limit: number = ProjectionCatalogService.CATALOG_PAGE_LIMIT
+  ): Observable<DomainRuleCatalogPage> {
+    return this.fetchCatalogPageWithOutcome(page, limit, options, false).pipe(
+      map(outcome => {
+        if (!outcome.ok) throw outcome.error;
+        return outcome.page;
+      })
+    );
+  }
+
+  private fetchCatalogPageWithOutcome(
+    page: number,
+    limit: number,
+    options: DomainRuleRequestOptions,
+    allowPartialFailure: boolean
+  ): Observable<CatalogPageFetchOutcome> {
+    return this.domainRules.browseDefinitionCatalog({ page, limit }, options).pipe(
+      retry({
+        count: 2,
+        delay: (error: unknown) => (
+          this.isTransientCatalogError(error)
+            ? timer(this.transientRetryDelayMs)
+            : throwError(() => error)
+        )
+      }),
+      map(result => ({ ok: true as const, page: result as ExtendedCatalogPage })),
+      catchError((error: unknown) => {
+        if (error instanceof HttpErrorResponse && error.status === 400 && page > 0) {
+          return of({
+            ok: true as const,
+            page: {
+              schemaVersion: 'praxis-domain-rule-catalog.v1',
+              candidates: [],
+              page,
+              limit,
+              hasMore: false
+            } satisfies ExtendedCatalogPage
+          });
+        }
+        if (error instanceof HttpErrorResponse && (error.status === 401 || error.status === 403)) {
+          return throwError(() => error);
+        }
+        if (allowPartialFailure) {
+          return of({ ok: false as const, pageNumber: page, error });
+        }
+        return throwError(() => error);
+      })
+    );
+  }
+
+  private isTransientCatalogError(error: unknown): boolean {
+    return error instanceof HttpErrorResponse
+      && (error.status === 0 || error.status === 502 || error.status === 503 || error.status === 504);
+  }
+
+  private resolveRequestedDeepLinkContext(
+    config: PolicyStudioRuntimeConfig,
+    workspaces: readonly DomainRuleChangeWorkspace[]
+  ) {
+    const searchParams = typeof window !== 'undefined' && window.location?.search
+      ? new URLSearchParams(window.location.search)
+      : null;
+    const requestedDecisionKey = searchParams?.get('decisionKey')?.trim() || null;
+    const requestedBindingKey = searchParams?.get('bindingKey')?.trim() || null;
+    const requestedSlotKey = searchParams?.get('slotKey')?.trim() || null;
+    const requestedRuleSetKey = searchParams?.get('ruleSetKey')?.trim() || null;
+    const requestedResourceKey = searchParams?.get('resourceKey')?.trim() || null;
+    const hasRequestedDeepLink = Boolean(
+      requestedDecisionKey || requestedBindingKey || requestedSlotKey || requestedRuleSetKey || requestedResourceKey
+    );
+    const eagerRuleKeys = new Set<string>([
+      ...(config.initialDecisionKey ? [config.initialDecisionKey] : []),
+      ...(requestedDecisionKey ? [requestedDecisionKey] : []),
+      ...(requestedBindingKey ? [requestedBindingKey] : []),
+      ...(requestedSlotKey ? [requestedSlotKey] : []),
+      ...workspaces.map(item => item.ruleKey)
+    ]);
+    const matchesRequestedDeepLink = (
+      candidate: DomainRuleCatalogCandidate,
+      projection?: DomainProjection | null
+    ): boolean =>
+      eagerRuleKeys.has(candidate.ruleKey)
+      || (!!projection && projection.decisionRefs.some(item => item.decisionKey === candidate.ruleKey))
+      || (!!requestedSlotKey && candidate.ruleKey.startsWith(`${requestedSlotKey}.`))
+      || (!!requestedRuleSetKey && candidate.resourceKey === requestedRuleSetKey)
+      || (!!requestedResourceKey && candidate.resourceKey === requestedResourceKey);
+    return { hasRequestedDeepLink, matchesRequestedDeepLink };
+  }
+
+  private selectEagerCandidates(
+    catalog: readonly DomainRuleCatalogCandidate[],
+    projection: DomainProjection | null,
+    deepLinkCtx: ReturnType<ProjectionCatalogService['resolveRequestedDeepLinkContext']>,
+    isTotalCatalogSmall: boolean
+  ): readonly DomainRuleCatalogCandidate[] {
+    if (!catalog.length) return [];
+    if (isTotalCatalogSmall) return catalog;
+    const projectionMatchesCatalog = !!projection
+      && catalog.some(candidate => projection.decisionRefs.some(ref => ref.decisionKey === candidate.ruleKey));
+    if (projectionMatchesCatalog) {
+      return catalog.filter(candidate => deepLinkCtx.matchesRequestedDeepLink(candidate, projection));
+    }
+    const deepLinkMatches = catalog.filter(candidate => deepLinkCtx.matchesRequestedDeepLink(candidate, projection));
+    if (deepLinkMatches.length) {
+      return deepLinkMatches.slice(0, 6);
+    }
+    const firstActive = catalog.find(candidate => candidate.status !== 'retired') ?? catalog[0];
+    return firstActive ? [firstActive] : [];
+  }
+
+  private selectIncrementalHydrationCandidates(
+    unhydratedBatchCandidates: readonly DomainRuleCatalogCandidate[],
+    hydratedByKey: ReadonlyMap<string, DecisionSummary>,
+    deepLinkCtx: ReturnType<ProjectionCatalogService['resolveRequestedDeepLinkContext']>
+  ): readonly DomainRuleCatalogCandidate[] {
+    if (!unhydratedBatchCandidates.length) return [];
+    const hydratedCount = [...hydratedByKey.values()].filter(item => item.detailHydrated).length;
+    const upgradedPrevious = unhydratedBatchCandidates.filter(candidate => hydratedByKey.get(candidate.ruleKey)?.detailHydrated);
+    const deepLinkMatches = unhydratedBatchCandidates.filter(candidate => deepLinkCtx.matchesRequestedDeepLink(candidate, null));
+    const combined = [...new Map([...upgradedPrevious, ...deepLinkMatches].map(c => [c.definitionId, c])).values()];
+    if (combined.length) return combined.slice(0, 6);
+    if (hydratedCount === 0) {
+      const firstActive = unhydratedBatchCandidates.find(c => c.status !== 'retired') ?? unhydratedBatchCandidates[0];
+      return firstActive ? [firstActive] : [];
+    }
+    return [];
+  }
+
+  private hydrateAndBuildSummaries(params: {
+    readonly projection: DomainProjection | null;
+    readonly allCandidates: readonly DomainRuleCatalogCandidate[];
+    readonly candidatesToHydrate: readonly DomainRuleCatalogCandidate[];
+    readonly hydratedByKey: Map<string, DecisionSummary>;
+    readonly ruleSetMetaByResourceKey: Map<string, {
+      ruleSetKey: string;
+      resourceKey: string | null;
+      availableRoots: readonly string[];
+      conceptRoots: readonly string[];
+    }>;
+    readonly workspaces: readonly DomainRuleChangeWorkspace[];
+    readonly definitionCapabilities: DomainRuleDefinitionCapabilities;
+    readonly locale: SupportedLocale;
+    readonly config: PolicyStudioRuntimeConfig;
+  }): Observable<{ readonly summaries: readonly DecisionSummary[] }> {
+    const {
+      projection,
+      allCandidates,
+      candidatesToHydrate,
+      hydratedByKey,
+      ruleSetMetaByResourceKey,
+      workspaces,
+      definitionCapabilities,
+      locale,
+      config
+    } = params;
+    const detailRead$ = (candidate: DomainRuleCatalogCandidate) => forkJoin({
+      definitionWithParameters: this.domainRules.getDefinition(candidate.definitionId, this.requestOptions(config)).pipe(
+        switchMap(definition => (this.hasParameterTemplate(definition)
+          ? this.fetchDefinitionParameters(candidate.definitionId, config)
+          : of<DomainRuleParameterCatalog | null>(null)
+        ).pipe(map(serverParameterCatalog => ({ definition, serverParameterCatalog }))))
+      ),
+      factCatalog: this.domainRules.getDefinitionFacts(candidate.definitionId, this.requestOptions(config))
+    });
+    return (candidatesToHydrate.length
+      ? from(candidatesToHydrate).pipe(mergeMap(detailRead$, 6), toArray())
+      : of([])
+    ).pipe(map(definitionDetails => {
+      const details = new Map(definitionDetails.map(detail => [detail.definitionWithParameters.definition.id, detail]));
+      for (const detail of definitionDetails) {
+        const def = detail.definitionWithParameters.definition;
+        const rk = def.resourceKey?.trim();
+        if (!rk || ruleSetMetaByResourceKey.has(rk)) continue;
+        const defBody = this.record(def.definition);
+        const paramsBody = this.record(def.parameters);
+        const slotMeta = this.extractSlotPlanMetadata(defBody, undefined);
+        ruleSetMetaByResourceKey.set(rk, {
+          ruleSetKey: this.stringValue(defBody, 'ruleSetKey')
+            ?? this.stringValue(paramsBody, 'ruleSetKey')
+            ?? rk,
+          resourceKey: this.stringValue(defBody, 'operationalResourceKey')
+            ?? this.stringValue(paramsBody, 'operationalResourceKey')
+            ?? rk,
+          availableRoots: slotMeta.availableRoots ?? [],
+          conceptRoots: slotMeta.conceptRoots ?? []
+        });
+      }
+      const summaries = allCandidates.map((candidate, index) => {
+        const detail = details.get(candidate.definitionId);
+        const existingHydrated = hydratedByKey.get(candidate.ruleKey);
+        if (!detail && existingHydrated?.detailHydrated && existingHydrated.configDefinitionId === candidate.definitionId) {
+          return {
+            ...existingHydrated,
+            order: existingHydrated.order || index + 1,
+            totalDecisions: projection ? projection.decisionRefs.length : allCandidates.length
+          };
+        }
+        const built = this.mapCandidateToSummary(
+          candidate,
+          index,
+          allCandidates.length,
+          projection,
+          detail,
+          ruleSetMetaByResourceKey,
+          workspaces,
+          definitionCapabilities,
+          locale
+        );
+        if (built.detailHydrated || !existingHydrated || existingHydrated.configDefinitionId !== candidate.definitionId) {
+          hydratedByKey.set(candidate.ruleKey, built);
+        }
+        return built;
+      });
+      if (!projection) return { summaries };
+      const projectionKeys = new Set(projection.decisionRefs.map(item => item.decisionKey));
+      const governed = summaries
+        .filter(item => projectionKeys.has(item.key))
+        .sort((left, right) => left.order - right.order);
+      const others = summaries.filter(item => !projectionKeys.has(item.key));
+      return { summaries: [...governed, ...others] };
+    }));
+  }
+
+  private mapCandidateToSummary(
+    candidate: DomainRuleCatalogCandidate,
+    index: number,
+    totalCandidates: number,
+    projection: DomainProjection | null,
+    detail: {
+      readonly definitionWithParameters: {
+        readonly definition: DomainRuleDefinition;
+        readonly serverParameterCatalog: DomainRuleParameterCatalog | null;
+      };
+      readonly factCatalog: DomainRuleFactCatalog;
+    } | undefined,
+    ruleSetMetaByResourceKey: ReadonlyMap<string, {
+      ruleSetKey: string;
+      resourceKey: string | null;
+      availableRoots: readonly string[];
+      conceptRoots: readonly string[];
+    }>,
+    workspaces: readonly DomainRuleChangeWorkspace[],
+    definitionCapabilities: DomainRuleDefinitionCapabilities,
+    locale: SupportedLocale
+  ): DecisionSummary {
+    const definition = detail?.definitionWithParameters.definition;
+    const serverParameterCatalog = detail?.definitionWithParameters.serverParameterCatalog ?? null;
+    const factCatalog = detail?.factCatalog ?? undefined;
+    const decision = projection?.decisionRefs.find(item => item.decisionKey === candidate.ruleKey);
+    const workspace = this.latestWorkspace(workspaces, candidate.ruleKey);
+    const availableDefinitionActions = this.mergeDefinitionActions(
+      definitionCapabilities,
+      candidate.definitionId,
+      candidate.ruleKey,
+      candidate.version,
+      workspace?.promotedDefinitionId ?? null
+    );
+    if (!projection || !decision) {
+      const baseSummary = this.catalogSummary(candidate, index, totalCandidates, locale,
+        availableDefinitionActions, factCatalog, definition, workspace, serverParameterCatalog);
+      const siblingMeta = candidate.resourceKey?.trim()
+        ? ruleSetMetaByResourceKey.get(candidate.resourceKey.trim())
+        : undefined;
+      if (!definition && siblingMeta) {
+        return {
+          ...baseSummary,
+          ruleSetKey: siblingMeta.ruleSetKey,
+          resourceKey: siblingMeta.resourceKey,
+          ...(siblingMeta.availableRoots.length ? { availableRoots: siblingMeta.availableRoots } : {}),
+          ...(siblingMeta.conceptRoots.length ? { conceptRoots: siblingMeta.conceptRoots } : {})
+        };
+      }
+      return baseSummary;
+    }
+    const conditionFactPaths = collectFactPaths(definition?.condition);
+    if (conditionFactPaths.some(factPath => !decision.factPaths.includes(factPath))) {
+      throw new Error(`CONFIG_FACT_OUTSIDE_GOVERNED_PROJECTION ${decision.decisionKey}`);
+    }
+    const hasCatalogFacts = (factCatalog?.facts.length ?? 0) > 0;
+    const facts = hasCatalogFacts
+      ? this.decisionFacts(factCatalog, locale)
+      : this.projectionFacts(decision.factPaths, projection.factSchemas);
+    if (hasCatalogFacts && conditionFactPaths.some(factPath => !facts.some(fact => fact.path === factPath))) {
+      throw new Error(`CONFIG_FACT_CATALOG_INCOMPLETE ${decision.decisionKey}`);
+    }
+    const parameterCatalog = this.overlayParameterCatalog(
+      this.parameterCatalog(definition, serverParameterCatalog),
+      workspace?.parameters
+    );
+    const definitionBody = this.record(definition?.definition);
+    const slotPlanMeta = this.extractSlotPlanMetadata(definitionBody, decision);
+    const executorKind = this.stringValue(definitionBody, 'executorKind');
+    const isForbiddenSlot =
+      slotPlanMeta.slotOverridePolicy === 'FORBIDDEN'
+      || slotPlanMeta.slotOverridePolicy === 'LOCKED'
+      || executorKind === 'JAVA'
+      || executorKind === 'JAVA_EXECUTOR';
+    const definitionDocumentation = this.resolveDefinitionDocumentation(definitionBody, decision);
+    const hasWorkspaceDocField = !!workspace
+      && Object.prototype.hasOwnProperty.call(workspace, DOMAIN_RULE_DOCUMENTATION_KEY)
+      && (workspace as { documentation?: unknown }).documentation !== undefined;
+    const workspaceDocumentation = workspace
+      ? (hasWorkspaceDocField
+          ? extractRuleDocumentation((workspace as { documentation?: unknown }).documentation)
+          : definitionDocumentation)
+      : null;
+    const documentation = workspaceDocumentation ?? definitionDocumentation ?? null;
+    const decisionKind = (definition?.ruleType ?? candidate.ruleType) === 'authorization_policy'
+      ? 'AUTHORIZATION' as const
+      : 'BUSINESS' as const;
+    return {
+      order: decision.order,
+      totalDecisions: projection.decisionRefs.length,
+      key: decision.decisionKey,
+      code: decision.reasonCode ?? decision.decisionKey,
+      name: decision.presentationLabel || documentation?.title || decision.decisionKey,
+      domain: projection.presentationLabels.domain[locale] ?? projection.ruleSetRef.boundedContextKey,
+      ruleSet: projection.presentationLabels.ruleSet[locale] ?? projection.ruleSetRef.ruleSetKey,
+      ruleSetKey: projection.ruleSetRef.ruleSetKey,
+      resourceKey: projection.ruleSetRef.operationalResourceKey?.trim() || null,
+      serviceKey: definition?.serviceKey?.trim() || null,
+      state: decision.semanticStatus === 'REFERENCE_IMPLEMENTED' ? 'verified' as const : 'technical-draft' as const,
+      meaning: decision.presentationLabel || documentation?.summary || decision.decisionKey,
+      authority: `${projection.authorityEvidence.currentAuthority} · ${projection.authorityEvidence.baselineAuthority}`,
+      baselineAuthority: projection.authorityEvidence.baselineAuthority,
+      source: decision.semanticSourceRef,
+      evidenceCount: projection.sourceArtifacts.length,
+      authoringSupported: !isForbiddenSlot && (decision.editable
+        || (parameterCatalog?.parameters.length ?? 0) > 0
+        || this.hasEditableOperationalPolicy(definition)),
+      availableDefinitionActions,
+      reviewStatus: decision.reviewStatus,
+      configDefinitionId: candidate.definitionId,
+      configVersion: candidate.version,
+      configStatus: candidate.status,
+      workspaceId: workspace?.id,
+      workspaceStatus: workspace?.status,
+      workspaceEtag: workspace?.etag,
+      workspaceRevision: workspace?.revision,
+      promotedDefinitionId: workspace?.promotedDefinitionId ?? null,
+      workspaceCondition: workspace?.condition ?? null,
+      workspaceParameters: workspace?.parameters ?? {},
+      expression: formatDecisionExpression(definition?.condition),
+      condition: definition?.condition ?? null,
+      factPaths: conditionFactPaths.length ? conditionFactPaths : decision.factPaths,
+      evaluatedFactPaths: (() => {
+        const activePaths = collectFactPaths(workspace?.condition ?? definition?.condition)
+          .filter(path => !isParameterFactPath(path));
+        return activePaths.length ? activePaths : decision.factPaths;
+      })(),
+      facts,
+      nullSemantics: this.stringValue(definition?.parameters, 'nullSemantics'),
+      operationKeys: this.stringArrayValue(definition?.parameters, 'operationKeys') ?? projection.ruleSetRef.operationKeys,
+      hostContractVersion: this.stringValue(definition?.parameters, 'hostContractVersion') ??
+        projection.ruleSetRef.hostContractVersion ?? null,
+      evidence: projection.sourceArtifacts,
+      draftLifecycle: this.stringValue(definition?.governance, 'lifecycleBoundary'),
+      ruleType: definition?.ruleType ?? candidate.ruleType,
+      decisionKind,
+      parameters: definition?.parameters ?? {},
+      parameterCatalog,
+      detailHydrated: definition !== undefined,
+      documentation,
+      definitionDocumentation,
+      workspaceDocumentation,
+      ...slotPlanMeta
+    };
   }
 
   loadDiscoveredCandidate(
@@ -401,9 +1105,12 @@ export class ProjectionCatalogService {
 
   private loadCatalogPages(config: PolicyStudioRuntimeConfig): Observable<readonly DomainRuleCatalogCandidate[]> {
     const options = this.requestOptions(config);
-    return this.domainRules.browseDefinitionCatalog({ page: 0, limit: 12 }, options).pipe(
-      expand(page => page.hasMore
-        ? this.domainRules.browseDefinitionCatalog({ page: page.page + 1, limit: page.limit }, options)
+    return this.domainRules.browseDefinitionCatalog(
+      { page: 0, limit: ProjectionCatalogService.CATALOG_PAGE_LIMIT },
+      options
+    ).pipe(
+      expand(page => page.hasMore && page.page < ProjectionCatalogService.MAX_CATALOG_PAGE
+        ? this.fetchCatalogPageSafely(page.page + 1, options)
         : EMPTY),
       reduce((candidates, page) => [...candidates, ...page.candidates], [] as DomainRuleCatalogCandidate[]),
       map(candidates => this.latestCatalogCandidates(candidates.filter(candidate => candidate.ruleType !== AUTHORIZATION_RULE_TYPE)))
@@ -474,11 +1181,22 @@ export class ProjectionCatalogService {
       ?? this.stringValue(parametersBody, 'reasonCode')
       ?? this.operationalPolicyString(parametersBody, 'code')
       ?? this.inferReasonCodeFromRuleKey(candidate.ruleKey);
+    const extCandidate = candidate as ExtendedCatalogCandidate;
+    const presentationLabels = this.record(definitionBody?.['presentationLabels']);
+    const domainLabel = this.localizedText(presentationLabels?.['domain'], locale)
+      ?? this.localizedText(definitionBody?.['domainLabel'], locale)
+      ?? extCandidate.domainLabel?.trim()
+      ?? null;
+    const ruleSetLabel = this.localizedText(presentationLabels?.['ruleSet'], locale)
+      ?? this.localizedText(definitionBody?.['ruleSetLabel'], locale)
+      ?? extCandidate.ruleSetLabel?.trim()
+      ?? null;
     const name = this.localizedText(definitionBody?.['labels'], locale)
       ?? this.localizedText(definitionBody?.['title'], locale)
       ?? this.stringValue(definitionBody, 'presentationLabel')
       ?? this.stringValue(definitionBody, 'title')
       ?? documentation?.title
+      ?? (extCandidate.displayName?.trim() || null)
       ?? candidate.ruleKey;
     const meaning = this.localizedText(definitionBody?.['descriptions'], locale)
       ?? this.localizedText(definitionBody?.['description'], locale)
@@ -523,7 +1241,9 @@ export class ProjectionCatalogService {
       code,
       name,
       domain: context,
+      ...(domainLabel ? { domainLabel } : {}),
       ruleSet: candidate.resourceKey?.trim() || candidate.serviceKey?.trim() || context,
+      ...(ruleSetLabel ? { ruleSetLabel } : {}),
       ruleSetKey,
       resourceKey,
       serviceKey: definition?.serviceKey?.trim() || candidate.serviceKey,
@@ -1531,13 +2251,22 @@ export class ProjectionCatalogService {
   timeline(definitionId: string, config: PolicyStudioRuntimeConfig): Observable<readonly DecisionTimelineEvent[]> {
     if (config.mode !== 'remote') return of([]);
     return this.domainRules.getDefinitionTimeline(definitionId, this.requestOptions(config)).pipe(
-      map(response => response.events.map(event => ({
-        eventType: event.eventType,
-        occurredAt: event.occurredAt ?? '',
-        summary: event.summary ?? event.eventType,
-        status: null,
-        actor: event.actor ?? null
-      })))
+      map(response => response.events.map(event => {
+        const ext = event as unknown as {
+          readonly status?: string | null;
+          readonly summaryCode?: string | null;
+          readonly summaryArgs?: Readonly<Record<string, unknown>> | null;
+        };
+        return {
+          eventType: event.eventType,
+          occurredAt: event.occurredAt ?? '',
+          summary: event.summary ?? event.eventType,
+          ...(ext.summaryCode ? { summaryCode: ext.summaryCode } : {}),
+          ...(ext.summaryArgs ? { summaryArgs: ext.summaryArgs } : {}),
+          status: ext.status ?? null,
+          actor: event.actor ?? null
+        };
+      }))
     );
   }
 

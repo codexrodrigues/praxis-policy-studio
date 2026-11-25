@@ -693,10 +693,44 @@ function appendStructuredFactMetaTags(
     metaTags.push({ label: dict.factGovernanceExportBlocked, tone: 'warning' });
   }
   for (const complianceTag of (fact.governance?.complianceTags ?? []).slice(0, 3)) {
-    const cleanTag = complianceTag?.trim();
+    const cleanTag = humanizeComplianceTag(complianceTag, locale);
     if (cleanTag) {
       metaTags.push({ label: cleanTag, tone: 'info' });
     }
+  }
+}
+
+export function humanizeComplianceTag(
+  tag: string | null | undefined,
+  locale: SupportedLocale
+): string {
+  const trimmed = tag?.trim() ?? '';
+  if (!trimmed) {
+    return '';
+  }
+  const normalized = trimmed.replace(/[.:\s-]+/g, '_').toUpperCase();
+  const dict = POLICY_STUDIO_COPY[locale];
+  switch (normalized) {
+    case 'COMPLIANCE':
+      return dict.complianceTagCompliance;
+    case 'INTERNAL_POLICY':
+      return dict.complianceTagInternalPolicy;
+    case 'REGULATORY':
+      return dict.complianceTagRegulatory;
+    case 'AUDIT':
+      return dict.complianceTagAudit;
+    case 'PRIVACY':
+      return dict.complianceTagPrivacy;
+    case 'SECURITY':
+      return dict.complianceTagSecurity;
+    case 'FINANCIAL':
+      return dict.complianceTagFinancial;
+    case 'STATUTORY':
+      return dict.complianceTagStatutory;
+    case 'CONTRACTUAL':
+      return dict.complianceTagContractual;
+    default:
+      return trimmed;
   }
 }
 

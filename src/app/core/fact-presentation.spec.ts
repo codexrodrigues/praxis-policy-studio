@@ -3,6 +3,7 @@ import {
   formatFactDisplayLabel,
   formatFactPopoverModel,
   groupFactsForDisplay,
+  humanizeComplianceTag,
   humanizeFactRedaction,
   isParameterFactPath,
   partitionDecisionFacts,
@@ -279,5 +280,13 @@ describe('fact-presentation', () => {
     expect(techPopover.detail).toContain('Lineage: hr.actors · actor.cpf · (MASKED)');
     expect(techPopover.detail).toContain('Lookup: actors · hr.actors');
     expect(techPopover.metaTags.map(t => t.label).some(l => l.startsWith('Padrão: '))).toBe(true);
+  });
+
+  it('localizes generic compliance policy enums while keeping legal citations intact', () => {
+    expect(humanizeComplianceTag('COMPLIANCE', 'pt-BR')).toBe('Conformidade');
+    expect(humanizeComplianceTag('INTERNAL_POLICY', 'pt-BR')).toBe('Política interna');
+    expect(humanizeComplianceTag('REGULATORY', 'en-US')).toBe('Regulatory');
+    expect(humanizeComplianceTag('LGPD_ART_5_I', 'pt-BR')).toBe('LGPD_ART_5_I');
+    expect(humanizeComplianceTag('LAI', 'pt-BR')).toBe('LAI');
   });
 });

@@ -2212,4 +2212,46 @@ describe('CatalogWorkspaceComponent selection isolation', () => {
     expect(withoutWsCopy).toBe(TestBed.inject(PolicyStudioI18n).text('nextStepLockedInspectOnlyBody'));
     expect(withoutWsCopy).not.toContain('simular cenários');
   });
+
+  it('distinguishes NO_ACTIVE_DRAFT when no workspace exists, navigates to test mode cleanly, and localizes timeline labels', () => {
+    const noDraftDecision: DecisionSummary = {
+      ...decision('workforce.rule.no-draft'),
+      workspaceId: undefined,
+      workspaceStatus: undefined,
+      promotedDefinitionId: null,
+      configStatus: 'draft',
+      slotOverridePolicy: 'PARAMETERIZABLE'
+    };
+
+    component.select(noDraftDecision);
+
+    expect(component.maturityPosture()?.approvalStage).toBe('NO_ACTIVE_DRAFT');
+    expect(component.approvalStageLabel('NO_ACTIVE_DRAFT')).toBe('Sem rascunho em andamento');
+    expect(component.statusGlossary(noDraftDecision).title).toBe('Sem rascunho em andamento');
+    expect(component.effectiveConfigStatusLabel(noDraftDecision)).toBe('Sem revisão em rascunho');
+    expect(component.nextStepBodyParts(noDraftDecision).beforeDraft).toContain('Abra um');
+
+    // Only marks as active in production when a live runtime snapshot or READY materialization exists
+    component.snapshotHead.set({
+      ruleSetKey: noDraftDecision.ruleSetKey,
+      operationKey: 'CREATE',
+      activeSnapshotKey: 'snap-v1',
+      ruleSetVersion: 1,
+      publicationRevision: 1,
+      activationRevision: 1,
+      headEtag: 'etag-head-1',
+      executionReady: true,
+      governanceState: 'READY'
+    });
+    expect(component.statusGlossary(noDraftDecision).title).toBe('Ativa em produção');
+
+    component.navigateToSection('decision-tests');
+    expect(component.activeMode()).toBe('test');
+    expect(component.timelineEventSummaryText({
+      eventType: 'approval.requested',
+      summary: 'Raw fallback',
+      summaryCode: 'domain_rule.event.approval_requested'
+    })).toBe('Solicitação de aprovação enviada');
+    expect(component.timelineEventStatusLabel('requested')).toBe('Solicitado');
+  });
 });

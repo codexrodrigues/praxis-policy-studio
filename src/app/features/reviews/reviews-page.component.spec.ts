@@ -62,6 +62,7 @@ describe('ReviewsPageComponent', () => {
   let store: CatalogSelectionStore;
   const ensureLoadedSpy = vi.fn();
   const requestOpenInCatalogSpy = vi.fn();
+  const browseAccessCatalogSpy = vi.fn();
 
   afterEach(() => {
     fixture?.destroy();
@@ -71,6 +72,15 @@ describe('ReviewsPageComponent', () => {
   beforeEach(async () => {
     ensureLoadedSpy.mockReset();
     requestOpenInCatalogSpy.mockReset();
+    browseAccessCatalogSpy.mockReset();
+    browseAccessCatalogSpy.mockReturnValue(of({
+      candidates: [],
+      page: 0,
+      limit: 12,
+      hasMore: false,
+      totalElements: 0,
+      truncated: false
+    }));
 
     await TestBed.configureTestingModule({
       imports: [ReviewsPageComponent],
@@ -78,7 +88,10 @@ describe('ReviewsPageComponent', () => {
         provideRouter([]),
         PolicyStudioI18n,
         CatalogSelectionStore,
-        { provide: ProjectionCatalogService, useValue: { load: () => of([]) } },
+        {
+          provide: ProjectionCatalogService,
+          useValue: { load: () => of([]), browseAccessCatalog: browseAccessCatalogSpy }
+        },
         { provide: AuthSessionService, useValue: { hasSession: () => of(true) } },
         {
           provide: RuntimeConfigService,
@@ -180,5 +193,96 @@ describe('ReviewsPageComponent', () => {
     store.permissionLimited.set(true);
     fixture.detectChanges();
     expect(fixture.debugElement.query(By.css('[data-testid="reviews-permission-card"]'))).not.toBeNull();
+  });
+
+  it('centers empty queue state without duplicating the catalog link in the header', () => {
+    store.allDecisions.set([makeDecision('stable.rule', 'PROMOTED')]);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-testid="reviews-empty-state"]')).toBeTruthy();
+    expect(el.querySelectorAll('.reviews-head-actions a')).toHaveLength(0);
+    expect(el.querySelectorAll('[data-testid="reviews-empty-state"] a')).toHaveLength(1);
+  });
+
+  it('loads segregated pending authorization policies on demand and excludes active policies', () => {
+    store.catalogSummary.set({
+      schemaVersion: 'praxis-domain-rule-catalog-summary.v1',
+      totalDefinitions: 5,
+      totalBusinessRules: 2,
+      totalAuthorizationPolicies: 3,
+      byContextKey: [],
+      byResourceKey: [],
+      byRuleType: [],
+      byDefinitionStatus: [],
+      reviewQueue: { openDrafts: 0, inReview: 0, approved: 0, rejected: 0, promoted: 0, totalPending: 0 }
+    });
+    browseAccessCatalogSpy.mockReturnValue(of({
+      candidates: [
+        {
+          definitionId: 'auth-draft',
+          ruleKey: 'access.docs.draft',
+          version: 1,
+          ruleType: 'authorization_policy',
+          status: 'draft',
+          contextKey: 'workforce.docs',
+          resourceKey: 'workforce.docs',
+          serviceKey: 'docs-service',
+          semanticOwner: null,
+          updatedAt: '2026-11-25T00:00:00Z',
+          displayName: 'Política em rascunho'
+        },
+        {
+          definitionId: 'auth-approved',
+          ruleKey: 'access.docs.approved',
+          version: 1,
+          ruleType: 'authorization_policy',
+          status: 'approved',
+          contextKey: 'workforce.docs',
+          resourceKey: 'workforce.docs',
+          serviceKey: 'docs-service',
+          semanticOwner: null,
+          updatedAt: '2026-11-25T00:00:00Z',
+          displayName: 'Política aprovada'
+        },
+        {
+          definitionId: 'auth-active',
+          ruleKey: 'access.docs.active',
+          version: 1,
+          ruleType: 'authorization_policy',
+          status: 'active',
+          contextKey: 'workforce.docs',
+          resourceKey: 'workforce.docs',
+          serviceKey: 'docs-service',
+          semanticOwner: null,
+          updatedAt: '2026-11-25T00:00:00Z',
+          displayName: 'Política ativa'
+        }
+      ],
+      page: 0,
+      limit: 50,
+      hasMore: false,
+      totalElements: 3,
+      truncated: false
+    }));
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(browseAccessCatalogSpy).not.toHaveBeenCalled();
+
+    const loadBtn = el.querySelector('[data-testid="reviews-load-authz-btn"]') as HTMLButtonElement;
+    expect(loadBtn).toBeTruthy();
+    loadBtn.click();
+    fixture.detectChanges();
+
+    expect(browseAccessCatalogSpy).toHaveBeenCalledOnce();
+    expect(browseAccessCatalogSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'remote' }),
+      { page: 0, limit: 50 }
+    );
+    const listText = el.querySelector('[data-testid="reviews-authz-list"]')?.textContent ?? '';
+    expect(listText).toContain('Política em rascunho');
+    expect(listText).toContain('Política aprovada');
+    expect(listText).not.toContain('Política ativa');
   });
 });

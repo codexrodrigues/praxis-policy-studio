@@ -222,6 +222,117 @@ export function timelineEventTone(eventType: string | null | undefined): Worksta
   return 'neutral';
 }
 
+export function humanizeTimelineEventStatus(
+  status: string | null | undefined,
+  locale: SupportedLocale
+): string {
+  const trimmed = status?.trim() ?? '';
+  if (!trimmed) return '—';
+  const dict = POLICY_STUDIO_COPY[locale];
+  const normalized = trimmed.replace(/[.:\s-]+/g, '_').toUpperCase();
+  switch (normalized) {
+    case 'REQUESTED':
+      return dict.timelineStatusRequested;
+    case 'COMPLETED':
+      return dict.timelineStatusCompleted;
+    case 'APPROVED':
+      return dict.timelineStatusApproved;
+    case 'REJECTED':
+      return dict.timelineStatusRejected;
+    case 'DRAFT':
+      return dict.timelineStatusDraft;
+    case 'ACTIVE':
+      return dict.timelineStatusActive;
+    case 'PUBLISHED':
+      return dict.timelineStatusPublished;
+    case 'PENDING':
+      return dict.timelineStatusPending;
+    case 'CANCELLED':
+    case 'CANCELED':
+      return dict.timelineStatusCancelled;
+    case 'PROMOTED':
+      return dict.timelineStatusPromoted;
+    default:
+      return humanizeTechnicalSlug(trimmed, undefined, locale);
+  }
+}
+
+export function humanizeTimelineEventSummary(
+  summary: string | null | undefined,
+  eventType: string | null | undefined,
+  locale: SupportedLocale,
+  summaryCode?: string | null,
+  _summaryArgs?: Readonly<Record<string, unknown>> | null
+): string {
+  const dict = POLICY_STUDIO_COPY[locale];
+  const code = summaryCode?.trim().toLowerCase() ?? '';
+  switch (code) {
+    case 'domain_rule.event.approval_requested':
+      return dict.timelineSummaryApprovalRequested;
+    case 'domain_rule.event.approval_completed':
+      return dict.timelineSummaryApprovalCompleted;
+    case 'domain_rule.event.intake_received':
+      return dict.timelineSummaryIntakeReceived;
+    case 'domain_rule.event.simulation_requested':
+      return dict.timelineSummarySimulationRequested;
+    case 'domain_rule.event.simulation_completed':
+      return dict.timelineSummarySimulationCompleted;
+    case 'domain_rule.event.publication_requested':
+      return dict.timelineSummaryPublicationRequested;
+    case 'domain_rule.event.publication_completed':
+      return dict.timelineSummaryPublicationCompleted;
+    case 'domain_rule.event.definition_created':
+      return dict.timelineSummaryDefinitionCreated;
+    case 'domain_rule.event.definition_approved':
+      return dict.timelineSummaryDefinitionApproved;
+    case 'domain_rule.event.definition_activated':
+      return dict.timelineSummaryDefinitionActivated;
+    case 'domain_rule.event.materialization_created':
+      return dict.timelineSummaryMaterializationCreated;
+    case 'domain_rule.event.materialization_applied':
+      return dict.timelineSummaryMaterializationApplied;
+    case 'domain_rule.event.materialization_superseded':
+      return dict.timelineSummaryMaterializationSuperseded;
+    default:
+      break;
+  }
+  const trimmed = summary?.trim() ?? '';
+  if (!trimmed) {
+    return humanizeTimelineEventType(eventType, locale, 'business');
+  }
+  const normalized = trimmed.toLowerCase().replace(/\s+/g, ' ');
+  switch (normalized) {
+    case 'decision approval requested':
+      return dict.timelineSummaryApprovalRequested;
+    case 'decision approval completed':
+      return dict.timelineSummaryApprovalCompleted;
+    case 'decision intake received':
+      return dict.timelineSummaryIntakeReceived;
+    case 'decision simulation requested':
+      return dict.timelineSummarySimulationRequested;
+    case 'decision simulation completed':
+      return dict.timelineSummarySimulationCompleted;
+    case 'decision publication requested':
+      return dict.timelineSummaryPublicationRequested;
+    case 'decision publication completed':
+      return dict.timelineSummaryPublicationCompleted;
+    case 'decision definition created':
+      return dict.timelineSummaryDefinitionCreated;
+    case 'decision definition approved':
+      return dict.timelineSummaryDefinitionApproved;
+    case 'decision definition activated':
+      return dict.timelineSummaryDefinitionActivated;
+    case 'decision materialization created':
+      return dict.timelineSummaryMaterializationCreated;
+    case 'decision materialization applied':
+      return dict.timelineSummaryMaterializationApplied;
+    case 'decision materialization superseded':
+      return dict.timelineSummaryMaterializationSuperseded;
+    default:
+      return trimmed;
+  }
+}
+
 export function humanizeSnapshotGovernanceState(
   state: string | null | undefined,
   locale: SupportedLocale,

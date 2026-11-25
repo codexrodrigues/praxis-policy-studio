@@ -32,7 +32,9 @@ export interface DecisionSummary {
   readonly code: string;
   readonly name: string;
   readonly domain: string;
+  readonly domainLabel?: string | null;
   readonly ruleSet: string;
+  readonly ruleSetLabel?: string | null;
   readonly ruleSetKey: string;
   readonly resourceKey: string | null;
   readonly serviceKey: string | null;
@@ -184,6 +186,8 @@ export interface DecisionTimelineEvent {
   readonly eventType: string;
   readonly occurredAt: string;
   readonly summary: string;
+  readonly summaryCode?: string | null;
+  readonly summaryArgs?: Readonly<Record<string, unknown>> | null;
   readonly status: string | null;
   readonly actor: string | null;
 }

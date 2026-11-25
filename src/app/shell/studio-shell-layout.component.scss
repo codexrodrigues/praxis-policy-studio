@@ -29,6 +29,7 @@
   top: 0;
   z-index: 40;
   min-height: var(--pax-topbar-height);
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -115,7 +116,7 @@
   font-size: var(--pax-text-sm);
   font-weight: 500;
   min-width: 0;
-  max-width: 18rem;
+  max-width: min(36rem, 42vw);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -334,9 +335,15 @@
   }
 }
 
+@media (min-width: 761px) {
+  .product-bar {
+    height: var(--pax-topbar-height);
+  }
+}
+
 @media (max-width: 1280px) {
   .crumb-current {
-    max-width: 11rem;
+    max-width: min(20rem, 30vw);
   }
   .bar-center {
     flex-basis: 12.5rem;

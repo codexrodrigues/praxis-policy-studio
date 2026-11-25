@@ -14,7 +14,7 @@ import {
   type DomainRuleWorkspaceAction
 } from '@praxisui/core';
 import type { RuleBuilderState } from '@praxisui/visual-builder';
-import { skip } from 'rxjs';
+import { EMPTY, catchError, from, map, mergeMap, of, skip, switchMap, type Observable, type Subscription } from 'rxjs';
 import { AuthSessionService } from '../../core/auth-session.service';
 import type { ExplorerGlobalLens } from '../../core/catalog-portfolio';
 import type { DecisionDiscoveryCandidate } from '../../core/decision-discovery.service';
@@ -26,14 +26,16 @@ import {
   humanizeGovernanceGateLabel,
   humanizeOperationMode,
   humanizeReviewDecision,
+  humanizeTimelineEventStatus,
+  humanizeTimelineEventSummary,
   humanizeTimelineEventType,
   reviewDecisionTone,
   timelineEventTone,
   type WorkstationStatusTone
 } from '../../core/workstation-presentation';
-import { humanizeDecisionTitle, humanizeTechnicalSlug, looksLikeTechnicalSlug } from '../../core/humanize-labels';
+import { humanizeDecisionTitle, humanizeTechnicalSlug, looksLikeTechnicalSlug, stripLeadingDecisionCode } from '../../core/humanize-labels';
 import { PolicyStudioI18n } from '../../core/i18n';
-import { ProjectionCatalogService } from '../../core/projection-catalog.service';
+import { ProjectionCatalogService, type ProgressiveCatalogChunk } from '../../core/projection-catalog.service';
 import {
   buildRuleParameterDisplayEntries,
   type RuleParameterDisplayEntry
@@ -139,6 +141,27 @@ export class CatalogWorkspaceComponent implements OnInit {
   private readonly loadedModesForSelection = new Set<DecisionWorkMode>(['understand']);
   private pendingLeaveResolver: ((allowLeave: boolean) => void) | null = null;
   private pendingPostLoginRedirect = false;
+  private catalogLoadSubscription: Subscription | null = null;
+  private siblingHydrationSubscription: Subscription | null = null;
+  private userManuallySelectedDuringStream = false;
+  private isAutoSelectingFromLoad = false;
+  private selectionEstablishedInLoad = false;
+  private deepLinkResolvedInLoad = false;
+  private postLoginHandledInLoad = false;
+
+  private cancelCatalogLoad(): void {
+    this.siblingHydrationSubscription?.unsubscribe();
+    this.siblingHydrationSubscription = null;
+    const wasActive = this.catalogLoadSubscription !== null;
+    this.catalogLoadSubscription?.unsubscribe();
+    this.catalogLoadSubscription = null;
+    if (wasActive && this.store.catalogStreaming()) {
+      this.store.catalogStreaming.set(false);
+      this.store.catalogTotalHint.set(null);
+      this.store.catalogTruncated.set(false);
+      this.store.loadedEnvironmentSignature.set(null);
+    }
+  }
 
   readonly activeWorkspaceTrack = this.store.activeWorkspaceTrack;
   readonly viewDepth = this.store.viewDepth;
@@ -156,6 +179,11 @@ export class CatalogWorkspaceComponent implements OnInit {
   readonly policyConfig = this.store.policyConfig;
   readonly loadError = this.store.loadError;
   readonly loading = this.store.loading;
+  readonly catalogStreaming = this.store.catalogStreaming;
+  readonly catalogTotalHint = this.store.catalogTotalHint;
+  readonly catalogTruncated = this.store.catalogTruncated;
+  readonly catalogPartialError = this.store.catalogPartialError;
+  readonly catalogSummary = this.store.catalogSummary;
   readonly authenticationRequired = this.store.authenticationRequired;
   readonly permissionLimited = this.store.permissionLimited;
   readonly authenticating = this.store.authenticating;
@@ -292,6 +320,10 @@ export class CatalogWorkspaceComponent implements OnInit {
   });
 
   constructor(readonly i18n: PolicyStudioI18n) {
+    this.destroyRef.onDestroy(() => {
+      this.bootstrap?.detachChunkListener?.();
+      this.cancelCatalogLoad();
+    });
     this.shell.registerLogoutHandler(() => this.logout());
     if (this.theme) {
       this.shell.registerThemeToggleHandler(() => this.theme!.toggleDark());
@@ -401,7 +433,23 @@ export class CatalogWorkspaceComponent implements OnInit {
       this.hydrateExistingCatalogSelection();
       return;
     }
+    if (this.bootstrap?.isStreamingCurrentEnvironment?.()) {
+      this.attachToActiveBootstrapStream();
+      return;
+    }
     this.loadCatalog();
+  }
+
+  private attachToActiveBootstrapStream(): void {
+    this.selectionEstablishedInLoad = this.selected() !== null;
+    this.deepLinkResolvedInLoad = this.store.deepLinkConsumed();
+    this.postLoginHandledInLoad = false;
+    if (this.allDecisions().length > 0) {
+      this.hydrateExistingCatalogSelection();
+    }
+    this.bootstrap?.attachChunkListener?.((chunk, decisions, replaceExisting) =>
+      this.handleCatalogChunk(chunk, decisions, replaceExisting, true)
+    );
   }
 
   private hydrateExistingCatalogSelection(): void {
@@ -451,19 +499,25 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   displayHeaderDomain(decision: DecisionSummary): string {
+    if (this.viewDepth() === 'business' && decision.domainLabel?.trim()) {
+      return decision.domainLabel.trim();
+    }
     const raw = decision.domain?.trim() || this.i18n.text('selected');
     if (this.viewDepth() === 'technical' || !looksLikeTechnicalSlug(raw)) return raw;
     return humanizeTechnicalSlug(raw, 2, this.i18n.locale()) || raw;
   }
 
   displayDecisionTitle(decision: DecisionSummary): string {
-    return humanizeDecisionTitle(
+    const title = humanizeDecisionTitle(
       decision.name,
       decision.code,
       this.effectiveDocumentation(decision)?.title,
       this.viewDepth(),
       this.i18n.locale()
     );
+    return this.viewDepth() === 'technical'
+      ? stripLeadingDecisionCode(title, decision.code)
+      : title;
   }
 
   displayCanvasTitle(decision: DecisionSummary): string {
@@ -515,7 +569,7 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   private resolvedGovernanceStatusCode(
     decision: DecisionSummary
-  ): 'PROMOTED' | 'APPROVED' | 'SUBMITTED' | 'REJECTED' | 'OPEN' {
+  ): 'PROMOTED' | 'APPROVED' | 'SUBMITTED' | 'REJECTED' | 'OPEN' | 'NO_ACTIVE_DRAFT' {
     const posture = this.maturityPosture();
     if (posture?.operationalAuthority === 'CONFIG_ACTIVE_SNAPSHOT') {
       return 'PROMOTED';
@@ -529,6 +583,8 @@ export class CatalogWorkspaceComponent implements OnInit {
         return 'SUBMITTED';
       case 'REJECTED':
         return 'REJECTED';
+      case 'NO_ACTIVE_DRAFT':
+        return 'NO_ACTIVE_DRAFT';
       default:
         return decision.state === 'verified' ? 'PROMOTED' : 'OPEN';
     }
@@ -649,9 +705,11 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   nextStepBodyParts(decision: DecisionSummary): { readonly beforeDraft: string; readonly betweenDraftAndFourEyes: string; readonly afterFourEyes: string } {
-    const template = this.isNextStepEditable(decision)
-      ? this.i18n.text('nextStepEditableBody')
-      : this.i18n.text('nextStepParameterizableBody');
+    const template = !decision.workspaceId
+      ? this.i18n.text('nextStepCreateDraftFirstBody')
+      : this.isNextStepEditable(decision)
+        ? this.i18n.text('nextStepEditableBody')
+        : this.i18n.text('nextStepParameterizableBody');
     const [beforeDraft = '', rest = ''] = template.split('{draft}');
     const [betweenDraftAndFourEyes = '', afterFourEyes = ''] = rest.split('{fourEyes}');
     return { beforeDraft, betweenDraftAndFourEyes, afterFourEyes };
@@ -744,6 +802,18 @@ export class CatalogWorkspaceComponent implements OnInit {
     return this.i18n.text('configOtherStatus');
   }
 
+  effectiveConfigStatusLabel(decision: DecisionSummary): string {
+    if (!decision.workspaceId) {
+      if (this.maturityPosture()?.activeSnapshotKey) {
+        return this.i18n.text('configActiveLiveLabel');
+      }
+      if (decision.configStatus?.toUpperCase().includes('DRAFT')) {
+        return this.i18n.text('configNoActiveDraftLabel');
+      }
+    }
+    return decision.configStatus ? this.configStatusLabel(decision.configStatus) : '';
+  }
+
   technicalMaturityLabel(value: DecisionMaturityPosture['technicalMaturity']): string {
     if (value === 'STRUCTURAL_VERIFIED') return this.i18n.text('maturityVerified');
     if (value === 'FACT_CATALOG_GAP') return this.i18n.text('maturityFactGap');
@@ -759,6 +829,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     if (value === 'APPROVED') return this.i18n.text('approvalStageApproved');
     if (value === 'IN_REVIEW') return this.i18n.text('approvalStageInReview');
     if (value === 'REJECTED') return this.i18n.text('approvalStageRejected');
+    if (value === 'NO_ACTIVE_DRAFT') return this.i18n.text('approvalStageNoActiveDraft');
     return this.i18n.text('approvalStageDraft');
   }
 
@@ -863,6 +934,10 @@ export class CatalogWorkspaceComponent implements OnInit {
     return formatLocalizedTimestamp(iso, this.i18n.locale(), this.viewDepth());
   }
 
+  formatWorkstationTimeBusiness(iso: string | null | undefined): string {
+    return formatLocalizedTimestamp(iso, this.i18n.locale(), 'business');
+  }
+
   reviewDecisionLabel(decision: string): string {
     return humanizeReviewDecision(decision, this.i18n.locale(), this.viewDepth());
   }
@@ -879,6 +954,29 @@ export class CatalogWorkspaceComponent implements OnInit {
     return humanizeTimelineEventType(eventType, this.i18n.locale(), this.viewDepth());
   }
 
+  timelineEventBusinessLabel(eventType: string): string {
+    return humanizeTimelineEventType(eventType, this.i18n.locale(), 'business');
+  }
+
+  timelineEventSummaryText(event: {
+    readonly summary?: string | null;
+    readonly eventType?: string | null;
+    readonly summaryCode?: string | null;
+    readonly summaryArgs?: Readonly<Record<string, unknown>> | null;
+  }): string {
+    return humanizeTimelineEventSummary(
+      event.summary,
+      event.eventType,
+      this.i18n.locale(),
+      event.summaryCode,
+      event.summaryArgs
+    );
+  }
+
+  timelineEventStatusLabel(status: string | null | undefined): string {
+    return humanizeTimelineEventStatus(status, this.i18n.locale());
+  }
+
   timelineBadgeTone(eventType: string): WorkstationStatusTone {
     return timelineEventTone(eventType);
   }
@@ -892,64 +990,110 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   loadCatalog(): void {
-    const loadRevision = ++this.store.catalogLoadRevision;
+    this.cancelCatalogLoad();
+    this.userManuallySelectedDuringStream = false;
+    this.selectionEstablishedInLoad = false;
+    this.deepLinkResolvedInLoad = false;
+    this.postLoginHandledInLoad = false;
     const state = this.runtime.state();
     if (state.kind !== 'ready') return;
+
+    if (this.bootstrap && typeof this.bootstrap.loadCatalog === 'function') {
+      this.bootstrap.loadCatalog({
+        onChunk: (chunk, decisions, replaceExisting) =>
+          this.handleCatalogChunk(chunk, decisions, replaceExisting, true),
+        onAuthRequired: () => this.clearSelection(),
+        onError: () => {
+          if (!this.allDecisions().length) {
+            this.clearSelection();
+          }
+        }
+      });
+      return;
+    }
+
+    const loadRevision = ++this.store.catalogLoadRevision;
+    const envSignature = this.bootstrap?.currentEnvironmentSignature() ?? null;
     this.loading.set(true);
+    this.store.catalogStreaming.set(false);
+    this.store.catalogTotalHint.set(null);
+    this.store.catalogTruncated.set(false);
+    this.store.catalogPartialError.set(null);
+    this.store.catalogSummary.set(null);
     this.i18n.locale.set(state.config.locale);
     this.titleStrategy?.refreshCurrentTitle();
     this.loadError.set(null);
     this.authenticationRequired.set(false);
     this.permissionLimited.set(false);
-    this.catalog.load(this.i18n.locale(), state.config).subscribe({
-      next: decisions => {
+    const sessionCheck$ = state.config.mode === 'remote'
+      && !this.store.sessionActive()
+      && typeof this.auth.hasSession === 'function'
+      ? this.auth.hasSession(state.config)
+      : of(true);
+    let receivedFirstChunk = false;
+
+    this.catalogLoadSubscription = sessionCheck$.pipe(
+      switchMap(active => {
+        if (loadRevision !== this.store.catalogLoadRevision) return EMPTY;
+        if (!active) {
+          this.store.loadedEnvironmentSignature.set(envSignature);
+          this.store.catalogStreaming.set(false);
+          this.store.catalogTotalHint.set(null);
+          this.store.catalogTruncated.set(false);
+          this.loading.set(false);
+          this.allDecisions.set([]);
+          this.clearSelection();
+          this.sessionActive.set(false);
+          this.shell.syncSessionState(false, false);
+          this.authenticationRequired.set(true);
+          this.loadError.set('AUTHENTICATION_REQUIRED');
+          return EMPTY;
+        }
+        const catalogStream$: Observable<ProgressiveCatalogChunk> = typeof this.catalog.loadProgressive === 'function'
+          ? this.catalog.loadProgressive(this.i18n.locale(), state.config)
+          : this.catalog.load(this.i18n.locale(), state.config).pipe(
+              map(decisions => ({ decisions, complete: true, totalKnown: decisions.length }))
+            );
+        return catalogStream$;
+      })
+    ).subscribe({
+      next: chunk => {
         if (loadRevision !== this.store.catalogLoadRevision) return;
-        this.store.loadedEnvironmentSignature.set(this.bootstrap?.currentEnvironmentSignature() ?? null);
+        const replaceExisting = !receivedFirstChunk;
+        receivedFirstChunk = true;
+        this.store.loadedEnvironmentSignature.set(chunk.complete ? envSignature : null);
         this.authenticationFailed.set(false);
         this.sessionActive.set(state.config.mode === 'remote');
         this.signingOut.set(false);
         this.shell.syncSessionState(state.config.mode === 'remote', false);
         this.logoutFailed.set(false);
-        this.activeRuleTypeFilter.set(null);
-        this.allDecisions.set(decisions);
+        if (replaceExisting) {
+          this.activeRuleTypeFilter.set(null);
+        }
+        const decisions = this.store.mergeProgressiveDecisions(chunk.decisions, replaceExisting);
+        this.store.catalogStreaming.set(!chunk.complete);
+        this.store.catalogTotalHint.set(chunk.totalKnown);
+        this.store.catalogTruncated.set(Boolean(chunk.truncated));
+        this.store.catalogPartialError.set(chunk.partialError ?? null);
+        this.store.catalogChunkRevision.update(v => v + 1);
         this.shell.setReviewQueueCount(this.store.reviewQueueDecisions().length);
-        const pendingKey = this.store.pendingSelectionKey();
-        const pendingMode = this.store.pendingWorkMode();
-        this.store.pendingSelectionKey.set(null);
-        this.store.pendingWorkMode.set(null);
-        this.contextScopeFilter.set(this.resolveDeepLinkScopeFilter(decisions));
-        const initial = (pendingKey ? decisions.find(item => item.key === pendingKey) : null)
-          ?? this.resolveInitialDecision(decisions, state.config.initialDecisionKey);
-        const initialOperationKey = this.resolveInitialOperationKey();
-        if (initial) this.select(initial, true, Boolean(pendingKey || this.hasExplicitDeepLink()), false, initialOperationKey);
-        else this.clearSelection();
-        this.store.deepLinkConsumed.set(true);
-        if (pendingMode && initial) {
-          const sectionByMode: Readonly<Record<DecisionWorkMode, string>> = {
-            understand: 'decision-overview',
-            rule: 'decision-rule',
-            test: 'decision-tests',
-            operate: 'decision-execution',
-            history: 'decision-history'
-          };
-          this.navigateToSection(sectionByMode[pendingMode]);
-        }
         this.loading.set(false);
-        const returnRoute = this.pendingPostLoginRedirect ? this.store.postLoginReturnRoute() : null;
-        this.pendingPostLoginRedirect = false;
-        if (returnRoute && returnRoute !== '/catalog' && this.router) {
-          this.store.postLoginReturnRoute.set(null);
-          void this.router.navigate([returnRoute], {
-            queryParams: extractPreservedEnvironmentQueryParams(
-              typeof window !== 'undefined' ? window.location.search : ''
-            )
-          });
-        }
+        this.handleCatalogChunk(chunk, decisions, replaceExisting, false);
       },
       error: (error: unknown) => {
         if (loadRevision !== this.store.catalogLoadRevision) return;
-        this.store.loadedEnvironmentSignature.set(null);
+        this.store.catalogStreaming.set(false);
         this.loading.set(false);
+        const isAuthError = error instanceof HttpErrorResponse && (error.status === 401 || error.status === 403);
+        if (receivedFirstChunk && !isAuthError && this.allDecisions().length > 0) {
+          this.store.loadedEnvironmentSignature.set(null);
+          this.store.catalogPartialError.set('CATALOG_PARTIAL_LOAD');
+          return;
+        }
+        this.store.catalogTotalHint.set(null);
+        this.store.catalogTruncated.set(false);
+        this.store.catalogPartialError.set(null);
+        this.store.loadedEnvironmentSignature.set(null);
         this.allDecisions.set([]);
         this.clearSelection();
         this.loadError.set(error instanceof Error ? error.message : 'PROJECTION_LOAD_FAILED');
@@ -962,6 +1106,130 @@ export class CatalogWorkspaceComponent implements OnInit {
         }
       }
     });
+  }
+
+  private handleCatalogChunk(
+    chunk: ProgressiveCatalogChunk,
+    decisions: readonly DecisionSummary[],
+    replaceExisting: boolean,
+    allowEarlyPostLoginRedirect: boolean
+  ): void {
+    const state = this.runtime.state();
+    if (state.kind !== 'ready') return;
+    const selectAuto = (
+      decision: DecisionSummary,
+      revealOnNarrow: boolean,
+      initialOperationKey: string | null
+    ): void => {
+      this.isAutoSelectingFromLoad = true;
+      try {
+        this.select(decision, true, revealOnNarrow, false, initialOperationKey);
+      } finally {
+        this.isAutoSelectingFromLoad = false;
+      }
+    };
+    const sectionByMode: Readonly<Record<DecisionWorkMode, string>> = {
+      understand: 'decision-overview',
+      rule: 'decision-rule',
+      test: 'decision-tests',
+      operate: 'decision-execution',
+      history: 'decision-history'
+    };
+
+    const pendingKey = this.store.pendingSelectionKey();
+    const pendingMode = this.store.pendingWorkMode();
+    const deepLinkScope = this.resolveDeepLinkScopeFilter(decisions);
+    if (deepLinkScope && !this.userManuallySelectedDuringStream) {
+      this.contextScopeFilter.set(deepLinkScope);
+    } else if (replaceExisting) {
+      this.contextScopeFilter.set(deepLinkScope);
+    }
+
+    const explicitTarget = this.resolveExplicitTargetDecision(
+      decisions,
+      pendingKey,
+      state.config.initialDecisionKey
+    );
+    const initialOperationKey = this.resolveInitialOperationKey();
+    if (!this.userManuallySelectedDuringStream) {
+      if (explicitTarget && !this.deepLinkResolvedInLoad) {
+        this.deepLinkResolvedInLoad = true;
+        this.selectionEstablishedInLoad = true;
+        this.store.pendingSelectionKey.set(null);
+        this.store.pendingWorkMode.set(null);
+        this.store.deepLinkConsumed.set(true);
+        selectAuto(explicitTarget, Boolean(pendingKey || this.hasExplicitDeepLink()), initialOperationKey);
+        if (pendingMode) {
+          this.navigateToSection(sectionByMode[pendingMode]);
+        }
+      } else if (!this.selectionEstablishedInLoad) {
+        const fallback = decisions[0] ?? null;
+        if (fallback) {
+          this.selectionEstablishedInLoad = true;
+          selectAuto(fallback, Boolean(pendingKey || this.hasExplicitDeepLink()), initialOperationKey);
+        } else {
+          this.clearSelection();
+        }
+      }
+    }
+    if (chunk.complete) {
+      this.store.pendingSelectionKey.set(null);
+      this.store.pendingWorkMode.set(null);
+      this.store.deepLinkConsumed.set(true);
+    }
+    if (!this.postLoginHandledInLoad && (allowEarlyPostLoginRedirect || chunk.complete)) {
+      this.postLoginHandledInLoad = true;
+      const returnRoute = this.pendingPostLoginRedirect ? this.store.postLoginReturnRoute() : null;
+      this.pendingPostLoginRedirect = false;
+      if (returnRoute && returnRoute !== '/catalog' && this.router) {
+        this.store.postLoginReturnRoute.set(null);
+        void this.router.navigate([returnRoute], {
+          queryParams: extractPreservedEnvironmentQueryParams(
+            typeof window !== 'undefined' ? window.location.search : ''
+          )
+        });
+      }
+    }
+  }
+
+  private resolveExplicitTargetDecision(
+    decisions: readonly DecisionSummary[],
+    pendingKey: string | null,
+    configuredInitialKey: string | null
+  ): DecisionSummary | null {
+    if (!decisions.length) return null;
+    if (pendingKey) {
+      const pendingMatch = decisions.find(item => item.key === pendingKey);
+      if (pendingMatch) return pendingMatch;
+    }
+    if (this.hasExplicitDeepLink()) {
+      const deepMatch = this.resolveInitialDecision(decisions, configuredInitialKey);
+      if (deepMatch && deepMatch !== decisions[0]) return deepMatch;
+      const firstDeepMatch = this.resolveInitialDecision(decisions.slice(0, 1), configuredInitialKey);
+      if (firstDeepMatch && typeof window !== 'undefined' && window.location?.search) {
+        const params = new URLSearchParams(window.location.search);
+        const matchesFirst = [
+          params.get('decisionKey')?.trim(),
+          params.get('bindingKey')?.trim(),
+          params.get('slotKey')?.trim(),
+          params.get('ruleSetKey')?.trim(),
+          params.get('resourceKey')?.trim()
+        ].some(val => Boolean(val && (
+          firstDeepMatch.key === val
+          || firstDeepMatch.code === val
+          || firstDeepMatch.slotKey === val
+          || firstDeepMatch.key.startsWith(`${val}.`)
+          || firstDeepMatch.ruleSetKey === val
+          || firstDeepMatch.resourceKey === val
+        )));
+        if (matchesFirst) return firstDeepMatch;
+      }
+      return null;
+    }
+    if (configuredInitialKey) {
+      return decisions.find(item => item.key === configuredInitialKey) ?? null;
+    }
+    return null;
   }
 
   resolveInitialDecision(
@@ -1098,6 +1366,13 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.logoutFailed.set(false);
     this.auth.logout(state.config).subscribe({
       next: () => {
+        this.bootstrap?.cancelActiveLoad?.();
+        this.cancelCatalogLoad();
+        this.store.catalogStreaming.set(false);
+        this.store.catalogTotalHint.set(null);
+        this.store.catalogTruncated.set(false);
+        this.store.catalogPartialError.set(null);
+        this.store.catalogSummary.set(null);
         ++this.store.catalogLoadRevision;
         this.store.loadedEnvironmentSignature.set(null);
         this.signingOut.set(false);
@@ -1133,6 +1408,12 @@ export class CatalogWorkspaceComponent implements OnInit {
   }
 
   requestAuthentication(): void {
+    this.bootstrap?.cancelActiveLoad?.();
+    this.cancelCatalogLoad();
+    this.store.catalogStreaming.set(false);
+    this.store.catalogTotalHint.set(null);
+    this.store.catalogTruncated.set(false);
+    this.store.catalogPartialError.set(null);
     ++this.store.catalogLoadRevision;
     this.loading.set(false);
     this.loadError.set(null);
@@ -1204,11 +1485,23 @@ export class CatalogWorkspaceComponent implements OnInit {
     if (!mode) return;
     this.activeMode.set(mode);
     this.ensureModeDataLoaded(mode);
+    this.resetDecisionPaneScroll();
     requestAnimationFrame(() => {
+      this.resetDecisionPaneScroll();
       const target = this.host.nativeElement.querySelector<HTMLElement>(`#${sectionId}`);
       if (!target) return;
       target.focus({ preventScroll: true });
     });
+  }
+
+  private resetDecisionPaneScroll(): void {
+    const scrollRegion = this.host.nativeElement.querySelector<HTMLElement>('.decision-pane-body');
+    if (scrollRegion) {
+      scrollRegion.scrollTop = 0;
+    }
+    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function' && window.scrollY > 0) {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
   }
 
   private ensureModeDataLoaded(mode: DecisionWorkMode): void {
@@ -1255,6 +1548,9 @@ export class CatalogWorkspaceComponent implements OnInit {
     discardConfirmed = false,
     initialOperationKey: string | null = null
   ): void {
+    if (!this.isAutoSelectingFromLoad) {
+      this.userManuallySelectedDuringStream = true;
+    }
     if (decision.key === this.selected()?.key && !forceReload) {
       if (revealOnNarrow) this.narrowDetailOpen.set(true);
       this.revealSelectedDecision();
@@ -1273,6 +1569,7 @@ export class CatalogWorkspaceComponent implements OnInit {
     this.selected.set(decision);
     this.narrowDetailOpen.set(revealOnNarrow);
     this.activeMode.set('understand');
+    this.resetDecisionPaneScroll();
     this.timeline.set([]);
     this.authoring.resetForSelection(decision);
     this.testing.resetForSelection();
@@ -1341,6 +1638,8 @@ export class CatalogWorkspaceComponent implements OnInit {
       });
     }
 
+    this.siblingHydrationSubscription?.unsubscribe();
+    this.siblingHydrationSubscription = null;
     const unhydratedSiblings = all.filter(
       item =>
         item.key !== decision.key
@@ -1350,37 +1649,65 @@ export class CatalogWorkspaceComponent implements OnInit {
         && Boolean(item.configDefinitionId)
         && Boolean(item.configVersion)
     );
-    for (const sibling of unhydratedSiblings) {
-      const siblingIndex = Math.max(0, all.findIndex(item => item.key === sibling.key));
-      this.catalog.loadDiscoveredCandidate(
-        {
-          definitionId: sibling.configDefinitionId!,
-          ruleKey: sibling.key,
-          version: sibling.configVersion!,
-          status: sibling.configStatus ?? 'draft',
-          ruleType: sibling.ruleType ?? 'validation',
-          contextKey: sibling.domain,
-          resourceKey: sibling.ruleSetKey || sibling.resourceKey,
-          serviceKey: sibling.serviceKey,
-          semanticOwner: null,
-          updatedAt: ''
-        },
-        siblingIndex,
+    if (!unhydratedSiblings.length) return;
+
+    if (typeof this.catalog.hydrateRuleSetSiblings === 'function') {
+      const siblingResource =
+        decision.resourceKey?.trim()
+        || decision.ruleSetKey?.trim()
+        || unhydratedSiblings[0]?.resourceKey?.trim()
+        || '';
+      this.siblingHydrationSubscription = this.catalog.hydrateRuleSetSiblings(
+        siblingResource,
+        unhydratedSiblings,
         total,
         this.i18n.locale(),
         state.config
       ).subscribe({
-        next: hydratedSibling => {
-          if (selectionRevision !== this.store.selectionRevision) return;
+        next: hydratedSiblings => {
+          if (selectionRevision !== this.store.selectionRevision || !hydratedSiblings.length) return;
+          const byKey = new Map(hydratedSiblings.map(item => [item.key, item]));
           this.allDecisions.update(items =>
-            items.map(item => item.key === hydratedSibling.key ? hydratedSibling : item)
+            items.map(item => item.detailHydrated ? item : (byKey.get(item.key) ?? item))
           );
         },
         error: () => {
           // Sibling background hydration for DAG completeness is non-blocking
         }
       });
+      return;
     }
+
+    this.siblingHydrationSubscription = from(unhydratedSiblings).pipe(
+      mergeMap(sibling => {
+        const siblingIndex = Math.max(0, all.findIndex(item => item.key === sibling.key));
+        return this.catalog.loadDiscoveredCandidate(
+          {
+            definitionId: sibling.configDefinitionId!,
+            ruleKey: sibling.key,
+            version: sibling.configVersion!,
+            status: sibling.configStatus ?? 'draft',
+            ruleType: sibling.ruleType ?? 'validation',
+            contextKey: sibling.domain,
+            resourceKey: sibling.ruleSetKey || sibling.resourceKey,
+            serviceKey: sibling.serviceKey,
+            semanticOwner: null,
+            updatedAt: ''
+          },
+          siblingIndex,
+          total,
+          this.i18n.locale(),
+          state.config
+        ).pipe(catchError(() => EMPTY));
+      }, 4)
+    ).subscribe({
+      next: hydratedSibling => {
+        if (selectionRevision !== this.store.selectionRevision) return;
+        this.allDecisions.update(items =>
+          items.map(item => item.key === hydratedSibling.key ? hydratedSibling : item)
+        );
+      }
+    });
   }
 
   selectDiscoveredCandidate(candidate: DecisionDiscoveryCandidate): void {

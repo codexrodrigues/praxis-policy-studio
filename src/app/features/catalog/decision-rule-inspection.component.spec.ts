@@ -286,4 +286,44 @@ describe('DecisionRuleInspectionComponent', () => {
     expect(el.querySelectorAll('.catalog-only-cards > .fact-card')).toHaveLength(1);
     expect(el.querySelector('.catalog-only-cards')?.textContent).toContain('Campo Especializado');
   });
+
+  it('shows pass-through note for 1 == 1 rules and no-open-draft label in comparison card when workspaceId is missing', () => {
+    const decision = makeDecision();
+    const passThrough: DecisionSummary = {
+      ...decision,
+      workspaceId: undefined,
+      configStatus: 'draft',
+      condition: { '==': [1, 1] },
+      expression: '1 == 1'
+    };
+
+    fixture = TestBed.createComponent(DecisionRuleInspectionComponent);
+    fixture.componentRef.setInput('decision', passThrough);
+    fixture.componentRef.setInput('configStatusText', 'Sem revisão em rascunho');
+    fixture.componentRef.setInput('viewDepth', 'business');
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const noteWithoutParams = el.querySelector('[data-testid="rule-passthrough-note"]');
+    expect(noteWithoutParams).toBeTruthy();
+    expect(noteWithoutParams?.textContent).toContain('Regra incondicional sempre ativa');
+    expect(el.querySelector('.version-compare-card')?.textContent).toContain('Nenhum rascunho aberto');
+
+    fixture.componentRef.setInput('parameters', [
+      {
+        key: 'maxDays',
+        label: 'Máximo de dias',
+        description: 'Prazo limite configurado',
+        valueText: '30',
+        defaultValueText: null,
+        defaultHint: null,
+        detailText: 'maxDays',
+        isCustomized: false
+      }
+    ]);
+    fixture.detectChanges();
+
+    const noteWithParams = el.querySelector('[data-testid="rule-passthrough-note"]');
+    expect(noteWithParams?.textContent).toContain('Regra de passagem sempre ativa');
+  });
 });

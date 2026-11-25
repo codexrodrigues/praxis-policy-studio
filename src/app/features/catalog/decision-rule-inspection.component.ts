@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, computed, inject, signal } from '@angular/core';
-import { formatDecisionExpression } from '../../core/decision-inspection';
+import { formatDecisionExpression, isPassThroughCondition } from '../../core/decision-inspection';
 import {
   buildExpressionFactLabels,
   buildReadableRuleSummary,
@@ -76,7 +76,12 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
             }
           </div>
 
-          @if (summary.clauses.length > 0 && summary.lossless) {
+          @if (isPassThrough()) {
+            <div class="readable-fallback is-passthrough" data-testid="rule-passthrough-note">
+              <strong>{{ i18n.text(hasEditableParameters() ? 'rulePassThroughTitle' : 'rulePassThroughNoParamsTitle') }}</strong>
+              <p class="fallback-summary">{{ i18n.text(hasEditableParameters() ? 'rulePassThroughBody' : 'rulePassThroughNoParamsBody') }}</p>
+            </div>
+          } @else if (summary.clauses.length > 0 && summary.lossless) {
             <ul class="clause-list">
               @for (clause of summary.clauses; track clause.factPath + ':' + $index) {
                 <li class="clause-card" data-testid="rule-readable-clause">
@@ -108,6 +113,11 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
             [attr.open]="viewDepthSignal() === 'technical' ? '' : null">
             <summary>{{ i18n.text(viewDepthSignal() === 'technical' ? 'ruleExpressionTechnicalTitle' : 'ruleShowExpressionToggle') }}</summary>
             <div class="disclosure-body">
+              @if (isPassThrough()) {
+                <p class="fallback-note" data-testid="rule-technical-passthrough-note">
+                  {{ i18n.text(hasEditableParameters() ? 'rulePassThroughBody' : 'rulePassThroughNoParamsBody') }}
+                </p>
+              }
               @if (formattedExpression(); as expr) {
                 <pre class="expression studio-mono" data-testid="rule-formatted-expression"><code>{{ expr }}</code></pre>
               } @else {
@@ -116,13 +126,14 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
               <dl class="contract-facts">
                 <div>
                   <dt>{{ i18n.text('missingDataBehavior') }}</dt>
-                  <dd>{{ nullSemanticsTextSignal() }}</dd>
+                  <dd>
+                    <span>{{ nullSemanticsTextSignal() }}</span>
+                    @if (viewDepthSignal() === 'technical' && current.nullSemantics) {
+                      <code class="studio-mono technical-code-inline">({{ current.nullSemantics }})</code>
+                    }
+                  </dd>
                 </div>
                 @if (viewDepthSignal() === 'technical') {
-                  <div>
-                    <dt>{{ i18n.text('nullBehavior') }}</dt>
-                    <dd><code class="studio-mono">{{ current.nullSemantics ?? '—' }}</code></dd>
-                  </div>
                   <div>
                     <dt>{{ i18n.text('operations') }}</dt>
                     <dd><code class="studio-mono">{{ current.operationKeys.join(' · ') || '—' }}</code></dd>
@@ -293,9 +304,9 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
         <small>{{ baselineAuthorityText() }}</small>
       </section>
       <pax-icon class="compare-arrow" name="arrow-right" [size]="18" />
-      <section class="compare-side" [class.unavailable]="!current.configStatus">
+      <section class="compare-side" [class.unavailable]="!current.workspaceId || !current.configStatus">
         <span class="version-kicker">{{ i18n.text('draft') }}</span>
-        <strong>{{ current.configStatus ? configStatusTextSignal() : i18n.text('noDraft') }}</strong>
+        <strong>{{ current.workspaceId && current.configStatus ? configStatusTextSignal() : i18n.text('noOpenDraftLabel') }}</strong>
         <small>{{ i18n.text('governedDraftReviewHint') }}</small>
       </section>
     </div>
@@ -497,6 +508,12 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
       font-size: var(--pax-text-sm);
       line-height: var(--pax-lh-sm);
       font-weight: 500;
+    }
+
+    .technical-code-inline {
+      margin-inline-start: 0.35rem;
+      font-size: var(--pax-text-xs);
+      color: var(--pax-color-on-surface-variant);
     }
 
     .technical-disclosure {
@@ -844,7 +861,8 @@ import type { DecisionFact, DecisionSummary } from './catalog.fixture';
     }
 
     .compare-side.unavailable {
-      opacity: 0.72;
+      border-inline-start: 2px dashed var(--pax-color-outline-variant);
+      padding-inline-start: var(--pax-space-3);
     }
 
     .compare-side strong {
@@ -1024,6 +1042,15 @@ export class DecisionRuleInspectionComponent {
       this.i18n.locale(),
       this.viewDepthSignal()
     );
+  });
+
+  readonly hasEditableParameters = computed(() => this.parametersSignal().length > 0);
+
+  readonly isPassThrough = computed(() => {
+    const current = this.decisionSignal();
+    if (!current) return false;
+    const sourceCondition = current.workspaceCondition ?? current.condition;
+    return isPassThroughCondition(sourceCondition, this.formattedExpression());
   });
 
   readonly formattedExpression = computed<string | null>(() => {

@@ -1,9 +1,10 @@
 <div
   class="workspace"
   [class.explorer-collapsed]="!explorerOpen()"
-  [class.inspector-collapsed]="!inspectorOpen()"
+  [class.inspector-collapsed]="!inspectorOpen() || authenticationRequired()"
   [class.decision-open]="narrowDetailOpen()"
-  [class.inspector-ai-active]="inspectorOpen() && inspectorTab() === 'ai'"
+  [class.auth-required]="authenticationRequired()"
+  [class.inspector-ai-active]="inspectorOpen() && !authenticationRequired() && inspectorTab() === 'ai'"
   [style.--pax-explorer-width.px]="shell.explorerWidthPx()"
   [attr.data-view-depth]="viewDepth()">
 
@@ -24,6 +25,10 @@
     [activeRuleTypeFilter]="activeRuleTypeFilter()"
     [globalLens]="explorerGlobalLens()"
     [loading]="loading()"
+    [catalogStreaming]="catalogStreaming()"
+    [catalogTotalHint]="catalogTotalHint()"
+    [catalogTruncated]="catalogTruncated()"
+    [catalogPartialError]="catalogPartialError()"
     [loadError]="loadError()"
     [authenticationRequired]="authenticationRequired()"
     [permissionLimited]="permissionLimited()"
@@ -68,9 +73,11 @@
               @if (viewDepth() === 'technical') {
                 <code class="technical-code-badge studio-mono" data-testid="header-technical-code">{{ current.code }}</code>
                 <code class="technical-key-badge studio-mono" data-testid="header-technical-key">{{ current.key }}</code>
-                <span class="status" [class.verified]="current.state === 'verified'">
-                  {{ i18n.text(current.state === 'verified' ? 'verifiedState' : 'draftState') }}
-                </span>
+                @if (current.workspaceId || current.state === 'verified' || maturityPosture()?.operationalAuthority === 'CONFIG_ACTIVE_SNAPSHOT') {
+                  <span class="status" [class.verified]="current.state === 'verified' || maturityPosture()?.operationalAuthority === 'CONFIG_ACTIVE_SNAPSHOT'">
+                    {{ i18n.text(current.state === 'verified' || maturityPosture()?.operationalAuthority === 'CONFIG_ACTIVE_SNAPSHOT' ? 'verifiedState' : 'draftState') }}
+                  </span>
+                }
               }
             </div>
             <h1 class="decision-title" id="decision-title">{{ displayCanvasTitle(current) }}</h1>
@@ -167,25 +174,18 @@
             (click)="navigateToSection('decision-rule')">
             <span>{{ i18n.text('rule') }}</span>
           </button>
-          @if (current.workspaceId) {
-            <button
-              type="button"
-              [class.active]="activeMode() === 'test'"
-              [attr.aria-current]="activeMode() === 'test' ? 'page' : null"
-              [title]="scenarioCountHint(scenarios().length)"
-              (click)="navigateToSection('decision-tests')">
-              <span>{{ i18n.text('test') }}</span>
+          <button
+            type="button"
+            [class.active]="activeMode() === 'test'"
+            [class.navigation-requires-draft]="!current.workspaceId"
+            [attr.aria-current]="activeMode() === 'test' ? 'page' : null"
+            [attr.title]="current.workspaceId ? scenarioCountHint(scenarios().length) : i18n.text('testsRequireWorkspace')"
+            (click)="navigateToSection('decision-tests')">
+            <span>{{ i18n.text('test') }}</span>
+            @if (current.workspaceId) {
               <span class="nav-count studio-mono">{{ scenarios().length }}</span>
-            </button>
-          } @else {
-            <button
-              type="button"
-              disabled
-              class="navigation-unavailable"
-              [attr.title]="i18n.text('testsRequireWorkspace')">
-              <span>{{ i18n.text('test') }}</span>
-            </button>
-          }
+            }
+          </button>
           <button
             type="button"
             [class.active]="activeMode() === 'operate'"
@@ -518,14 +518,14 @@
             [canCreateDraft]="canShowNextStepCreateDraft(current)"
             [authoringBusy]="authoringBusy()"
             [nullSemanticsText]="nullSemanticsLabel(current.nullSemantics)"
-            [configStatusText]="current.configStatus ? configStatusLabel(current.configStatus) : ''"
+            [configStatusText]="effectiveConfigStatusLabel(current)"
             (editRuleRequested)="openAuthoringAndFocus()"
             (createDraftRequested)="createWorkspace()"
             (openAccessPrivacyRequested)="openAccessPrivacyForCurrentDecision()" />
         </section>
 
-        @if (current.workspaceId) {
-          <section class="scenario-workspace anchored-section work-mode-panel" id="decision-tests" tabindex="-1" aria-labelledby="scenario-title" [hidden]="activeMode() !== 'test'">
+        <section class="scenario-workspace anchored-section work-mode-panel" id="decision-tests" tabindex="-1" aria-labelledby="scenario-title" [hidden]="activeMode() !== 'test'">
+          @if (current.workspaceId) {
             <header>
               <div>
                 <p class="section-label" id="scenario-title">{{ i18n.text('testScenarios') }}</p>
@@ -621,8 +621,28 @@
               }
             }
             <pax-policy-sandbox-results [run]="sandboxRun()" />
+          } @else {
+            <div class="empty-test-workspace-card" data-testid="tests-require-draft-card">
+              <p class="section-label" id="scenario-title">{{ i18n.text('test') }}</p>
+              <h3>{{ i18n.text('testsRequireWorkspaceTitle') }}</h3>
+              <p>{{ i18n.text('testsRequireWorkspaceBody') }}</p>
+              @if (canShowNextStepCreateDraft(current) || isCreateDraftPrimary(current)) {
+                <button
+                  type="button"
+                  class="primary-action"
+                  data-testid="tests-create-draft-cta"
+                  [disabled]="!(current.promotedDefinitionId ?? current.configDefinitionId) || authoringBusy()"
+                  (click)="createWorkspace()">
+                  {{ i18n.text('nextStepCreateDraftCta') }}
+                </button>
+              } @else {
+                <p class="tests-readonly-hint">{{ i18n.text('testsRequireWorkspaceReadOnly') }}</p>
+              }
+            </div>
+          }
           </section>
 
+        @if (current.workspaceId) {
           <section class="review-workspace work-mode-panel" aria-labelledby="review-title" [hidden]="activeMode() !== 'operate'">
             <header>
               <div>
@@ -981,14 +1001,17 @@
             } @else {
               @for (event of timeline(); track event.occurredAt + event.eventType) {
                 <article class="timeline-event">
-                  <time [attr.datetime]="event.occurredAt" [attr.title]="event.occurredAt">{{ formatWorkstationTime(event.occurredAt) }}</time>
-                  <strong>{{ event.summary }}</strong>
+                  <time [attr.datetime]="event.occurredAt" [attr.title]="event.occurredAt">{{ formatWorkstationTimeBusiness(event.occurredAt) }}</time>
+                  <strong>{{ timelineEventSummaryText(event) }}</strong>
                   <small class="timeline-event-meta">
                     <span
                       class="pax-status-pill"
                       [class]="'pax-status-pill pax-status-pill--' + timelineBadgeTone(event.eventType)"
-                      [attr.title]="event.eventType">{{ timelineEventLabel(event.eventType) }}</span>
-                    @if (event.status) { <span>{{ event.status }}</span> }
+                      [attr.title]="event.eventType">{{ timelineEventBusinessLabel(event.eventType) }}</span>
+                    @if (viewDepth() === 'technical') {
+                      <code class="studio-mono timeline-tech-code">{{ event.eventType }}</code>
+                    }
+                    @if (event.status) { <span>{{ timelineEventStatusLabel(event.status) }}</span> }
                     @if (event.actor) { <span>· {{ event.actor }}</span> }
                   </small>
                 </article>
@@ -1013,6 +1036,20 @@
             <p class="section-label">{{ i18n.text('product') }}</p>
             <h2>{{ i18n.text('authOnboardingTitle') }}</h2>
             <p>{{ i18n.text('authOnboardingBody') }}</p>
+            <form #loginForm class="development-login" (submit)="$event.preventDefault(); login(username.value, password.value, loginForm)">
+              <strong>{{ i18n.text('developmentLogin') }}</strong>
+              <label>
+                <span>{{ i18n.text('username') }}</span>
+                <input #username name="username" value="" [placeholder]="i18n.text('usernamePlaceholder')" autocomplete="username" required>
+              </label>
+              <label>
+                <span>{{ i18n.text('password') }}</span>
+                <input #password name="password" type="password" autocomplete="current-password" required>
+              </label>
+              @if (authenticationFailed()) { <p role="alert">{{ i18n.text('authenticationFailed') }}</p> }
+              <button type="submit" [disabled]="authenticating()">{{ i18n.text(authenticating() ? 'authenticating' : 'login') }}</button>
+              <small>{{ i18n.text('credentialBoundary') }}</small>
+            </form>
           </div>
         } @else if (loadError()) {
           <div class="auth-onboarding-card" data-testid="catalog-load-error-card">
@@ -1030,7 +1067,7 @@
       </section>
     }
 
-    @if (inspectorOpen()) {
+    @if (inspectorOpen() && !authenticationRequired()) {
       @let current = selected();
       <pax-decision-inspector-rail
         class="inspector-slot"
@@ -1044,7 +1081,7 @@
         [autonomyGuidance]="current ? customizationGuidanceFallback(current) : ''"
         [authorityText]="current ? authorityLabel(current.authority) : ''"
         [migrationStrategyText]="current ? persistenceLabel(current.authority) : ''"
-        [configStatusText]="current?.configStatus ? configStatusLabel(current!.configStatus!) : ''"
+        [configStatusText]="current ? effectiveConfigStatusLabel(current) : ''"
         [nullSemanticsText]="current ? nullSemanticsLabel(current.nullSemantics) : ''"
         [technicalMaturityText]="maturityPosture() ? technicalMaturityLabel(maturityPosture()!.technicalMaturity) : ''"
         [approvalStageText]="maturityPosture() ? approvalStageLabel(maturityPosture()!.approvalStage) : ''"

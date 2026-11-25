@@ -120,10 +120,17 @@ describe('DecisionExplorerRailComponent', () => {
     expect(component.displayDecisionTitle(decision)).toBe('Attendance · Limit Days');
     expect(component.displayRuleSetSubtitle(decision)).toBeNull();
 
-    Object.defineProperty(component, 'viewDepth', { configurable: true, value: signal<'business' | 'technical'>('technical') });
-    expect(component.displayDomainEyebrow()).toBe('human-resources.attendance');
-    expect(component.displayDecisionTitle(decision)).toBe('WF-10 — attendance.limit-days');
-    expect(component.displayRuleSetSubtitle(decision)).toBe('Workforce Attendance');
+    Object.defineProperty(component, 'viewDepth', { configurable: true, value: signal<'business' | 'technical'>('business') });
+    expect(component.virtualItemSize()).toBe(78);
+
+    const technicalComponent = TestBed.runInInjectionContext(() => new DecisionExplorerRailComponent());
+    Object.defineProperty(technicalComponent, 'selected', { configurable: true, value: signal(decision) });
+    Object.defineProperty(technicalComponent, 'contextScopeFilter', { configurable: true, value: signal('human-resources.attendance.launch') });
+    Object.defineProperty(technicalComponent, 'viewDepth', { configurable: true, value: signal<'business' | 'technical'>('technical') });
+    expect(technicalComponent.displayDomainEyebrow()).toBe('human-resources.attendance');
+    expect(technicalComponent.displayDecisionTitle(decision)).toBe('attendance.limit-days');
+    expect(technicalComponent.displayRuleSetSubtitle(decision)).toBe('Workforce Attendance');
+    expect(technicalComponent.virtualItemSize()).toBe(98);
   });
 
   it('prevents partial hydration catalogs from dumping unhydrated rows into Other and groups truthfully by global lens', () => {

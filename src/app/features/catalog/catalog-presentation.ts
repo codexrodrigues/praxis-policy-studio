@@ -59,7 +59,13 @@ export interface ExecutionCorrelationSummary {
 
 export interface DecisionMaturityPosture {
   readonly technicalMaturity: 'STRUCTURAL_VERIFIED' | 'FACT_CATALOG_GAP' | 'DRAFT_STRUCTURE';
-  readonly approvalStage: 'PROMOTED_READY' | 'APPROVED' | 'IN_REVIEW' | 'REJECTED' | 'DRAFT_OPEN';
+  readonly approvalStage:
+    | 'PROMOTED_READY'
+    | 'APPROVED'
+    | 'IN_REVIEW'
+    | 'REJECTED'
+    | 'DRAFT_OPEN'
+    | 'NO_ACTIVE_DRAFT';
   readonly operationalAuthority: 'CONFIG_ACTIVE_SNAPSHOT' | 'CONFIG_AUTHORITATIVE' | 'LEGACY_AUTHORITATIVE' | 'UNDECLARED';
   readonly activeSnapshotKey: string | null;
   readonly totalFacts: number;
@@ -751,8 +757,22 @@ export function buildDecisionMaturityPosture(
 
   const wsStatus = decision.workspaceStatus?.toUpperCase() ?? '';
   const cfgStatus = decision.configStatus?.toUpperCase() ?? '';
-  const approvalStage: DecisionMaturityPosture['approvalStage'] =
-    decision.promotedDefinitionId || wsStatus === 'PROMOTED'
+  const coupledCohortIncomplete = decision.operationKeys.length > 1 && snapshotHeadSet === null;
+  const activeSnapshotKey =
+    !coupledCohortIncomplete
+    && snapshotHead?.executionReady !== false
+    && (!snapshotHead?.governanceState || snapshotHead.governanceState === 'READY')
+      ? (snapshotHead?.activeSnapshotKey?.trim() || null)
+      : null;
+
+  const hasOpenWorkspace = Boolean(decision.workspaceId?.trim());
+  const approvalStage: DecisionMaturityPosture['approvalStage'] = !hasOpenWorkspace
+    ? decision.promotedDefinitionId || activeSnapshotKey
+      ? 'PROMOTED_READY'
+      : cfgStatus === 'APPROVED' || cfgStatus === 'ACTIVE'
+        ? 'APPROVED'
+        : 'NO_ACTIVE_DRAFT'
+    : decision.promotedDefinitionId || wsStatus === 'PROMOTED'
       ? 'PROMOTED_READY'
       : wsStatus === 'APPROVED' || cfgStatus === 'APPROVED' || cfgStatus === 'ACTIVE'
         ? 'APPROVED'
@@ -761,14 +781,6 @@ export function buildDecisionMaturityPosture(
           : wsStatus === 'REJECTED'
             ? 'REJECTED'
             : 'DRAFT_OPEN';
-
-  const coupledCohortIncomplete = decision.operationKeys.length > 1 && snapshotHeadSet === null;
-  const activeSnapshotKey =
-    !coupledCohortIncomplete
-    && snapshotHead?.executionReady !== false
-    && (!snapshotHead?.governanceState || snapshotHead.governanceState === 'READY')
-      ? (snapshotHead?.activeSnapshotKey?.trim() || null)
-      : null;
   const normalizedAuthority = decision.authority.toUpperCase();
   const operationalAuthority: DecisionMaturityPosture['operationalAuthority'] =
     normalizedAuthority.includes('LEGACY_AUTHORITATIVE')

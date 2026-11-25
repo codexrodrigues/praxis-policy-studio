@@ -1,7 +1,7 @@
 import '@angular/compiler';
 import { TestBed } from '@angular/core/testing';
 import { BrowserTestingModule, platformBrowserTesting } from '@angular/platform-browser/testing';
-import { of } from 'rxjs';
+import { Subject, of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthSessionService } from './auth-session.service';
 import { GovernedHostScopeService } from './governed-host-scope.service';
@@ -58,7 +58,7 @@ describe('StudioCatalogBootstrapService', () => {
     logoutSpy.mockReset();
     hasSessionSpy.mockReset();
     logoutSpy.mockReturnValue(of(void 0));
-    hasSessionSpy.mockReturnValue(of(false));
+    hasSessionSpy.mockReturnValue(of(true));
 
     TestBed.configureTestingModule({
       providers: [
@@ -183,5 +183,88 @@ describe('StudioCatalogBootstrapService', () => {
     expect(shell.accessBridgeContext()).toBeNull();
     expect(capabilities.serverCapabilities()).toBeNull();
     expect(store.authenticationRequired()).toBe(true);
+  });
+
+  it('aborts catalog load before requesting definitions when session probe returns false', () => {
+    hasSessionSpy.mockReturnValue(of(false));
+    const bootstrap = TestBed.inject(StudioCatalogBootstrapService);
+    const store = TestBed.inject(CatalogSelectionStore);
+
+    bootstrap.loadCatalog();
+
+    expect(hasSessionSpy).toHaveBeenCalledOnce();
+    expect(loadCatalogSpy).not.toHaveBeenCalled();
+    expect(store.authenticationRequired()).toBe(true);
+    expect(store.loading()).toBe(false);
+    expect(store.loadError()).toBe('AUTHENTICATION_REQUIRED');
+    expect(store.allDecisions()).toEqual([]);
+  });
+
+  it('clears streaming state and refuses to mark partial catalog loaded when interrupted mid-stream', () => {
+    const bootstrap = TestBed.inject(StudioCatalogBootstrapService);
+    const store = TestBed.inject(CatalogSelectionStore);
+    const stream$ = new Subject<{ readonly decisions: readonly DecisionSummary[]; readonly complete: boolean; readonly totalKnown: number | null }>();
+    const projection = TestBed.inject(ProjectionCatalogService) as unknown as {
+      loadProgressive?: (locale: unknown, config: unknown) => typeof stream$;
+    };
+    projection.loadProgressive = vi.fn(() => stream$);
+
+    bootstrap.loadCatalog();
+    stream$.next({ decisions: [decision('r1')], complete: false, totalKnown: null });
+
+    expect(store.catalogStreaming()).toBe(true);
+    expect(bootstrap.hasLoadedCurrentEnvironment()).toBe(false);
+
+    // Interrupt active stream via cancellation (e.g. scope reload or unmount destroy)
+    (bootstrap as unknown as { cancelCatalogLoad: () => void }).cancelCatalogLoad();
+    expect(store.catalogStreaming()).toBe(false);
+    expect(store.catalogTotalHint()).toBeNull();
+    expect(bootstrap.hasLoadedCurrentEnvironment()).toBe(false);
+
+    // Fresh complete stream marks environment loaded cleanly
+    bootstrap.loadCatalog();
+    stream$.next({ decisions: [decision('r1'), decision('r2')], complete: true, totalKnown: 2 });
+    expect(store.catalogStreaming()).toBe(false);
+    expect(bootstrap.hasLoadedCurrentEnvironment()).toBe(true);
+  });
+
+  it('prevents ensureLoaded restart while streaming in background and preserves loaded items on later chunk error', () => {
+    const bootstrap = TestBed.inject(StudioCatalogBootstrapService);
+    const store = TestBed.inject(CatalogSelectionStore);
+    const stream$ = new Subject<import('./projection-catalog.service').ProgressiveCatalogChunk>();
+    const summary$ = new Subject<import('./projection-catalog.service').DomainRuleCatalogSummary>();
+    const projection = TestBed.inject(ProjectionCatalogService) as unknown as {
+      loadProgressive?: (locale: unknown, config: unknown) => typeof stream$;
+      loadCatalogSummary?: (config: unknown) => typeof summary$;
+    };
+    const loadProgSpy = vi.fn(() => stream$);
+    const loadSumSpy = vi.fn(() => summary$);
+    projection.loadProgressive = loadProgSpy;
+    projection.loadCatalogSummary = loadSumSpy;
+
+    const r1 = decision('r1');
+    bootstrap.loadCatalog({ onChunk: () => { /* listener active on mount */ } });
+    stream$.next({
+      decisions: [r1],
+      complete: false,
+      totalKnown: 42,
+      supportsServerSummary: true
+    });
+
+    expect(bootstrap.isStreamingCurrentEnvironment()).toBe(true);
+    expect(loadSumSpy).toHaveBeenCalledOnce();
+    expect(store.catalogTotalHint()).toBe(42);
+
+    // Navigating across shell routes while streaming must not restart catalog load
+    bootstrap.detachChunkListener();
+    bootstrap.ensureLoaded();
+    expect(loadProgSpy).toHaveBeenCalledTimes(1);
+
+    // Partial failure on subsequent batch retains already loaded decisions
+    stream$.error(new Error('BATCH_TIMEOUT'));
+    expect(store.catalogStreaming()).toBe(false);
+    expect(store.allDecisions()).toHaveLength(1);
+    expect(store.catalogPartialError()).toBe('CATALOG_PARTIAL_LOAD');
+    expect(bootstrap.isStreamingCurrentEnvironment()).toBe(false);
   });
 });

@@ -732,3 +732,28 @@ function visit(value: unknown, consumer: (candidate: unknown) => void): void {
   if (Array.isArray(value)) value.forEach(item => visit(item, consumer));
   else if (value && typeof value === 'object') Object.values(value as JsonObject).forEach(item => visit(item, consumer));
 }
+
+/**
+ * Returns true when a rule condition is a constant pass-through expression (`1 == 1`, `true`)
+ * whose effective business behavior is driven by parameters or slot metadata.
+ */
+export function isPassThroughCondition(
+  condition: unknown,
+  expression?: string | null
+): boolean {
+  if (condition === true) return true;
+  if (condition && typeof condition === 'object' && !Array.isArray(condition)) {
+    const entries = Object.entries(condition as JsonObject);
+    if (entries.length === 1) {
+      const [op, arg] = entries[0]!;
+      if ((op === '==' || op === '===') && Array.isArray(arg) && arg.length === 2) {
+        const [left, right] = arg;
+        if ((left === 1 && right === 1) || (left === true && right === true)) {
+          return true;
+        }
+      }
+    }
+  }
+  const trimmedExpr = expression?.trim().toLowerCase().replace(/\s+/g, ' ') ?? '';
+  return trimmedExpr === '1 == 1' || trimmedExpr === '1 === 1' || trimmedExpr === 'true';
+}

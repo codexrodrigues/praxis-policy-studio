@@ -15,69 +15,85 @@ import type { DecisionSummary } from '../catalog/catalog.fixture';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="page-shell">
-      <div class="overview-utility-bar">
-        <button
-          type="button"
-          class="quiet-button refresh-btn"
-          data-testid="overview-refresh-btn"
-          [disabled]="store.loading()"
-          [attr.title]="i18n.text('refreshQueueHint')"
-          (click)="bootstrap.loadCatalog()">
-          <pax-icon name="refresh-cw" [size]="14" />
-          <span>{{ i18n.text('refreshQueueCta') }}</span>
-        </button>
-      </div>
-
       @if (store.allDecisions().length > 0) {
         <pax-catalog-portfolio-overview
           [decisions]="store.allDecisions()"
           [selected]="store.selected()"
           [viewDepth]="shell.viewDepth()"
+          [serverSummary]="store.catalogSummary()"
+          [catalogStreaming]="store.catalogStreaming()"
+          [catalogTruncated]="store.catalogTruncated()"
           (scopeSelected)="openScopeInCatalog($event)"
           (ruleTypeSelected)="openRuleTypeInCatalog($event)"
           (decisionSelected)="openDecisionInCatalog($event)"
           (closeRequested)="returnToCatalog()"
-          (workflowQueueFilterRequested)="openReviewsQueue()" />
-      } @else if (store.loading()) {
-        <div class="state-card" aria-live="polite">
-          <p class="studio-eyebrow">{{ i18n.text('navItemOverview') }}</p>
-          <h1>{{ i18n.text('portfolioTitle') }}</h1>
-          <p class="state-copy">{{ i18n.text('loading') }}</p>
-        </div>
-      } @else if (store.authenticationRequired()) {
-        <div class="state-card" data-testid="overview-auth-card">
-          <p class="studio-eyebrow">{{ i18n.text('navItemOverview') }}</p>
-          <h1>{{ i18n.text('portfolioTitle') }}</h1>
-          <p class="state-copy">{{ i18n.text('overviewAuthPrompt') }}</p>
-          <a
-            class="primary-action"
-            routerLink="/catalog"
-            queryParamsHandling="preserve"
-            (click)="rememberReturnRoute()">
-            {{ i18n.text('reviewsGoToCatalogCta') }}
-          </a>
-        </div>
-      } @else if (store.permissionLimited()) {
-        <div class="state-card" data-testid="overview-permission-card" role="status">
-          <p class="studio-eyebrow">{{ i18n.text('navItemOverview') }}</p>
-          <h1>{{ i18n.text('portfolioTitle') }}</h1>
-          <p class="state-copy">{{ i18n.text('permissionLimited') }}</p>
-        </div>
-      } @else if (store.loadError()) {
-        <div class="state-card" role="alert">
-          <p class="studio-eyebrow">{{ i18n.text('navItemOverview') }}</p>
-          <h1>{{ i18n.text('projectionUnavailable') }}</h1>
-          <p class="state-copy">{{ i18n.text('remoteError') }}</p>
-          <button type="button" class="quiet-button" (click)="bootstrap.loadCatalog()">
-            {{ i18n.text('retryCatalog') }}
+          (workflowQueueFilterRequested)="openReviewsQueue()">
+          <button
+            overviewHeaderActions
+            type="button"
+            class="quiet-button refresh-btn"
+            data-testid="overview-refresh-btn"
+            [disabled]="store.loading()"
+            [attr.title]="i18n.text('refreshQueueHint')"
+            (click)="bootstrap.loadCatalog()">
+            <pax-icon name="refresh-cw" [size]="14" />
+            <span>{{ i18n.text('refreshQueueCta') }}</span>
+          </button>
+        </pax-catalog-portfolio-overview>
+      } @else {
+        <div class="overview-utility-bar">
+          <button
+            type="button"
+            class="quiet-button refresh-btn"
+            data-testid="overview-refresh-btn"
+            [disabled]="store.loading()"
+            [attr.title]="i18n.text('refreshQueueHint')"
+            (click)="bootstrap.loadCatalog()">
+            <pax-icon name="refresh-cw" [size]="14" />
+            <span>{{ i18n.text('refreshQueueCta') }}</span>
           </button>
         </div>
-      } @else {
-        <div class="state-card">
-          <p class="studio-eyebrow">{{ i18n.text('navItemOverview') }}</p>
-          <h1>{{ i18n.text('portfolioTitle') }}</h1>
-          <p class="state-copy">{{ i18n.text('noResults') }}</p>
-        </div>
+        @if (store.loading()) {
+          <div class="state-card" aria-live="polite">
+            <p class="studio-eyebrow">{{ i18n.text('navItemOverview') }}</p>
+            <h1>{{ i18n.text('portfolioTitle') }}</h1>
+            <p class="state-copy">{{ i18n.text('loading') }}</p>
+          </div>
+        } @else if (store.authenticationRequired()) {
+          <div class="state-card" data-testid="overview-auth-card">
+            <p class="studio-eyebrow">{{ i18n.text('navItemOverview') }}</p>
+            <h1>{{ i18n.text('portfolioTitle') }}</h1>
+            <p class="state-copy">{{ i18n.text('overviewAuthPrompt') }}</p>
+            <a
+              class="primary-action"
+              routerLink="/catalog"
+              queryParamsHandling="preserve"
+              (click)="rememberReturnRoute()">
+              {{ i18n.text('reviewsGoToCatalogCta') }}
+            </a>
+          </div>
+        } @else if (store.permissionLimited()) {
+          <div class="state-card" data-testid="overview-permission-card" role="status">
+            <p class="studio-eyebrow">{{ i18n.text('navItemOverview') }}</p>
+            <h1>{{ i18n.text('portfolioTitle') }}</h1>
+            <p class="state-copy">{{ i18n.text('permissionLimited') }}</p>
+          </div>
+        } @else if (store.loadError()) {
+          <div class="state-card" role="alert">
+            <p class="studio-eyebrow">{{ i18n.text('navItemOverview') }}</p>
+            <h1>{{ i18n.text('projectionUnavailable') }}</h1>
+            <p class="state-copy">{{ i18n.text('remoteError') }}</p>
+            <button type="button" class="quiet-button" (click)="bootstrap.loadCatalog()">
+              {{ i18n.text('retryCatalog') }}
+            </button>
+          </div>
+        } @else {
+          <div class="state-card">
+            <p class="studio-eyebrow">{{ i18n.text('navItemOverview') }}</p>
+            <h1>{{ i18n.text('portfolioTitle') }}</h1>
+            <p class="state-copy">{{ i18n.text('noResults') }}</p>
+          </div>
+        }
       }
     </section>
   `,

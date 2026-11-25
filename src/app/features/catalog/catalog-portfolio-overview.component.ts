@@ -2,10 +2,12 @@ import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, comput
 import {
   buildCatalogPortfolioSummary,
   classifyDecisionWorkflowBucket,
-  type CatalogPortfolioSummary
+  type CatalogPortfolioSummary,
+  type PortfolioDomainCard
 } from '../../core/catalog-portfolio';
 import { humanizeDecisionTitle, humanizeTechnicalSlug, looksLikeTechnicalSlug } from '../../core/humanize-labels';
 import { PolicyStudioI18n } from '../../core/i18n';
+import type { DomainRuleCatalogSummary } from '../../core/projection-catalog.service';
 import type { StudioViewDepth } from '../../core/studio-shell-state.service';
 import { StudioIconComponent } from '../../shared/studio-icon.component';
 import type { DecisionSummary } from './catalog.fixture';
@@ -26,16 +28,19 @@ import type { DecisionSummary } from './catalog.fixture';
       <h1 id="portfolio-title">{{ i18n.text('portfolioTitle') }}</h1>
       <p class="portfolio-subtitle">{{ i18n.text('portfolioSubtitle') }}</p>
     </div>
-    @if (selectedSignal()) {
-      <button
-        type="button"
-        class="quiet-button"
-        data-testid="portfolio-back-to-decision"
-        (click)="closeRequested.emit()">
-        <pax-icon name="arrow-left" [size]="14" />
-        <span>{{ i18n.text('portfolioBackToDecision') }}</span>
-      </button>
-    }
+    <div class="portfolio-header-actions">
+      <ng-content select="[overviewHeaderActions]" />
+      @if (selectedSignal()) {
+        <button
+          type="button"
+          class="quiet-button"
+          data-testid="portfolio-back-to-decision"
+          (click)="closeRequested.emit()">
+          <pax-icon name="arrow-left" [size]="14" />
+          <span>{{ i18n.text('portfolioBackToDecision') }}</span>
+        </button>
+      }
+    </div>
   </header>
 
   <div class="kpi-strip" role="group" [attr.aria-label]="i18n.text('portfolioEyebrow')">
@@ -51,7 +56,7 @@ import type { DecisionSummary } from './catalog.fixture';
       <span class="kpi-label">{{ i18n.text('portfolioKpiFunctionalities') }}</span>
       <strong class="kpi-value studio-mono">{{ portfolio.functionalityCount }}</strong>
     </div>
-    @if (portfolio.activeWorkflowDecisions.length > 0) {
+    @if (activeWorkCount() > 0) {
       <button
         type="button"
         class="kpi-tile kpi-interactive"
@@ -61,7 +66,7 @@ import type { DecisionSummary } from './catalog.fixture';
           <pax-icon name="activity" [size]="14" />
           <span>{{ i18n.text('portfolioKpiActiveWork') }}</span>
         </span>
-        <strong class="kpi-value studio-mono">{{ portfolio.activeWorkflowDecisions.length }}</strong>
+        <strong class="kpi-value studio-mono">{{ activeWorkCount() }}</strong>
       </button>
     } @else {
       <div class="kpi-tile" data-testid="portfolio-kpi-active-work">
@@ -140,8 +145,22 @@ import type { DecisionSummary } from './catalog.fixture';
     </div>
 
     @if (activeTab() === 'domains') {
+      @if (portfolio.domains.length > 12) {
+        <div class="portfolio-domain-toolbar">
+          <label class="portfolio-domain-search">
+            <pax-icon name="search" [size]="14" />
+            <span class="visually-hidden">{{ i18n.text('portfolioDomainSearchPlaceholder') }}</span>
+            <input
+              type="search"
+              data-testid="portfolio-domain-search"
+              [value]="domainQuery()"
+              [placeholder]="i18n.text('portfolioDomainSearchPlaceholder')"
+              (input)="domainQuery.set($any($event.target).value)" />
+          </label>
+        </div>
+      }
       <div class="domain-grid" data-testid="portfolio-domain-grid">
-        @for (domain of portfolio.domains; track domain.domainKey) {
+        @for (domain of filteredDomains(); track domain.domainKey) {
           <article class="domain-card" [attr.data-testid]="'portfolio-domain-' + domain.domainKey">
             <header class="domain-card-head">
               <div class="domain-card-copy">
@@ -158,27 +177,31 @@ import type { DecisionSummary } from './catalog.fixture';
               </button>
             </header>
 
-            <ul class="functionality-list">
-              @for (func of domain.functionalities.slice(0, 5); track func.scopeKey) {
-                <li>
-                  <button
-                    type="button"
-                    class="functionality-row"
-                    [attr.data-testid]="'portfolio-func-' + func.scopeKey"
-                    (click)="scopeSelected.emit(func.scopeKey)">
-                    <span class="functionality-name">{{ func.label }}</span>
-                    <span class="functionality-count studio-mono">{{ func.count }}</span>
-                  </button>
-                </li>
-              }
-            </ul>
+            @if (hasDistinctFunctionalities(domain)) {
+              <ul class="functionality-list">
+                @for (func of domain.functionalities.slice(0, 5); track func.scopeKey) {
+                  <li>
+                    <button
+                      type="button"
+                      class="functionality-row"
+                      [attr.data-testid]="'portfolio-func-' + func.scopeKey"
+                      (click)="scopeSelected.emit(func.scopeKey)">
+                      <span class="functionality-name" [attr.title]="func.label">{{ displayFunctionalityLabel(domain, func.label) }}</span>
+                      <span class="functionality-count studio-mono">{{ func.count }}</span>
+                    </button>
+                  </li>
+                }
+              </ul>
 
-            @if (domain.functionalities.length > 5) {
-              <p class="domain-more-note">
-                {{ moreFunctionalitiesText(domain.functionalities.length - 5) }}
-              </p>
+              @if (domain.functionalities.length > 5) {
+                <p class="domain-more-note">
+                  {{ moreFunctionalitiesText(domain.functionalities.length - 5) }}
+                </p>
+              }
             }
           </article>
+        } @empty {
+          <p class="portfolio-domain-empty" data-testid="portfolio-domain-search-empty">{{ i18n.text('portfolioDomainSearchEmpty') }}</p>
         }
       </div>
     } @else {
@@ -204,6 +227,30 @@ import type { DecisionSummary } from './catalog.fixture';
               <pax-icon name="arrow-right" [size]="14" />
             </span>
           </button>
+        }
+
+        @if (portfolio.ruleTypes.length === 1 && portfolio.domains.length > 1) {
+          <section class="single-type-context-card" data-testid="portfolio-single-type-context">
+            <div class="single-type-context-head">
+              <strong>{{ i18n.text('portfolioSingleTypeSummaryTitle') }}</strong>
+              <span class="single-type-status-pills">
+                <span class="studio-badge">{{ i18n.text('workflowBucketStable') }}: {{ portfolio.totalRules - portfolio.activeWorkflowDecisions.length }}</span>
+                <span class="studio-badge">{{ i18n.text('portfolioKpiActiveWork') }}: {{ portfolio.activeWorkflowDecisions.length }}</span>
+              </span>
+            </div>
+            <p class="single-type-domains-label">{{ i18n.text('portfolioTopDomainsTitle') }}</p>
+            <div class="single-type-domain-chips">
+              @for (domain of portfolio.domains.slice(0, 6); track domain.domainKey) {
+                <button
+                  type="button"
+                  class="quiet-button single-type-domain-btn"
+                  (click)="scopeSelected.emit(domain.domainKey)">
+                  <span>{{ domain.label }}</span>
+                  <span class="studio-mono">{{ domain.totalCount }}</span>
+                </button>
+              }
+            </div>
+          </section>
         }
       </div>
     }
@@ -232,6 +279,19 @@ import type { DecisionSummary } from './catalog.fixture';
   gap: var(--pax-space-3) var(--pax-space-4);
   padding-bottom: var(--pax-space-4);
   border-bottom: 1px solid var(--pax-color-outline-variant);
+}
+
+.portfolio-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--pax-space-2);
+}
+
+.portfolio-header-actions ::ng-deep .refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pax-space-2);
 }
 
 .portfolio-heading-copy {
@@ -674,7 +734,86 @@ button.kpi-interactive:focus-visible,
   color: var(--pax-color-primary);
   font-size: var(--pax-text-xs);
   font-weight: 700;
-}`],
+}
+
+.portfolio-domain-toolbar {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.portfolio-domain-search {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pax-space-2);
+  width: min(100%, 24rem);
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--pax-color-outline-variant);
+  border-radius: var(--pax-radius-md);
+  background: var(--pax-color-surface);
+  color: var(--pax-color-on-surface-variant);
+}
+
+.portfolio-domain-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--pax-color-on-surface);
+  font: inherit;
+  font-size: var(--pax-text-sm);
+}
+
+.portfolio-domain-empty {
+  color: var(--pax-color-on-surface-variant);
+  font-size: var(--pax-text-sm);
+}
+
+.single-type-context-card {
+  display: grid;
+  gap: var(--pax-space-3);
+  padding: var(--pax-space-4);
+  border: 1px solid var(--pax-color-outline-variant);
+  border-radius: var(--pax-radius-lg);
+  background: var(--pax-color-surface);
+}
+
+.single-type-context-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pax-space-2);
+}
+
+.single-type-status-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pax-space-2);
+}
+
+.single-type-domains-label {
+  margin: 0;
+  color: var(--pax-color-on-surface-variant);
+  font-size: var(--pax-text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.single-type-domain-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pax-space-2);
+}
+
+.single-type-domain-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pax-space-2);
+  font-size: var(--pax-text-xs);
+}
+`],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class CatalogPortfolioOverviewComponent {
@@ -683,7 +822,11 @@ export class CatalogPortfolioOverviewComponent {
   readonly decisionsSignal = signal<readonly DecisionSummary[]>([]);
   readonly selectedSignal = signal<DecisionSummary | null>(null);
   readonly viewDepthSignal = signal<StudioViewDepth>('business');
+  readonly serverSummarySignal = signal<DomainRuleCatalogSummary | null>(null);
+  readonly catalogStreamingSignal = signal(false);
+  readonly catalogTruncatedSignal = signal(false);
   readonly activeTab = signal<'domains' | 'types'>('domains');
+  readonly domainQuery = signal('');
 
   @Input({ required: true })
   set decisions(value: readonly DecisionSummary[]) {
@@ -700,19 +843,99 @@ export class CatalogPortfolioOverviewComponent {
     this.viewDepthSignal.set(value ?? 'business');
   }
 
+  @Input()
+  set serverSummary(value: DomainRuleCatalogSummary | null | undefined) {
+    this.serverSummarySignal.set(value ?? null);
+  }
+
+  @Input()
+  set catalogStreaming(value: boolean | undefined) {
+    this.catalogStreamingSignal.set(Boolean(value));
+  }
+
+  @Input()
+  set catalogTruncated(value: boolean | undefined) {
+    this.catalogTruncatedSignal.set(Boolean(value));
+  }
+
   @Output() readonly scopeSelected = new EventEmitter<string>();
   @Output() readonly ruleTypeSelected = new EventEmitter<string>();
   @Output() readonly decisionSelected = new EventEmitter<DecisionSummary>();
   @Output() readonly closeRequested = new EventEmitter<void>();
   @Output() readonly workflowQueueFilterRequested = new EventEmitter<void>();
 
-  readonly summary = computed<CatalogPortfolioSummary>(() =>
-    buildCatalogPortfolioSummary(
+  readonly summary = computed<CatalogPortfolioSummary>(() => {
+    const clientSummary = buildCatalogPortfolioSummary(
       this.decisionsSignal(),
       this.i18n.locale(),
       this.viewDepthSignal()
-    )
-  );
+    );
+    const server = this.serverSummarySignal();
+    const useServerAuthoritative = Boolean(
+      server && (this.catalogStreamingSignal() || this.catalogTruncatedSignal() || server.totalBusinessRules > clientSummary.totalRules)
+    );
+    if (!useServerAuthoritative || !server) {
+      return clientSummary;
+    }
+    const serverDomains = server.byContextKey.filter(bucket => bucket.key.trim().length > 0).length;
+    const serverFuncs = server.byResourceKey.filter(bucket => bucket.key.trim().length > 0).length;
+    return {
+      ...clientSummary,
+      totalRules: server.totalBusinessRules,
+      domainCount: Math.max(clientSummary.domainCount, serverDomains),
+      functionalityCount: Math.max(clientSummary.functionalityCount, serverFuncs)
+    };
+  });
+
+  readonly activeWorkCount = computed(() => {
+    const clientCount = this.summary().activeWorkflowDecisions.length;
+    const server = this.serverSummarySignal();
+    if (server && (this.catalogStreamingSignal() || this.catalogTruncatedSignal())) {
+      return Math.max(clientCount, server.reviewQueue.totalPending);
+    }
+    return clientCount;
+  });
+
+  readonly filteredDomains = computed<readonly PortfolioDomainCard[]>(() => {
+    const query = this.domainQuery().trim().toLowerCase();
+    const domains = this.summary().domains;
+    if (!query) return domains;
+    return domains.filter(domain =>
+      domain.label.toLowerCase().includes(query)
+      || domain.domainKey.toLowerCase().includes(query)
+      || domain.functionalities.some(func => func.label.toLowerCase().includes(query))
+    );
+  });
+
+  hasDistinctFunctionalities(domain: PortfolioDomainCard): boolean {
+    if (domain.functionalities.length > 1) return true;
+    const single = domain.functionalities[0];
+    if (!single) return false;
+    return single.label.trim().toLowerCase() !== domain.label.trim().toLowerCase();
+  }
+
+  displayFunctionalityLabel(domain: PortfolioDomainCard, funcLabel: string): string {
+    const trimmed = funcLabel.trim();
+    if (!trimmed) return trimmed;
+    const domainSegments = new Set(
+      domain.label
+        .split('·')
+        .map(part => part.trim().toLowerCase())
+        .filter(Boolean)
+    );
+    const funcParts = trimmed
+      .split('·')
+      .map(part => part.trim())
+      .filter(Boolean);
+    let dropCount = 0;
+    while (
+      dropCount < funcParts.length - 1
+      && domainSegments.has(funcParts[dropCount]!.toLowerCase())
+    ) {
+      dropCount += 1;
+    }
+    return dropCount > 0 ? funcParts.slice(dropCount).join(' · ') : trimmed;
+  }
 
   displayDecisionTitle(decision: DecisionSummary): string {
     const docTitle =

@@ -14,7 +14,8 @@ import {
   humanizeDecisionTitle,
   humanizeRuleType,
   humanizeTechnicalSlug,
-  looksLikeTechnicalSlug
+  looksLikeTechnicalSlug,
+  stripLeadingDecisionCode
 } from '../../core/humanize-labels';
 import { PolicyStudioI18n, type CopyKey } from '../../core/i18n';
 import {
@@ -79,6 +80,10 @@ export class DecisionExplorerRailComponent {
   readonly activeRuleTypeFilter = input<string | null>(null);
   readonly globalLens = input<ExplorerGlobalLens>('domain');
   readonly loading = input(true);
+  readonly catalogStreaming = input(false);
+  readonly catalogTotalHint = input<number | null>(null);
+  readonly catalogTruncated = input(false);
+  readonly catalogPartialError = input<string | null>(null);
   readonly loadError = input<string | null>(null);
   readonly authenticationRequired = input(false);
   readonly permissionLimited = input(false);
@@ -112,6 +117,11 @@ export class DecisionExplorerRailComponent {
   private readonly destroyRef = inject(DestroyRef);
   private stopResizeDrag: (() => void) | null = null;
   private lastAutoScrolledKey: string | null = null;
+  private lastObservedSelectionKey: string | null = null;
+  private lastObservedFilterSig: string | null = null;
+  private userScrolledDuringStream = false;
+  private programmaticScrollTargetOffset: number | null = null;
+  private readonly viewportMeasuredTick = signal(0);
 
   private readonly virtualViewport = viewChild(CdkVirtualScrollViewport);
 
@@ -312,6 +322,7 @@ export class DecisionExplorerRailComponent {
   });
 
   readonly useVirtualScroll = computed(() => this.filteredDecisions().length > 40);
+  readonly virtualItemSize = computed(() => (this.viewDepth() === 'technical' ? 98 : 78));
 
   readonly virtualRows = computed<readonly ExplorerVirtualRow[]>(() => {
     if (!this.useVirtualScroll()) return [];
@@ -357,48 +368,104 @@ export class DecisionExplorerRailComponent {
       this.contextScopeFilter();
       this.autonomyFilter.set('all');
     });
+    effect(() => {
+      const streaming = this.catalogStreaming();
+      const filterSig = `${this.query()}|${this.contextScopeFilter() ?? ''}|${this.activeRuleTypeFilter() ?? ''}`;
+      if (filterSig !== this.lastObservedFilterSig) {
+        this.lastObservedFilterSig = filterSig;
+        this.userScrolledDuringStream = false;
+      }
+      if (!streaming) {
+        this.userScrolledDuringStream = false;
+      }
+    });
+    effect(onCleanup => {
+      const viewport = this.virtualViewport();
+      if (!viewport) return;
+      const el = viewport.elementRef.nativeElement;
+      const onScroll = () => {
+        if (!this.catalogStreaming()) return;
+        const offset = viewport.measureScrollOffset('top');
+        if (
+          this.programmaticScrollTargetOffset !== null
+          && Math.abs(offset - this.programmaticScrollTargetOffset) <= 6
+        ) {
+          this.programmaticScrollTargetOffset = null;
+          return;
+        }
+        this.programmaticScrollTargetOffset = null;
+        this.userScrolledDuringStream = true;
+      };
+      el.addEventListener('scroll', onScroll, { passive: true });
+      onCleanup(() => el.removeEventListener('scroll', onScroll));
+    });
     effect(onCleanup => {
       const current = this.selected();
       const rows = this.virtualRows();
       const viewport = this.virtualViewport();
+      const itemSize = this.virtualItemSize();
+      this.viewportMeasuredTick();
+      const currentKey = current?.key ?? null;
+      if (currentKey !== this.lastObservedSelectionKey) {
+        this.lastObservedSelectionKey = currentKey;
+        this.userScrolledDuringStream = false;
+      }
       if (!current || !rows.length || !viewport) {
         this.lastAutoScrolledKey = null;
+        return;
+      }
+      if (this.catalogStreaming() && this.userScrolledDuringStream) {
         return;
       }
       const index = rows.findIndex(row => row.kind === 'decision' && row.decision.key === current.key);
       if (index < 0) return;
 
-      const selectionSignature = `${current.key}@${rows.length}`;
+      const selectionSignature = `${current.key}@${index}@${rows.length}@${itemSize}`;
       if (this.lastAutoScrolledKey === selectionSignature) return;
-      this.lastAutoScrolledKey = selectionSignature;
 
-      const itemSize = 78;
-      const ensureVisible = () => {
+      const ensureVisible = (): boolean => {
         viewport.checkViewportSize();
         const viewSize = viewport.getViewportSize();
-        if (viewSize <= 0) return;
+        if (viewSize <= 0) return false;
         const itemTop = index * itemSize;
         const itemBottom = itemTop + itemSize;
+        const targetOffset = index <= 2 ? 0 : Math.max(0, itemTop - Math.max(0, (viewSize - itemSize) / 2));
+        const scrollHeight = viewport.elementRef.nativeElement.scrollHeight;
+        if (targetOffset > 0 && scrollHeight < itemBottom - 2) {
+          return false;
+        }
         const viewTop = viewport.measureScrollOffset('top');
         if (itemTop < viewTop || itemBottom > viewTop + viewSize) {
-          const targetOffset = index <= 2 ? 0 : Math.max(0, itemTop - Math.max(0, (viewSize - itemSize) / 2));
+          this.programmaticScrollTargetOffset = targetOffset;
           viewport.scrollToOffset(targetOffset, 'auto');
         }
+        const settledTop = viewport.measureScrollOffset('top');
+        const visible = itemTop >= settledTop - 2 && itemBottom <= settledTop + viewSize + 2;
+        if (visible) {
+          this.lastAutoScrolledKey = selectionSignature;
+        }
+        return visible;
       };
 
       if (typeof requestAnimationFrame === 'function') {
-        ensureVisible();
-        let raf2: number | null = null;
-        const raf1 = requestAnimationFrame(() => {
-          ensureVisible();
-          raf2 = requestAnimationFrame(() => ensureVisible());
-        });
+        if (ensureVisible()) return;
+        let attempts = 0;
+        let rafId: number | null = null;
+        const step = () => {
+          attempts++;
+          if (ensureVisible() || attempts >= 6) {
+            rafId = null;
+            return;
+          }
+          rafId = requestAnimationFrame(step);
+        };
+        rafId = requestAnimationFrame(step);
         onCleanup(() => {
-          cancelAnimationFrame(raf1);
-          if (raf2 !== null) cancelAnimationFrame(raf2);
+          if (rafId !== null) cancelAnimationFrame(rafId);
         });
       } else {
         viewport.scrollToIndex(index, 'auto');
+        this.lastAutoScrolledKey = selectionSignature;
       }
     });
     effect(onCleanup => {
@@ -408,9 +475,18 @@ export class DecisionExplorerRailComponent {
       this.activeRuleTypeFilter();
       this.selectionOutsideFilter();
       this.logoutFailed();
+      this.viewDepth();
       if (!viewport) return;
 
-      const refreshSize = () => viewport.checkViewportSize();
+      let previousSize = viewport.getViewportSize();
+      const refreshSize = () => {
+        viewport.checkViewportSize();
+        const nextSize = viewport.getViewportSize();
+        if (previousSize <= 0 && nextSize > 0) {
+          this.viewportMeasuredTick.update(v => v + 1);
+        }
+        previousSize = nextSize;
+      };
       refreshSize();
       const rafId =
         typeof requestAnimationFrame === 'function'
@@ -633,8 +709,31 @@ export class DecisionExplorerRailComponent {
     }
   }
 
+  streamingBadgeText(): string {
+    const total = this.catalogTotalHint();
+    const loaded = this.allCatalogDecisions().length || this.decisions().length;
+    if (total && total > 0 && loaded > 0 && loaded <= total) {
+      return this.i18n.format('catalogLoadingMoreCount', { loaded, total });
+    }
+    return this.i18n.text('catalogLoadingMore');
+  }
+
+  truncatedBannerText(): string {
+    const loaded = this.allCatalogDecisions().length || this.decisions().length;
+    return this.i18n.format('catalogTruncatedBanner', { loaded });
+  }
+
+  partialErrorBannerText(): string {
+    const loaded = this.allCatalogDecisions().length || this.decisions().length;
+    return this.i18n.format('catalogPartialErrorBanner', { loaded });
+  }
+
   displayDomainEyebrow(): string {
-    const domain = this.selected()?.domain?.trim() ?? '';
+    const current = this.selected();
+    if (this.viewDepth() === 'business' && current?.domainLabel?.trim()) {
+      return current.domainLabel.trim();
+    }
+    const domain = current?.domain?.trim() ?? '';
     if (!domain) return this.i18n.text('product');
     if (this.viewDepth() === 'technical' || !looksLikeTechnicalSlug(domain)) return domain;
     return humanizeTechnicalSlug(domain, 2, this.i18n.locale()) || domain;
@@ -650,18 +749,24 @@ export class DecisionExplorerRailComponent {
       decision.workspaceDocumentation?.title ??
       decision.documentation?.title ??
       decision.definitionDocumentation?.title;
-    return humanizeDecisionTitle(
+    const title = humanizeDecisionTitle(
       decision.name,
       decision.code,
       docTitle,
       this.viewDepth(),
       this.i18n.locale()
     );
+    return this.viewDepth() === 'technical'
+      ? stripLeadingDecisionCode(title, decision.code)
+      : title;
   }
 
   displayRuleSetSubtitle(decision: DecisionSummary): string | null {
     if (this.viewDepth() === 'business' && this.contextScopeFilter()) {
       return null;
+    }
+    if (this.viewDepth() === 'business' && decision.ruleSetLabel?.trim()) {
+      return decision.ruleSetLabel.trim();
     }
     const raw = decision.ruleSet?.trim() ?? '';
     if (!raw) return null;

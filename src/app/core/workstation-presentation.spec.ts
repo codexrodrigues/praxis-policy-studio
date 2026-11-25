@@ -9,6 +9,8 @@ import {
   humanizeReviewDecision,
   humanizeRolloutStatus,
   humanizeSnapshotGovernanceState,
+  humanizeTimelineEventStatus,
+  humanizeTimelineEventSummary,
   humanizeTimelineEventType,
   reviewDecisionTone,
   rolloutStatusTone,
@@ -96,5 +98,26 @@ describe('workstation-presentation', () => {
     expect(humanizeEvidenceKind('legacy_oracle_probe', 'en-US', 'business')).toBe('Legacy Oracle Probe');
     expect(humanizeOperationMode('CREATE', 'pt-BR', 'business')).toBe('Criação');
     expect(humanizeOperationMode('UPDATE', 'en-US', 'business')).toBe('Update');
+  });
+
+  it('localizes timeline summaries and statuses cleanly in pt-BR and en-US', () => {
+    expect(humanizeTimelineEventSummary('Decision approval requested', 'approval.requested', 'pt-BR'))
+      .toBe('Solicitação de aprovação enviada');
+    expect(humanizeTimelineEventSummary('Decision approval completed', 'approval.completed', 'en-US'))
+      .toBe('Decision approval completed');
+    expect(
+      humanizeTimelineEventSummary(
+        'Raw server fallback note',
+        'approval.requested',
+        'pt-BR',
+        'domain_rule.event.approval_requested'
+      )
+    ).toBe('Solicitação de aprovação enviada');
+    expect(
+      humanizeTimelineEventSummary('Decision rejected due to quorum mismatch', 'review.rejected', 'pt-BR')
+    ).toBe('Decision rejected due to quorum mismatch');
+    expect(humanizeTimelineEventStatus('requested', 'pt-BR')).toBe('Solicitado');
+    expect(humanizeTimelineEventStatus('completed', 'pt-BR')).toBe('Concluído');
+    expect(humanizeTimelineEventStatus('requested', 'en-US')).toBe('Requested');
   });
 });

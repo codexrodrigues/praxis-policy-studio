@@ -14,6 +14,7 @@ import { CatalogSelectionStore } from '../catalog/catalog-selection.store';
   template: `
     <pax-access-authorization-workspace
       [config]="store.policyConfig()"
+      [viewDepth]="shell.viewDepth()"
       [isRemoteMode]="runtime.mode() === 'remote'"
       [sessionActive]="store.sessionActive()"
       [loading]="store.loading()"

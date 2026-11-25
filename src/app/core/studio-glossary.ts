@@ -129,6 +129,12 @@ export function resolveStatusGlossaryEntry(
           title: 'Working draft',
           summary: 'Editable draft not yet active in runtime. Safe to experiment and simulate.'
         };
+      case 'NO_ACTIVE_DRAFT':
+        return {
+          category: 'Governance status',
+          title: 'No working draft',
+          summary: 'No open draft revision or confirmed active runtime snapshot is recorded for this scope.'
+        };
       default:
         return {
           category: 'Governance status',
@@ -170,6 +176,12 @@ export function resolveStatusGlossaryEntry(
         category: 'Estado de governança',
         title: 'Rascunho em edição',
         summary: 'Versão de trabalho ainda não publicada em produção. Você pode simular cenários livremente.'
+      };
+    case 'NO_ACTIVE_DRAFT':
+      return {
+        category: 'Estado de governança',
+        title: 'Sem rascunho em andamento',
+        summary: 'Não há revisão em rascunho aberta nem snapshot ativo confirmado para este escopo.'
       };
     default:
       return {

@@ -1203,18 +1203,8 @@ describe('ProjectionCatalogService', () => {
     expect(decisions[0]?.reviewStatus).toBe('CATALOG_IDENTITY_ONLY');
   });
 
-  it('hydrates at least one representative per RuleSet in large catalogs (>36 items) and propagates 1-hop ontology roots and inferred WF codes to unhydrated siblings', () => {
+  it('hydrates requested initial/deep-link rule in large catalogs without blocking on unrelated rules and propagates sibling metadata', () => {
     let decisions: readonly import('../features/catalog/catalog.fixture').DecisionSummary[] = [];
-    service.load('pt-BR', {
-      mode: 'remote', configApiBaseUrl: '', locale: 'pt-BR',
-      projectionPath: null, initialDecisionKey: null
-    }).subscribe(value => decisions = value);
-
-    http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([]);
-    http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities').flush({
-      tenantId: '1', environment: 'local', definitions: []
-    });
-
     const candidates = Array.from({ length: 38 }, (_, i) => {
       const idx = i + 1;
       const isSecondRuleSet = idx >= 37;
@@ -1234,6 +1224,16 @@ describe('ProjectionCatalogService', () => {
       };
     });
 
+    service.load('pt-BR', {
+      mode: 'remote', configApiBaseUrl: '', locale: 'pt-BR',
+      projectionPath: null, initialDecisionKey: candidates[36]!.ruleKey
+    }).subscribe(value => decisions = value);
+
+    http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([]);
+    http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities').flush({
+      tenantId: '1', environment: 'local', definitions: []
+    });
+
     http.expectOne(request => request.url.endsWith('/definitions/catalog')).flush({
       schemaVersion: 'praxis-domain-rule-catalog.v1',
       page: 0,
@@ -1242,38 +1242,36 @@ describe('ProjectionCatalogService', () => {
       candidates
     });
 
-    // First 36 items of RN-013 + item 37 (first representative of second RuleSet) are hydrated eagerly; item 38 remains lazy
-    for (let idx = 1; idx <= 37; idx++) {
-      const isSecondRuleSet = idx === 37;
-      http.expectOne(`/api/praxis/config/domain-rules/definitions/def-${idx}`).flush({
-        id: `def-${idx}`,
-        ruleKey: candidates[idx - 1]!.ruleKey,
-        version: 1,
-        status: 'draft',
-        resourceKey: candidates[idx - 1]!.resourceKey,
-        serviceKey: 'praxis-api-quickstart',
-        definition: {
-          ruleSetKey: candidates[idx - 1]!.resourceKey,
-          operationalResourceKey: isSecondRuleSet
-            ? 'human-resources.attendance'
-            : 'human-resources.statutory-attendance-rules',
-          slotKey: `slot.${idx}`,
-          falseReasonCode: isSecondRuleSet ? 'WF-00447' : `WF-083${String(idx).padStart(2, '0')}`,
-          availableRoots: ['draft', 'attendanceType', 'context'],
-          conceptRoots: ['attendanceType']
-        },
-        condition: { '==': [1, 1] },
-        parameters: { nullSemantics: 'FAIL_CLOSED', operationKeys: ['validate'] },
-        governance: { lifecycleBoundary: 'REFERENCE_DRAFT_ONLY' }
-      });
-      http.expectOne(`/api/praxis/config/domain-rules/definitions/def-${idx}/facts`)
-        .flush(factCatalog(`def-${idx}`, candidates[idx - 1]!.ruleKey));
-    }
+    // Only the requested initial rule def-37 is eagerly hydrated; items 1..36 and 38 remain lazy
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-37').flush({
+      id: 'def-37',
+      ruleKey: candidates[36]!.ruleKey,
+      version: 1,
+      status: 'draft',
+      resourceKey: candidates[36]!.resourceKey,
+      serviceKey: 'praxis-api-quickstart',
+      definition: {
+        ruleSetKey: candidates[36]!.resourceKey,
+        operationalResourceKey: 'human-resources.attendance',
+        slotKey: 'slot.37',
+        falseReasonCode: 'WF-00447',
+        availableRoots: ['draft', 'attendanceType', 'context'],
+        conceptRoots: ['attendanceType']
+      },
+      condition: { '==': [1, 1] },
+      parameters: { nullSemantics: 'FAIL_CLOSED', operationKeys: ['validate'] },
+      governance: { lifecycleBoundary: 'REFERENCE_DRAFT_ONLY' }
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-37/facts')
+      .flush(factCatalog('def-37', candidates[36]!.ruleKey));
+    http.expectNone('/api/praxis/config/domain-rules/definitions/def-1');
+    http.expectNone('/api/praxis/config/domain-rules/definitions/def-38');
 
     expect(decisions).toHaveLength(38);
     const hydratedRepresentative = decisions[36]!;
     const lazySibling = decisions[37]!;
     expect(hydratedRepresentative.detailHydrated).toBe(true);
+    expect(decisions[0]?.detailHydrated).toBe(false);
     expect(lazySibling.detailHydrated).toBe(false);
     expect(lazySibling.code).toBe('WF-00448');
     expect(lazySibling.ruleSetKey).toBe('workforce.human-resources.attendance.entry');
@@ -1842,5 +1840,629 @@ describe('ProjectionCatalogService', () => {
     expect(createReq.request.method).toBe('POST');
     createReq.flush({ id: 'ws-hydrated-1', ruleKey: 'rule.1', status: 'OPEN', etag: 'etag-1', revision: 1 });
     expect(createdId).toBe('ws-hydrated-1');
+  });
+
+  it('streams page 0 immediately in loadProgressive, upgrades newer versions across batches, and recovers from HTTP 400 page limit', () => {
+    const config = {
+      mode: 'remote' as const,
+      configApiBaseUrl: '',
+      locale: 'pt-BR' as const,
+      projectionPath: null,
+      initialDecisionKey: 'workforce.rule.01'
+    };
+    const chunks: import('./projection-catalog.service').ProgressiveCatalogChunk[] = [];
+    service.loadProgressive('pt-BR', config).subscribe(chunk => chunks.push(chunk));
+
+    http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([]);
+    http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities').flush({
+      tenantId: 'rio', environment: 'local', definitions: []
+    });
+    const page0Candidates = Array.from({ length: 12 }, (_, idx) => ({
+      definitionId: `def-v1-${idx}`,
+      ruleKey: `workforce.rule.${String(idx + 1).padStart(2, '0')}`,
+      version: 1,
+      ruleType: 'validation',
+      status: 'active' as const,
+      contextKey: 'workforce'
+    }));
+    http.expectOne(req => req.url.endsWith('/definitions/catalog') && req.params.get('page') === '0').flush({
+      schemaVersion: 'praxis-domain-rule-catalog.v1',
+      page: 0,
+      limit: 12,
+      hasMore: true,
+      candidates: page0Candidates
+    });
+
+    // Chunk 1 hydrates initialDecisionKey (def-v1-0) immediately
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-v1-0').flush({
+      id: 'def-v1-0', ruleKey: 'workforce.rule.01', version: 1, status: 'active',
+      condition: { '==': [1, 1] }, parameters: {}
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-v1-0/facts')
+      .flush(factCatalog('def-v1-0', 'workforce.rule.01'));
+
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]?.complete).toBe(false);
+    expect(chunks[0]?.decisions).toHaveLength(12);
+    expect(chunks[0]?.decisions[0]?.configVersion).toBe(1);
+
+    // Phase 2 fires parallel batch of 6 pages (pages 1..6); page 1 introduces v2 of workforce.rule.01, page 2 returns 400 limit guard
+    http.expectOne(req => req.url.endsWith('/definitions/catalog') && req.params.get('page') === '1').flush({
+      schemaVersion: 'praxis-domain-rule-catalog.v1',
+      page: 1,
+      limit: 12,
+      hasMore: false,
+      candidates: [
+        {
+          definitionId: 'def-v2-0',
+          ruleKey: 'workforce.rule.01',
+          version: 2,
+          ruleType: 'validation',
+          status: 'active' as const,
+          contextKey: 'workforce'
+        }
+      ]
+    });
+    for (let pageNum = 2; pageNum <= 6; pageNum++) {
+      http.expectOne(req => req.url.endsWith('/definitions/catalog') && req.params.get('page') === String(pageNum))
+        .flush({}, { status: 400, statusText: 'Bad Request' });
+    }
+    // Upgraded v2 supersedes cached v1 hydration
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-v2-0').flush({
+      id: 'def-v2-0', ruleKey: 'workforce.rule.01', version: 2, status: 'active',
+      condition: { '==': [1, 1] }, parameters: {}
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-v2-0/facts')
+      .flush(factCatalog('def-v2-0', 'workforce.rule.01'));
+
+    expect(chunks).toHaveLength(2);
+    expect(chunks[1]?.complete).toBe(true);
+    expect(chunks[1]?.decisions[0]?.configDefinitionId).toBe('def-v2-0');
+    expect(chunks[1]?.decisions[0]?.configVersion).toBe(2);
+  });
+
+  it('lists authorization definitions in listAccessDefinitions while filtering non-authorization rules', () => {
+    let items: readonly import('@praxisui/core').DomainRuleDefinition[] = [];
+    service.listAccessDefinitions({
+      mode: 'remote', configApiBaseUrl: '', locale: 'pt-BR', projectionPath: null, initialDecisionKey: null
+    }).subscribe(res => items = res);
+
+    http.expectOne(req =>
+      req.url === '/api/praxis/config/domain-rules/definitions'
+      && req.params.get('ruleType') === 'authorization_policy'
+    ).flush([
+      { id: 'auth-1', ruleKey: 'access.docs', version: 1, ruleType: 'authorization_policy', status: 'draft' },
+      { id: 'biz-1', ruleKey: 'wf.1', version: 1, ruleType: 'validation', status: 'active' }
+    ]);
+
+    expect(items).toHaveLength(1);
+    expect(items[0]?.id).toBe('auth-1');
+  });
+
+  it('upgrades loadProgressive from page 0 limit=12 to limit=100 without 400 and converges totalKnown on completion', () => {
+    const config = {
+      mode: 'remote' as const,
+      configApiBaseUrl: '',
+      locale: 'pt-BR' as const,
+      projectionPath: null,
+      initialDecisionKey: null
+    };
+    const chunks: import('./projection-catalog.service').ProgressiveCatalogChunk[] = [];
+    service.loadProgressive('pt-BR', config).subscribe(chunk => chunks.push(chunk));
+
+    http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([]);
+    http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities').flush({
+      tenantId: 'default',
+      environment: 'dev',
+      definitions: []
+    });
+
+    const page0Req = http.expectOne(req =>
+      req.url === '/api/praxis/config/domain-rules/definitions/catalog'
+      && req.params.get('page') === '0'
+      && req.params.get('limit') === '12'
+    );
+    page0Req.flush({
+      schemaVersion: 'praxis-domain-rule-catalog.v1',
+      page: 0,
+      limit: 12,
+      hasMore: true,
+      totalElements: 150,
+      totalPages: 13,
+      candidates: [
+        {
+          definitionId: 'def-0',
+          ruleKey: 'workforce.r0',
+          version: 1,
+          ruleType: 'validation',
+          status: 'active',
+          contextKey: 'workforce',
+          resourceKey: 'workforce.res',
+          serviceKey: 'workforce-svc',
+          displayName: 'Regra inicial'
+        }
+      ]
+    });
+
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-0').flush({
+      id: 'def-0',
+      ruleKey: 'workforce.r0',
+      version: 1,
+      status: 'active',
+      condition: null,
+      parameters: {}
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-0/facts').flush(
+      factCatalog('def-0', 'workforce.r0', [])
+    );
+
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]?.complete).toBe(false);
+    expect(chunks[0]?.supportsServerSummary).toBe(true);
+    expect(chunks[0]?.totalKnown).toBe(150);
+
+    const batchPage0 = http.expectOne(req =>
+      req.url === '/api/praxis/config/domain-rules/definitions/catalog'
+      && req.params.get('page') === '0'
+      && req.params.get('limit') === '100'
+    );
+    const batchPage1 = http.expectOne(req =>
+      req.url === '/api/praxis/config/domain-rules/definitions/catalog'
+      && req.params.get('page') === '1'
+      && req.params.get('limit') === '100'
+    );
+
+    batchPage0.flush({
+      schemaVersion: 'praxis-domain-rule-catalog.v1',
+      page: 0,
+      limit: 100,
+      hasMore: true,
+      totalElements: 150,
+      totalPages: 2,
+      candidates: [
+        {
+          definitionId: 'def-0',
+          ruleKey: 'workforce.r0',
+          version: 1,
+          ruleType: 'validation',
+          status: 'active',
+          contextKey: 'workforce',
+          resourceKey: 'workforce.res',
+          serviceKey: 'workforce-svc'
+        },
+        {
+          definitionId: 'def-1',
+          ruleKey: 'workforce.r1',
+          version: 1,
+          ruleType: 'validation',
+          status: 'active',
+          contextKey: 'workforce',
+          resourceKey: 'workforce.res',
+          serviceKey: 'workforce-svc'
+        }
+      ]
+    });
+    batchPage1.flush({
+      schemaVersion: 'praxis-domain-rule-catalog.v1',
+      page: 1,
+      limit: 100,
+      hasMore: false,
+      totalElements: 150,
+      totalPages: 2,
+      candidates: [
+        {
+          definitionId: 'def-2',
+          ruleKey: 'workforce.r2',
+          version: 1,
+          ruleType: 'validation',
+          status: 'active',
+          contextKey: 'workforce',
+          resourceKey: 'workforce.res',
+          serviceKey: 'workforce-svc'
+        },
+        {
+          definitionId: 'auth-ignored',
+          ruleKey: 'auth.ignored',
+          version: 1,
+          ruleType: 'authorization_policy',
+          status: 'active',
+          contextKey: 'workforce',
+          resourceKey: 'workforce.res',
+          serviceKey: 'workforce-svc'
+        }
+      ]
+    });
+
+    expect(chunks).toHaveLength(2);
+    expect(chunks[1]?.complete).toBe(true);
+    expect(chunks[1]?.partialError).toBeNull();
+    expect(chunks[1]?.decisions.map(d => d.key)).toEqual(['workforce.r0', 'workforce.r1', 'workforce.r2']);
+    expect(chunks[1]?.totalKnown).toBe(3);
+  });
+
+  it('retries transient 503 batch errors and preserves partial loaded decisions when retries exhaust', () => {
+    vi.useFakeTimers();
+    try {
+      service.transientRetryDelayMs = 0;
+      const config = {
+        mode: 'remote' as const,
+        configApiBaseUrl: '',
+        locale: 'pt-BR' as const,
+        projectionPath: null,
+        initialDecisionKey: null
+      };
+      const chunks: import('./projection-catalog.service').ProgressiveCatalogChunk[] = [];
+      service.loadProgressive('pt-BR', config).subscribe(chunk => chunks.push(chunk));
+
+      http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([]);
+      http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities').flush({
+        tenantId: 'default',
+        environment: 'dev',
+        definitions: []
+      });
+      http.expectOne(req =>
+        req.url === '/api/praxis/config/domain-rules/definitions/catalog'
+        && req.params.get('page') === '0'
+        && req.params.get('limit') === '12'
+      ).flush({
+        schemaVersion: 'praxis-domain-rule-catalog.v1',
+        page: 0,
+        limit: 12,
+        hasMore: true,
+        totalElements: 150,
+        totalPages: 2,
+        candidates: [
+          {
+            definitionId: 'def-0',
+            ruleKey: 'workforce.r0',
+            version: 1,
+            ruleType: 'validation',
+            status: 'active',
+            contextKey: 'workforce',
+            resourceKey: 'workforce.res',
+            serviceKey: 'workforce-svc'
+          }
+        ]
+      });
+      http.expectOne('/api/praxis/config/domain-rules/definitions/def-0').flush({
+        id: 'def-0',
+        ruleKey: 'workforce.r0',
+        version: 1,
+        status: 'active',
+        condition: null,
+        parameters: {}
+      });
+      http.expectOne('/api/praxis/config/domain-rules/definitions/def-0/facts').flush(
+        factCatalog('def-0', 'workforce.r0', [])
+      );
+
+      http.expectOne(req =>
+        req.url === '/api/praxis/config/domain-rules/definitions/catalog'
+        && req.params.get('page') === '0'
+        && req.params.get('limit') === '100'
+      ).flush({
+        schemaVersion: 'praxis-domain-rule-catalog.v1',
+        page: 0,
+        limit: 100,
+        hasMore: true,
+        totalElements: 150,
+        totalPages: 2,
+        candidates: [
+          {
+            definitionId: 'def-0',
+            ruleKey: 'workforce.r0',
+            version: 1,
+            ruleType: 'validation',
+            status: 'active',
+            contextKey: 'workforce',
+            resourceKey: 'workforce.res',
+            serviceKey: 'workforce-svc'
+          },
+          {
+            definitionId: 'def-1',
+            ruleKey: 'workforce.r1',
+            version: 1,
+            ruleType: 'validation',
+            status: 'active',
+            contextKey: 'workforce',
+            resourceKey: 'workforce.res',
+            serviceKey: 'workforce-svc'
+          }
+        ]
+      });
+
+      const flushUnavailable = () => http.expectOne(req =>
+        req.url === '/api/praxis/config/domain-rules/definitions/catalog'
+        && req.params.get('page') === '1'
+        && req.params.get('limit') === '100'
+      ).flush('Service Unavailable', { status: 503, statusText: 'Service Unavailable' });
+
+      flushUnavailable();
+      vi.advanceTimersByTime(0);
+      flushUnavailable();
+      vi.advanceTimersByTime(0);
+      flushUnavailable();
+
+      expect(chunks).toHaveLength(2);
+      expect(chunks[1]?.complete).toBe(true);
+      expect(chunks[1]?.partialError).toBe('CATALOG_PARTIAL_LOAD');
+      expect(chunks[1]?.decisions.map(d => d.key)).toEqual(['workforce.r0', 'workforce.r1']);
+      expect(chunks[1]?.totalKnown).toBe(150);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('loads server catalog summary and degrades gracefully to null on 404', () => {
+    const config = {
+      mode: 'remote' as const,
+      configApiBaseUrl: '',
+      locale: 'pt-BR' as const,
+      projectionPath: null,
+      initialDecisionKey: null
+    };
+    let okResult: import('./projection-catalog.service').DomainRuleCatalogSummary | null | undefined;
+    let missingResult: import('./projection-catalog.service').DomainRuleCatalogSummary | null | undefined = undefined;
+
+    service.loadCatalogSummary(config).subscribe(res => okResult = res);
+    http.expectOne('/api/praxis/config/domain-rules/definitions/catalog/summary').flush({
+      schemaVersion: 'praxis-domain-rule-catalog-summary.v1',
+      totalDefinitions: 10,
+      totalBusinessRules: 8,
+      totalAuthorizationPolicies: 2,
+      byContextKey: [{ key: 'workforce', count: 8 }],
+      byResourceKey: [{ key: 'workforce.res', count: 8 }],
+      byRuleType: [{ key: 'validation', count: 8 }, { key: 'authorization_policy', count: 2 }],
+      byDefinitionStatus: [{ key: 'active', count: 8 }],
+      reviewQueue: { openDrafts: 1, inReview: 0, approved: 0, rejected: 0, promoted: 7, totalPending: 1 }
+    });
+    expect(okResult?.totalBusinessRules).toBe(8);
+    expect(okResult?.totalAuthorizationPolicies).toBe(2);
+
+    service.loadCatalogSummary(config).subscribe(res => missingResult = res);
+    http.expectOne('/api/praxis/config/domain-rules/definitions/catalog/summary').flush(
+      'Not Found',
+      { status: 404, statusText: 'Not Found' }
+    );
+    expect(missingResult).toBeNull();
+  });
+
+  it('hydrates RuleSet siblings in a single resourceKey query while preserving detailHydrated: false', () => {
+    const config = {
+      mode: 'remote' as const,
+      configApiBaseUrl: '',
+      locale: 'pt-BR' as const,
+      projectionPath: null,
+      initialDecisionKey: null
+    };
+    const sibling: import('../features/catalog/catalog.fixture').DecisionSummary = {
+      order: 2,
+      totalDecisions: 10,
+      key: 'workforce.s1',
+      code: 'WF-S1',
+      name: 'Sibling rule',
+      domain: 'workforce',
+      ruleSet: 'workforce.res',
+      ruleSetKey: 'workforce.res',
+      resourceKey: 'workforce.res',
+      serviceKey: 'workforce-svc',
+      state: 'verified',
+      meaning: '',
+      authority: 'CONFIG_AUTHORITATIVE',
+      baselineAuthority: 'CONFIG',
+      source: 'config',
+      evidenceCount: 0,
+      authoringSupported: false,
+      availableDefinitionActions: [],
+      configDefinitionId: 'def-s1',
+      configVersion: 1,
+      configStatus: 'active',
+      expression: null,
+      condition: null,
+      factPaths: [],
+      facts: [],
+      nullSemantics: 'FAIL_CLOSED',
+      operationKeys: [],
+      hostContractVersion: null,
+      evidence: [],
+      draftLifecycle: null,
+      detailHydrated: false
+    };
+
+    let hydrated: readonly import('../features/catalog/catalog.fixture').DecisionSummary[] = [];
+    service.hydrateRuleSetSiblings('workforce.res', [sibling], 10, 'pt-BR', config).subscribe(res => hydrated = res);
+
+    const req = http.expectOne(r =>
+      r.url === '/api/praxis/config/domain-rules/definitions'
+      && r.params.get('resourceKey') === 'workforce.res'
+    );
+    req.flush([
+      {
+        id: 'def-s1',
+        ruleKey: 'workforce.s1',
+        version: 1,
+        ruleType: 'validation',
+        status: 'active',
+        contextKey: 'workforce',
+        resourceKey: 'workforce.res',
+        serviceKey: 'workforce-svc',
+        definition: {
+          description: 'Irmã enriquecida',
+          slotKey: 'attendance.entry',
+          decisionStage: 'DOMAIN_DECISION'
+        }
+      }
+    ]);
+
+    expect(hydrated).toHaveLength(1);
+    expect(hydrated[0]?.key).toBe('workforce.s1');
+    expect(hydrated[0]?.detailHydrated).toBe(false);
+    expect(hydrated[0]?.meaning).toBe('Irmã enriquecida');
+    expect(hydrated[0]?.decisionStage).toBe('DOMAIN_DECISION');
+    expect(hydrated[0]?.slotKey).toBe('attendance.entry');
+  });
+
+  it('browses authorization catalog with 200 pagination and degrades on 400 -> limit=12 -> 404 listDefinitions', () => {
+    const config = {
+      mode: 'remote' as const,
+      configApiBaseUrl: '',
+      locale: 'pt-BR' as const,
+      projectionPath: null,
+      initialDecisionKey: null
+    };
+    let okPage: import('./projection-catalog.service').AccessCatalogPage | undefined;
+    service.browseAccessCatalog(config, { page: 0, limit: 25, query: 'docs', status: 'draft' }).subscribe(res => okPage = res);
+
+    http.expectOne(req =>
+      req.url === '/api/praxis/config/domain-rules/definitions/catalog'
+      && req.params.get('ruleType') === 'authorization_policy'
+      && req.params.get('limit') === '25'
+      && req.params.get('query') === 'docs'
+      && req.params.get('status') === 'draft'
+    ).flush({
+      schemaVersion: 'praxis-domain-rule-catalog.v1',
+      page: 0,
+      limit: 25,
+      hasMore: true,
+      totalElements: 40,
+      totalPages: 2,
+      candidates: [
+        {
+          definitionId: 'auth-200',
+          ruleKey: 'access.docs.read',
+          version: 1,
+          ruleType: 'authorization_policy',
+          status: 'draft',
+          contextKey: 'docs',
+          resourceKey: 'docs.files',
+          serviceKey: 'docs-svc'
+        }
+      ]
+    });
+    expect(okPage?.totalElements).toBe(40);
+    expect(okPage?.hasMore).toBe(true);
+    expect(okPage?.candidates).toHaveLength(1);
+
+    let fallbackPage: import('./projection-catalog.service').AccessCatalogPage | undefined;
+    service.browseAccessCatalog(config, { page: 0, limit: 25, query: 'docs', status: 'draft' }).subscribe(res => fallbackPage = res);
+
+    http.expectOne(req =>
+      req.url === '/api/praxis/config/domain-rules/definitions/catalog'
+      && req.params.get('limit') === '25'
+    ).flush('limit too high', { status: 400, statusText: 'Bad Request' });
+
+    http.expectOne(req =>
+      req.url === '/api/praxis/config/domain-rules/definitions/catalog'
+      && req.params.get('limit') === '12'
+    ).flush('not found', { status: 404, statusText: 'Not Found' });
+
+    http.expectOne(req =>
+      req.url === '/api/praxis/config/domain-rules/definitions'
+      && req.params.get('ruleType') === 'authorization_policy'
+    ).flush([
+      {
+        id: 'auth-fallback',
+        ruleKey: 'access.docs.write',
+        version: 1,
+        ruleType: 'authorization_policy',
+        status: 'draft',
+        resourceKey: 'docs.files',
+        serviceKey: 'docs-svc'
+      },
+      {
+        id: 'auth-other',
+        ruleKey: 'access.payroll.read',
+        version: 1,
+        ruleType: 'authorization_policy',
+        status: 'active',
+        resourceKey: 'payroll',
+        serviceKey: 'payroll-svc'
+      }
+    ]);
+
+    expect(fallbackPage?.candidates.map(c => c.ruleKey)).toEqual(['access.docs.write']);
+    expect(fallbackPage?.totalElements).toBe(1);
+    expect(fallbackPage?.hasMore).toBe(false);
+  });
+
+  it('preserves structured status, summaryCode, and summaryArgs on timeline events', () => {
+    const config = {
+      mode: 'remote' as const,
+      configApiBaseUrl: '',
+      locale: 'pt-BR' as const,
+      projectionPath: null,
+      initialDecisionKey: null
+    };
+    let events: readonly import('../features/catalog/catalog.fixture').DecisionTimelineEvent[] = [];
+    service.timeline('def-1', config).subscribe(res => events = res);
+
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-1/timeline').flush({
+      events: [
+        {
+          eventType: 'definition.created',
+          occurredAt: '2026-11-25T00:00:00Z',
+          summary: 'Decision definition created',
+          status: 'ACTIVE',
+          summaryCode: 'DOMAIN_RULE_DEFINITION_CREATED',
+          summaryArgs: { ruleKey: 'workforce.r0', version: 2 },
+          actor: 'workforce.reviewer'
+        }
+      ]
+    });
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      eventType: 'definition.created',
+      status: 'ACTIVE',
+      summaryCode: 'DOMAIN_RULE_DEFINITION_CREATED',
+      summaryArgs: { ruleKey: 'workforce.r0', version: 2 },
+      actor: 'workforce.reviewer'
+    });
+  });
+
+  it('degrades browseAccessCatalog to limit=12 when legacy hosts return 500 on limit=25, without masking real 500s on limit=12', () => {
+    const config = {
+      mode: 'remote' as const,
+      configApiBaseUrl: '',
+      locale: 'pt-BR' as const,
+      projectionPath: null,
+      initialDecisionKey: null
+    };
+    let degradedPage: import('./projection-catalog.service').AccessCatalogPage | undefined;
+    service.browseAccessCatalog(config, { page: 0, limit: 25 }).subscribe(res => degradedPage = res);
+
+    http.expectOne(req =>
+      req.url === '/api/praxis/config/domain-rules/definitions/catalog'
+      && req.params.get('limit') === '25'
+      && req.params.get('ruleType') === 'authorization_policy'
+    ).flush({ message: 'limit must be between 1 and 12' }, { status: 500, statusText: 'Internal Server Error' });
+
+    http.expectOne(req =>
+      req.url === '/api/praxis/config/domain-rules/definitions/catalog'
+      && req.params.get('limit') === '12'
+      && req.params.get('ruleType') === 'authorization_policy'
+    ).flush({
+      schemaVersion: 'praxis-domain-rule-catalog.v1',
+      page: 0,
+      limit: 12,
+      hasMore: false,
+      candidates: []
+    });
+
+    expect(degradedPage?.candidates).toEqual([]);
+    expect(degradedPage?.limit).toBe(12);
+
+    let propagatedStatus: number | null = null;
+    service.browseAccessCatalog(config, { page: 0, limit: 12 }).subscribe({
+      error: err => propagatedStatus = err instanceof HttpErrorResponse ? err.status : null
+    });
+
+    http.expectOne(req =>
+      req.url === '/api/praxis/config/domain-rules/definitions/catalog'
+      && req.params.get('limit') === '12'
+      && req.params.get('ruleType') === 'authorization_policy'
+    ).flush('backend down', { status: 500, statusText: 'Internal Server Error' });
+
+    expect(propagatedStatus).toBe(500);
   });
 });

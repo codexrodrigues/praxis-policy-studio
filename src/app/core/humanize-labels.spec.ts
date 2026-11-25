@@ -101,4 +101,11 @@ describe('humanize-labels', () => {
     expect(humanizeRuleType('custom_audit_rule', 'pt-BR')).toBe('Custom Audit Rule');
     expect(humanizeRuleType(null, 'en-US')).toBe('Other type');
   });
+
+  it('applies Portuguese accents cleanly on domain slugs with declaracoes, retencao, previdenciarias, parametros, and nomeacoes', () => {
+    expect(humanizeTechnicalSlug('declaracoes.retencao_guarda_arquivistica', undefined, 'pt-BR'))
+      .toBe('Declarações · Retenção Guarda Arquivística');
+    expect(humanizeTechnicalSlug('beneficios.previdenciarias_nomeacoes.parametros', undefined, 'pt-BR'))
+      .toBe('Benefícios · Previdenciárias Nomeações · Parâmetros');
+  });
 });

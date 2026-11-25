@@ -100,13 +100,13 @@ describe('StudioShellStateService', () => {
     shell.toggleSidebar();
     expect(shell.sidebarCollapsed()).toBe(true);
 
-    expect(shell.explorerWidthPx()).toBe(336);
+    expect(shell.explorerWidthPx()).toBe(296);
     shell.setExplorerWidth(120);
-    expect(shell.explorerWidthPx()).toBe(280);
+    expect(shell.explorerWidthPx()).toBe(256);
     shell.setExplorerWidth(999);
     expect(shell.explorerWidthPx()).toBe(440);
     shell.resetExplorerWidth();
-    expect(shell.explorerWidthPx()).toBe(336);
+    expect(shell.explorerWidthPx()).toBe(296);
 
     shell.setReviewQueueCount(7);
     expect(shell.reviewQueueCount()).toBe(7);

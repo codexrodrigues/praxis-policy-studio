@@ -7,7 +7,10 @@ import type {
 } from '@praxisui/core';
 import { classifyDecisionWorkflowBucket, type ExplorerGlobalLens } from '../../core/catalog-portfolio';
 import { PolicyStudioI18n } from '../../core/i18n';
-import { ProjectionCatalogService } from '../../core/projection-catalog.service';
+import {
+  ProjectionCatalogService,
+  type DomainRuleCatalogSummary
+} from '../../core/projection-catalog.service';
 import { RuntimeConfigService } from '../../core/runtime-config.service';
 import { StudioShellStateService } from '../../core/studio-shell-state.service';
 import type {
@@ -62,6 +65,12 @@ export class CatalogSelectionStore {
 
   readonly loadError = signal<string | null>(null);
   readonly loading = signal(true);
+  readonly catalogStreaming = signal(false);
+  readonly catalogTotalHint = signal<number | null>(null);
+  readonly catalogTruncated = signal(false);
+  readonly catalogPartialError = signal<string | null>(null);
+  readonly catalogSummary = signal<DomainRuleCatalogSummary | null>(null);
+  readonly catalogChunkRevision = signal(0);
   readonly authenticationRequired = signal(false);
   readonly permissionLimited = signal(false);
   readonly authenticating = signal(false);
@@ -414,6 +423,11 @@ export class CatalogSelectionStore {
     ++this.timelineLoadRevision;
     ++this.lifecycleLoadRevision;
     ++this.workspaceCapabilitiesLoadRevision;
+    this.catalogStreaming.set(false);
+    this.catalogTotalHint.set(null);
+    this.catalogTruncated.set(false);
+    this.catalogPartialError.set(null);
+    this.catalogSummary.set(null);
     this.authoringBusy.set(false);
     this.authoringError.set(false);
     this.authoringConflict.set(false);
@@ -428,5 +442,31 @@ export class CatalogSelectionStore {
     this.workspaceCapabilities.set(null);
     this.workspaceCapabilitiesLoading.set(false);
     this.workspaceCapabilitiesError.set(false);
+  }
+
+  mergeProgressiveDecisions(
+    incoming: readonly DecisionSummary[],
+    replaceExisting: boolean
+  ): readonly DecisionSummary[] {
+    if (replaceExisting) {
+      this.allDecisions.set(incoming);
+      return incoming;
+    }
+    const existingHydratedByKey = new Map<string, DecisionSummary>();
+    for (const item of this.allDecisions()) {
+      if (item.detailHydrated || Boolean(item.decisionStage) || item.condition !== null) {
+        existingHydratedByKey.set(item.key, item);
+      }
+    }
+    const merged = incoming.map(item => {
+      const hydrated = existingHydratedByKey.get(item.key);
+      if (!hydrated) return item;
+      const itemLacksDetails = !item.detailHydrated && !item.decisionStage && item.condition === null;
+      return itemLacksDetails && hydrated.configDefinitionId === item.configDefinitionId
+        ? { ...hydrated, totalDecisions: item.totalDecisions }
+        : item;
+    });
+    this.allDecisions.set(merged);
+    return merged;
   }
 }

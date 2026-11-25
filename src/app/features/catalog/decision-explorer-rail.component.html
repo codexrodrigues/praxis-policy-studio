@@ -9,6 +9,9 @@
             {{ filteredDecisions().length }}
           </span>
         </div>
+        @if (catalogStreaming()) {
+          <span class="streaming-badge" data-testid="catalog-streaming-badge">{{ streamingBadgeText() }}</span>
+        }
       </div>
 
       <button
@@ -27,7 +30,8 @@
     <p class="session-error" role="alert">{{ i18n.text('logoutFailed') }}</p>
   }
 
-  <div class="explorer-controls">
+  @if (!authenticationRequired()) {
+    <div class="explorer-controls">
     @if (hasMultipleQuickScopes()) {
       <div class="quick-scope-picker">
         <label class="visually-hidden" for="explorer-quick-scope">{{ i18n.text('explorerScopeSelectLabel') }}</label>
@@ -227,21 +231,27 @@
         }
       </div>
     }
-  </div>
+    </div>
+  }
+
+    @if (catalogPartialError()) {
+      <div class="catalog-status-banner is-warning" data-testid="catalog-partial-error-banner" role="status">
+        <span>{{ partialErrorBannerText() }}</span>
+        <button type="button" class="quiet-button catalog-banner-btn" data-testid="catalog-retry-incomplete-btn" (click)="retryCatalogRequested.emit()">
+          {{ i18n.text('catalogRetryIncompleteCta') }}
+        </button>
+      </div>
+    } @else if (catalogTruncated()) {
+      <div class="catalog-status-banner" data-testid="catalog-truncated-banner" role="status">
+        <span>{{ truncatedBannerText() }}</span>
+      </div>
+    }
 
   <div class="decision-list studio-scroll-region" [attr.aria-label]="i18n.text('availableDecisions')">
     @if (loading()) {
       <p class="empty" aria-live="polite">{{ i18n.text('loading') }}</p>
     } @else if (authenticationRequired()) {
-      <p class="empty state-message" role="alert">{{ i18n.text('authenticationRequired') }}</p>
-      <form #loginForm class="development-login" (submit)="$event.preventDefault(); loginRequested.emit({ username: username.value, password: password.value, form: loginForm })">
-        <strong>{{ i18n.text('developmentLogin') }}</strong>
-        <label><span>{{ i18n.text('username') }}</span><input #username name="username" value="admin" autocomplete="username" required></label>
-        <label><span>{{ i18n.text('password') }}</span><input #password name="password" type="password" autocomplete="current-password" required></label>
-        @if (authenticationFailed()) { <p role="alert">{{ i18n.text('authenticationFailed') }}</p> }
-        <button type="submit" [disabled]="authenticating()">{{ i18n.text(authenticating() ? 'authenticating' : 'login') }}</button>
-        <small>{{ i18n.text('credentialBoundary') }}</small>
-      </form>
+      <p class="empty state-message" [class.state-message-info]="!authenticationFailed()" role="alert">{{ i18n.text('authenticationRequired') }}</p>
     } @else if (permissionLimited()) {
       <p class="empty state-message" role="alert">{{ i18n.text('permissionLimited') }}</p>
       <button type="button" class="quiet-button state-retry" (click)="reauthenticateRequested.emit()">
@@ -258,7 +268,10 @@
     } @else if (filteredDecisions().length === 0) {
       <p class="empty">{{ i18n.text('noResults') }}</p>
     } @else if (useVirtualScroll()) {
-      <cdk-virtual-scroll-viewport itemSize="78" class="decision-virtual-viewport studio-scroll-region">
+      <cdk-virtual-scroll-viewport
+        [itemSize]="virtualItemSize()"
+        [style.--pax-virtual-row-height.px]="virtualItemSize()"
+        class="decision-virtual-viewport studio-scroll-region">
         <div *cdkVirtualFor="let row of virtualRows(); let i = index; trackBy: trackVirtualRow" class="virtual-row-slot">
           @if (row.kind === 'stage') {
             <div class="stage-heading virtual-heading" [class.virtual-heading-first]="i === 0">

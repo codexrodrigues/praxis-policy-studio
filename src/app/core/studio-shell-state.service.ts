@@ -34,8 +34,8 @@ export interface StudioCatalogRouteBridge {
 
 export const SIDEBAR_COLLAPSED_STORAGE_KEY = 'praxis-rules-studio.shell.sidebar-collapsed';
 export const EXPLORER_WIDTH_STORAGE_KEY = 'praxis-rules-studio.shell.explorer-width-px';
-export const DEFAULT_EXPLORER_WIDTH_PX = 336;
-export const MIN_EXPLORER_WIDTH_PX = 280;
+export const DEFAULT_EXPLORER_WIDTH_PX = 296;
+export const MIN_EXPLORER_WIDTH_PX = 256;
 export const MAX_EXPLORER_WIDTH_PX = 440;
 
 function readStoredSidebarCollapsed(): boolean {

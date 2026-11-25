@@ -16,6 +16,8 @@ describe('studio-glossary', () => {
 
   it('resolves status and governance glossary entries', () => {
     expect(resolveStatusGlossaryEntry('PROMOTED', 'pt-BR').title).toBe('Ativa em produção');
+    expect(resolveStatusGlossaryEntry('NO_ACTIVE_DRAFT', 'pt-BR').title).toBe('Sem rascunho em andamento');
+    expect(resolveStatusGlossaryEntry('NO_ACTIVE_DRAFT', 'en-US').title).toBe('No working draft');
     expect(resolveStatusGlossaryEntry('REJECTED', 'pt-BR').title).toBe('Revisão recusada');
     expect(resolveStatusGlossaryEntry('REJECTED', 'en-US').title).toBe('Review rejected');
     expect(resolveGovernanceGlossaryEntry('fourEyes', 'pt-BR').title).toBe('Revisão 4-olhos');

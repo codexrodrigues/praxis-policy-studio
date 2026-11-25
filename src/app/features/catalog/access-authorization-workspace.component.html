@@ -3,7 +3,7 @@
     <div>
       <p class="studio-eyebrow">{{ i18n.text('trackAccessPrivacy') }}</p>
       <h1 id="access-workspace-title">{{ i18n.text('accessWorkspaceTitle') }}</h1>
-      <p class="access-boundary">{{ i18n.text('accessWorkspaceBoundary') }}</p>
+      <p class="access-boundary">{{ i18n.text(viewDepth() === 'technical' ? 'accessWorkspaceBoundary' : 'accessWorkspaceBoundaryBusiness') }}</p>
     </div>
     <button
       type="button"
@@ -11,7 +11,7 @@
       data-testid="back-to-business-track"
       (click)="backToBusinessRequested.emit()">
       <pax-icon name="arrow-left" [size]="14" />
-      <span>{{ i18n.text('trackBusinessRules') }}</span>
+      <span>{{ i18n.text('navItemCatalog') }}</span>
     </button>
   </header>
 
@@ -64,7 +64,7 @@
     <div class="access-empty-state" role="status">
       <p>{{ i18n.text('accessWorkspaceLoginRequired') }}</p>
       <button type="button" class="primary-action" (click)="backToBusinessRequested.emit()">
-        {{ i18n.text('trackBusinessRules') }}
+        {{ i18n.text('navItemCatalog') }}
       </button>
     </div>
   } @else if (config(); as runtimeConfig) {
@@ -72,6 +72,7 @@
       <div class="access-workspace-content">
         <pax-access-draft-review
           [config]="runtimeConfig"
+          [viewDepth]="viewDepth()"
           [preferredResourceKey]="bridgeContext()?.resourceKey ?? null"
           [preferredServiceKey]="bridgeContext()?.serviceKey ?? null" />
       </div>

@@ -5,15 +5,17 @@
         type="button"
         role="tab"
         data-testid="inspector-tab-properties"
+        [attr.title]="i18n.text('inspectorTabProperties')"
         [class.active]="activeTab() === 'properties'"
         [attr.aria-selected]="activeTab() === 'properties'"
         (click)="tabChanged.emit('properties')">
-        {{ i18n.text('inspectorTabProperties') }}
+        <span>{{ i18n.text('inspectorTabProperties') }}</span>
       </button>
       <button
         type="button"
         role="tab"
         data-testid="inspector-tab-ai"
+        [attr.title]="i18n.text('inspectorTabAi')"
         [class.active]="activeTab() === 'ai'"
         [attr.aria-selected]="activeTab() === 'ai'"
         (click)="tabChanged.emit('ai')">
@@ -24,6 +26,7 @@
         type="button"
         role="tab"
         data-testid="inspector-tab-technical"
+        [attr.title]="i18n.text('inspectorTabTechnical')"
         [class.active]="activeTab() === 'technical'"
         [attr.aria-selected]="activeTab() === 'technical'"
         (click)="tabChanged.emit('technical')">

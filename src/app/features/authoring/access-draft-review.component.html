@@ -1,58 +1,75 @@
-<details class="review">
+<details class="review" open>
   <summary>{{ i18n.text('accessReview') }}</summary>
   <p class="access-step-kicker">{{ i18n.text('accessStepDraftKicker') }}</p>
-  <p class="access-hint">{{ i18n.text('accessHint') }}</p>
-  <pax-pap-catalog
-    [config]="config()"
-    [preferredResourceKey]="preferredResourceKey()"
-    [preferredServiceKey]="preferredServiceKey()"
-    (draftGenerated)="applyGeneratedDraft($event)" />
-  <div class="access-field-block">
-    <label for="access-source">{{ i18n.text('accessSource') }}</label>
-    <textarea id="access-source" rows="5" spellcheck="false" [disabled]="busy()" [value]="source()"
-      (input)="editSource($any($event.target).value)"></textarea>
-    <div class="access-action-row">
-      <button type="button" class="access-btn-primary" [disabled]="busy() || !source().trim() || attempted()" (click)="review()">{{ i18n.text('accessInspect') }}</button>
+  <p class="access-hint">{{ i18n.text(viewDepth() === 'technical' ? 'accessHint' : 'accessHintBusiness') }}</p>
+  <div class="access-field-block access-discovery-block">
+    <div class="access-discovery-header">
+      <label for="access-id">{{ i18n.text('accessId') }}</label>
+      <button
+        type="button"
+        data-testid="access-load-existing-btn"
+        [disabled]="busy() || existingLoading()"
+        (click)="loadExistingPolicies(false)">
+        {{ i18n.text('accessLoadExistingCta') }}
+      </button>
     </div>
-  </div>
-  @if (candidate(); as draft) {
-    <section class="access-subcard" [attr.aria-label]="i18n.text('accessInspect')">
-      <header class="access-subcard-header">
-        <div>
-          <h3>{{ draft.preview.title }}</h3>
-          <p class="access-meta-line">{{ draft.request.ruleKey }} · v{{ draft.request.version }} · {{ draft.request.serviceKey }} · {{ draft.request.resourceKey }}</p>
-        </div>
-        <span class="access-meta-pill">{{ draft.preview.policyId }} · {{ draft.preview.version }}</span>
-      </header>
-      <h4>{{ i18n.text('accessTargets') }}</h4>
-      <ul class="access-item-list">
-        @for (target of draft.preview.targets; track $index) {
-          <li>
-            <code>{{ target.point }}</code> · {{ target.modes.join(', ') }}
-            <br><code>{{ target.digest }}</code>
-          </li>
+    <div class="access-discovery-filters">
+      <input
+        type="search"
+        data-testid="access-existing-search"
+        [value]="existingQuery()"
+        [placeholder]="i18n.text('accessSearchPlaceholder')"
+        (input)="existingQuery.set($any($event.target).value)"
+        (keydown.enter)="loadExistingPolicies(false)">
+      <select
+        data-testid="access-existing-status"
+        [attr.aria-label]="i18n.text('accessStatusFilterLabel')"
+        [value]="existingStatusFilter()"
+        (change)="existingStatusFilter.set($any($event.target).value); loadExistingPolicies(false)">
+        <option value="">{{ i18n.text('accessStatusAll') }}</option>
+        <option value="draft">{{ i18n.text('timelineStatusDraft') }}</option>
+        <option value="approved">{{ i18n.text('timelineStatusApproved') }}</option>
+        <option value="active">{{ i18n.text('timelineStatusActive') }}</option>
+      </select>
+    </div>
+    @if (existingPolicies(); as policies) {
+      @if (policies.length > 0) {
+        <p class="access-meta-line">
+          {{ i18n.text('accessSelectExistingHint') }}
+          @if (existingCountSummary(); as countSummary) {
+            <span> · {{ countSummary }}</span>
+          }
+        </p>
+        <ul class="access-existing-list" data-testid="access-existing-policies-list" [attr.aria-label]="i18n.text('accessExistingPoliciesLabel')">
+          @for (item of policies; track item.definitionId) {
+            <li>
+              <button
+                type="button"
+                class="access-existing-item"
+                [class.selected]="definitionId() === item.definitionId"
+                [attr.data-testid]="'access-existing-item-' + item.ruleKey"
+                (click)="selectExistingPolicy(item)">
+                <span class="access-existing-title">{{ item.displayName || item.ruleKey }}</span>
+                <span class="access-existing-meta">v{{ item.version }} · {{ item.status }} · <code>{{ item.definitionId }}</code></span>
+              </button>
+            </li>
+          }
+        </ul>
+        @if (existingHasMore()) {
+          <div class="access-action-row">
+            <button
+              type="button"
+              data-testid="access-load-more-btn"
+              [disabled]="busy() || existingLoading()"
+              (click)="loadExistingPolicies(true)">
+              {{ i18n.text('accessLoadMoreCta') }}
+            </button>
+          </div>
         }
-      </ul>
-      <h4>{{ i18n.text('accessEffects') }}</h4>
-      <ul class="access-item-list">
-        @for (rule of draft.preview.rules; track $index) {
-          <li>
-            <span>{{ rule.id }} · {{ rule.modes.join(', ') }}</span>
-            <br><strong>{{ rule.authority }} / {{ rule.effect }}</strong> · {{ rule.reason }}
-          </li>
-        }
-      </ul>
-      <p class="access-meta-line">policy_engine / opa-policy · {{ draft.preview.artifacts.join(', ') }}</p>
-      <details class="access-nested-details"><summary>{{ i18n.text('accessOriginal') }}</summary><pre>{{ draft.request | json }}</pre></details>
-      @if (!attempted()) {
-        <div class="access-action-row">
-          <button type="button" class="access-btn-primary" [disabled]="busy()" (click)="save()">{{ i18n.text('accessSave') }}</button>
-        </div>
+      } @else {
+        <p class="access-meta-line" role="status">{{ i18n.text('accessNoExistingPolicies') }}</p>
       }
-    </section>
-  }
-  <div class="access-field-block">
-    <label for="access-id">{{ i18n.text('accessId') }}</label>
+    }
     <input id="access-id" [value]="definitionId()" [disabled]="busy()" (input)="definitionId.set($any($event.target).value); stored.set(null)">
     <div class="access-action-row">
       <button type="button" [disabled]="busy() || !definitionId().trim()" (click)="read()">{{ i18n.text('accessRead') }}</button>
@@ -77,5 +94,62 @@
       <details class="access-nested-details"><summary>{{ i18n.text('accessStored') }}</summary><pre>{{ result | json }}</pre></details>
     </section>
   }
+  <section class="access-authoring-section" aria-labelledby="access-create-title">
+    <h2 id="access-create-title" class="access-section-title">{{ i18n.text('accessCreateSectionTitle') }}</h2>
+    <pax-pap-catalog
+      [config]="config()"
+      [preferredResourceKey]="preferredResourceKey()"
+      [preferredServiceKey]="preferredServiceKey()"
+      (draftGenerated)="applyGeneratedDraft($event)" />
+    <div class="access-field-block">
+      <label for="access-source">{{ i18n.text('accessSource') }}</label>
+      <textarea
+        id="access-source"
+        [rows]="viewDepth() === 'technical' ? 5 : 3"
+        spellcheck="false"
+        [disabled]="busy()"
+        [value]="source()"
+        (input)="editSource($any($event.target).value)"></textarea>
+      <div class="access-action-row">
+        <button type="button" class="access-btn-primary" [disabled]="busy() || !source().trim() || attempted()" (click)="review()">{{ i18n.text('accessInspect') }}</button>
+      </div>
+    </div>
+    @if (candidate(); as draft) {
+      <section class="access-subcard" [attr.aria-label]="i18n.text('accessInspect')">
+        <header class="access-subcard-header">
+          <div>
+            <h3>{{ draft.preview.title }}</h3>
+            <p class="access-meta-line">{{ draft.request.ruleKey }} · v{{ draft.request.version }} · {{ draft.request.serviceKey }} · {{ draft.request.resourceKey }}</p>
+          </div>
+          <span class="access-meta-pill">{{ draft.preview.policyId }} · {{ draft.preview.version }}</span>
+        </header>
+        <h4>{{ i18n.text('accessTargets') }}</h4>
+        <ul class="access-item-list">
+          @for (target of draft.preview.targets; track $index) {
+            <li>
+              <code>{{ target.point }}</code> · {{ target.modes.join(', ') }}
+              <br><code>{{ target.digest }}</code>
+            </li>
+          }
+        </ul>
+        <h4>{{ i18n.text('accessEffects') }}</h4>
+        <ul class="access-item-list">
+          @for (rule of draft.preview.rules; track $index) {
+            <li>
+              <span>{{ rule.id }} · {{ rule.modes.join(', ') }}</span>
+              <br><strong>{{ rule.authority }} / {{ rule.effect }}</strong> · {{ rule.reason }}
+            </li>
+          }
+        </ul>
+        <p class="access-meta-line">policy_engine / opa-policy · {{ draft.preview.artifacts.join(', ') }}</p>
+        <details class="access-nested-details"><summary>{{ i18n.text('accessOriginal') }}</summary><pre>{{ draft.request | json }}</pre></details>
+        @if (!attempted()) {
+          <div class="access-action-row">
+            <button type="button" class="access-btn-primary" [disabled]="busy()" (click)="save()">{{ i18n.text('accessSave') }}</button>
+          </div>
+        }
+      </section>
+    }
+  </section>
 </details>
 <pax-access-release [config]="config()" />

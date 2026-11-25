@@ -106,4 +106,58 @@ describe('CatalogPortfolioOverviewComponent', () => {
     approvalCard.click();
     expect(typeSpy).toHaveBeenCalledWith('approval_policy');
   });
+
+  it('hides redundant 1:1 functionalities, offers domain search (>12 domains), and enriches single-rule-type view', () => {
+    const manyDecisions: DecisionSummary[] = Array.from({ length: 14 }, (_, idx) =>
+      makeDecision(idx + 1, {
+        key: `domain-${idx}`,
+        name: `Domain ${idx}`,
+        domain: `Area ${idx}`,
+        ruleSet: `Area ${idx}`,
+        ruleSetKey: `area.${idx}`,
+        ruleType: 'validation'
+      })
+    );
+
+    fixture = TestBed.createComponent(CatalogPortfolioOverviewComponent);
+    fixture.componentRef.setInput('decisions', manyDecisions);
+    fixture.componentRef.setInput('viewDepth', 'business');
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    // All 14 areas have single 1:1 functionality matching domain label -> .functionality-list omitted
+    expect(el.querySelectorAll('.functionality-list')).toHaveLength(0);
+
+    const sampleDomain = {
+      domainKey: 'pessoal.pensoes',
+      label: 'Administração Pessoal · Pensões Cotas Previdenciárias',
+      totalCount: 37,
+      activeWorkCount: 0,
+      functionalities: []
+    };
+    expect(
+      fixture.componentInstance.displayFunctionalityLabel(
+        sampleDomain,
+        'Pensões Cotas Previdenciárias · Previdência'
+      )
+    ).toBe('Previdência');
+    expect(
+      fixture.componentInstance.displayFunctionalityLabel(
+        sampleDomain,
+        'Pensões Cotas Previdenciárias'
+      )
+    ).toBe('Pensões Cotas Previdenciárias');
+
+    const search = el.querySelector<HTMLInputElement>('[data-testid="portfolio-domain-search"]');
+    expect(search).toBeTruthy();
+    search!.value = 'Area 13';
+    search!.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(el.querySelectorAll('.domain-card')).toHaveLength(1);
+
+    const typesTab = el.querySelector<HTMLButtonElement>('[data-testid="portfolio-tab-types"]');
+    typesTab?.click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="portfolio-single-type-context"]')).toBeTruthy();
+  });
 });

@@ -1,5 +1,11 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
+
+async function ensureDetailsOpen(details: Locator): Promise<void> {
+  if (!(await details.evaluate(el => (el as HTMLDetailsElement).open))) {
+    await details.locator('> summary').click();
+  }
+}
 
 const definition = {
   id: '7b0fca89-cb64-40bf-8eea-d3467083bbf4', ruleKey: 'grant.amount-parameters', version: 1, status: 'approved',
@@ -1309,13 +1315,6 @@ test('reviews a prepared ACCESS draft and retries readback without repeating the
   let reads = 0;
   let probes = 0;
   const token = crypto.randomUUID();
-  await page.route('**/auth/session', async route => {
-    expect(route.request().method()).toBe('GET');
-    probes++;
-    if (probes === 1) return route.fulfill({ status: 503 });
-    if (probes === 2) return route.fulfill({ status: 401 });
-    return route.fulfill({ status: 204, headers: { 'X-XSRF-TOKEN': token } });
-  });
   await page.route('**/api/praxis/config/domain-rules/definitions', async route => {
     expect(route.request().method()).toBe('POST');
     expect(await route.request().headerValue('x-xsrf-token')).toBe(token);
@@ -1330,7 +1329,14 @@ test('reviews a prepared ACCESS draft and retries readback without repeating the
   });
   await page.goto('/catalog');
   await page.getByTestId('workspace-track-authorization').click();
-  await page.getByText('Revisar rascunho de acesso (ACCESS)', { exact: true }).click();
+  await ensureDetailsOpen(page.locator('pax-access-draft-review details.review'));
+  await page.route('**/auth/session', async route => {
+    expect(route.request().method()).toBe('GET');
+    probes++;
+    if (probes === 1) return route.fulfill({ status: 503 });
+    if (probes === 2) return route.fulfill({ status: 401 });
+    return route.fulfill({ status: 204, headers: { 'X-XSRF-TOKEN': token } });
+  });
   const source = page.getByLabel('Requisição JSON de criação da definição');
   const inspect = page.getByRole('button', { name: 'Revisar candidata', exact: true });
   const save = page.getByRole('button', { name: 'Salvar rascunho no Config' });
@@ -1383,7 +1389,7 @@ test('browses the scoped PAP catalog and uses the selected mode without changing
   });
   await page.goto('/catalog');
   await page.getByTestId('workspace-track-authorization').click();
-  await page.getByText('Revisar rascunho de acesso (ACCESS)', { exact: true }).click();
+  await ensureDetailsOpen(page.locator('pax-access-draft-review details.review'));
   const source = page.getByLabel('Requisição JSON de criação da definição');
   await source.fill('draft in progress');
   const panel = page.locator('pax-pap-catalog');
@@ -1459,7 +1465,7 @@ test('publishes approved ACCESS and resumes activation and rollback against the 
   await page.goto('/catalog');
   await page.getByTestId('workspace-track-authorization').click();
   const panel = page.locator('pax-access-release');
-  await panel.locator('summary').click();
+  await ensureDetailsOpen(panel.locator('details.release'));
   await panel.getByRole('button', { name: 'Carregar definições aprovadas' }).click();
   const options = panel.getByLabel('Definição ACCESS aprovada');
   await expect(options.locator('option')).toHaveCount(2);
@@ -1509,7 +1515,7 @@ test('recovers a currently selected pending ACCESS activation by confirming roll
   await page.goto('/catalog');
   await page.getByTestId('workspace-track-authorization').click();
   const panel = page.locator('pax-access-release');
-  await panel.locator('summary').click();
+  await ensureDetailsOpen(panel.locator('details.release'));
   await panel.getByLabel('ID do release OPA').fill(releaseId);
   const refresh = panel.getByRole('button', { name: 'Consultar estado no Config' });
   const rollbackPending = panel.getByRole('button', { name: 'Reverter ativação pendente' });
@@ -2388,8 +2394,14 @@ test('scopes evaluated facts with rich popovers and navigates 5-stage pipeline w
   await expect(factsStrip.getByTestId('evaluated-facts-catalog-panel')).toBeVisible();
   await expect(factsStrip.getByTestId('evaluated-facts-catalog-panel')).toContainText('Histórico Anterior');
 
-  // 2. Interactive 5-stage horizontal stepper & focused stage panel
+  // 2. Interactive 5-stage horizontal stepper & canonical relationship graph
   const dag = page.getByTestId('rule-decision-plan-dag');
+  const graph = dag.getByTestId('dag-relationship-graph');
+  await expect(graph).toBeVisible();
+  await expect(graph.locator('svg').first()).toBeVisible();
+  await dag.getByTestId('dag-graph-mode-impact').click();
+  await expect(dag.getByTestId('dag-graph-mode-impact')).toHaveAttribute('aria-pressed', 'true');
+  await dag.getByTestId('dag-graph-mode-flow').click();
   await expect(dag.getByTestId('dag-focused-stage-panel')).toBeVisible();
   await expect(dag.getByTestId('dag-causal-subtitle')).toContainText('Etapa 1 de 5 · Pré-requisitos obrigatórios');
 
@@ -2865,8 +2877,8 @@ test('aligns 03 Testar, 04 Operar, 05 Histórico, and /access with Business/Tech
   // 4. /access: upgraded design-system cards in Light and Dark Mode + Axe 0 violations
   await page.getByTestId('workspace-track-authorization').click();
   await expect(page.getByTestId('access-authorization-workspace')).toBeVisible();
-  await page.locator('pax-access-draft-review details.review > summary').click();
-  await page.locator('pax-access-release details.release > summary').click();
+  await ensureDetailsOpen(page.locator('pax-access-draft-review details.review'));
+  await ensureDetailsOpen(page.locator('pax-access-release details.release'));
   await expect(page.getByText('Etapa 1 · Catálogo e rascunho')).toBeVisible();
   await expect(page.getByText('Etapa 2 · Release e ativação OPA')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
