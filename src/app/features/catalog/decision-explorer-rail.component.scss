@@ -7,8 +7,10 @@
 .heading-title-meta,
 .title-count-row,
 .quick-scope-label,
+.explorer-controls,
 .search,
 .search input,
+.scope-filter-chip,
 .scope-filter-copy,
 .scope-filter-value,
 .stage-heading,
@@ -44,10 +46,12 @@
 .catalog-status-banner,
 .explorer-controls,
 .filters-popover-panel,
+.scope-filter-copy,
 .stage-group,
 .decision-copy,
 .selection-outside-filter {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .pane-collapse-btn,
@@ -70,6 +74,7 @@
   height: calc(100dvh - var(--pax-topbar-height));
   display: flex;
   flex-direction: column;
+  overflow-x: clip;
   background: var(--pax-color-surface-container-low);
   border-right: 1px solid var(--pax-color-outline-variant);
 }
@@ -327,11 +332,25 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--pax-space-2);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
   padding: 0.3125rem 0.45rem 0.3125rem 0.55rem;
   border-radius: var(--pax-radius-md);
   background: var(--pax-color-primary-container);
   color: var(--pax-color-on-primary-container);
   font-size: var(--pax-text-xs);
+}
+
+.scope-filter-copy {
+  gap: 0.0625rem;
+}
+
+.scope-filter-kicker,
+.scope-filter-value {
+  display: block;
+  max-width: 100%;
 }
 
 .scope-filter-kicker {
