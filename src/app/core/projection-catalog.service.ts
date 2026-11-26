@@ -2365,9 +2365,11 @@ export class ProjectionCatalogService {
         });
       });
 
-    const rawInvariants = Array.isArray(template?.['invariants'])
+    const rawInvariants = Array.isArray(template?.['invariants']) && template!['invariants'].length > 0
       ? (template!['invariants'] as unknown[])
-      : [];
+      : (Array.isArray(this.record(serverCatalog)?.['invariants'])
+          ? (this.record(serverCatalog)!['invariants'] as unknown[])
+          : []);
     const invariants: DecisionParameterInvariant[] = [];
     for (const rawInvariant of rawInvariants) {
       const inv = this.record(rawInvariant);
@@ -2385,16 +2387,27 @@ export class ProjectionCatalogService {
     if (!serverCatalog || serverCatalog.parameters.length === 0) return null;
     const mappedParameters = serverCatalog.parameters.map((param: DomainRuleParameterDescriptor, index: number) => {
       const meta = uiMetadata.get(param.name);
+      const paramRecord = this.record(param);
+      const serverMeta = this.record(paramRecord?.['metadata']);
+      const rawServerOrder = serverMeta?.['displayOrder'] ?? paramRecord?.['displayOrder'];
+      const serverDisplayOrder = typeof rawServerOrder === 'number' && Number.isInteger(rawServerOrder) && rawServerOrder >= 0
+        ? rawServerOrder
+        : null;
+      const displayOrder = meta?.displayOrder ?? serverDisplayOrder;
+      const label = meta?.label ?? this.stringValue(serverMeta, 'label') ?? this.stringValue(paramRecord, 'label');
+      const description = meta?.description ?? this.stringValue(serverMeta, 'description') ?? this.stringValue(paramRecord, 'description');
+      const legalBasis = meta?.legalBasis ?? this.stringValue(serverMeta, 'legalBasis') ?? this.stringValue(paramRecord, 'legalBasis');
+      const group = meta?.group ?? this.stringValue(serverMeta, 'group') ?? this.stringValue(paramRecord, 'group');
       return {
         index,
-        order: meta?.displayOrder ?? null,
+        order: displayOrder,
         descriptor: {
           name: param.name,
-          label: meta?.label ?? null,
-          description: meta?.description ?? null,
-          legalBasis: meta?.legalBasis ?? null,
-          group: meta?.group ?? null,
-          displayOrder: meta?.displayOrder ?? null,
+          label: label ?? null,
+          description: description ?? null,
+          legalBasis: legalBasis ?? null,
+          group: group ?? null,
+          displayOrder,
           type: param.type,
           required: param.required,
           nullable: param.nullable,

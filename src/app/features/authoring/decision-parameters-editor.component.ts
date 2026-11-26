@@ -1,5 +1,6 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output } from '@angular/core';
-import { localizeGenericUnit } from '../../core/humanize-labels';
+import { humanizeTechnicalSlug, localizeGenericUnit, looksLikeTechnicalSlug } from '../../core/humanize-labels';
 import { PolicyStudioI18n } from '../../core/i18n';
 import type {
   DecisionParameterCatalog,
@@ -39,6 +40,72 @@ const ORDER_COMPARE_OPS: Readonly<Record<string, (left: number, right: number) =
   '>': (left, right) => left > right
 };
 
+export interface DecisionParameterGroup {
+  readonly key: string;
+  readonly label: string;
+  readonly parameters: readonly DecisionParameterDescriptor[];
+}
+
+function normalizeParameterVarName(raw: unknown): string | null {
+  const candidate = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof candidate !== 'string') return null;
+  const trimmed = candidate.trim();
+  const normalized = trimmed.startsWith('parameterValues.')
+    ? trimmed.slice('parameterValues.'.length)
+    : trimmed;
+  return normalized || null;
+}
+
+function collectInvariantParameterNames(node: unknown, target: Set<string>, depth: number): void {
+  if (!node || typeof node !== 'object' || depth > 32) return;
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      collectInvariantParameterNames(item, target, depth + 1);
+    }
+    return;
+  }
+  for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+    if (key === 'var') {
+      const name = normalizeParameterVarName(value);
+      if (name) target.add(name);
+    } else {
+      collectInvariantParameterNames(value, target, depth + 1);
+    }
+  }
+}
+
+/**
+ * Extracts scalar parameter names referenced by {@code {"var": ...}} nodes inside a Contract 1.8
+ * cross-parameter invariant expression.
+ */
+export function extractInvariantParameterNames(expression: unknown): ReadonlySet<string> {
+  const names = new Set<string>();
+  collectInvariantParameterNames(expression, names, 0);
+  return names;
+}
+
+function looseInvariantEquals(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (left === null || left === undefined || right === null || right === undefined) {
+    return false;
+  }
+  if (typeof left === 'number' && typeof right === 'string') {
+    const trimmed = right.trim();
+    return trimmed !== '' && Number.isFinite(Number(trimmed)) && left === Number(trimmed);
+  }
+  if (typeof left === 'string' && typeof right === 'number') {
+    const trimmed = left.trim();
+    return trimmed !== '' && Number.isFinite(Number(trimmed)) && Number(trimmed) === right;
+  }
+  if (typeof left === 'boolean' && typeof right === 'number') {
+    return Number(left) === right;
+  }
+  if (typeof left === 'number' && typeof right === 'boolean') {
+    return left === Number(right);
+  }
+  return false;
+}
+
 function evaluateInvariantOperand(
   node: unknown,
   effectiveValues: Readonly<Record<string, unknown>>
@@ -49,9 +116,9 @@ function evaluateInvariantOperand(
   const entries = Object.entries(node as Record<string, unknown>);
   if (entries.length !== 1) return undefined;
   const [op, raw] = entries[0];
-  if (op === 'var' && typeof raw === 'string') {
-    const key = raw.trim();
-    return Object.prototype.hasOwnProperty.call(effectiveValues, key)
+  if (op === 'var') {
+    const key = normalizeParameterVarName(raw);
+    return key && Object.prototype.hasOwnProperty.call(effectiveValues, key)
       ? effectiveValues[key]
       : undefined;
   }
@@ -110,21 +177,117 @@ export function evaluateParameterInvariant(
     return result === null ? null : !result;
   }
   if (!Array.isArray(raw) || raw.length < 2) return null;
+  if (op in ORDER_COMPARE_OPS) {
+    if (raw.length !== 2 && raw.length !== 3) return null;
+    const values: number[] = [];
+    for (const operand of raw) {
+      const evaluated = evaluateInvariantOperand(operand, effectiveValues);
+      if (typeof evaluated !== 'number' || !Number.isFinite(evaluated)) return null;
+      values.push(evaluated);
+    }
+    const compare = ORDER_COMPARE_OPS[op];
+    for (let i = 0; i < values.length - 1; i++) {
+      if (!compare(values[i]!, values[i + 1]!)) return false;
+    }
+    return true;
+  }
   const left = evaluateInvariantOperand(raw[0], effectiveValues);
   const right = evaluateInvariantOperand(raw[1], effectiveValues);
   if (left === undefined || right === undefined) return null;
-  if (op in ORDER_COMPARE_OPS) {
-    if (typeof left !== 'number' || typeof right !== 'number') return null;
-    return ORDER_COMPARE_OPS[op](left, right);
-  }
-  if (op === '==' || op === '===') return left === right;
-  if (op === '!=' || op === '!==') return left !== right;
+  if (op === '===') return left === right;
+  if (op === '!==') return left !== right;
+  if (op === '==') return looseInvariantEquals(left, right);
+  if (op === '!=') return !looseInvariantEquals(left, right);
   return null;
 }
 
 @Component({
   selector: 'pax-decision-parameters-editor',
+  imports: [NgTemplateOutlet],
   template: `
+    <ng-template #parameterFieldTemplate let-descriptor>
+      <div class="parameter-field" [attr.data-testid]="'parameter-field-' + descriptor.name">
+        <label [for]="'param-input-' + descriptor.name">
+          <span>{{ descriptor.label || descriptor.name }}</span>
+          @if (localizedUnit(descriptor.unit); as unitText) {
+            <small class="parameter-unit">({{ unitText }})</small>
+          }
+        </label>
+        @if (descriptor.description) {
+          <p [id]="'param-help-' + descriptor.name" class="field-help">{{ descriptor.description }}</p>
+        }
+        @if (descriptor.legalBasis) {
+          <small [id]="'param-legal-' + descriptor.name" class="parameter-legal-basis">
+            <strong>{{ i18n.text('parameterLegalBasis') }}</strong> {{ descriptor.legalBasis }}
+          </small>
+        }
+        @if (descriptor.allowedValues?.length) {
+          <select
+            [id]="'param-input-' + descriptor.name"
+            [disabled]="descriptor.readOnly"
+            [attr.aria-invalid]="isFieldInvalid(descriptor) ? 'true' : null"
+            [attr.aria-describedby]="describedByIds(descriptor)"
+            [value]="stringParameterValue(descriptor)"
+            (change)="updateTemplateValue(descriptor, $any($event.target).value)">
+            @if (descriptor.nullable) {
+              <option value="__NULL__">null</option>
+            }
+            @for (allowed of descriptor.allowedValues; track $index) {
+              <option [value]="stringifyAllowed(allowed)">{{ stringifyAllowed(allowed) }}</option>
+            }
+          </select>
+        } @else if (descriptor.type === 'BOOLEAN') {
+          <select
+            [id]="'param-input-' + descriptor.name"
+            [disabled]="descriptor.readOnly"
+            [attr.aria-invalid]="isFieldInvalid(descriptor) ? 'true' : null"
+            [attr.aria-describedby]="describedByIds(descriptor)"
+            [value]="booleanParameterSelectValue(descriptor)"
+            (change)="updateBooleanValue(descriptor, $any($event.target).value)">
+            @if (descriptor.nullable) {
+              <option value="__NULL__">null</option>
+            }
+            <option value="true">{{ i18n.text('booleanTrue') }}</option>
+            <option value="false">{{ i18n.text('booleanFalse') }}</option>
+          </select>
+        } @else if (descriptor.type === 'NUMBER' || descriptor.type === 'INTEGER') {
+          <input
+            [id]="'param-input-' + descriptor.name"
+            type="number"
+            [disabled]="descriptor.readOnly"
+            [attr.step]="descriptor.type === 'INTEGER' ? '1' : 'any'"
+            [attr.min]="descriptor.minimum ?? null"
+            [attr.max]="descriptor.maximum ?? null"
+            [attr.aria-invalid]="isFieldInvalid(descriptor) ? 'true' : null"
+            [attr.aria-describedby]="describedByIds(descriptor)"
+            [value]="numericParameterValue(descriptor)"
+            (input)="updateNumericValue(descriptor, $any($event.target).value)" />
+        } @else {
+          <input
+            [id]="'param-input-' + descriptor.name"
+            type="text"
+            [disabled]="descriptor.readOnly"
+            [attr.aria-invalid]="isFieldInvalid(descriptor) ? 'true' : null"
+            [attr.aria-describedby]="describedByIds(descriptor)"
+            [value]="stringParameterValue(descriptor)"
+            (input)="updateTemplateValue(descriptor, $any($event.target).value)" />
+        }
+        @if (descriptor.minimum !== null && descriptor.minimum !== undefined || descriptor.maximum !== null && descriptor.maximum !== undefined) {
+          <small [id]="'param-bounds-' + descriptor.name" class="parameter-bounds">
+            @if (descriptor.minimum !== null && descriptor.minimum !== undefined) {
+              <span>{{ i18n.text('parameterMinimumBound') }} {{ descriptor.minimum }}</span>
+            }
+            @if (descriptor.maximum !== null && descriptor.maximum !== undefined) {
+              <span>{{ i18n.text('parameterMaximumBound') }} {{ descriptor.maximum }}</span>
+            }
+          </small>
+        }
+        @if (descriptorError(descriptor); as errorText) {
+          <small [id]="'param-error-' + descriptor.name" class="parameter-error" role="alert">{{ errorText }}</small>
+        }
+      </div>
+    </ng-template>
+
     <div class="parameters-editor" data-testid="decision-parameters-editor">
       @if (templateParameters().length) {
         <section class="parameters-flat-section" data-testid="parameter-template-section">
@@ -134,96 +297,33 @@ export function evaluateParameterInvariant(
               <code class="template-badge">{{ parameterCatalog()!.templateKey }}</code>
             }
           </div>
-          <div class="parameters-grid">
-            @for (descriptor of templateParameters(); track descriptor.name) {
-              <div class="parameter-field" [attr.data-testid]="'parameter-field-' + descriptor.name">
-                <label [for]="'param-input-' + descriptor.name">
-                  <span>{{ descriptor.label || descriptor.name }}</span>
-                  @if (localizedUnit(descriptor.unit); as unitText) {
-                    <small class="parameter-unit">({{ unitText }})</small>
-                  }
-                </label>
-                @if (descriptor.description) {
-                  <p [id]="'param-help-' + descriptor.name" class="field-help">{{ descriptor.description }}</p>
-                }
-                @if (descriptor.legalBasis) {
-                  <small [id]="'param-legal-' + descriptor.name" class="parameter-legal-basis">
-                    <strong>{{ i18n.text('parameterLegalBasis') }}</strong> {{ descriptor.legalBasis }}
-                  </small>
-                }
-                @if (descriptor.allowedValues?.length) {
-                  <select
-                    [id]="'param-input-' + descriptor.name"
-                    [disabled]="descriptor.readOnly"
-                    [attr.aria-invalid]="descriptorError(descriptor) ? 'true' : null"
-                    [attr.aria-describedby]="describedByIds(descriptor)"
-                    [value]="stringParameterValue(descriptor)"
-                    (change)="updateTemplateValue(descriptor, $any($event.target).value)">
-                    @if (descriptor.nullable) {
-                      <option value="__NULL__">null</option>
+          @if (parameterGroups().length) {
+            <div class="parameter-groups">
+              @for (group of parameterGroups(); track group.key) {
+                <fieldset class="parameter-group" [attr.data-testid]="'parameter-group-' + group.key">
+                  <legend>{{ group.label }}</legend>
+                  <div class="parameters-grid">
+                    @for (descriptor of group.parameters; track descriptor.name) {
+                      <ng-container *ngTemplateOutlet="parameterFieldTemplate; context: { $implicit: descriptor }" />
                     }
-                    @for (allowed of descriptor.allowedValues; track $index) {
-                      <option [value]="stringifyAllowed(allowed)">{{ stringifyAllowed(allowed) }}</option>
-                    }
-                  </select>
-                } @else if (descriptor.type === 'BOOLEAN') {
-                  <select
-                    [id]="'param-input-' + descriptor.name"
-                    [disabled]="descriptor.readOnly"
-                    [attr.aria-invalid]="descriptorError(descriptor) ? 'true' : null"
-                    [attr.aria-describedby]="describedByIds(descriptor)"
-                    [value]="booleanParameterSelectValue(descriptor)"
-                    (change)="updateBooleanValue(descriptor, $any($event.target).value)">
-                    @if (descriptor.nullable) {
-                      <option value="__NULL__">null</option>
-                    }
-                    <option value="true">{{ i18n.text('booleanTrue') }}</option>
-                    <option value="false">{{ i18n.text('booleanFalse') }}</option>
-                  </select>
-                } @else if (descriptor.type === 'NUMBER' || descriptor.type === 'INTEGER') {
-                  <input
-                    [id]="'param-input-' + descriptor.name"
-                    type="number"
-                    [disabled]="descriptor.readOnly"
-                    [attr.step]="descriptor.type === 'INTEGER' ? '1' : 'any'"
-                    [attr.min]="descriptor.minimum ?? null"
-                    [attr.max]="descriptor.maximum ?? null"
-                    [attr.aria-invalid]="descriptorError(descriptor) ? 'true' : null"
-                    [attr.aria-describedby]="describedByIds(descriptor)"
-                    [value]="numericParameterValue(descriptor)"
-                    (input)="updateNumericValue(descriptor, $any($event.target).value)" />
-                } @else {
-                  <input
-                    [id]="'param-input-' + descriptor.name"
-                    type="text"
-                    [disabled]="descriptor.readOnly"
-                    [attr.aria-invalid]="descriptorError(descriptor) ? 'true' : null"
-                    [attr.aria-describedby]="describedByIds(descriptor)"
-                    [value]="stringParameterValue(descriptor)"
-                    (input)="updateTemplateValue(descriptor, $any($event.target).value)" />
-                }
-                @if (descriptor.minimum !== null && descriptor.minimum !== undefined || descriptor.maximum !== null && descriptor.maximum !== undefined) {
-                  <small [id]="'param-bounds-' + descriptor.name" class="parameter-bounds">
-                    @if (descriptor.minimum !== null && descriptor.minimum !== undefined) {
-                      <span>{{ i18n.text('parameterMinimumBound') }} {{ descriptor.minimum }}</span>
-                    }
-                    @if (descriptor.maximum !== null && descriptor.maximum !== undefined) {
-                      <span>{{ i18n.text('parameterMaximumBound') }} {{ descriptor.maximum }}</span>
-                    }
-                  </small>
-                }
-                @if (descriptorError(descriptor); as errorText) {
-                  <small [id]="'param-error-' + descriptor.name" class="parameter-error" role="alert">{{ errorText }}</small>
-                }
-              </div>
-            }
-          </div>
+                  </div>
+                </fieldset>
+              }
+            </div>
+          } @else {
+            <div class="parameters-grid">
+              @for (descriptor of templateParameters(); track descriptor.name) {
+                <ng-container *ngTemplateOutlet="parameterFieldTemplate; context: { $implicit: descriptor }" />
+              }
+            </div>
+          }
           @if (invariantStates().length) {
             <div class="parameters-invariants" data-testid="parameter-invariants-section">
               <h4>{{ i18n.text('parameterInvariantsTitle') }}</h4>
               <ul class="invariant-list">
                 @for (state of invariantStates(); track state.invariant.code) {
                   <li
+                    [id]="'parameter-invariant-' + state.invariant.code"
                     class="invariant-item"
                     [class.violated]="state.violated"
                     [attr.data-testid]="'parameter-invariant-' + state.invariant.code"
@@ -315,6 +415,32 @@ export function evaluateParameterInvariant(
     .parameter-field {
       display: grid;
       gap: 0.3rem;
+    }
+    .parameter-field:has([aria-invalid="true"]),
+    .parameter-field:has(:user-invalid) {
+      border-inline-start: 3px solid var(--danger, #b91c1c);
+      padding-inline-start: 0.5rem;
+    }
+    .parameter-groups {
+      display: grid;
+      gap: 0.85rem;
+    }
+    .parameter-group {
+      border: 1px solid var(--line, rgba(15, 23, 42, 0.14));
+      border-radius: 0.45rem;
+      padding: 0.75rem;
+      margin: 0;
+    }
+    .parameter-group:has([aria-invalid="true"]),
+    .parameter-group:has(:user-invalid) {
+      border-color: var(--danger, #b91c1c);
+      background-color: rgba(185, 28, 28, 0.03);
+    }
+    .parameter-group legend {
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding-inline: 0.35rem;
+      color: var(--pax-color-on-surface-variant, #52636a);
     }
     .parameter-field label {
       font-size: 0.78rem;
@@ -409,7 +535,35 @@ export class DecisionParametersEditorComponent {
     const effective = this.effectiveTemplateValues();
     return this.templateInvariants().map(invariant => ({
       invariant,
-      violated: evaluateParameterInvariant(invariant.expression, effective) === false
+      violated: evaluateParameterInvariant(invariant.expression, effective) === false,
+      parameterNames: extractInvariantParameterNames(invariant.expression)
+    }));
+  });
+
+  readonly parameterGroups = computed<readonly DecisionParameterGroup[]>(() => {
+    const params = this.templateParameters();
+    if (!params.some(descriptor => !!descriptor.group?.trim())) {
+      return [];
+    }
+    const grouped = new Map<string, DecisionParameterDescriptor[]>();
+    for (const descriptor of params) {
+      const rawGroup = descriptor.group?.trim() || '__ungrouped__';
+      const bucket = grouped.get(rawGroup);
+      if (bucket) {
+        bucket.push(descriptor);
+      } else {
+        grouped.set(rawGroup, [descriptor]);
+      }
+    }
+    const locale = this.i18n.locale();
+    return Array.from(grouped.entries()).map(([key, items]) => ({
+      key,
+      label: key === '__ungrouped__'
+        ? this.i18n.text('parameterGroupOther')
+        : (looksLikeTechnicalSlug(key) || !/\s/.test(key)
+            ? humanizeTechnicalSlug(key, undefined, locale)
+            : key),
+      parameters: items
     }));
   });
 
@@ -450,6 +604,16 @@ export class DecisionParametersEditorComponent {
     });
   }
 
+  violatedInvariantsFor(paramName: string) {
+    return this.invariantStates().filter(
+      state => state.violated && state.parameterNames.has(paramName)
+    );
+  }
+
+  isFieldInvalid(descriptor: DecisionParameterDescriptor): boolean {
+    return Boolean(this.descriptorError(descriptor) || this.violatedInvariantsFor(descriptor.name).length > 0);
+  }
+
   describedByIds(descriptor: DecisionParameterDescriptor): string | null {
     const ids: string[] = [];
     if (descriptor.description) ids.push(`param-help-${descriptor.name}`);
@@ -461,6 +625,9 @@ export class DecisionParametersEditorComponent {
       ids.push(`param-bounds-${descriptor.name}`);
     }
     if (this.descriptorError(descriptor)) ids.push(`param-error-${descriptor.name}`);
+    for (const state of this.violatedInvariantsFor(descriptor.name)) {
+      ids.push(`parameter-invariant-${state.invariant.code}`);
+    }
     return ids.length ? ids.join(' ') : null;
   }
 

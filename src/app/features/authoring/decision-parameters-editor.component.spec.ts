@@ -7,7 +7,8 @@ import { PolicyStudioI18n } from '../../core/i18n';
 import type { DecisionParameterCatalog } from '../catalog/catalog.fixture';
 import {
   DecisionParametersEditorComponent,
-  evaluateParameterInvariant
+  evaluateParameterInvariant,
+  extractInvariantParameterNames
 } from './decision-parameters-editor.component';
 
 TestBed.initTestEnvironment(BrowserTestingModule, platformBrowserTesting());
@@ -87,8 +88,10 @@ describe('DecisionParametersEditorComponent (Contract 1.8 metadata & invariants)
     const emittedErrors: Array<readonly string[]> = [];
     editor.validationErrorsChanged.subscribe(errs => emittedErrors.push(errs));
 
+    expect(editor.isFieldInvalid(catalog.parameters[0])).toBe(true);
+    expect(editor.isFieldInvalid(catalog.parameters[1])).toBe(true);
     expect(editor.describedByIds(catalog.parameters[0])).toBe(
-      'param-help-minRetroactiveDays param-legal-minRetroactiveDays param-bounds-minRetroactiveDays'
+      'param-help-minRetroactiveDays param-legal-minRetroactiveDays param-bounds-minRetroactiveDays parameter-invariant-MIN_LTE_MAX'
     );
     expect(editor.invariantStates()).toEqual([
       expect.objectContaining({ violated: true })
@@ -99,6 +102,10 @@ describe('DecisionParametersEditorComponent (Contract 1.8 metadata & invariants)
     ]);
 
     paramsSignal.set({ parameterValues: { minRetroactiveDays: 10, maxRetroactiveDays: 60 } });
+    expect(editor.isFieldInvalid(catalog.parameters[0])).toBe(false);
+    expect(editor.describedByIds(catalog.parameters[0])).toBe(
+      'param-help-minRetroactiveDays param-legal-minRetroactiveDays param-bounds-minRetroactiveDays'
+    );
     expect(editor.invariantStates()).toEqual([
       expect.objectContaining({ violated: false })
     ]);
@@ -170,8 +177,67 @@ describe('DecisionParametersEditorComponent (Contract 1.8 metadata & invariants)
       { a: 20, b: 30 }
     )).toBe(true);
     expect(evaluateParameterInvariant(
+      { '<=': [0, { var: 'x' }, 10] },
+      { x: 5 }
+    )).toBe(true);
+    expect(evaluateParameterInvariant(
+      { '<=': [0, { var: 'x' }, 10] },
+      { x: 15 }
+    )).toBe(false);
+    expect(evaluateParameterInvariant(
+      { '==': [{ var: 'days' }, '10'] },
+      { days: 10 }
+    )).toBe(true);
+    expect(evaluateParameterInvariant(
+      { '===': [{ var: 'days' }, '10'] },
+      { days: 10 }
+    )).toBe(false);
+    expect(evaluateParameterInvariant(
       { customOp: [{ var: 'a' }] },
       { a: 10 }
     )).toBeNull();
+    expect(Array.from(extractInvariantParameterNames(
+      { '<=': [{ var: 'parameterValues.minDays' }, { var: 'maxDays' }] }
+    ))).toEqual(['minDays', 'maxDays']);
+  });
+
+  it('renders semantic fieldset legends for grouped parameters and propagates aria-invalid across violated invariant controls', () => {
+    const fixture = TestBed.createComponent(DecisionParametersEditorComponent);
+    const catalogSignal = signal<DecisionParameterCatalog | null>(createBoundsCatalog());
+    const paramsSignal = signal<Readonly<Record<string, unknown>>>({
+      parameterValues: { minRetroactiveDays: 90, maxRetroactiveDays: 60 }
+    });
+    Object.defineProperty(fixture.componentInstance, 'parameterCatalog', {
+      configurable: true,
+      value: catalogSignal
+    });
+    Object.defineProperty(fixture.componentInstance, 'parameters', {
+      configurable: true,
+      value: paramsSignal
+    });
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const fieldset = host.querySelector('fieldset.parameter-group[data-testid="parameter-group-retroatividade"]');
+    expect(fieldset).not.toBeNull();
+    expect(fieldset?.firstElementChild?.tagName.toLowerCase()).toBe('legend');
+    expect(fieldset?.firstElementChild?.textContent?.trim()).toBe('Retroatividade');
+
+    const minInput = host.querySelector('#param-input-minRetroactiveDays') as HTMLInputElement | null;
+    const maxInput = host.querySelector('#param-input-maxRetroactiveDays') as HTMLInputElement | null;
+    const invariantItem = host.querySelector('#parameter-invariant-MIN_LTE_MAX') as HTMLElement | null;
+    expect(minInput?.getAttribute('aria-invalid')).toBe('true');
+    expect(maxInput?.getAttribute('aria-invalid')).toBe('true');
+    expect(minInput?.getAttribute('aria-describedby')).toContain('parameter-invariant-MIN_LTE_MAX');
+    expect(maxInput?.getAttribute('aria-describedby')).toContain('parameter-invariant-MIN_LTE_MAX');
+    expect(invariantItem?.getAttribute('role')).toBe('alert');
+
+    paramsSignal.set({
+      parameterValues: { minRetroactiveDays: 10, maxRetroactiveDays: 60 }
+    });
+    fixture.detectChanges();
+    expect(minInput?.getAttribute('aria-invalid')).toBeNull();
+    expect(maxInput?.getAttribute('aria-invalid')).toBeNull();
+    expect(minInput?.getAttribute('aria-describedby')).not.toContain('parameter-invariant-MIN_LTE_MAX');
   });
 });

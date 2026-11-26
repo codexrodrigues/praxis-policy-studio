@@ -2606,4 +2606,93 @@ describe('ProjectionCatalogService', () => {
       }
     ]);
   });
+
+  it('falls back to server /parameters metadata and invariants when template schema omits them', () => {
+    const config = {
+      mode: 'remote' as const,
+      configApiBaseUrl: '',
+      locale: 'pt-BR' as const,
+      projectionPath: null,
+      initialDecisionKey: null
+    };
+    let summaries: readonly import('../features/catalog/catalog.fixture').DecisionSummary[] = [];
+    service.load('pt-BR', config).subscribe(value => { summaries = value; });
+
+    http.expectOne('/api/praxis/config/domain-rules/definitions/catalog?page=0&limit=12').flush({
+      page: 0, limit: 12, hasMore: false, candidates: [{
+        definitionId: 'def-server-meta',
+        ruleKey: 'tempo.ferias.prazo',
+        version: 1,
+        ruleType: 'validation',
+        status: 'active',
+        contextKey: 'tempo',
+        resourceKey: 'parametro-contagem',
+        serviceKey: 'ergon-showcase'
+      }]
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities').flush({
+      tenantId: 'rio', environment: 'local', definitions: []
+    });
+    http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([]);
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-server-meta').flush({
+      id: 'def-server-meta',
+      ruleKey: 'tempo.ferias.prazo',
+      version: 1,
+      ruleType: 'validation',
+      status: 'active',
+      serviceKey: 'ergon-showcase',
+      definition: { parameterTemplate: { templateKey: 'ergon.ferias:prazo', templateVersion: '1.0', parameters: [] } },
+      parameters: { parameterValues: { minDias: 10, maxDias: 30 } }
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-server-meta/facts').flush({
+      definitionId: 'def-server-meta', ruleKey: 'tempo.ferias.prazo', version: 1,
+      schemaVersion: 'praxis.domain-rule-fact-catalog.v1', facts: []
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-server-meta/parameters').flush({
+      definitionId: 'def-server-meta',
+      ruleKey: 'tempo.ferias.prazo',
+      version: 1,
+      schemaVersion: 'praxis.domain-rule-parameter-catalog.v1',
+      templateKey: 'ergon.ferias:prazo',
+      templateVersion: '1.0',
+      parameters: [
+        {
+          name: 'maxDias', type: 'INTEGER', required: true, nullable: false, readOnly: false,
+          defaultValue: 30, effectiveValue: 30, origin: 'DEFAULT', unit: 'days',
+          metadata: { label: 'Máximo dias', legalBasis: 'Lei 8.112', group: 'ferias-limites', displayOrder: 2 }
+        },
+        {
+          name: 'minDias', type: 'INTEGER', required: true, nullable: false, readOnly: false,
+          defaultValue: 10, effectiveValue: 10, origin: 'DEFAULT', unit: 'days',
+          metadata: { label: 'Mínimo dias', legalBasis: 'Lei 8.112', group: 'ferias-limites', displayOrder: 1 }
+        }
+      ],
+      invariants: [
+        {
+          code: 'FERIAS_MIN_LTE_MAX',
+          message: 'minDias deve ser menor ou igual a maxDias.',
+          condition: {
+            type: 'JSON_LOGIC',
+            expression: { '<=': [{ var: 'minDias' }, { var: 'maxDias' }] }
+          }
+        }
+      ]
+    });
+
+    const catalog = summaries[0]?.parameterCatalog;
+    expect(catalog?.parameters.map(p => p.name)).toEqual(['minDias', 'maxDias']);
+    expect(catalog?.parameters[0]).toMatchObject({
+      label: 'Mínimo dias',
+      legalBasis: 'Lei 8.112',
+      group: 'ferias-limites',
+      displayOrder: 1
+    });
+    expect(catalog?.invariants).toEqual([
+      {
+        code: 'FERIAS_MIN_LTE_MAX',
+        message: 'minDias deve ser menor ou igual a maxDias.',
+        expression: { '<=': [{ var: 'minDias' }, { var: 'maxDias' }] }
+      }
+    ]);
+  });
 });
