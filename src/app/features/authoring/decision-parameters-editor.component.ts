@@ -1,7 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output } from '@angular/core';
 import { localizeGenericUnit } from '../../core/humanize-labels';
 import { PolicyStudioI18n } from '../../core/i18n';
-import type { DecisionParameterCatalog, DecisionParameterDescriptor } from '../catalog/catalog.fixture';
+import type {
+  DecisionParameterCatalog,
+  DecisionParameterDescriptor,
+  DecisionParameterInvariant
+} from '../catalog/catalog.fixture';
 
 export type OperationalPolicySlot = 'validationPolicy' | 'availabilityPolicy' | 'approvalPolicy';
 
@@ -28,6 +32,96 @@ const ALLOWED_ALLOW_PARAMETER_KEYS = new Set([
   'validationMessageTemplate'
 ]);
 
+const ORDER_COMPARE_OPS: Readonly<Record<string, (left: number, right: number) => boolean>> = {
+  '<=': (left, right) => left <= right,
+  '<': (left, right) => left < right,
+  '>=': (left, right) => left >= right,
+  '>': (left, right) => left > right
+};
+
+function evaluateInvariantOperand(
+  node: unknown,
+  effectiveValues: Readonly<Record<string, unknown>>
+): unknown {
+  if (node === null || typeof node === 'boolean' || typeof node === 'string') return node;
+  if (typeof node === 'number') return Number.isFinite(node) ? node : undefined;
+  if (!node || typeof node !== 'object' || Array.isArray(node)) return undefined;
+  const entries = Object.entries(node as Record<string, unknown>);
+  if (entries.length !== 1) return undefined;
+  const [op, raw] = entries[0];
+  if (op === 'var' && typeof raw === 'string') {
+    const key = raw.trim();
+    return Object.prototype.hasOwnProperty.call(effectiveValues, key)
+      ? effectiveValues[key]
+      : undefined;
+  }
+  if (op === '+' && Array.isArray(raw) && raw.length >= 2) {
+    let total = 0;
+    for (const item of raw) {
+      const val = evaluateInvariantOperand(item, effectiveValues);
+      if (typeof val !== 'number' || !Number.isFinite(val)) return undefined;
+      total += val;
+    }
+    return total;
+  }
+  if (op === '-' && Array.isArray(raw) && (raw.length === 1 || raw.length === 2)) {
+    const first = evaluateInvariantOperand(raw[0], effectiveValues);
+    if (typeof first !== 'number' || !Number.isFinite(first)) return undefined;
+    if (raw.length === 1) return -first;
+    const second = evaluateInvariantOperand(raw[1], effectiveValues);
+    if (typeof second !== 'number' || !Number.isFinite(second)) return undefined;
+    return first - second;
+  }
+  return undefined;
+}
+
+/**
+ * Evaluates a cross-parameter Contract 1.8 JSON Logic invariant client-side against resolved
+ * scalar parameter values. Returns `null` when an expression cannot be previewed safely in UI
+ * (failing open so authoritative server enforcement stays definitive).
+ */
+export function evaluateParameterInvariant(
+  expression: unknown,
+  effectiveValues: Readonly<Record<string, unknown>>
+): boolean | null {
+  if (typeof expression === 'boolean') return expression;
+  if (!expression || typeof expression !== 'object' || Array.isArray(expression)) return null;
+  const entries = Object.entries(expression as Record<string, unknown>);
+  if (entries.length !== 1) return null;
+  const [op, raw] = entries[0];
+  if ((op === 'and' || op === 'or') && Array.isArray(raw)) {
+    let indeterminate = false;
+    for (const item of raw) {
+      const result = evaluateParameterInvariant(item, effectiveValues);
+      if (result === null) {
+        indeterminate = true;
+      } else if (op === 'and' && !result) {
+        return false;
+      } else if (op === 'or' && result) {
+        return true;
+      }
+    }
+    if (indeterminate) return null;
+    return op === 'and';
+  }
+  if (op === '!' || op === 'not') {
+    const inner = Array.isArray(raw) ? raw[0] : raw;
+    const result = evaluateParameterInvariant(inner, effectiveValues);
+    return result === null ? null : !result;
+  }
+  if (!Array.isArray(raw) || raw.length < 2) return null;
+  const left = evaluateInvariantOperand(raw[0], effectiveValues);
+  const right = evaluateInvariantOperand(raw[1], effectiveValues);
+  if (left === undefined || right === undefined) return null;
+  if (op in ORDER_COMPARE_OPS) {
+    if (typeof left !== 'number' || typeof right !== 'number') return null;
+    return ORDER_COMPARE_OPS[op](left, right);
+  }
+  if (op === '==' || op === '===') return left === right;
+  if (op === '!=' || op === '!==') return left !== right;
+  return null;
+}
+
 @Component({
   selector: 'pax-decision-parameters-editor',
   template: `
@@ -50,12 +144,19 @@ const ALLOWED_ALLOW_PARAMETER_KEYS = new Set([
                   }
                 </label>
                 @if (descriptor.description) {
-                  <p class="field-help">{{ descriptor.description }}</p>
+                  <p [id]="'param-help-' + descriptor.name" class="field-help">{{ descriptor.description }}</p>
+                }
+                @if (descriptor.legalBasis) {
+                  <small [id]="'param-legal-' + descriptor.name" class="parameter-legal-basis">
+                    <strong>{{ i18n.text('parameterLegalBasis') }}</strong> {{ descriptor.legalBasis }}
+                  </small>
                 }
                 @if (descriptor.allowedValues?.length) {
                   <select
                     [id]="'param-input-' + descriptor.name"
                     [disabled]="descriptor.readOnly"
+                    [attr.aria-invalid]="descriptorError(descriptor) ? 'true' : null"
+                    [attr.aria-describedby]="describedByIds(descriptor)"
                     [value]="stringParameterValue(descriptor)"
                     (change)="updateTemplateValue(descriptor, $any($event.target).value)">
                     @if (descriptor.nullable) {
@@ -69,6 +170,8 @@ const ALLOWED_ALLOW_PARAMETER_KEYS = new Set([
                   <select
                     [id]="'param-input-' + descriptor.name"
                     [disabled]="descriptor.readOnly"
+                    [attr.aria-invalid]="descriptorError(descriptor) ? 'true' : null"
+                    [attr.aria-describedby]="describedByIds(descriptor)"
                     [value]="booleanParameterSelectValue(descriptor)"
                     (change)="updateBooleanValue(descriptor, $any($event.target).value)">
                     @if (descriptor.nullable) {
@@ -85,6 +188,8 @@ const ALLOWED_ALLOW_PARAMETER_KEYS = new Set([
                     [attr.step]="descriptor.type === 'INTEGER' ? '1' : 'any'"
                     [attr.min]="descriptor.minimum ?? null"
                     [attr.max]="descriptor.maximum ?? null"
+                    [attr.aria-invalid]="descriptorError(descriptor) ? 'true' : null"
+                    [attr.aria-describedby]="describedByIds(descriptor)"
                     [value]="numericParameterValue(descriptor)"
                     (input)="updateNumericValue(descriptor, $any($event.target).value)" />
                 } @else {
@@ -92,11 +197,13 @@ const ALLOWED_ALLOW_PARAMETER_KEYS = new Set([
                     [id]="'param-input-' + descriptor.name"
                     type="text"
                     [disabled]="descriptor.readOnly"
+                    [attr.aria-invalid]="descriptorError(descriptor) ? 'true' : null"
+                    [attr.aria-describedby]="describedByIds(descriptor)"
                     [value]="stringParameterValue(descriptor)"
                     (input)="updateTemplateValue(descriptor, $any($event.target).value)" />
                 }
                 @if (descriptor.minimum !== null && descriptor.minimum !== undefined || descriptor.maximum !== null && descriptor.maximum !== undefined) {
-                  <small class="parameter-bounds">
+                  <small [id]="'param-bounds-' + descriptor.name" class="parameter-bounds">
                     @if (descriptor.minimum !== null && descriptor.minimum !== undefined) {
                       <span>{{ i18n.text('parameterMinimumBound') }} {{ descriptor.minimum }}</span>
                     }
@@ -106,11 +213,30 @@ const ALLOWED_ALLOW_PARAMETER_KEYS = new Set([
                   </small>
                 }
                 @if (descriptorError(descriptor); as errorText) {
-                  <small class="parameter-error" role="alert">{{ errorText }}</small>
+                  <small [id]="'param-error-' + descriptor.name" class="parameter-error" role="alert">{{ errorText }}</small>
                 }
               </div>
             }
           </div>
+          @if (invariantStates().length) {
+            <div class="parameters-invariants" data-testid="parameter-invariants-section">
+              <h4>{{ i18n.text('parameterInvariantsTitle') }}</h4>
+              <ul class="invariant-list">
+                @for (state of invariantStates(); track state.invariant.code) {
+                  <li
+                    class="invariant-item"
+                    [class.violated]="state.violated"
+                    [attr.data-testid]="'parameter-invariant-' + state.invariant.code"
+                    [attr.role]="state.violated ? 'alert' : null">
+                    @if (state.violated) {
+                      <strong class="invariant-status">{{ i18n.text('parameterInvariantViolated') }}</strong>
+                    }
+                    <span>{{ state.invariant.message || state.invariant.code }}</span>
+                  </li>
+                }
+              </ul>
+            </div>
+          }
         </section>
       }
 
@@ -205,16 +331,50 @@ const ALLOWED_ALLOW_PARAMETER_KEYS = new Set([
       padding: 0.5rem 0.65rem;
       font-family: inherit;
     }
+    .parameter-field input:focus-visible,
+    .parameter-field select:focus-visible {
+      outline: 3px solid var(--pax-color-primary, #0b57d0);
+      outline-offset: 2px;
+    }
     .parameter-unit,
-    .parameter-bounds {
+    .parameter-bounds,
+    .parameter-legal-basis {
       display: inline-flex;
-      gap: 0.5rem;
-      opacity: 0.75;
+      gap: 0.35rem;
+      color: var(--pax-color-on-surface-variant, #52636a);
       font-size: 0.78rem;
+      line-height: 1.35;
     }
     .parameter-error {
       color: var(--danger, #b91c1c);
       font-size: 0.78rem;
+    }
+    .parameters-invariants {
+      display: grid;
+      gap: 0.45rem;
+      padding: 0.65rem 0.75rem;
+      border: 1px solid var(--line, rgba(15, 23, 42, 0.14));
+      border-radius: 0.45rem;
+      background: var(--pax-color-surface-container-low, rgba(15, 23, 42, 0.03));
+    }
+    .parameters-invariants h4 {
+      margin: 0;
+      font-size: 0.82rem;
+      color: var(--pax-color-on-surface-variant, #52636a);
+    }
+    .invariant-list {
+      margin: 0;
+      padding-inline-start: 1.15rem;
+      display: grid;
+      gap: 0.35rem;
+      font-size: 0.8rem;
+    }
+    .invariant-item.violated {
+      color: var(--danger, #b91c1c);
+      font-weight: 600;
+    }
+    .invariant-status {
+      margin-inline-end: 0.3rem;
     }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -230,6 +390,29 @@ export class DecisionParametersEditorComponent {
     this.parameterCatalog()?.parameters ?? []
   );
 
+  readonly templateInvariants = computed<readonly DecisionParameterInvariant[]>(() =>
+    this.parameterCatalog()?.invariants ?? []
+  );
+
+  protected readonly effectiveTemplateValues = computed<Readonly<Record<string, unknown>>>(() => {
+    const resolved: Record<string, unknown> = {};
+    for (const descriptor of this.templateParameters()) {
+      const value = this.currentTemplateValue(descriptor);
+      if (value !== undefined) {
+        resolved[descriptor.name] = value;
+      }
+    }
+    return resolved;
+  });
+
+  readonly invariantStates = computed(() => {
+    const effective = this.effectiveTemplateValues();
+    return this.templateInvariants().map(invariant => ({
+      invariant,
+      violated: evaluateParameterInvariant(invariant.expression, effective) === false
+    }));
+  });
+
   /**
    * When a governed `parameterTemplate` is present, `DomainRuleParameters.draftCondition`
    * requires that workspace edits only modify `parameters.parameterValues`. Operational
@@ -244,11 +427,19 @@ export class DecisionParametersEditorComponent {
     return null;
   });
 
-  protected readonly validationErrors = computed<readonly string[]>(() => {
+  readonly validationErrors = computed<readonly string[]>(() => {
     const errors: string[] = [];
     for (const descriptor of this.templateParameters()) {
       const err = this.descriptorError(descriptor);
       if (err) errors.push(`${descriptor.name}: ${err}`);
+    }
+    for (const state of this.invariantStates()) {
+      if (state.violated) {
+        errors.push(
+          state.invariant.message
+            || `${this.i18n.text('parameterInvariantViolated')} ${state.invariant.code}`
+        );
+      }
     }
     return errors;
   });
@@ -257,6 +448,20 @@ export class DecisionParametersEditorComponent {
     effect(() => {
       this.validationErrorsChanged.emit(this.validationErrors());
     });
+  }
+
+  describedByIds(descriptor: DecisionParameterDescriptor): string | null {
+    const ids: string[] = [];
+    if (descriptor.description) ids.push(`param-help-${descriptor.name}`);
+    if (descriptor.legalBasis) ids.push(`param-legal-${descriptor.name}`);
+    if (
+      (descriptor.minimum !== null && descriptor.minimum !== undefined)
+      || (descriptor.maximum !== null && descriptor.maximum !== undefined)
+    ) {
+      ids.push(`param-bounds-${descriptor.name}`);
+    }
+    if (this.descriptorError(descriptor)) ids.push(`param-error-${descriptor.name}`);
+    return ids.length ? ids.join(' ') : null;
   }
 
   descriptorError(descriptor: DecisionParameterDescriptor): string | null {

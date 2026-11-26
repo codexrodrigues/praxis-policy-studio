@@ -33,6 +33,7 @@ import {
   DecisionLifecycleSummary,
   DecisionParameterCatalog,
   DecisionParameterDescriptor,
+  DecisionParameterInvariant,
   DecisionParameterValueType,
   DecisionPublicationResult,
   DecisionStageId,
@@ -2337,32 +2338,63 @@ export class ProjectionCatalogService {
     const rawParameters = Array.isArray(template?.['parameters'])
       ? (template!['parameters'] as unknown[])
       : [];
-    const uiMetadata = new Map<string, { label: string | null; description: string | null; expressionPointers: readonly string[] }>();
+    const uiMetadata = new Map<string, {
+      label: string | null;
+      description: string | null;
+      legalBasis: string | null;
+      group: string | null;
+      displayOrder: number | null;
+      expressionPointers: readonly string[];
+    }>();
     rawParameters
       .map(item => this.record(item))
       .filter((item): item is Record<string, unknown> => item !== null && typeof item['name'] === 'string')
       .forEach(item => {
+        const nestedMeta = this.record(item['metadata']);
+        const rawOrder = nestedMeta?.['displayOrder'] ?? item['displayOrder'];
+        const displayOrder = typeof rawOrder === 'number' && Number.isInteger(rawOrder) && rawOrder >= 0
+          ? rawOrder
+          : null;
         uiMetadata.set(String(item['name']).trim(), {
-          label: this.stringValue(item, 'label'),
-          description: this.stringValue(item, 'description'),
+          label: this.stringValue(nestedMeta, 'label') ?? this.stringValue(item, 'label'),
+          description: this.stringValue(nestedMeta, 'description') ?? this.stringValue(item, 'description'),
+          legalBasis: this.stringValue(nestedMeta, 'legalBasis') ?? this.stringValue(item, 'legalBasis'),
+          group: this.stringValue(nestedMeta, 'group') ?? this.stringValue(item, 'group'),
+          displayOrder,
           expressionPointers: this.stringArrayValue(item, 'expressionPointers') ?? []
         });
       });
 
+    const rawInvariants = Array.isArray(template?.['invariants'])
+      ? (template!['invariants'] as unknown[])
+      : [];
+    const invariants: DecisionParameterInvariant[] = [];
+    for (const rawInvariant of rawInvariants) {
+      const inv = this.record(rawInvariant);
+      if (!inv) continue;
+      const code = this.stringValue(inv, 'code');
+      const expression = inv['expression'] ?? this.record(inv['condition'])?.['expression'];
+      if (!code || expression === undefined) continue;
+      invariants.push({
+        code,
+        message: this.stringValue(inv, 'message'),
+        expression
+      });
+    }
+
     if (!serverCatalog || serverCatalog.parameters.length === 0) return null;
-    return {
-      definitionId: serverCatalog.definitionId,
-      ruleKey: serverCatalog.ruleKey,
-      version: serverCatalog.definitionVersion ?? definition?.version ?? 1,
-      schemaVersion: serverCatalog.schemaVersion,
-      templateKey: serverCatalog.templateKey,
-      templateVersion: serverCatalog.templateVersion,
-      parameters: serverCatalog.parameters.map((param: DomainRuleParameterDescriptor) => {
-        const meta = uiMetadata.get(param.name);
-        return {
+    const mappedParameters = serverCatalog.parameters.map((param: DomainRuleParameterDescriptor, index: number) => {
+      const meta = uiMetadata.get(param.name);
+      return {
+        index,
+        order: meta?.displayOrder ?? null,
+        descriptor: {
           name: param.name,
           label: meta?.label ?? null,
           description: meta?.description ?? null,
+          legalBasis: meta?.legalBasis ?? null,
+          group: meta?.group ?? null,
+          displayOrder: meta?.displayOrder ?? null,
           type: param.type,
           required: param.required,
           nullable: param.nullable,
@@ -2376,8 +2408,26 @@ export class ProjectionCatalogService {
           unit: param.unit ?? null,
           origin: param.origin,
           ...(meta?.expressionPointers.length ? { expressionPointers: meta.expressionPointers } : {})
-        };
-      })
+        }
+      };
+    });
+    mappedParameters.sort((left, right) => {
+      if (left.order !== null && right.order !== null && left.order !== right.order) {
+        return left.order - right.order;
+      }
+      if (left.order !== null && right.order === null) return -1;
+      if (left.order === null && right.order !== null) return 1;
+      return left.index - right.index;
+    });
+    return {
+      definitionId: serverCatalog.definitionId,
+      ruleKey: serverCatalog.ruleKey,
+      version: serverCatalog.definitionVersion ?? definition?.version ?? 1,
+      schemaVersion: serverCatalog.schemaVersion,
+      templateKey: serverCatalog.templateKey,
+      templateVersion: serverCatalog.templateVersion,
+      parameters: mappedParameters.map(entry => entry.descriptor),
+      ...(invariants.length > 0 ? { invariants } : {})
     };
   }
 
