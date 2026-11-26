@@ -2465,4 +2465,145 @@ describe('ProjectionCatalogService', () => {
 
     expect(propagatedStatus).toBe(500);
   });
+
+  it('extracts Contract 1.8 nested metadata, sorts by displayOrder, and preserves cross-parameter invariants', () => {
+    const config = {
+      mode: 'remote' as const,
+      configApiBaseUrl: '',
+      locale: 'pt-BR' as const,
+      projectionPath: null,
+      initialDecisionKey: null
+    };
+    let summaries: readonly import('../features/catalog/catalog.fixture').DecisionSummary[] = [];
+    service.load('pt-BR', config).subscribe(value => { summaries = value; });
+
+    http.expectOne('/api/praxis/config/domain-rules/definitions/catalog?page=0&limit=12').flush({
+      page: 0, limit: 12, hasMore: false, candidates: [{
+        definitionId: 'def-c18',
+        ruleKey: 'tempo.frequencia.retro',
+        version: 1,
+        ruleType: 'validation',
+        status: 'active',
+        contextKey: 'tempo',
+        resourceKey: 'frequencia-lancamento',
+        serviceKey: 'ergon-showcase',
+        updatedAt: '2026-11-26T00:00:00Z'
+      }]
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities').flush({
+      tenantId: 'rio', environment: 'local', definitions: []
+    });
+    http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([]);
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-c18').flush({
+      id: 'def-c18',
+      ruleKey: 'tempo.frequencia.retro',
+      version: 1,
+      ruleType: 'validation',
+      status: 'active',
+      serviceKey: 'ergon-showcase',
+      condition: { '<=': [{ var: 'draft.retroactiveDays' }, 60] },
+      definition: {
+        parameterTemplate: {
+          templateKey: 'ergon.frequencia:retroactive-bounds',
+          templateVersion: '1.0',
+          parameters: [
+            {
+              name: 'maxRetroactiveDays',
+              metadata: {
+                label: 'Máximo retroativo',
+                description: 'Limite superior da janela retroativa.',
+                legalBasis: 'Decreto Estadual 123/2025, art. 4',
+                group: 'retroatividade',
+                displayOrder: 2
+              }
+            },
+            {
+              name: 'minRetroactiveDays',
+              metadata: {
+                label: 'Mínimo retroativo',
+                description: 'Limite inferior da janela retroativa.',
+                legalBasis: 'Decreto Estadual 123/2025, art. 3',
+                group: 'retroatividade',
+                displayOrder: 1
+              }
+            },
+            {
+              name: 'graceDays',
+              label: 'Tolerância legada'
+            }
+          ],
+          invariants: [
+            {
+              code: 'MIN_LTE_MAX',
+              message: 'O valor mínimo deve ser menor ou igual ao máximo.',
+              condition: {
+                type: 'JSON_LOGIC',
+                expression: { '<=': [{ var: 'minRetroactiveDays' }, { var: 'maxRetroactiveDays' }] }
+              }
+            }
+          ]
+        }
+      },
+      parameters: {
+        parameterValues: { minRetroactiveDays: 0, maxRetroactiveDays: 60, graceDays: 2 }
+      }
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-c18/facts').flush({
+      definitionId: 'def-c18', ruleKey: 'tempo.frequencia.retro', version: 1,
+      schemaVersion: 'praxis.domain-rule-fact-catalog.v1', facts: []
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-c18/parameters').flush({
+      definitionId: 'def-c18',
+      ruleKey: 'tempo.frequencia.retro',
+      version: 1,
+      schemaVersion: 'praxis.domain-rule-parameter-catalog.v1',
+      templateKey: 'ergon.frequencia:retroactive-bounds',
+      templateVersion: '1.0',
+      parameters: [
+        {
+          name: 'graceDays', type: 'INTEGER', required: true, nullable: false, readOnly: false,
+          defaultValue: 2, declaredValue: 2, effectiveValue: 2, origin: 'DEFAULT',
+          minimum: 0, maximum: 10, unit: 'days'
+        },
+        {
+          name: 'maxRetroactiveDays', type: 'INTEGER', required: true, nullable: false, readOnly: false,
+          defaultValue: 60, declaredValue: 60, effectiveValue: 60, origin: 'DEFAULT',
+          minimum: 1, maximum: 365, unit: 'days'
+        },
+        {
+          name: 'minRetroactiveDays', type: 'INTEGER', required: true, nullable: false, readOnly: false,
+          defaultValue: 0, declaredValue: 0, effectiveValue: 0, origin: 'DEFAULT',
+          minimum: 0, maximum: 30, unit: 'days'
+        }
+      ]
+    });
+
+    expect(summaries).toHaveLength(1);
+    const catalog = summaries[0].parameterCatalog;
+    expect(catalog?.parameters.map(p => p.name)).toEqual([
+      'minRetroactiveDays',
+      'maxRetroactiveDays',
+      'graceDays'
+    ]);
+    expect(catalog?.parameters[0]).toMatchObject({
+      name: 'minRetroactiveDays',
+      label: 'Mínimo retroativo',
+      legalBasis: 'Decreto Estadual 123/2025, art. 3',
+      group: 'retroatividade',
+      displayOrder: 1
+    });
+    expect(catalog?.parameters[2]).toMatchObject({
+      name: 'graceDays',
+      label: 'Tolerância legada',
+      legalBasis: null,
+      displayOrder: null
+    });
+    expect(catalog?.invariants).toEqual([
+      {
+        code: 'MIN_LTE_MAX',
+        message: 'O valor mínimo deve ser menor ou igual ao máximo.',
+        expression: { '<=': [{ var: 'minRetroactiveDays' }, { var: 'maxRetroactiveDays' }] }
+      }
+    ]);
+  });
 });

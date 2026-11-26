@@ -90,6 +90,9 @@ export interface DecisionParameterDescriptor {
   readonly name: string;
   readonly label?: string | null;
   readonly description?: string | null;
+  readonly legalBasis?: string | null;
+  readonly group?: string | null;
+  readonly displayOrder?: number | null;
   readonly type: DecisionParameterValueType;
   readonly required: boolean;
   readonly nullable: boolean;
@@ -105,6 +108,12 @@ export interface DecisionParameterDescriptor {
   readonly expressionPointers?: readonly string[];
 }
 
+export interface DecisionParameterInvariant {
+  readonly code: string;
+  readonly message?: string | null;
+  readonly expression: unknown;
+}
+
 export interface DecisionParameterCatalog {
   readonly definitionId: string;
   readonly ruleKey: string;
@@ -114,6 +123,7 @@ export interface DecisionParameterCatalog {
   readonly templateKey: string | null;
   readonly templateVersion: string | null;
   readonly parameters: readonly DecisionParameterDescriptor[];
+  readonly invariants?: readonly DecisionParameterInvariant[];
 }
 
 export interface DecisionFactAllowedValue {
