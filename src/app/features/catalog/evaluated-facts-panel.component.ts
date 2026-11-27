@@ -301,6 +301,12 @@ import type { DecisionSummary } from './catalog.fixture';
     .evaluated-params-label {
       margin: var(--pax-space-1) 0 0;
     }
+
+    @media (prefers-reduced-motion: reduce) {
+      .toggle-chevron {
+        transition: none;
+      }
+    }
   `]
 })
 export class EvaluatedFactsPanelComponent {

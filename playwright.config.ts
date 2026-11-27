@@ -7,11 +7,17 @@ export default defineConfig({
   testDir: './e2e',
   testIgnore: /\.live\.spec\.ts/,
   outputDir: 'test-results',
+  expect: {
+    timeout: process.env['CI'] ? 20_000 : 10_000
+  },
   fullyParallel: false,
   retries: 0,
   reporter: [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
   use: {
     baseURL,
+    contextOptions: {
+      reducedMotion: 'reduce'
+    },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure'
   },
