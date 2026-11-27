@@ -813,6 +813,12 @@ button.kpi-interactive:focus-visible,
   gap: var(--pax-space-2);
   font-size: var(--pax-text-xs);
 }
+
+@media (prefers-reduced-motion: reduce) {
+  button.kpi-interactive {
+    transition: none;
+  }
+}
 `],
   changeDetection: ChangeDetectionStrategy.OnPush
 })

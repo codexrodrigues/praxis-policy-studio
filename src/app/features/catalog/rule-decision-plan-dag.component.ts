@@ -1243,6 +1243,12 @@ const CANONICAL_STAGES: readonly {
       width: 100%;
       color: var(--pax-color-on-surface-variant, #42545c);
     }
+
+    @media (prefers-reduced-motion: reduce) {
+      .dag-step {
+        transition: none;
+      }
+    }
   `]
 })
 export class RuleDecisionPlanDagComponent {

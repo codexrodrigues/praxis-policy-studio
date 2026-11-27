@@ -382,6 +382,12 @@ let nextTermPopoverId = 0;
       text-decoration: none;
       cursor: pointer;
     }
+
+    @media (prefers-reduced-motion: reduce) {
+      .pax-term-trigger {
+        transition: none;
+      }
+    }
   `
 })
 export class TermPopoverComponent implements OnDestroy {
