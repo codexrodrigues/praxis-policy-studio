@@ -993,19 +993,23 @@ export class ProjectionCatalogService {
     const decisionKind = (definition?.ruleType ?? candidate.ruleType) === 'authorization_policy'
       ? 'AUTHORIZATION' as const
       : 'BUSINESS' as const;
+    const domainLabel = projection.presentationLabels.domain[locale]?.trim() || null;
+    const ruleSetLabel = projection.presentationLabels.ruleSet[locale]?.trim() || null;
     return {
       order: decision.order,
       totalDecisions: projection.decisionRefs.length,
       key: decision.decisionKey,
       code: decision.reasonCode ?? decision.decisionKey,
-      name: decision.presentationLabel || documentation?.title || decision.decisionKey,
-      domain: projection.presentationLabels.domain[locale] ?? projection.ruleSetRef.boundedContextKey,
-      ruleSet: projection.presentationLabels.ruleSet[locale] ?? projection.ruleSetRef.ruleSetKey,
+      name: documentation?.title || decision.presentationLabel || decision.decisionKey,
+      domain: domainLabel ?? projection.ruleSetRef.boundedContextKey,
+      ...(domainLabel ? { domainLabel } : {}),
+      ruleSet: ruleSetLabel ?? projection.ruleSetRef.ruleSetKey,
+      ...(ruleSetLabel ? { ruleSetLabel } : {}),
       ruleSetKey: projection.ruleSetRef.ruleSetKey,
       resourceKey: projection.ruleSetRef.operationalResourceKey?.trim() || null,
       serviceKey: definition?.serviceKey?.trim() || null,
       state: decision.semanticStatus === 'REFERENCE_IMPLEMENTED' ? 'verified' as const : 'technical-draft' as const,
-      meaning: decision.presentationLabel || documentation?.summary || decision.decisionKey,
+      meaning: documentation?.summary || decision.presentationLabel || decision.decisionKey,
       authority: `${projection.authorityEvidence.currentAuthority} · ${projection.authorityEvidence.baselineAuthority}`,
       baselineAuthority: projection.authorityEvidence.baselineAuthority,
       source: decision.semanticSourceRef,
@@ -1192,23 +1196,23 @@ export class ProjectionCatalogService {
       ?? this.localizedText(definitionBody?.['ruleSetLabel'], locale)
       ?? extCandidate.ruleSetLabel?.trim()
       ?? null;
-    const name = this.localizedText(definitionBody?.['labels'], locale)
+    const name = documentation?.title
+      ?? this.localizedText(definitionBody?.['labels'], locale)
       ?? this.localizedText(definitionBody?.['title'], locale)
-      ?? this.stringValue(definitionBody, 'presentationLabel')
       ?? this.stringValue(definitionBody, 'title')
-      ?? documentation?.title
+      ?? this.stringValue(definitionBody, 'presentationLabel')
       ?? (extCandidate.displayName?.trim() || null)
       ?? candidate.ruleKey;
-    const meaning = this.localizedText(definitionBody?.['descriptions'], locale)
+    const meaning = documentation?.summary
+      ?? this.localizedText(definitionBody?.['descriptions'], locale)
       ?? this.localizedText(definitionBody?.['description'], locale)
       ?? this.stringValue(definitionBody, 'description')
       ?? this.stringValue(definitionBody, 'messagePtBr')
       ?? this.operationalPolicyString(parametersBody, 'message')
-      ?? documentation?.summary
+      ?? documentation?.title
       ?? this.localizedText(definitionBody?.['labels'], locale)
       ?? this.localizedText(definitionBody?.['title'], locale)
       ?? this.stringValue(definitionBody, 'presentationLabel')
-      ?? documentation?.title
       ?? candidate.ruleKey;
     const ruleSetKey = this.stringValue(definitionBody, 'ruleSetKey')
       ?? this.stringValue(parametersBody, 'ruleSetKey')
@@ -1565,6 +1569,8 @@ export class ProjectionCatalogService {
   }
 
   private fixtureSummaries(projection: DomainProjection, locale: SupportedLocale): readonly DecisionSummary[] {
+    const domainLabel = projection.presentationLabels.domain[locale]?.trim() || null;
+    const ruleSetLabel = projection.presentationLabels.ruleSet[locale]?.trim() || null;
     return projection.decisionRefs.map(decision => {
       const definitionDocumentation = this.resolveDefinitionDocumentation(null, decision);
       return {
@@ -1572,14 +1578,16 @@ export class ProjectionCatalogService {
         totalDecisions: projection.decisionRefs.length,
         key: decision.decisionKey,
         code: decision.reasonCode ?? decision.decisionKey,
-        name: decision.presentationLabel || definitionDocumentation?.title || decision.decisionKey,
-        domain: projection.presentationLabels.domain[locale] ?? projection.ruleSetRef.boundedContextKey,
-        ruleSet: projection.presentationLabels.ruleSet[locale] ?? projection.ruleSetRef.ruleSetKey,
+        name: definitionDocumentation?.title || decision.presentationLabel || decision.decisionKey,
+        domain: domainLabel ?? projection.ruleSetRef.boundedContextKey,
+        ...(domainLabel ? { domainLabel } : {}),
+        ruleSet: ruleSetLabel ?? projection.ruleSetRef.ruleSetKey,
+        ...(ruleSetLabel ? { ruleSetLabel } : {}),
         ruleSetKey: projection.ruleSetRef.ruleSetKey,
         resourceKey: projection.ruleSetRef.operationalResourceKey?.trim() || null,
         serviceKey: null,
         state: decision.semanticStatus === 'REFERENCE_IMPLEMENTED' ? 'verified' : 'technical-draft',
-        meaning: decision.presentationLabel || definitionDocumentation?.summary || decision.decisionKey,
+        meaning: definitionDocumentation?.summary || decision.presentationLabel || decision.decisionKey,
         authority: `${projection.authorityEvidence.currentAuthority} · ${projection.authorityEvidence.baselineAuthority}`,
         baselineAuthority: projection.authorityEvidence.baselineAuthority,
         source: decision.semanticSourceRef,

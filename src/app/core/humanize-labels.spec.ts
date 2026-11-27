@@ -74,6 +74,15 @@ describe('humanize-labels', () => {
         'Teto financeiro alternativo',
         'business'
       )
+    ).toBe('Teto financeiro alternativo');
+
+    expect(
+      humanizeDecisionTitle(
+        'O valor solicitado deve respeitar o limite do programa.',
+        'GRANT-01',
+        null,
+        'business'
+      )
     ).toBe('O valor solicitado deve respeitar o limite do programa.');
 
     expect(

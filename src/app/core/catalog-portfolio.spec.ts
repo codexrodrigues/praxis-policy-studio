@@ -143,5 +143,30 @@ describe('catalog-portfolio', () => {
       count: 2,
       percentage: 50
     });
+
+    const labeledDecisions: DecisionSummary[] = [
+      makeCatalogRule(10, {
+        domain: 'administracao-pessoal',
+        domainLabel: 'Férias e Prescrição',
+        ruleSet: 'ergon.administracao-pessoal.ferias-gozo.operacional.guardas',
+        ruleSetLabel: 'Guardas operacionais de concessão de férias',
+        ruleSetKey: 'ergon.administracao-pessoal.ferias-gozo.operacional.guardas',
+        name: 'Vínculo funcional'
+      })
+    ];
+    const labeledBusiness = buildCatalogPortfolioSummary(labeledDecisions, 'pt-BR', 'business');
+    expect(labeledBusiness.domains[0]).toMatchObject({
+      domainKey: 'administracao-pessoal',
+      label: 'Férias e Prescrição'
+    });
+    expect(labeledBusiness.domains[0]!.functionalities[0]).toMatchObject({
+      scopeKey: 'ergon.administracao-pessoal.ferias-gozo.operacional.guardas',
+      label: 'Guardas operacionais de concessão de férias'
+    });
+    const labeledTechnical = buildCatalogPortfolioSummary(labeledDecisions, 'pt-BR', 'technical');
+    expect(labeledTechnical.domains[0]?.label).toBe('administracao-pessoal');
+    expect(labeledTechnical.domains[0]!.functionalities[0]?.label).toBe(
+      'ergon.administracao-pessoal.ferias-gozo.operacional.guardas'
+    );
   });
 });

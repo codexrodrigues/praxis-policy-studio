@@ -2695,4 +2695,79 @@ describe('ProjectionCatalogService', () => {
       }
     ]);
   });
+
+  it('prefers curated documentation.title and documentation.summary over negative presentationLabel and messagePtBr and extracts scope labels', () => {
+    let decisions: readonly import('../features/catalog/catalog.fixture').DecisionSummary[] = [];
+    service.load('pt-BR', {
+      mode: 'remote',
+      configApiBaseUrl: '',
+      locale: 'pt-BR',
+      projectionPath: null,
+      initialDecisionKey: null
+    }).subscribe(value => decisions = value);
+
+    http.expectOne('/api/praxis/config/domain-rules/workspaces').flush([]);
+    http.expectOne('/api/praxis/config/domain-rules/definitions/capabilities').flush({
+      tenantId: '1',
+      environment: 'local',
+      definitions: []
+    });
+    http.expectOne(request => request.url.endsWith('/definitions/catalog')).flush({
+      schemaVersion: 'praxis-domain-rule-catalog.v1',
+      page: 0,
+      limit: 12,
+      hasMore: false,
+      candidates: [{
+        definitionId: 'def-didactic',
+        ruleKey: 'product.operacao.ferias.vinculo',
+        version: 1,
+        ruleType: 'selection_eligibility',
+        status: 'active',
+        contextKey: 'administracao-pessoal',
+        resourceKey: 'ergon.administracao-pessoal.ferias-gozo.operacional.guardas',
+        serviceKey: 'praxis-ergon-showcase'
+      }]
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-didactic').flush({
+      id: 'def-didactic',
+      ruleKey: 'product.operacao.ferias.vinculo',
+      version: 1,
+      ruleType: 'selection_eligibility',
+      status: 'active',
+      contextKey: 'administracao-pessoal',
+      resourceKey: 'ergon.administracao-pessoal.ferias-gozo.operacional.guardas',
+      serviceKey: 'praxis-ergon-showcase',
+      definition: {
+        ruleSetKey: 'ergon.administracao-pessoal.ferias-gozo.operacional.guardas',
+        operationalResourceKey: 'administracao-pessoal.ferias-gozo',
+        slotKey: 'operacao.ferias.vinculo',
+        domainLabel: 'Férias e Prescrição',
+        ruleSetLabel: 'Guardas operacionais de concessão de férias',
+        presentationLabels: {
+          domain: { 'pt-BR': 'Férias e Prescrição' },
+          ruleSet: { 'pt-BR': 'Guardas operacionais de concessão de férias' }
+        },
+        labels: { 'pt-BR': 'Título genérico secundário' },
+        presentationLabel: 'CERG-09003 — Período aquisitivo deve pertencer ao vínculo da parcela.',
+        description: 'Período aquisitivo deve pertencer ao vínculo da parcela.',
+        messagePtBr: 'Período aquisitivo deve pertencer ao vínculo da parcela.',
+        documentation: {
+          title: 'Vínculo entre período aquisitivo e parcela de férias',
+          summary: 'Exige que o período aquisitivo pertença à mesma pessoa e vínculo funcional da parcela.'
+        }
+      },
+      condition: { '==': [1, 1] },
+      parameters: {}
+    });
+    http.expectOne('/api/praxis/config/domain-rules/definitions/def-didactic/facts')
+      .flush(factCatalog('def-didactic', 'product.operacao.ferias.vinculo'));
+
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0]?.name).toBe('Vínculo entre período aquisitivo e parcela de férias');
+    expect(decisions[0]?.meaning).toBe(
+      'Exige que o período aquisitivo pertença à mesma pessoa e vínculo funcional da parcela.'
+    );
+    expect(decisions[0]?.domainLabel).toBe('Férias e Prescrição');
+    expect(decisions[0]?.ruleSetLabel).toBe('Guardas operacionais de concessão de férias');
+  });
 });

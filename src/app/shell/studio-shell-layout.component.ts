@@ -213,7 +213,7 @@ export class StudioShellLayoutComponent implements OnInit {
           this.shell.openAccessBridge({
             resourceKey,
             serviceKey: current.serviceKey?.trim() || null,
-            domainLabel: current.domain?.trim() || '',
+            domainLabel: current.domainLabel?.trim() || current.domain?.trim() || '',
             ruleTitle: current.name,
             decisionKey: current.key,
             sensitiveFactsCount: current.facts.filter(

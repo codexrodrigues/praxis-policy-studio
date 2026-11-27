@@ -140,4 +140,50 @@ describe('studio-command-palette', () => {
       badge: 'WF-0999'
     });
   });
+
+  it('prefers ruleSetLabel/domainLabel in business subtitles and matches searches against them', () => {
+    const decision = makeDecision(7, {
+      domain: 'administracao-pessoal',
+      domainLabel: 'Férias e Prescrição',
+      ruleSet: 'ergon.administracao-pessoal.ferias-gozo.operacional.guardas',
+      ruleSetLabel: 'Guardas operacionais de concessão de férias',
+      name: 'Vínculo funcional'
+    });
+
+    const businessResults = buildCommandPaletteResults({
+      query: 'prescricao',
+      decisions: [decision],
+      selected: decision,
+      viewDepth: 'business',
+      locale: 'pt-BR',
+      isRemoteMode: true,
+      hasWorkspace: false,
+      labels: LABELS
+    });
+    const businessDecisionItem = businessResults.find(
+      item => item.kind === 'decision' && item.decision.key === decision.key
+    );
+    expect(businessDecisionItem).toMatchObject({
+      kind: 'decision',
+      subtitle: 'Guardas operacionais de concessão de férias'
+    });
+
+    const technicalResults = buildCommandPaletteResults({
+      query: 'prescricao',
+      decisions: [decision],
+      selected: decision,
+      viewDepth: 'technical',
+      locale: 'pt-BR',
+      isRemoteMode: true,
+      hasWorkspace: false,
+      labels: LABELS
+    });
+    const technicalDecisionItem = technicalResults.find(
+      item => item.kind === 'decision' && item.decision.key === decision.key
+    );
+    expect(technicalDecisionItem).toMatchObject({
+      kind: 'decision',
+      subtitle: 'ergon.administracao-pessoal.ferias-gozo.operacional.guardas'
+    });
+  });
 });

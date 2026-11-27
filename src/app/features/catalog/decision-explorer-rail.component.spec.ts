@@ -226,4 +226,44 @@ describe('DecisionExplorerRailComponent', () => {
     component.toggleFiltersPanel();
     expect(component.filtersPanelOpen()).toBe(true);
   });
+
+  it('prefers domainLabel and ruleSetLabel for domainGroups in business mode and falls back to slugs in technical mode', () => {
+    const component = TestBed.runInInjectionContext(() => new DecisionExplorerRailComponent());
+    const depth = signal<'business' | 'technical'>('business');
+    const items: DecisionSummary[] = [
+      {
+        ...makeDecision(1),
+        decisionStage: undefined,
+        slotOverridePolicy: undefined,
+        domain: 'administracao-pessoal',
+        domainLabel: 'Férias e Prescrição',
+        ruleSet: 'administracao-pessoal.ferias-gozo',
+        ruleSetLabel: 'Concessão de Férias',
+        ruleSetKey: 'ergon.administracao-pessoal.ferias-gozo'
+      },
+      {
+        ...makeDecision(2),
+        decisionStage: undefined,
+        slotOverridePolicy: undefined,
+        domain: 'administracao-pessoal',
+        domainLabel: 'Férias e Prescrição',
+        ruleSet: 'administracao-pessoal.afastamentos',
+        ruleSetLabel: 'Concessão de Afastamentos',
+        ruleSetKey: 'ergon.administracao-pessoal.afastamentos'
+      }
+    ];
+    Object.defineProperty(component, 'decisions', { configurable: true, value: signal(items) });
+    Object.defineProperty(component, 'viewDepth', { configurable: true, value: depth });
+
+    expect(component.globalGroups().map(group => group.label)).toEqual([
+      'Concessão de Afastamentos',
+      'Concessão de Férias'
+    ]);
+
+    depth.set('technical');
+    expect(component.globalGroups().map(group => group.label)).toEqual([
+      'administracao-pessoal.afastamentos',
+      'administracao-pessoal.ferias-gozo'
+    ]);
+  });
 });

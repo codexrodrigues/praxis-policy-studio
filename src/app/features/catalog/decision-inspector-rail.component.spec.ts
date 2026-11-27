@@ -52,4 +52,24 @@ describe('DecisionInspectorRailComponent', () => {
     vi.advanceTimersByTime(1800);
     expect(component.copiedField()).toBeNull();
   });
+
+  it('prefers domainLabel and ruleSetLabel in business mode and falls back to raw slugs in technical mode', () => {
+    const component = TestBed.runInInjectionContext(() => new DecisionInspectorRailComponent());
+    const decision = {
+      domain: 'administracao-pessoal',
+      domainLabel: 'Frequência e Afastamentos',
+      ruleSet: 'administracao-pessoal.afastamentos',
+      ruleSetLabel: 'Concessão de Afastamentos'
+    } as import('../../features/catalog/catalog.fixture').DecisionSummary;
+
+    expect(component.displayDomain(decision)).toBe('Frequência e Afastamentos');
+    expect(component.displayRuleSet(decision)).toBe('Concessão de Afastamentos');
+
+    Object.defineProperty(component, 'viewDepth', {
+      configurable: true,
+      value: signal<'business' | 'technical'>('technical')
+    });
+    expect(component.displayDomain(decision)).toBe('administracao-pessoal');
+    expect(component.displayRuleSet(decision)).toBe('administracao-pessoal.afastamentos');
+  });
 });

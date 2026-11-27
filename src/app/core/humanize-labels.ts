@@ -401,13 +401,13 @@ export function humanizeDecisionTitle(
     return trimmedName || trimmedDidactic || trimmedCode;
   }
 
+  if (trimmedDidactic && !looksLikeTechnicalSlug(trimmedDidactic)) {
+    return trimmedDidactic;
+  }
+
   const withoutCode = stripLeadingDecisionCode(trimmedName, trimmedCode);
   if (withoutCode && !looksLikeTechnicalSlug(withoutCode)) {
     return withoutCode;
-  }
-
-  if (trimmedDidactic && !looksLikeTechnicalSlug(trimmedDidactic)) {
-    return trimmedDidactic;
   }
 
   if (withoutCode) {

@@ -624,7 +624,7 @@ export class ReviewsPageComponent implements OnInit {
         ?? item.documentation?.title
         ?? item.definitionDocumentation?.title
         ?? '';
-      return `${item.name} ${docTitle} ${item.code} ${item.key} ${item.ruleSet} ${item.domain}`
+      return `${item.name} ${docTitle} ${item.code} ${item.key} ${item.ruleSetLabel ?? ''} ${item.domainLabel ?? ''} ${item.ruleSet} ${item.domain}`
         .toLowerCase()
         .includes(query);
     });
@@ -651,6 +651,12 @@ export class ReviewsPageComponent implements OnInit {
   }
 
   displayScope(decision: DecisionSummary): string {
+    if (this.shell.viewDepth() === 'business') {
+      const explicitLabel = decision.ruleSetLabel?.trim() || decision.domainLabel?.trim();
+      if (explicitLabel) {
+        return explicitLabel;
+      }
+    }
     const raw = decision.ruleSet?.trim() || decision.domain?.trim() || '';
     if (!raw || this.shell.viewDepth() === 'technical' || !looksLikeTechnicalSlug(raw)) {
       return raw;

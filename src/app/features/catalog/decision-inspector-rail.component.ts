@@ -69,12 +69,18 @@ export class DecisionInspectorRailComponent {
   }
 
   displayDomain(decision: DecisionSummary): string {
+    if (this.viewDepth() === 'business' && decision.domainLabel?.trim()) {
+      return decision.domainLabel.trim();
+    }
     const raw = decision.domain?.trim() ?? '';
     if (this.viewDepth() === 'technical' || !looksLikeTechnicalSlug(raw)) return raw;
     return humanizeTechnicalSlug(raw, 2, this.i18n.locale()) || raw;
   }
 
   displayRuleSet(decision: DecisionSummary): string {
+    if (this.viewDepth() === 'business' && decision.ruleSetLabel?.trim()) {
+      return decision.ruleSetLabel.trim();
+    }
     const raw = decision.ruleSet?.trim() ?? '';
     if (this.viewDepth() === 'technical' || !looksLikeTechnicalSlug(raw)) return raw;
     return humanizeTechnicalSlug(raw, 2, this.i18n.locale()) || raw;

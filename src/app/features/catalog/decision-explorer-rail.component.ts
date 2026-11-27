@@ -293,7 +293,7 @@ export class DecisionExplorerRailComponent {
 
     const distinctDomains = new Set(list.map(item => item.domain?.trim() || 'domain-decisions'));
     const groupByFunctionality = distinctDomains.size <= 1;
-    const byScope = new Map<string, { rawLabel: string; items: DecisionSummary[] }>();
+    const byScope = new Map<string, { rawLabel: string; businessLabel: string | null; items: DecisionSummary[] }>();
     for (const item of list) {
       const key = groupByFunctionality
         ? (item.ruleSetKey?.trim() || item.resourceKey?.trim() || item.domain?.trim() || 'catalog')
@@ -301,20 +301,27 @@ export class DecisionExplorerRailComponent {
       const rawLabel = groupByFunctionality
         ? (item.ruleSet?.trim() || item.resourceKey?.trim() || key)
         : key;
+      const businessLabel = groupByFunctionality
+        ? (item.ruleSetLabel?.trim() || null)
+        : (item.domainLabel?.trim() || null);
       const entry = byScope.get(key);
       if (entry) {
         entry.items.push(item);
+        if (!entry.businessLabel && businessLabel) {
+          entry.businessLabel = businessLabel;
+        }
       } else {
-        byScope.set(key, { rawLabel, items: [item] });
+        byScope.set(key, { rawLabel, businessLabel, items: [item] });
       }
     }
     return [...byScope.entries()]
       .map(([scopeKey, entry]) => ({
         groupKey: `domain:${scopeKey}`,
         label:
-          depth === 'technical' || !looksLikeTechnicalSlug(entry.rawLabel)
+          (depth === 'business' && entry.businessLabel) ||
+          (depth === 'technical' || !looksLikeTechnicalSlug(entry.rawLabel)
             ? entry.rawLabel
-            : (humanizeTechnicalSlug(entry.rawLabel, 2, locale) || entry.rawLabel),
+            : (humanizeTechnicalSlug(entry.rawLabel, 2, locale) || entry.rawLabel)),
         scopeKey: groupByFunctionality || !this.contextScopeFilter() ? scopeKey : null,
         items: entry.items
       }))

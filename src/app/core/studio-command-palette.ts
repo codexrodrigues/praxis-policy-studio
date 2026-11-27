@@ -313,7 +313,14 @@ export function buildCommandPaletteResults(
       input.viewDepth,
       input.locale
     );
-    const searchable = `${decision.code} ${decision.key} ${displayTitle} ${decision.name} ${decision.ruleSet} ${decision.domain}`;
+    const scopeSearch = `${decision.ruleSetLabel ?? ''} ${decision.domainLabel ?? ''} ${decision.ruleSet} ${decision.domain}`;
+    const searchable = `${decision.code} ${decision.key} ${displayTitle} ${decision.name} ${scopeSearch}`;
+    const subtitle =
+      (input.viewDepth === 'business'
+        ? decision.ruleSetLabel?.trim() || decision.domainLabel?.trim()
+        : null) ||
+      decision.ruleSet ||
+      decision.domain;
     const score = normalizedQuery
       ? Math.max(
           scoreMatch(decision.code, normalizedQuery) * 1.4,
@@ -330,7 +337,7 @@ export function buildCommandPaletteResults(
           kind: 'decision',
           id: `decision:${decision.key}`,
           title: displayTitle,
-          subtitle: decision.ruleSet || decision.domain,
+          subtitle,
           badge: decision.code,
           icon: decision.slotOverridePolicy === 'PARAMETERIZABLE' ? 'sliders' : 'circle-dot',
           decision

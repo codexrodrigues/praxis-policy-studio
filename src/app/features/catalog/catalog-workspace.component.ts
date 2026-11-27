@@ -495,7 +495,9 @@ export class CatalogWorkspaceComponent implements OnInit {
 
   meaningText(decision: DecisionSummary): string {
     if (decision.meaning.trim() && decision.meaning.trim() !== decision.name.trim()) return decision.meaning;
-    return `${this.i18n.text('decisionInDecisionSet')} ${decision.ruleSet}.`;
+    const scopeLabel =
+      (this.viewDepth() === 'business' && decision.ruleSetLabel?.trim()) || decision.ruleSet;
+    return `${this.i18n.text('decisionInDecisionSet')} ${scopeLabel}.`;
   }
 
   displayHeaderDomain(decision: DecisionSummary): string {

@@ -150,9 +150,19 @@ export function buildCatalogPortfolioSummary(
     string,
     {
       domainKey: string;
+      domainLabel: string | null;
       totalCount: number;
       activeWorkCount: number;
-      functionalities: Map<string, { scopeKey: string; rawLabel: string; count: number; activeWorkCount: number }>;
+      functionalities: Map<
+        string,
+        {
+          scopeKey: string;
+          rawLabel: string;
+          ruleSetLabel: string | null;
+          count: number;
+          activeWorkCount: number;
+        }
+      >;
     }
   >();
   const typeMap = new Map<string, number>();
@@ -165,15 +175,19 @@ export function buildCatalogPortfolioSummary(
     }
 
     const domainKey = item.domain?.trim() || 'domain-decisions';
+    const itemDomainLabel = item.domainLabel?.trim() || null;
     let domainEntry = domainMap.get(domainKey);
     if (!domainEntry) {
       domainEntry = {
         domainKey,
+        domainLabel: itemDomainLabel,
         totalCount: 0,
         activeWorkCount: 0,
         functionalities: new Map()
       };
       domainMap.set(domainKey, domainEntry);
+    } else if (!domainEntry.domainLabel && itemDomainLabel) {
+      domainEntry.domainLabel = itemDomainLabel;
     }
     domainEntry.totalCount += 1;
     if (isActiveWork) {
@@ -181,16 +195,20 @@ export function buildCatalogPortfolioSummary(
     }
 
     const funcKey = resolveFunctionalityScopeKey(item);
+    const itemRuleSetLabel = item.ruleSetLabel?.trim() || null;
     functionalityKeys.add(funcKey);
     let funcEntry = domainEntry.functionalities.get(funcKey);
     if (!funcEntry) {
       funcEntry = {
         scopeKey: funcKey,
         rawLabel: resolveFunctionalityRawName(item),
+        ruleSetLabel: itemRuleSetLabel,
         count: 0,
         activeWorkCount: 0
       };
       domainEntry.functionalities.set(funcKey, funcEntry);
+    } else if (!funcEntry.ruleSetLabel && itemRuleSetLabel) {
+      funcEntry.ruleSetLabel = itemRuleSetLabel;
     }
     funcEntry.count += 1;
     if (isActiveWork) {
@@ -214,13 +232,19 @@ export function buildCatalogPortfolioSummary(
   const domains: PortfolioDomainCard[] = [...domainMap.values()]
     .map((entry) => ({
       domainKey: entry.domainKey,
-      label: formatPortfolioLabel(entry.domainKey, locale, viewDepth, 2) || entry.domainKey,
+      label:
+        (viewDepth === 'business' && entry.domainLabel) ||
+        formatPortfolioLabel(entry.domainKey, locale, viewDepth, 2) ||
+        entry.domainKey,
       totalCount: entry.totalCount,
       activeWorkCount: entry.activeWorkCount,
       functionalities: [...entry.functionalities.values()]
         .map((func) => ({
           scopeKey: func.scopeKey,
-          label: formatPortfolioLabel(func.rawLabel, locale, viewDepth, 2) || func.scopeKey,
+          label:
+            (viewDepth === 'business' && func.ruleSetLabel) ||
+            formatPortfolioLabel(func.rawLabel, locale, viewDepth, 2) ||
+            func.scopeKey,
           count: func.count,
           activeWorkCount: func.activeWorkCount
         }))

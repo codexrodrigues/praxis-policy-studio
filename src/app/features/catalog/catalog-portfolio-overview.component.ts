@@ -958,6 +958,12 @@ export class CatalogPortfolioOverviewComponent {
   }
 
   displayDecisionScope(decision: DecisionSummary): string {
+    if (this.viewDepthSignal() === 'business') {
+      const explicitLabel = decision.ruleSetLabel?.trim() || decision.domainLabel?.trim();
+      if (explicitLabel) {
+        return explicitLabel;
+      }
+    }
     const raw = decision.ruleSet?.trim() || decision.domain?.trim() || '';
     if (!raw || this.viewDepthSignal() === 'technical' || !looksLikeTechnicalSlug(raw)) {
       return raw;
